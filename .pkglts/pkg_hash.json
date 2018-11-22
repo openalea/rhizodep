@@ -1,0 +1,27 @@
+{
+  "AUTHORS.rst": {
+    "doc.authors": "3S5++7xZFarComZPiTBUFXArFcIIR2PJ/RkNfB4PLkB1GRR/HT/YJT6VqTcG3CQo5/AeAVMODMS+AQGFnLCtTQ==", 
+    "doc.contributors": "Ac1xHbB5q5mQmhiYDeN4wlY1XcXX+3z2O7Y14J0R8PshAShZ7fH6eusQDc1eMXM1tgKvDvo+lZMEc+Ondw9kiw=="
+  }, 
+  "CONTRIBUTING.rst": {}, 
+  "HISTORY.rst": {}, 
+  "LICENSE": {
+    "license": "RbGRVVjgGPhWaPWhqwtq7HHev/U1DkppBYjGN39HbDZ2BDejFc2exfwAH1MiY2HHn+3TgxlvBkg/s/x9hs3aOA=="
+  }, 
+  "README.rst": {
+    "doc": "vmiIOMqGhuXJBom/KrWFzvETfJmbSMcLkvZ6XDTcFWl7XRHJgu1tcb4eHn97TgcziEqpfD96M5qO0DV3z3S+CQ=="
+  }, 
+  "doc/_static/nonempty.txt": {}, 
+  "src/openalea/rhizodep/__init__.py": {
+    "base": "vmiIOMqGhuXJBom/KrWFzvETfJmbSMcLkvZ6XDTcFWl7XRHJgu1tcb4eHn97TgcziEqpfD96M5qO0DV3z3S+CQ=="
+  }, 
+  "src/rhizodep/__init__.py": {
+    "base": "vmiIOMqGhuXJBom/KrWFzvETfJmbSMcLkvZ6XDTcFWl7XRHJgu1tcb4eHn97TgcziEqpfD96M5qO0DV3z3S+CQ=="
+  }, 
+  "test/conftest.py": {
+    "test.pytest_addoption": "I/hswVryIEYvZRBcFqkfRBxLP6eZCwZSbQuPclkOkjHw4MApBst5h7H0ejnMMe4bmwHXMXR5DCSxOMj/FcCnjQ==", 
+    "test.pytest_cmdline_preparse": "Lid4ojpVpBIIn1jpCe1fmfeSeAgYhmIu4K5huJGEMv87/LruGeI0PjWNyONDNXlZrL0CL0BPTKvXlOkEj3jIWA==", 
+    "test.pytest_collection": "a/3h30sLUHJ7xWsOrmfCInOOVXvm660dS+RxHwcDUcae2jHqDLRGhq/v8zgC+FSzN3pXaEaJ1QBJ9MNLOUBuCA==", 
+    "test.pytest_import": "2ox6A0szNpUYZR5cJJRSW3OwEWR558BOiUMjC/OVkTPT++CF/OCgGSELCPL+7YHWaJGQKMw2rtCXmOMeSK5ZJA=="
+  }
+}
