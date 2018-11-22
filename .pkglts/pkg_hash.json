@@ -8,12 +8,31 @@
   "LICENSE": {
     "license": "RbGRVVjgGPhWaPWhqwtq7HHev/U1DkppBYjGN39HbDZ2BDejFc2exfwAH1MiY2HHn+3TgxlvBkg/s/x9hs3aOA=="
   }, 
+  "MANIFEST.in": {
+    "pysetup": "esEBh1caPoq8pmf/PK/qJfwP8PtEXerK/wmXVHWCWc1Qj7m2KMyAYZLkxjdaTC3c+1FQXKKH0zwpg3BF/hcWZg=="
+  }, 
   "README.rst": {
     "doc": "vmiIOMqGhuXJBom/KrWFzvETfJmbSMcLkvZ6XDTcFWl7XRHJgu1tcb4eHn97TgcziEqpfD96M5qO0DV3z3S+CQ=="
   }, 
   "doc/_static/nonempty.txt": {}, 
+  "requirements.txt": {
+    "pysetup": "lCESFMWDvRZdt3JXNu1yhLMZDYudlqB2/1m/sXme+dLYryzCoXx9GqqIwNBuZ4xQBft7AtEMS9Hiy80FhK/JCA=="
+  }, 
+  "requirements_minimal.txt": {
+    "pysetup": "vmiIOMqGhuXJBom/KrWFzvETfJmbSMcLkvZ6XDTcFWl7XRHJgu1tcb4eHn97TgcziEqpfD96M5qO0DV3z3S+CQ=="
+  }, 
+  "setup.cfg": {
+    "pysetup": "t1PI7UmJ8QCtjg+A5tx9/s+BjWYCYuKCI0f38yzMNAIBRlM30VIQPh0CJlveNb4rBM28h6GQ22fsB0TiMvllJg=="
+  }, 
+  "setup.py": {
+    "pysetup.call": "t30iIuCMd/sWxStR2XNYb8bCBgwanhKt8YYn2VKACyAqL5cKFRUWpVRIpAR+uxXUZ9PYYy2csMmECcONnRZE8w==", 
+    "pysetup.kwds": "uR/TownlKDX48whFvTRl/kwoPb6YkHdQYJY/n0mmGXwDWZBuzQE66MWn9enFAbPN9MlslvXBL09sGKC45EbEyA=="
+  }, 
   "src/openalea/rhizodep/__init__.py": {
-    "base": "vmiIOMqGhuXJBom/KrWFzvETfJmbSMcLkvZ6XDTcFWl7XRHJgu1tcb4eHn97TgcziEqpfD96M5qO0DV3z3S+CQ=="
+    "base": "+GVGxVjJGifAp8dAR9V2W3aVPe7/D53bN7r0O5VxO9OUqG4vnGTZvnORu1objjjIwm86DgemQd7ax/IJpRa8Wg=="
+  }, 
+  "src/openalea/rhizodep/version.py": {
+    "version": "Poz1/alXrqr57G/XrSNy7m8tCwJL45bDimFzgZVkWfxClQS4Zyhbm4zL+pAc9GupqQXyNiDqprfJrt6kcuPeMg=="
   }, 
   "src/rhizodep/__init__.py": {
     "base": "vmiIOMqGhuXJBom/KrWFzvETfJmbSMcLkvZ6XDTcFWl7XRHJgu1tcb4eHn97TgcziEqpfD96M5qO0DV3z3S+CQ=="

@@ -1,45 +1,56 @@
 {
   "_pkglts": {
-    "auto_install": true,
-    "install_front_end": "stdout",
-    "use_prompts": false,
+    "auto_install": true, 
+    "install_front_end": "stdout", 
+    "use_prompts": false, 
     "version": 12
-  },
+  }, 
   "base": {
     "authors": [
       [
-        "Frederic Reed",
+        "Frederic Reed", 
         "frederic.rees@inra.fr"
-      ],
+      ], 
       [
-        "Christophe Pradal",
+        "Christophe Pradal", 
         "christophe.pradal@cirad.fr"
       ]
-    ],
-    "namespace": "openalea",
-    "namespace_method": "pkg_util",
-    "pkgname": "rhizodep",
+    ], 
+    "namespace": "openalea", 
+    "namespace_method": "pkg_util", 
+    "pkgname": "rhizodep", 
     "url": null
-  },
+  }, 
   "data": {
     "filetype": [
-      ".json",
+      ".json", 
       ".ini"
-    ],
+    ], 
     "use_ext_dir": false
-  },
+  }, 
   "doc": {
-    "description": "RhizoDeposition",
-    "fmt": "rst",
+    "description": "RhizoDeposition", 
+    "fmt": "rst", 
     "keywords": []
-  },
+  }, 
   "license": {
-    "name": "cecill-c",
-    "organization": "INRA",
-    "project": "{{ base.pkgname }}",
+    "name": "cecill-c", 
+    "organization": "INRA", 
+    "project": "{{ base.pkgname }}", 
     "year": 2018
-  },
+  }, 
+  "pysetup": {
+    "intended_versions": [
+      "36"
+    ], 
+    "require": []
+  }, 
   "test": {
     "suite_name": "pytest"
+  }, 
+  "version": {
+    "major": 0, 
+    "minor": 0, 
+    "post": 1
   }
 }
