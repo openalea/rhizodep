@@ -7,7 +7,7 @@ Development Lead
 
 .. {# pkglts, doc.authors
 
-* Frederic Reed, <frederic.rees@inra.fr>
+* Frederic Rees, <frederic.rees@inra.fr>
 * Christophe Pradal, <christophe.pradal@cirad.fr>
 
 .. #}
