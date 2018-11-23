@@ -6,5 +6,4 @@ rhizodep
 
 .. #}
 
-belle petite description
-
+RhizoDeposition of RSA
