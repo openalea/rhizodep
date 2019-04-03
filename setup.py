@@ -44,10 +44,10 @@ setup_kwds = dict(
     zip_safe=False,
 
     packages=pkgs,
-    namespace_packages=['openalea'],
+    #namespace_packages=['openalea'],
     package_dir={'': 'src'},
-    
-    
+
+
     package_data=pkg_data,
     setup_requires=[
         "pytest-runner",
