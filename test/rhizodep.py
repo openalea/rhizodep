@@ -87,8 +87,9 @@ def plot(g, prop_cmap='radius', cmap='jet', lognorm=False):
     scene = pgl.Scene(shapes.values())
     return scene
 
-# Generating a MTG describing the root system:
-##############################################
+########################################################
+# GENERATION OF A RANDOM MTG DESCRIBING THE ROOT SYSTEM
+########################################################
 
 # Defining a function for generating a MTG:
 # -----------------------------------------
@@ -109,15 +110,8 @@ def tips(g):
     """
     return [vid for vid in g.vertices_iter(scale=1) if g.is_leaf(vid)]
 
-#################################
-# MODULE "ROOT SYSTEM MANAGEMENT"
-#################################
-
-# Defining some properties of the root system:
-##############################################
-
-# Defining the radius of an element:
-# ----------------------------------
+# Defining the radius of a root element:
+# --------------------------------------
 def radius(g, r=0.01,alpha=0.8):
 
     """
@@ -129,7 +123,7 @@ def radius(g, r=0.01,alpha=0.8):
 
     # We initialize an empty dictionary for radius:
     radius = {}
-    # We define "root" as  the starting point of the loop below (i.e. the first apex in the MTG)(?):
+    # We define "root" as  the starting point of the loop below:
     root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
     root = root_gen.next()
 
@@ -151,9 +145,9 @@ def radius(g, r=0.01,alpha=0.8):
     # We return a modified version of the MTG "g" with a new property "radius":
     return g
 
-# Defining the length of each element:
-# ------------------------------------
-def length(g, length=0.05):
+# Defining the length of a root element:
+# --------------------------------------
+def length(g, length=0.01):
 
     """
     The function "length" computes the length (in meter) of each individual root segment in the MTG "g".
@@ -166,6 +160,10 @@ def length(g, length=0.05):
     g.properties()['length'] = _length
     # We return a modified version of the MTG "g" with a new property "length":
     return g
+
+##########################################
+# DEFINITION OF THE PROPERTIES OF THE MTG
+##########################################
 
 # Defining the surface of each root element in contact with the soil:
 # -------------------------------------------------------------------
@@ -191,7 +189,7 @@ def surface_and_volume(g):
         n = g.node(vid)
         # If there is no children to the root element:
         if number_of_children==0:
-            #Then the root element corresponds to an apex considered as a cone
+            # Then the root element corresponds to an apex considered as a cone
             # of height = "length" and radius = "radius":
             n.external_surface = pi * n.radius*sqrt(n.radius**2 + n.length**2)
             n.volume = pi * n.radius**2 * n.length / 3
@@ -214,10 +212,10 @@ def surface_and_volume(g):
 
 # Defining the distance of a vertex from the tip:
 # -----------------------------------------------
-def dist_to_tips(g):
+def dist_to_tip(g):
 
     """
-    The function "dist_to_tips" computes the distance (in meter) of a given vertex from the apex
+    The function "dist_to_tip" computes the distance (in meter) of a given vertex from the apex
     of the corresponding root axis in the MTG "g" based on the properties "length" of all vertices
     [see the function "length"].
     """
@@ -227,7 +225,7 @@ def dist_to_tips(g):
     # We use the property "length" of each vertex based on the function "length":
     length = g.property('length')
 
-    # We define "root" as  the starting point of the loop below (i.e. the first apex in the MTG)(?):
+    # We define "root" as the starting point of the loop below (i.e. the first apex in the MTG)(?):
     root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
     root = root_gen.next()
 
@@ -243,9 +241,9 @@ def dist_to_tips(g):
             # And we calculate the new distance from the tip by adding the distance of the successor and its length:
             to_tips[vid] = to_tips[son_id] + length[son_id]
 
-    # We assign the result "dist_to_tips" as a new property of each vertex in the MTG "g":
-    g.properties()['dist_to_tips'] = to_tips
-    # We return a modified version of the MTG "g" with a new property "dist_to_tips":
+    # We assign the result "dist_to_tip" as a new property of each vertex in the MTG "g":
+    g.properties()['dist_to_tip'] = to_tips
+    # We return a modified version of the MTG "g" with a new property "dist_to_tip":
     return g
 
 # Defining the structural dry biomass of each element:
@@ -273,7 +271,7 @@ def biomass(g, density=0.1e6):
 
 # Setting the initial sugar concentrations for each vertex with default values:
 # ----------------------------------------------------------------------------
-def initial_C_sucrose_root(g, C_sucrose_ref=1e-2):
+def initial_C_sucrose_root(g, C_sucrose_ref=1e-4):
 
     """
     This function sets the concentration of sucrose in the phloem of the root system, C_sucrose_root
@@ -282,7 +280,7 @@ def initial_C_sucrose_root(g, C_sucrose_ref=1e-2):
     sucrose = dict((vid, C_sucrose_ref) for vid in g.vertices_iter(scale=1))
     g.properties()['C_sucrose_root']=sucrose
 
-def initial_C_hexose_root(g, C_hexose_root_ref=0.3e-3):
+def initial_C_hexose_root(g, C_hexose_root_ref=3e-4):
 
     """
     This function sets the concentration of hexose in the root of the root system, C_hexose_root
@@ -291,7 +289,7 @@ def initial_C_hexose_root(g, C_hexose_root_ref=0.3e-3):
     hexose_root = dict((vid, C_hexose_root_ref) for vid in g.vertices_iter(scale=1))
     g.properties()['C_hexose_root']=hexose_root
 
-def initial_C_hexose_soil(g, C_hexose_soil_ref=0.3e-5):
+def initial_C_hexose_soil(g, C_hexose_soil_ref=3e-6):
 
     """
     This function sets the concentration of hexose outside the root of the root system, C_hexose_soil
@@ -310,7 +308,7 @@ def init(g):
     - radius(g)
     - length(g)
     - external_surface(g)
-    - dist_to_tips(g)
+    - dist_to_tip(g)
     - biomass(g)
     - initial_C_sucrose_root(g)
     - initial_C_hexose_root(g)
@@ -320,20 +318,20 @@ def init(g):
     radius(g)
     length(g)
     surface_and_volume(g)
-    dist_to_tips(g)
+    dist_to_tip(g)
     biomass(g)
     initial_C_sucrose_root(g)
     initial_C_hexose_root(g)
     initial_C_hexose_soil(g)
 
 #Calculation of the total amount of sucrose and structural biomass in the root system:
-# ---------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------
 def total_root_sucrose_and_biomass(g):
 
     """
     This function returns two numeric values:
-    i) the total amount of sucrose (total_sucrose_root, in mol of sucrose),
-    ii) the total dry biomass of the root system (g).
+    i) the total amount of sucrose of the root system (total_sucrose_root, in mol of sucrose),
+    ii) the total dry biomass of the root system (total_biomass, in g of dry structural biomass).
     """
 
     # We initialize the values to 0:
@@ -351,16 +349,21 @@ def total_root_sucrose_and_biomass(g):
     # We return a list of two numeric values:
     return total_sucrose_root, total_biomass
 
+######################################
+# MODULE "DISTRIBUTION-TRANSFORMATION"
+######################################
+
 # Unloading of sucrose from the phloem and conversion of sucrose into hexose:
 # --------------------------------------------------------------------------
-def sucrose_to_hexose(g, time=1, Umax_apex=1.8e-5, gamma_unloading=0.4, Km_unloading=6e-6):
+def sucrose_to_hexose(g, time=1, unloading_apex=1.8e-5, gamma_unloading=0.4, Km_unloading=6e-6):
 
     """
     The function "sucrose_to_hexose" simulates the process of sucrose unloading from phloem over time
-    (in seconds) and its immediate conversion into hexose. It returns the variable prod_hexose (in mol),
-    considering that 2 mol of hexose are produced for 1 mol of sucrose.
+    (in seconds) and its immediate conversion into hexose, for a given root element (cylinder or cone)
+    with an external surface (m2). It returns the variable prod_hexose (in mol), considering that 2 mol of hexose
+    are produced for 1 mol of sucrose.
     The unloading of sucrose is represented as an active process with a substrate-limited relationship
-    (Michaelis-Menten function), where Umax (in mol cm-2 s-1) is the maximal amount of sucrose unloading
+    (Michaelis-Menten function), where unloading_coeff (in mol m-2 s-1) is the maximal amount of sucrose unloading
     and Km_unloading (in mol per gram of root structural biomass) represents the sucrose concentration
     for which sucrose_to_hexose is equal to half of its maximum.
     """
@@ -370,9 +373,9 @@ def sucrose_to_hexose(g, time=1, Umax_apex=1.8e-5, gamma_unloading=0.4, Km_unloa
         # n represents the vertex:
         n = g.node(vid)
         # We calculate the unloading coefficient according to the distance from the apex:
-        n.unloading_coeff = Umax_apex / (1 + n.dist_to_tips) ** gamma_unloading
+        n.unloading_coeff = unloading_apex / (1 + n.dist_to_tip) ** gamma_unloading
         # We calculate the production of hexose (in mol) according to the Michaelis-Menten function:
-        n.prod_hexose = 2. * n.external_surface * (n.unloading_coeff * n.C_sucrose_root / (Km_unloading + n.C_sucrose_root)) * time
+        n.prod_hexose = 2. * n.external_surface * n.unloading_coeff * n.C_sucrose_root / (Km_unloading + n.C_sucrose_root) * time
         # The factor 2 originates from the conversion of 1 molecule of sucrose into 2 molecules of hexose.
 
     return g
@@ -443,7 +446,7 @@ def balance(g, time,sucrose_input):
         # USE OF THE PROPERTY "hexose_degradation" CALCULATED IN THE MODULE "SOIL TRANSFORMATION":
         # ----------------------------------------------------------------------------------------
         # The new hexose concentration in the soil is calculated by adding to the initial soil hexose concentration
-        # the input of hexose by net exudation, and by substracting the amount of hexose consumed by microorganisms:
+        # the input of hexose by net exudation, and by subtracting the amount of hexose consumed by microorganisms:
         n.C_hexose_soil = n.C_hexose_soil + n.hexose_exudation / n.biomass - n.hexose_degradation / n.biomass
         # -----------------------------------------------------------------------------------------
         # We create a new property "amount_hexose_soil" which corresponds to the amount of hexose outside the root element:
@@ -519,7 +522,7 @@ def hexose_exudation(g,time=1, Pmax_apex=6.67e-3, gamma_exudation=0.4, Imax=1.8e
         # n represents the vertex:
         n = g.node(vid)
         # We calculate the permeability coefficient P according to the distance from the apex:
-        n.permeability_coeff = Pmax_apex / (1 + n.dist_to_tips) ** gamma_exudation
+        n.permeability_coeff = Pmax_apex / (1 + n.dist_to_tip) ** gamma_exudation
         # hexose_exudation is calculated by the difference between the efflux (by diffusion)
         # and the influx (by Michaelis-Menten) and defined as a new property of the MTG:
         n.hexose_exudation = n.external_surface * (n.permeability_coeff * (n.C_hexose_root - n.C_hexose_soil)
@@ -536,13 +539,12 @@ def hexose_exudation(g,time=1, Pmax_apex=6.67e-3, gamma_exudation=0.4, Imax=1.8e
 def soil_hexose_degradation(g, time=1, degradation_max=1.8e-5, Km_degradation=6e-6):
 
     """
-    The function "hexose_degradation" computes the decrease of the concentration of hexose
-    outside the root (in mol of hexose) over time (in seconds).
-    It mimics the uptake of hexose by rhizosphere microorganisms,
-    and is therefore described using a substrate-limited function (Michaelis-Menten). g represents the MTG
-    describing the root system, degradation_max is the maximal degradation of hexose (mol m-2), and Km_degradation
-    (mol per gram of root structural biomass) represents the hexose concentration for which
-    the rate of hexose_degradation is equal to half of its maximum.
+    The function "hexose_degradation" computes the decrease of the concentration of hexose outside the root (in mol of
+    hexose per gram of root structural biomass) over time (in seconds). It mimics the uptake of hexose by rhizosphere
+    microorganisms, and is therefore described using a substrate-limited function (Michaelis-Menten). g represents the
+    MTG     describing the root system, degradation_max is the maximal degradation of hexose (mol m-2),
+    and Km_degradation (mol per gram of root structural biomass) represents the hexose concentration for which the rate
+    of hexose_degradation is equal to half of its maximum.
     """
 
     # We cover all the vertices in the MTG:
@@ -553,6 +555,35 @@ def soil_hexose_degradation(g, time=1, degradation_max=1.8e-5, Km_degradation=6e
         n.hexose_degradation = n.external_surface * degradation_max * n.C_hexose_soil / (Km_degradation + n.C_hexose_soil) * time
 
 #######################################################################################################################
+
+#########################
+# MODULE "ACTUAL GROWTH"
+#########################
+
+def maintenance(g,time=1, resp_maintenance_max=1, Km_maintenance=1):
+
+    """
+    The function "maintenance" calculates the amount resp_maintenance (mol of CO2) corresponding to the consumption
+    of a part of the local hexose pool to cover the costs of maintenance processes, i.e. any biological process in the
+    root that is NOT linked to the actual growth of the root. The calculation is derived from the model of Thornley and
+    Cannell (2000), who initially used this formalism to describe the residual maintenance costs that could not be
+    accounted for by known processes. The local amount of CO2 respired for maintenance is calculated as a
+    Michaelis-Menten function of the local concentration of hexose "C_hexose_root" (in mol of hexose per gram of root
+    structural biomass. "g" represents the MTG describing the root system, "resp_maintenance__max" (mol of CO2 per gram
+    of root structural biomass per second) is the maximal rate of maintenance respiration, and "Km_maintenance" (mol of
+    hexose per gram of root structural biomass) represents the hexose concentration for which the rate of respiration is
+    equal to half of its maximum. "biomass" is the root structural biomass (g) and time is expressed in seconds.
+    """
+
+    # We cover all the vertices in the MTG:
+    for vid in g.vertices_iter(scale=1):
+        # n represents the vertex:
+        n = g.node(vid)
+        # We calculate the permeability coefficient P according to the distance from the apex:
+        n.resp_maintenance = resp_maintenance_max * n.C_hexose_root / (Km_maintenance + n.C_hexose_root) * n.biomass * time
+    return g
+
+########################################################################################################################
 
 # MAIN PROGRAM:
 ###############
