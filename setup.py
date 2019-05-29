@@ -66,5 +66,8 @@ setup_kwds = dict(
 
 # do not change things below
 # {# pkglts, pysetup.call
+setup_kwds['setup_requires']=[]
+setup_kwds['tests_requires']=[]
+
 setup(**setup_kwds)
 # #}

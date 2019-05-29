@@ -66,11 +66,11 @@ def plot_mtg(g, prop_cmap='radius', cmap='jet', lognorm=False):
 # Emission of adventious/seminal roots:
 #--------------------------------------
 # Maximal number of adventitious roots (including primary)(dimensionless):
-MNP=5
+MNP=1
 # Emission rate of adventious roots (day-1):
 ER=0.5
 # Tip diameter of the emitted root(s) (mm):
-Di=1.2
+Di=0.5
 
 # Elongation:
 #------------
@@ -89,9 +89,9 @@ emergence_delay=3.
 # Branching:
 #-----------
 # Inter-primordium distance (in mm):
-IPD=7.1
+IPD=7.6
 # Average ratio of the diameter of the daughter root to that of the mother root (dimensionless):
-RMD=0.25
+RMD=0.3
 # Relative variation of the daughter root diameter (dimensionless):
 CVDD=0.15
 
