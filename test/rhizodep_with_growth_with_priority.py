@@ -1183,7 +1183,6 @@ def sucrose_to_hexose(g, time_step = 1. * (60.*60.*24.)):
         # We calculate the unloading coefficient according to the distance from the apex:
         # OPTION 1 (Personeni et al. 2007): n.unloading_coeff = unloading_apex / (1 + n.dist_to_tip*100) ** gamma_unloading
         # OPTION 2:
-        # If the element is a growing apex or if it corresponds to a segment where a primordium can emerge
         if n.label=="Apex":
             n.unloading_coeff = unloading_apex
         elif n.lateral_emergence_possibility == "Possible":
