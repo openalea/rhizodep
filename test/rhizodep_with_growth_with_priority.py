@@ -1,5 +1,6 @@
 # Todo: Watch the calculation of surface and volume for the apices - if they correspond to cones, the mass balance for segmentation may not be correct!
 # Todo: Check why changing the time step significantly changes the results!
+# Todo: Impose a delay describing how long the parent segment must sustain the growth of the child
 
 # Importation of functions from the system:
 ###########################################
@@ -8,6 +9,8 @@ from math import sqrt, pi, trunc
 from decimal import Decimal
 import time
 import numpy as np
+import pandas as pd
+import os
 
 from openalea.mtg import *
 from openalea.mtg import turtle as turt
@@ -96,7 +99,6 @@ expected_C_hexose_root = 20./12.01/6.*1e-3
 # Expected hexose concentration in soil (in mol of hexose per g of root):
 expected_C_hexose_soil = expected_C_hexose_root/100.
 # => Explanation: We expect the soil concentration to be 2 orders of magnitude lower than the root concentration
-
 # Permeability coefficient (in g of biomass per m2 per s):
 Pmax_apex = expected_exudation_efflux /(expected_C_hexose_root-expected_C_hexose_soil)/100.
 # => Explanation: We calculate the permeability coefficient according to the expected flux and hexose concentrations.
@@ -409,7 +411,7 @@ def total_print(g):
 
 # Degradation of hexose in the soil (microbial consumption):
 # ---------------------------------------------------------
-def soil_hexose_degradation(g, time_step = 1. * (60.*60.*24.)):
+def soil_hexose_degradation(g, time_step_in_seconds = 1. * (60.*60.*24.)):
 
     """
     The function "hexose_degradation" computes the decrease of the concentration of hexose outside the root (in mol of
@@ -443,7 +445,7 @@ def soil_hexose_degradation(g, time_step = 1. * (60.*60.*24.)):
             n.external_surface, n.volume = surface_and_volume(n,n.radius,n.length)
             # hexose_degradation is defined according to a Michaelis-Menten function as a new property of the MTG:
             potential_hexose_degradation = n.external_surface * degradation_max * n.C_hexose_soil \
-                                   / (Km_degradation + n.C_hexose_soil) * time_step
+                                   / (Km_degradation + n.C_hexose_soil) * time_step_in_seconds
 
         # We modify the concentration of hexose in the soil according to the potential degradation:
         potential_C_hexose_soil = n.C_hexose_soil - potential_hexose_degradation / n.biomass
@@ -467,7 +469,7 @@ def soil_hexose_degradation(g, time_step = 1. * (60.*60.*24.)):
 
 # Exudation of hexose from the root into the soil:
 # ------------------------------------------------
-def root_hexose_exudation(g,time_step = 1. * (60.*60.*24.)):
+def root_hexose_exudation(g,time_step_in_seconds = 1. * (60.*60.*24.)):
 
     """
     The function "root_hexose_exudation" computes the net amount (in mol of hexose) of hexose accumulated
@@ -475,7 +477,7 @@ def root_hexose_exudation(g,time_step = 1. * (60.*60.*24.)):
     outside the root or hexose uptake by the root.
     Exudation corresponds to the difference between the efflux of hexose from the root
     to the soil by a passive diffusion. The efflux by diffusion is calculated from the product of the root external
-    surface (m2), the permeability coefficient (g m-2) and the gradient of hexose concentration (mol per gram of dry
+    surface (m2), the permeability coefficient (g m-2) and the gradient of hexose concentration (mol of hexose per gram of dry
     root structural biomass).
     """
 
@@ -506,7 +508,8 @@ def root_hexose_exudation(g,time_step = 1. * (60.*60.*24.)):
             n.permeability_coeff = Pmax_apex / (1 + n.dist_to_tip*100) ** gamma_exudation
 
         # hexose_exudation is calculated as an efflux by diffusion:
-        potential_hexose_exudation = n.external_surface * n.permeability_coeff * (n.C_hexose_root - n.C_hexose_soil) * time_step
+        potential_hexose_exudation \
+            = n.external_surface * n.permeability_coeff * (n.C_hexose_root - n.C_hexose_soil) * time_step_in_seconds
         # We calculate the concentrations of hexose in the root and in the soil according to this potential:
         potential_C_hexose_root = n.C_hexose_root - potential_hexose_exudation / n.biomass
 
@@ -527,7 +530,7 @@ def root_hexose_exudation(g,time_step = 1. * (60.*60.*24.)):
 
 # Uptake of hexose from the soil by the root:
 # -------------------------------------------
-def root_hexose_uptake(g, time_step=1. * (60. * 60. * 24.)):
+def root_hexose_uptake(g, time_step_in_seconds=1. * (60. * 60. * 24.)):
     """
     The function "root_hexose_uptake" computes the amount (in mol of hexose) of hexose taken up by roots from the soil.
     This influx of hexose is represented as an active process with a substrate-limited
@@ -549,7 +552,8 @@ def root_hexose_uptake(g, time_step=1. * (60. * 60. * 24.)):
             # Otherwise we go to the next element in the MTG:
             continue
 
-        potential_hexose_uptake = n.external_surface * Imax * n.C_hexose_soil / (Km_influx + n.C_hexose_soil) * time_step
+        potential_hexose_uptake \
+            = n.external_surface * Imax * n.C_hexose_soil / (Km_influx + n.C_hexose_soil) * time_step_in_seconds
 
         # We calculate the concentrations of hexose in the root and in the soil according to this potential:
         potential_C_hexose_soil = n.C_hexose_soil - potential_hexose_uptake / n.biomass
@@ -577,7 +581,7 @@ def root_hexose_uptake(g, time_step=1. * (60. * 60. * 24.)):
 ########################################################################################################################
 
 # Function calculating maintenance respiration:
-def maintenance_respiration(g, time_step=1.*(60.*60.*24.)):
+def maintenance_respiration(g, time_step_in_seconds=1.*(60.*60.*24.)):
     """
     The function "maintenance" calculates the amount resp_maintenance (mol of CO2) corresponding to the consumption
     of a part of the local hexose pool to cover the costs of maintenance processes, i.e. any biological process in the
@@ -603,7 +607,7 @@ def maintenance_respiration(g, time_step=1.*(60.*60.*24.)):
 
         # We calculate the number of moles of CO2 generated by maintenance respiration over the time_step:
         n.resp_maintenance = resp_maintenance_max * n.C_hexose_root / (Km_maintenance + n.C_hexose_root) \
-                             * n.biomass * time_step
+                             * n.biomass * time_step_in_seconds
 
         # The new concentration of hexose in the root after maintenance respiration is calculated
         # knowing that 1 mol of hexose generates 6 mol of CO2:
@@ -623,7 +627,7 @@ def maintenance_respiration(g, time_step=1.*(60.*60.*24.)):
 # Main function of apical development:
 #-------------------------------------
 
-def potential_apex_development(apex, time_step = 1. * (60.*60.*24.)):
+def potential_apex_development(apex, time_step_in_seconds = 1. * (60.*60.*24.)):
 
     # The result of this function, new_apex, is initialized as empty:
     new_apex = []
@@ -637,29 +641,29 @@ def potential_apex_development(apex, time_step = 1. * (60.*60.*24.)):
     # CASE 1: THE APEX CORRESPONDS TO THE PRIMORDIUM OF A LATERAL ROOT THAT MAY EMERGE FROM A NORMAL ROOT SEGMENT
     if apex.type == "Normal_root_before_emergence":
         # If the time since primordium formation is higher than the delay of emergence:
-        if apex.time_since_primordium_formation + time_step >= emergence_delay:
-            # The actual time elapsed since the emergence at the end of this time step is calculated:
-            apex.potential_time_since_emergence=apex.time_since_primordium_formation + time_step - emergence_delay
+        if apex.time_since_primordium_formation + time_step_in_seconds >= emergence_delay:
+            # The actual time elapsed at the end of this time step since the emergence is calculated:
+            apex.potential_time_since_emergence=apex.time_since_primordium_formation + time_step_in_seconds - emergence_delay
             # The corresponding elongation of the apex is calculated:
             elongation = EL * 2. * apex.radius * apex.potential_time_since_emergence
             apex.potential_length = apex.length + elongation
             volume = apex.radius ** 2 * pi * apex.potential_length
-            emergence_cost= volume * density * biomass_C_content
+            emergence_cost = volume * density * biomass_C_content
             # We select the segment on which the primordium has been formed:
-            vid=apex.index()
+            vid = apex.index()
             index_parent = g.Father(vid, EdgeType='+')
             parent = g.node(index_parent)
             # The possibility of emergence of a lateral root from the parent
             # and the associated biomass C cost are recorded inside the parent:
-            parent.lateral_emergence_possibility="Possible"
-            parent.emergence_cost=emergence_cost
+            parent.lateral_emergence_possibility = "Possible"
+            parent.emergence_cost = emergence_cost
             # And the new element returned by the function corresponds to the same apex:
             new_apex.append(apex)
             # And the function returns this new apex and stops here:
             return new_apex
         else:
             # Otherwise the time since primordium formation is simply increased by the time step:
-            apex.time_since_primordium_formation += time_step
+            apex.time_since_primordium_formation += time_step_in_seconds
             # And the new element returned by the function corresponds to the same apex:
             new_apex.append(apex)
             # And the function returns this new apex and stops here:
@@ -686,6 +690,8 @@ def potential_apex_development(apex, time_step = 1. * (60.*60.*24.)):
                                volume=0.,
                                biomass=0.,
 
+                               # The concentrations should therefore be 0:
+                               #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                                C_sucrose_root=apex.C_sucrose_root,
                                C_hexose_root=apex.C_hexose_root,
                                C_hexose_soil=apex.C_hexose_soil,
@@ -707,7 +713,7 @@ def potential_apex_development(apex, time_step = 1. * (60.*60.*24.)):
                                time_since_emergence=0.,
                                time_since_growth_stopped=0.,
                                time_since_death=0,
-                               # The distance between this root apex and the last ramification is set to zero:
+                               # The distance between this root apex and the last ramification on this new axis is set to zero:
                                dist_to_ramif=0.)
         # And the new apex now contains the primordium of a lateral root:
         new_apex.append(ramif)
@@ -716,11 +722,11 @@ def potential_apex_development(apex, time_step = 1. * (60.*60.*24.)):
 
     # CASE 3: THE APEX CAN ELONGATE
     if apex.type == "Normal_root_after_emergence":
-        apex.time_since_primordium_formation += time_step
-        apex.time_since_emergence += time_step
+        apex.time_since_primordium_formation += time_step_in_seconds
+        apex.time_since_emergence += time_step_in_seconds
         # ELONGATION OF THE APEX:
         # Elongation is calculated following the rules of Pages et al. (2014):
-        elongation = EL * 2. * apex.radius * time_step
+        elongation = EL * 2. * apex.radius * time_step_in_seconds
         # If the length of the apex is smaller than the defined length of a root segment:
         apex.potential_length = apex.length + elongation
         # The new apex is defined as the modified apex:
@@ -731,7 +737,7 @@ def potential_apex_development(apex, time_step = 1. * (60.*60.*24.)):
 # Main function of radial growth and segment death:
 #--------------------------------------------------
 
-def potential_segment_development(segment, time_step = 1. * (60.*60.*24.)):
+def potential_segment_development(segment, time_step_in_seconds = 1. * (60.*60.*24.)):
 
     # Initialization of variables:
     new_segment=[]
@@ -791,7 +797,7 @@ class Simulate_potential_growth(object):
         root = root_gen.next()
         self._segments = [g.node(v) for v in post_order(g, root) if g.label(v) == 'Segment']
 
-    def step(self, time_step=1.*(60.*60.*24.)):
+    def step(self, time_step_in_seconds=1.*(60.*60.*24.)):
         g = self.g
         # We define "apices" and "segments" as the list of apices and segments in g:
         apices_list = list(self._apices)
@@ -800,23 +806,23 @@ class Simulate_potential_growth(object):
         # For each apex in the list of apices:
         for apex in apices_list:
             # We define the new list of apices with the function apex_development:
-            new_apex = potential_apex_development(apex, time_step)
+            new_apex = potential_apex_development(apex, time_step_in_seconds)
             # We add these new apices to apex:
             self._apices.extend(new_apex)
 
         # For each segment in the list of segments:
         for segment in segments_list:
             # We define the new list of apices with the function apex_development:
-            new_segment = potential_segment_development(segment, time_step)
+            new_segment = potential_segment_development(segment, time_step_in_seconds)
             # We add these new apices to apex:
             self._segments.extend(new_segment)
 
 # We finally define the function that calculates the potential growth of the whole MTG at a given time step:
-def potential_growth(g, time_step = 1. * (60.*60.*24.)):
+def potential_growth(g, time_step_in_seconds = 1. * (60.*60.*24.)):
 
     # We simulate the development of all apices and segments in the MTG:
     simulator = Simulate_potential_growth(g)
-    simulator.step(time_step)
+    simulator.step(time_step_in_seconds=time_step_in_seconds)
 
 ########################################################################################################################
 ########################################################################################################################
@@ -849,9 +855,9 @@ def actual_growth_and_corresponding_respiration(g):
         n = g.node(vid)
 
         # First, we ensure that the element does not correspond to a primordium that has not emerged,
-        # as they are managed through their parent:
+        # as they are managed through their parent. If the element is a primordium:
         if n.type=="Normal_root_before_emergence":
-            # If the element is a primordium, then we pass to the next element in the iteration:
+            # Then we pass to the next element in the iteration:
             continue
 
         # We calculate the initial surface and volume of the element:
@@ -863,7 +869,7 @@ def actual_growth_and_corresponding_respiration(g):
 
         # If the emergence of a primordium is not possible:
         if n.lateral_emergence_possibility != "Possible":
-            # Then there is no emergence cost (else, the emergence cost has already been calculated):
+            # Then the emergence cost is set to 0 (else, the emergence cost has already been calculated):
             n.emergence_cost=0.
 
         # We calculate the number of moles of C included in the biomass potentially produced over the time_step,
@@ -880,6 +886,7 @@ def actual_growth_and_corresponding_respiration(g):
 
         # CASE 1: THE AMOUNT OF HEXOSE AVAILABLE IS NOT LIMITING THE GROWTH OF THE ELEMENT
         # OR THE EMERGENCE OF A PRIMORDIUM:
+
         # If there is enough hexose available at this stage to cover all costs related to the growth of the segment:
         if hexose_growth_demand <= hexose_available:
 
@@ -891,9 +898,9 @@ def actual_growth_and_corresponding_respiration(g):
             # The new dry structural biomass of the element is calculated from its new volume:
             n.biomass = n.volume * density
 
-            # If the emergence of a primordium is possible, then:
+            # If the emergence of a primordium is possible:
             if n.lateral_emergence_possibility == "Possible":
-                # We get the node corresponding to the primordium:
+                # We get the node corresponding to the primordium to be emerged:
                 index_primordium = g.Sons(vid, EdgeType='+')[0]
                 primordium = g.node(index_primordium)
 
@@ -923,6 +930,7 @@ def actual_growth_and_corresponding_respiration(g):
 
         # CASE 2: THE AMOUNT OF HEXOSE AVAILABLE DOES LIMIT THE GROWTH OF THE ELEMENT
         # OR THE EMERGENCE OF A PRIMORDIUM:
+
         # Otherwise, at least one type of growth is limited:
         else:
 
@@ -945,8 +953,8 @@ def actual_growth_and_corresponding_respiration(g):
                 n.length = n.potential_length
                 volume_after_elongation = pi * n.initial_radius ** 2 * n.length
                 # We calculate the remaining amount of hexose after elongation:
-                remaining_hexose = hexose_available - 1. / 6. * (
-                            volume_after_elongation - initial_volume) * density * biomass_C_content / yield_growth
+                remaining_hexose = hexose_available \
+                                   - 1. / 6. * (volume_after_elongation - initial_volume) * density * biomass_C_content / yield_growth
                 # The remaining hexose can still be used for radial growth and primordium emergence.
 
                 # EMERGENCE IS THEN CONSIDERED
@@ -1006,7 +1014,7 @@ def actual_growth_and_corresponding_respiration(g):
                 # The new concentration of sucrose in the root is calculated
                 # according to the initial sucrose concentration and the new biomass:
                 n.C_sucrose_root = n.C_sucrose_root * n.initial_biomass  / n.biomass
-                # The new concentration of hexose in the root is is set to 0 since all hexose has been used:
+                # The new concentration of hexose in the root is set to 0 since all hexose has been used:
                 n.C_hexose_root = 0.
                 # The new concentration of hexose in the soil is calculated
                 # according to the initial soil hexose concentration and the new biomass:
@@ -1021,7 +1029,7 @@ def actual_growth_and_corresponding_respiration(g):
 # SEGMENTATION OF ELONGATED APICES
 ##################################
 
-def segment_formation(apex, time_step=1.*(60.*60.*24.)):
+def segment_formation(apex):
 
     # The result of this function, new_apex, is initialized as empty:
     new_apex = []
@@ -1040,12 +1048,26 @@ def segment_formation(apex, time_step=1.*(60.*60.*24.)):
             n_segments = trunc(apex.length / segment_length) - 1
 
         initial_length = apex.length
+        initial_biomass = apex.biomass
+        initial_resp_maintenance = apex.resp_maintenance
+        initial_resp_growth = apex.resp_growth
+        initial_hexose_exudation = apex.hexose_exudation
+        initial_hexose_uptake = apex.hexose_uptake
+        initial_hexose_degradation = apex.hexose_degradation
+
         # We do an iteration on n-1 segments:
         for i in range(1,n_segments):
             # We define the length of the present element as the length of a segment:
             apex.length = segment_length
+            # We modify the geometrical features of the present element accordingly:
             apex.external_surface, apex.volume = surface_and_volume(apex, apex.radius, apex.length)
             apex.biomass = apex.volume * density
+            # We modify the variables representing total amounts according to the new biomass:
+            apex.resp_maintenance = initial_resp_maintenance * apex.biomass / initial_biomass
+            apex.resp_growth = initial_resp_growth * apex.biomass / initial_biomass
+            apex.hexose_exudation = initial_hexose_exudation * apex.biomass / initial_biomass
+            apex.hexose_uptake = initial_hexose_uptake * apex.biomass / initial_biomass
+            apex.hexose_degradation = initial_hexose_degradation * apex.biomass / initial_biomass
             # The element is now considered as a segment:
             apex.label = 'Segment'
             # And we add a new apex after this segment with the length of a segment:
@@ -1064,24 +1086,32 @@ def segment_formation(apex, time_step=1.*(60.*60.*24.)):
                                 C_hexose_root=apex.C_hexose_root,
                                 C_hexose_soil=apex.C_hexose_soil,
 
-                                resp_maintenance = 0.,
-                                resp_growth = 0.,
-                                hexose_exudation=0.,
-                                hexose_uptake=0.,
-                                hexose_degradation=0.,
-                                specific_net_exudation = 0.,
+                                resp_maintenance = apex.resp_maintenance,
+                                resp_growth = apex.resp_growth,
+                                hexose_exudation=apex.hexose_exudation,
+                                hexose_uptake=apex.hexose_uptake,
+                                hexose_degradation=apex.hexose_degradation,
+                                specific_net_exudation = apex.specific_net_exudation,
 
                                 time_since_primordium_formation=apex.time_since_primordium_formation,
                                 time_since_emergence=apex.time_since_emergence,
-                                time_since_growth_stopped=0.,
+                                time_since_growth_stopped=apex.time_since_growth_stopped,
                                 growth_duration=apex.growth_duration,
                                 life_duration=apex.life_duration,
+
                                 dist_to_ramif=apex.dist_to_ramif + segment_length)
 
         # Finally, we transform the last apex into a segment one last time:
         apex.length = segment_length
-        apex.external_surface,apex.volume = surface_and_volume(apex,apex.radius,apex.length)
+        # We modify the geometrical features of the present element accordingly:
+        apex.external_surface, apex.volume = surface_and_volume(apex, apex.radius, apex.length)
         apex.biomass = apex.volume * density
+        # We modify the variables representing total amounts according to the new biomass:
+        apex.resp_maintenance = initial_resp_maintenance * apex.biomass / initial_biomass
+        apex.resp_growth = initial_resp_growth * apex.biomass / initial_biomass
+        apex.hexose_exudation = initial_hexose_exudation * apex.biomass / initial_biomass
+        apex.hexose_uptake = initial_hexose_uptake * apex.biomass / initial_biomass
+        apex.hexose_degradation = initial_hexose_degradation * apex.biomass / initial_biomass
         # And the element is now considered as a segment:
         apex.label = 'Segment'
         # And we define a new apex after the new defined segment, with a new length defined as:
@@ -1097,12 +1127,12 @@ def segment_formation(apex, time_step=1.*(60.*60.*24.)):
                             C_hexose_root=apex.C_hexose_root,
                             C_hexose_soil=apex.C_hexose_soil,
 
-                            resp_maintenance=0.,
-                            resp_growth=0.,
-                            hexose_exudation=0.,
-                            hexose_uptake=0.,
-                            hexose_degradation=0.,
-                            specific_net_exudation = 0.,
+                            resp_maintenance=apex.resp_maintenance,
+                            resp_growth=apex.resp_growth,
+                            hexose_exudation=apex.hexose_exudation,
+                            hexose_uptake=apex.hexose_uptake,
+                            hexose_degradation=apex.hexose_degradation,
+                            specific_net_exudation = apex.specific_net_exudation,
 
                             time_since_primordium_formation=apex.time_since_primordium_formation,
                             time_since_emergence=apex.time_since_emergence,
@@ -1112,7 +1142,13 @@ def segment_formation(apex, time_step=1.*(60.*60.*24.)):
                             dist_to_ramif = apex.dist_to_ramif + new_length)
 
         apex.external_surface,apex.volume=surface_and_volume(apex,apex.radius,apex.length)
-        apex.biomass=apex.volume * density
+        apex.biomass = apex.volume * density
+        # We modify the variables representing total amounts according to the new biomass:
+        apex.resp_maintenance = initial_resp_maintenance * apex.biomass / initial_biomass
+        apex.resp_growth = initial_resp_growth * apex.biomass / initial_biomass
+        apex.hexose_exudation = initial_hexose_exudation * apex.biomass / initial_biomass
+        apex.hexose_uptake = initial_hexose_uptake * apex.biomass / initial_biomass
+        apex.hexose_degradation = initial_hexose_degradation * apex.biomass / initial_biomass
         # The new apex is defined as the modified apex:
         new_apex.append(apex)
 
@@ -1128,7 +1164,7 @@ class Simulate_segment_formation(object):
         # We define the list of apices for all vertices labelled as "Apex":
         self._apices = [g.node(v) for v in g.vertices_iter(scale=1) if g.label(v)=='Apex']
 
-    def step(self, time_step = 1. * (60.*60.*24.)):
+    def step(self):
         g = self.g
         # We define "apices" and "segments" as the list of apices and segments in g:
         apices_list = list(self._apices)
@@ -1136,16 +1172,16 @@ class Simulate_segment_formation(object):
         # For each apex in the list of apices:
         for apex in apices_list:
             # We define the new list of apices with the function apex_development:
-            new_apex = segment_formation(apex, time_step)
+            new_apex = segment_formation(apex)
             # We add these new apices to apex:
             self._apices.extend(new_apex)
 
 # We finally define the function that calculates segmentation over the whole MTG at a given time step:
-def segmentation(g, time_step = 1. * (60.*60.*24.)):
+def segmentation(g):
 
     # We simulate the segmentation of all apices:
     simulator = Simulate_segment_formation(g)
-    simulator.step(time_step)
+    simulator.step()
 
 ########################################################################################################################
 ########################################################################################################################
@@ -1155,7 +1191,7 @@ def segmentation(g, time_step = 1. * (60.*60.*24.)):
 
 # Unloading of sucrose from the phloem and conversion of sucrose into hexose:
 # --------------------------------------------------------------------------
-def sucrose_to_hexose(g, time_step = 1. * (60.*60.*24.)):
+def sucrose_to_hexose(g, time_step_in_seconds = 1. * (60.*60.*24.)):
 
     """
     The function "sucrose_to_hexose" simulates the process of sucrose unloading from phloem over time
@@ -1192,7 +1228,7 @@ def sucrose_to_hexose(g, time_step = 1. * (60.*60.*24.)):
 
         # We calculate the potential production of hexose (in mol) according to the Michaelis-Menten function:
         potential_prod_hexose = 2. * n.external_surface * n.unloading_coeff * n.C_sucrose_root \
-                        / (Km_unloading + n.C_sucrose_root) * time_step
+                        / (Km_unloading + n.C_sucrose_root) * time_step_in_seconds
         # The factor 2 originates from the conversion of 1 molecule of sucrose into 2 molecules of hexose.
 
         # The new potential sucrose concentration after the conversion is calculated:
@@ -1223,25 +1259,26 @@ def sucrose_to_hexose(g, time_step = 1. * (60.*60.*24.)):
 
 # Calculating the net input of sucrose by the aerial parts into the root system:
 # ------------------------------------------------------------------------------
-def shoot_sucrose_supply_and_spreading(g, C_sucrose_shoot=0.1, total_shoot_biomass = 1.,
-                                       C_sucrose_root=0.1, total_root_biomass = 1.):
+def shoot_sucrose_supply_and_spreading(g, sucrose_unloading_rate=1e-9, time_step_in_seconds=1.):
 
     """
     This function calculates the new root sucrose concentration (mol of sucrose per gram of dry root structural mass)
     AFTER the supply of sucrose from the shoot.
     """
 
+    # The input of sucrose over this time step is calculated
+    # from the sucrose transport rate provided as input of the function:
+    sucrose_input = sucrose_unloading_rate * time_step_in_seconds
+
     # We calculate the remaining amount of sucrose in the root system,
     # based on the current sucrose concentration and biomass of each root element:
     total_sucrose_root, total_biomass = total_root_sucrose_and_biomass(g)
 
     # The new average sucrose concentration in the root system is calculated as:
-    C_sucrose_root_before_supply = total_sucrose_root / total_biomass
+    C_sucrose_root_after_supply = (total_sucrose_root + sucrose_input) / total_biomass
 
-    # [TO COMPLETE: CALCULATIONS FOR CALCULATING THE NEW SUCROSE CONCENTRATION IN THE ROOT AFTER SUPPLY]
-
-    # But for now:
-    new_C_sucrose_root = 0.025 # based on Marion Gauthiers' current modelling of vegetative phase
+    new_C_sucrose_root = C_sucrose_root_after_supply
+    #new_C_sucrose_root = 0.025 based on Marion Gauthiers' current modelling of vegetative phase
 
     # We go through the MTG a second time to modify the sugars concentrations:
     for vid in g.vertices_iter(scale=1):
@@ -1305,49 +1342,115 @@ def mtg_initialization(density=0.1e6):
 # SIMULATION OVER TIME:
 #######################
 
-simulation_period_in_days = 60
+# We initiate the properties of the MTG "g":
+g=mtg_initialization()
+
+# We can check the current directory path:
+print ""
+print "The current directory path is:", os.getcwd()
+
+# We read the data showing the unloading rate of sucrose as a function of time from a file:
+#------------------------------------------------------------------------------------------
+# We first define the path and the file to read as a .csv:
+PATH = os.path.join('C:/','Users', 'frees', 'rhizodep','test','organs_states.csv')
+# Then we read the file and copy it in a dataframe "df":
+df = pd.read_csv(PATH, sep=',')
+# We only keep the two columns of interest:
+df=df[['t','Unloading_Sucrose']]
+# We remove any "NA" in the column of interest:
+df= df[pd.notnull(df['Unloading_Sucrose'])]
+# We remove any values below 0:
+sucrose_input_frame=df[(df.Unloading_Sucrose>=0.)]
+# We reset the indices after having filtered the data:
+sucrose_input_frame=sucrose_input_frame.reset_index(drop=True)
+
+# We define the time constraints of the simulation:
+simulation_period_in_days = 40
 time_step_in_days= 1.
 time_step_in_seconds = time_step_in_days *60.*60.*24.
 
 # We calculate the number of steps necessary to reach the end of the simulation period:
 n_steps=trunc(simulation_period_in_days / time_step_in_days)+1
 
-# We initiate the properties of the MTG "g":
-g=mtg_initialization()
-
-# We do an iteration for each time step:
+# An iteration is done for each time step:
 for step in range(0,n_steps):
 
+    # Defining the rate of transport of sucrose from shoots to roots:
+    #----------------------------------------------------------------
+    # We look for the first item in the time series of sucrose_input_frame for which time is higher
+    # than the current time (a default value of 0 is given otherwise):
+    current_time_in_hours = step * time_step_in_days * 24.
+    considered_time = next((time for time in sucrose_input_frame.t if time > current_time_in_hours), 0)
+    # If the current time in the loop is higher than any time indicated in the dataframe:
+    if considered_time == 0:
+        # Then we use the last value of sucrose unloading rate as the sucrose input rate:
+        sucrose_input_rate = sucrose_input_frame.Unloading_Sucrose[-1]
+    else:
+        # Otherwise, we get the index of the considered time in the list of times from the dataframe:
+        time_series=list(sucrose_input_frame.t)
+        index=time_series.index(considered_time)
+        # If the considered time corresponds to the first item in the list of times from the dataframe:
+        if index==0:
+            # Then we use the first item in the list of unloading rates:
+            sucrose_input_rate = sucrose_input_frame.Unloading_Sucrose[index]
+        else:
+            # Otherwise, we use a linear function between this considered time and the preceding one,
+            # so that we can calculate a plausible value of sucrose unloading rate at the exact time of the loop:
+            x1 = sucrose_input_frame.t[index-1]
+            x2 = sucrose_input_frame.t[index]
+            y1 = sucrose_input_frame.Unloading_Sucrose[index - 1]
+            y2 = sucrose_input_frame.Unloading_Sucrose[index]
+            a = (y2 - y1)/float(x2 - x1)
+            b = y1 - a*x1
+            sucrose_input_rate = a*current_time_in_hours + b
+    # Conversion of sucrose unloading rate from umol_C per hour in mol_sucrose per second:
+    sucrose_input = sucrose_input_rate/12.*1e-6/(60.*60.)
+    #CHEATING TO BE SURE THAT SUCROSE SUPPLY IS NOT AFFECTING THE RESULT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    sucrose_input_rate=1.
+
+    # Using the other functions to simulate the evolution of the MTG:
+    #----------------------------------------------------------------
+
     # 3. Calculation of potential growth without consideration of available hexose:
-    potential_growth(g, time_step=time_step_in_seconds)
+    potential_growth(g, time_step_in_seconds=time_step_in_seconds)
+
     # 1. Consumption of hexose in the soil:
-    soil_hexose_degradation(g, time_step=time_step_in_seconds)
+    soil_hexose_degradation(g, time_step_in_seconds=time_step_in_seconds)
+
     # 2. Transfer of hexose from the root to the soil, consumption of hexose inside the roots:
-    root_hexose_exudation(g, time_step=time_step_in_seconds)
+    root_hexose_exudation(g, time_step_in_seconds=time_step_in_seconds)
     # 2bis. Transfer of hexose from the soil to the root, consumption of hexose in the soil:
-    root_hexose_uptake(g, time_step=time_step_in_seconds)
-    # Consumption of hexose in the root by maintenance respiration:
-    maintenance_respiration(g, time_step=time_step_in_seconds)
+    root_hexose_uptake(g, time_step_in_seconds=time_step_in_seconds)
+
+    # 3. Consumption of hexose in the root by maintenance respiration:
+    maintenance_respiration(g, time_step_in_seconds=time_step_in_seconds)
+
     # 4. Calculation of actual growth based on the hexose remaining in the roots,
     # and corresponding consumption of hexose in the root:
     actual_growth_and_corresponding_respiration(g)
-    segmentation(g, time_step=time_step_in_seconds)
+    segmentation(g)
     dist_to_tip(g)
-    # 5. Supply of sucrose from the shoots to the roots :
-    shoot_sucrose_supply_and_spreading(g)
+
+    # 5. Supply of sucrose from the shoots to the roots and spreading into the whole phloem:
+    # Defining the rate of transfer of sucrose from shoots to roots:
+    shoot_sucrose_supply_and_spreading(g, sucrose_unloading_rate=sucrose_input_rate, time_step_in_seconds=time_step_in_seconds)
+
     # 6. Unloading of sucrose from phloem and conversion of sucrose into hexose:
-    sucrose_to_hexose(g, time_step=time_step_in_seconds)
+    sucrose_to_hexose(g, time_step_in_seconds=time_step_in_seconds)
 
     print ""
     print "At t =", "{:.2f}".format(Decimal(step*time_step_in_days)), "days:"
     print "------------------"
+    print "The input rate of sucrose to the root for time=", current_time_in_hours, "h is", \
+        "{:.2E}".format(Decimal(sucrose_input)), "mol of sucrose per second."
+    print ""
     total_print(g)
 
-    sc = plot_mtg(g, prop_cmap='specific_net_exudation')
+    sc = plot_mtg(g, prop_cmap='hexose_exudation')
     pgl.Viewer.display(sc)
 
     # The following code line enables to wait for 0.2 second between each iteration:
-    time.sleep(0.2)
+    #time.sleep(0.2)
 
 #time.sleep(10)
 raw_input()
