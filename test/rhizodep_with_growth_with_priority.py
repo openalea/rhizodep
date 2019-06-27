@@ -149,11 +149,11 @@ def get_root_visitor():
     def root_visitor(g, v, turtle):
 
         # Angle of branching for roots of order 1:
-        angle_1=random.randint(80,100)
+        angle_1=87. #random.randint(80,100)
         # Angle of branching for roots of order 2:
-        angle_2=random.randint(35,55)
+        angle_2= 45#random.randint(35,55)
         # Angle of branching for roots of higher orders:
-        angle_sup=random.randint(60,80)
+        angle_sup=70#random.randint(60,80)
         angles = [angle_1, angle_2] + [angle_sup] * 20
 
         n = g.node(v)
@@ -169,7 +169,7 @@ def get_root_visitor():
             turtle.down(angle)
         elif g.edge_type(v) == "<":
             #Otherwise the angle is very slightly modified:
-            angle = random.randint(0,3)
+            angle = 2#random.randint(0,3)
             turtle.down(angle)
 
         turtle.setId(v)
@@ -179,18 +179,70 @@ def get_root_visitor():
             # If the child is a lateral root:
             if c.edge_type() == '+':
                 # We set a random radial angle:
-                angle_roll=random.randint(110, 130)
+                angle_roll=120#random.randint(110, 130)
                 turtle.rollL(angle_roll)
             elif c.edge_type == "<":
                 # Otherwise the angle is very slightly modified:
-                angle_roll = random.randint(0, 20)
+                angle_roll = 10#random.randint(0, 20)
                 turtle.rollL(angle_roll)
 
         turtle.F(length)
 
     return root_visitor
 
-def plot_mtg(g, prop_cmap='radius', cmap='jet', lognorm=False):
+def colorbar(g, property_name, cmap='jet',lognorm=True, N=5, fmt='%.1e', vmin=None, vmax=None):
+    fig = color.pyplot.figure(figsize=(8,3))
+    ax = fig.add_axes([0.05, 0.65, 0.9, 0.15])
+
+    prop = g.property(property_name)
+    keys = prop.keys()
+    values = color.np.array(prop.values())
+    if vmin is None:
+        vmin = values.min()
+    if vmax is None:
+        vmax = values.max()
+    #m, M = values.min(), values.max()
+
+    ticks = np.linspace(vmin,vmax,N)
+
+    _cmap = color.get_cmap(cmap)
+    norm = color.Normalize(vmin=vmin, vmax=vmax) if not lognorm else color.LogNorm(vmin=vmin, vmax=vmax)
+    #values = norm(values)
+
+
+    cb = color.mpl.colorbar.ColorbarBase(ax, cmap=_cmap,
+                                   norm=norm,
+                                   ticks=ticks,
+                                   orientation='horizontal')
+    cb.ax.set_xticklabels([fmt%x for x in ticks])# horizontal colorbar
+    cb.set_label(property_name)
+
+    #cb = fig.colorbar(cax, ticks=[_min, (_min+_max)/2., _max], orientation='horizontal')
+
+    color.pyplot.show()
+    return g, cb, fig
+
+def my_colormap(g, property_name, cmap='jet',vmin=None, vmax=None, lognorm=True):
+    """ Compute a color property based on a given property and a colormap.
+
+    """
+    prop = g.property(property_name)
+    keys = prop.keys()
+    values = np.array(prop.values())
+    #m, M = int(values.min()), int(values.max())
+
+    _cmap = color.get_cmap(cmap)
+    norm = color.Normalize(vmin, vmax) if not lognorm else color.LogNorm(vmin, vmax)
+    values = norm(values)
+    #my_colorbar(values, _cmap, norm)
+
+    colors = (_cmap(values)[:,0:3])*255
+    colors = np.array(colors,dtype=np.int).tolist()
+
+    g.properties()['color'] = dict(zip(keys,colors))
+    return g
+
+def plot_mtg(g, prop_cmap='radius', cmap='jet', lognorm=False, vmin=0., vmax=3e-7):
 
     visitor = get_root_visitor()
 
@@ -199,7 +251,7 @@ def plot_mtg(g, prop_cmap='radius', cmap='jet', lognorm=False):
     scene = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
 
     # Compute color from radius
-    color.colormap(g,prop_cmap, cmap=cmap, lognorm=lognorm)
+    my_colormap(g,prop_cmap, cmap=cmap, vmin=vmin, vmax=vmax, lognorm=lognorm)
 
     shapes = dict((sh.getId(),sh) for sh in scene)
 
@@ -1353,6 +1405,9 @@ print "The current directory path is:", os.getcwd()
 #------------------------------------------------------------------------------------------
 # We first define the path and the file to read as a .csv:
 PATH = os.path.join('C:/','Users', 'frees', 'rhizodep','test','organs_states.csv')
+if not os.path.exists(PATH):
+    PATH = 'organs_states.csv'
+
 # Then we read the file and copy it in a dataframe "df":
 df = pd.read_csv(PATH, sep=',')
 # We only keep the two columns of interest:
@@ -1446,7 +1501,7 @@ for step in range(0,n_steps):
     print ""
     total_print(g)
 
-    sc = plot_mtg(g, prop_cmap='hexose_exudation')
+    sc = plot_mtg(g, prop_cmap='hexose_exudation', lognorm=False)
     pgl.Viewer.display(sc)
 
     # The following code line enables to wait for 0.2 second between each iteration:
