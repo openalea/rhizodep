@@ -1427,6 +1427,13 @@ time_step_in_seconds = time_step_in_days *60.*60.*24.
 # We calculate the number of steps necessary to reach the end of the simulation period:
 n_steps=trunc(simulation_period_in_days / time_step_in_days)+1
 
+# Video
+video_dir = 'video'
+if not os.path.exists(video_dir):
+    os.mkdir(video_dir)
+VIDEO=True
+
+image_name=os.path.join(video_dir,'root%.4d.png')
 # An iteration is done for each time step:
 for step in range(0,n_steps):
 
@@ -1503,6 +1510,8 @@ for step in range(0,n_steps):
 
     sc = plot_mtg(g, prop_cmap='hexose_exudation', lognorm=False)
     pgl.Viewer.display(sc)
+    if VIDEO:
+        pgl.Viewer.saveSnapshot(image_name%step)
 
     # The following code line enables to wait for 0.2 second between each iteration:
     #time.sleep(0.2)
