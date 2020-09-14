@@ -30,7 +30,7 @@ import openalea.plantgl.all as pgl
 MNP = 1
 # Emission rate of adventious roots (in s-1):
 # ER = 0.5 day-1
-ER=0.5 / (60.*60.*24.)
+ER = 0.5 / (60.*60.*24.)
 # Tip diameter of the emitted root(in s) ():
 # Di=0.5 mm
 Di = 0.5 / 1000.
@@ -44,7 +44,7 @@ Dmin = 0.05 / 1000.
 # GDs=400. day mm-2
 GDs = 400. * (60.*60.*24.) * 1000.**2.
 # Gravitropism (dimensionless):
-G=1.
+G = 1.
 # Delay of emergence of the primordium (in s):
 # emergence_delay = 3. days
 emergence_delay = 3. * (60.*60.*24.)
@@ -285,7 +285,7 @@ def dist_to_tip(g):
         # If the vertex corresponds to a root apex ("leaf" for a MTG):
         #
         #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        #  WATCH OUT: 'if g.is_leaf(vid):' doesn't work - so an apex is not always a leaf in the model?
+        #  WATCH OUT: 'if g.is_leaf(vid):' doesn't work - so an apex is not always a leaf in the model? !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         vertex=g.node(vid)
         if vertex.label=="Apex":
@@ -670,12 +670,19 @@ def potential_apex_development(apex, time_step_in_seconds = 1. * (60.*60.*24.)):
             return new_apex
 
     # CASE 2: THE APEX CAN FORM A PRIMORDIUM ON ITS SURFACE
+    # NOTE: In this configuration, the primordium is formed at the tip of the apex!
+    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     # We first calculate the radius that the primordium may have. This radius is drawn from a normal distribution
     # whose mean is the value of the mother root diameter multiplied by RMD, and whose standard deviation is
     # the product of this mean and the coefficient of variation CVDD (Pages et al. 2014):
     potential_radius = np.random.normal(apex.radius * RMD, apex.radius * RMD * CVDD)
     # If the distance between the apex and the last emerged root is higher than the inter-primordia distance
     # AND if the potential radius is higher than the minimum diameter:
+
+    # WARNING: If more than 1 primordium should be formed because the apex length is too long, the present code only forms 1!!!!!!!!!!!!!!!!!!!
+    if apex.dist_to_ramif >= 2 * IPD:
+        print "The time step is probably too high, as more than one primordia had to be formed at the same time step on an apex."
+
     if apex.dist_to_ramif >= IPD and potential_radius >= Dmin:
         # Then we add a primordium of a lateral root at the base of the apex:
         ramif = apex.add_child(edge_type='+',
@@ -708,17 +715,16 @@ def potential_apex_development(apex, time_step_in_seconds = 1. * (60.*60.*24.)):
                                life_duration=LDs * potential_radius * potential_radius * 4 * RTD,
                                # The actual time elapsed since the formation of this primordium is calculated
                                # according to the actual growth of the parent apex since formation:
-                               time_since_primordium_formation=(apex.length - (apex.dist_to_ramif - IPD))
-                                                               / (EL * 2. * apex.radius),
+                               time_since_primordium_formation=(apex.dist_to_ramif - IPD) / (EL * 2. * apex.radius),
                                time_since_emergence=0.,
                                time_since_growth_stopped=0.,
                                time_since_death=0,
-                               # The distance between this root apex and the last ramification on this new axis is set to zero:
+                               # The distance between this root apex and the last ramification on this new axis is set to 0:
                                dist_to_ramif=0.)
         # And the new apex now contains the primordium of a lateral root:
         new_apex.append(ramif)
-        # And the new distance between the element and the last ramification is set to 0:
-        apex.dist_to_ramif = 0.
+        # And the new distance between the element and the last ramification is calculated as:
+        apex.dist_to_ramif = apex.dist_to_ramif - IPD
 
     # CASE 3: THE APEX CAN ELONGATE
     if apex.type == "Normal_root_after_emergence":
@@ -944,6 +950,8 @@ def actual_growth_and_corresponding_respiration(g):
                 # Elongation is done according to the amount of hexose available;
                 # no radial growth and no primordium emergence is possible:
                 n.length = length_max
+                print "On segment", n.index() ,"no emergence of primordium was possible because residual hexose was too low !!!"
+                print ""
 
             # SUBCASE 2 - Otherwise, there is enough hexose to perform elongation and at least one other type of growth:
             else:
@@ -1366,7 +1374,7 @@ sucrose_input_frame=sucrose_input_frame.reset_index(drop=True)
 
 # We define the time constraints of the simulation:
 simulation_period_in_days = 40
-time_step_in_days= 1.
+time_step_in_days= 2.
 time_step_in_seconds = time_step_in_days *60.*60.*24.
 
 # We calculate the number of steps necessary to reach the end of the simulation period:
@@ -1404,15 +1412,20 @@ for step in range(0,n_steps):
             b = y1 - a*x1
             sucrose_input_rate = a*current_time_in_hours + b
     # Conversion of sucrose unloading rate from umol_C per hour in mol_sucrose per second:
-    sucrose_input = sucrose_input_rate/12.*1e-6/(60.*60.)
+    sucrose_input_rate = sucrose_input_rate/12.*1e-6/(60.*60.)
+
     #CHEATING TO BE SURE THAT SUCROSE SUPPLY IS NOT AFFECTING THE RESULT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     sucrose_input_rate=1.
 
+    print ""
+    print "At t =", "{:.2f}".format(Decimal(step*time_step_in_days)), "days:"
+    print "------------------"
+    print "The input rate of sucrose to the root for time=", current_time_in_hours, "h is", \
+        "{:.2E}".format(Decimal(sucrose_input_rate)), "mol of sucrose per second."
+    print ""
+
     # Using the other functions to simulate the evolution of the MTG:
     #----------------------------------------------------------------
-
-    # 3. Calculation of potential growth without consideration of available hexose:
-    potential_growth(g, time_step_in_seconds=time_step_in_seconds)
 
     # 1. Consumption of hexose in the soil:
     soil_hexose_degradation(g, time_step_in_seconds=time_step_in_seconds)
@@ -1424,6 +1437,9 @@ for step in range(0,n_steps):
 
     # 3. Consumption of hexose in the root by maintenance respiration:
     maintenance_respiration(g, time_step_in_seconds=time_step_in_seconds)
+
+    # 3. Calculation of potential growth without consideration of available hexose:
+    potential_growth(g, time_step_in_seconds=time_step_in_seconds)
 
     # 4. Calculation of actual growth based on the hexose remaining in the roots,
     # and corresponding consumption of hexose in the root:
@@ -1438,12 +1454,6 @@ for step in range(0,n_steps):
     # 6. Unloading of sucrose from phloem and conversion of sucrose into hexose:
     sucrose_to_hexose(g, time_step_in_seconds=time_step_in_seconds)
 
-    print ""
-    print "At t =", "{:.2f}".format(Decimal(step*time_step_in_days)), "days:"
-    print "------------------"
-    print "The input rate of sucrose to the root for time=", current_time_in_hours, "h is", \
-        "{:.2E}".format(Decimal(sucrose_input)), "mol of sucrose per second."
-    print ""
     total_print(g)
 
     sc = plot_mtg(g, prop_cmap='hexose_exudation')
