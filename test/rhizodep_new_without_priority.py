@@ -25,7 +25,7 @@ import pickle
 
 # Setting the randomness in the whole code to reproduce the same root system over different runs:
 # random_choice = int(round(np.random.normal(100,50)))
-random_choice = 110
+random_choice = 122
 print "The random seed used for this run is", random_choice
 np.random.seed(random_choice)
 
@@ -38,7 +38,7 @@ np.random.seed(random_choice)
 # Parameters for root growth:
 # ----------------------------
 # Maximal number of adventitious roots (including primary)(dimensionless):
-MNP = 1
+MNP = 5
 # Emission rate of adventious roots (in s-1):
 # ER = 0.5 day-1
 ER = 1. / (60. * 60. * 24.)
@@ -817,7 +817,7 @@ def elongated_length(initial_length, radius, elongation_time_in_seconds, printin
 # FUNCTION: A GIVEN APEX CAN FORM A PRIMORDIUM ON ITS SURFACE
 ###############################################################
 
-def primordium_formation(apex, elongation_rate=0., time_step_in_seconds=1. * 60. * 60. * 24., random=True):
+def primordium_formation(apex, elongation_rate=0., time_step_in_seconds=1. * 60. * 60. * 24., random=False):
     # NOTE: This function has to be called AFTER the actual elongation of the apex has been done and the distance
     # between the tip of the apex and the last ramification (dist_to_ramif) has been increased!
 
@@ -1668,7 +1668,7 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, printin
             continue
         # We make sure that there is a potential growth (of the current element or its primordium):
         if n.potential_length <= n.initial_length \
-                and n.potential_radius <= 0.999*n.initial_radius \
+                and n.potential_radius <= n.initial_radius \
                 and n.lateral_emergence_possibility != "Possible":
             # In such case, we just pass to the next element in the iteration:
             continue
@@ -1701,7 +1701,7 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, printin
         n.hexose_growth_demand = 1. / 6. * potential_growth_demand / yield_growth
         # The total amount of hexose available at this stage in the root element is calculated:
         n.hexose_available = n.C_hexose_root * n.initial_biomass
-        # We initialize the temporary variable remaining_hexose that computes the amount of hexose left for growth:
+        # We initialize the temporary variable "remaining_hexose" that computes the amount of hexose left for growth:
         remaining_hexose = n.hexose_available
         # We calculate the maximal possible volume of the root element (without considering primordium emergence) according to all the hexose available:
         volume_max = initial_volume + n.hexose_available * 6. / (density * biomass_C_content) * yield_growth
@@ -1712,8 +1712,8 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, printin
         #-----------------------------------------------------------------------------------------------------
         # If elongation should occur but is limited by the amount of hexose available:
         if length_max <= n.potential_length and n.potential_length > n.initial_length:
-            # ELONGATION IS LIMITED to all the amount of hexose available;
-            # no radial growth and no primordium emergence is possible:
+            # ELONGATION IS LIMITED using all the amount of hexose available;
+            # no radial growth and no primordium emergence are therefore possible:
             n.length = length_max
             remaining_hexose=0.
             # The radius or the emergence cost and possibility of a primordium are left unchanged.
@@ -2621,37 +2621,39 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1.0/100
             # CASE 2: WE PERFORM THE COMPLETE MODEL WITH C BALANCE IN EACH ROOT ELEMENT
             #--------------------------------------------------------------------------
 
-                # 3. Calculation of potential growth without consideration of available hexose:
+                # Calculation of potential growth without consideration of available hexose:
                 potential_growth(g, time_step_in_seconds=time_step_in_seconds, radial_growth=radial_growth, Archisimple=False)
 
-                # 4. Calculation of actual growth based on the hexose remaining in the roots,
+                # Calculation of actual growth based on the hexose remaining in the roots,
                 # and corresponding consumption of hexose in the root:
                 g = actual_growth_and_corresponding_respiration(g, time_step_in_seconds=time_step_in_seconds, printing_warnings=printing_warnings)
                 # We proceed to the segmentation of the whole root system (NOTE: segmentation should always occur AFTER actual growth):
                 segmentation_and_primordia_formation(g, time_step_in_seconds, random=random)
                 dist_to_tip(g)
 
-                # 1. Consumption of hexose in the soil:
+                # Consumption of hexose in the soil:
                 soil_hexose_degradation(g, time_step_in_seconds=time_step_in_seconds, printing_warnings=printing_warnings)
 
-                # 2a. Transfer of hexose from the root to the soil, consumption of hexose inside the roots:
+                # Transfer of hexose from the root to the soil, consumption of hexose inside the roots:
                 root_hexose_exudation(g, time_step_in_seconds=time_step_in_seconds, printing_warnings=printing_warnings)
-                # 2b. Transfer of hexose from the soil to the root, consumption of hexose in the soil:
+                # Transfer of hexose from the soil to the root, consumption of hexose in the soil:
                 root_hexose_uptake(g, time_step_in_seconds=time_step_in_seconds, printing_warnings=printing_warnings)
 
-                # 3. Consumption of hexose in the root by maintenance respiration:
+                # Consumption of hexose in the root by maintenance respiration:
                 maintenance_respiration(g, time_step_in_seconds=time_step_in_seconds, printing_warnings=printing_warnings)
 
-                # 6. Unloading of sucrose from phloem and conversion of sucrose into hexose:
+                # Unloading of sucrose from phloem and conversion of sucrose into hexose:
                 sucrose_to_hexose(g, time_step_in_seconds=time_step_in_seconds, printing_warnings=printing_warnings)
-
-                # 5. Supply of sucrose from the shoots to the roots and spreading into the whole phloem:
-                shoot_sucrose_supply_and_spreading(g, sucrose_input_rate=sucrose_input_rate,
-                                                   time_step_in_seconds=time_step_in_seconds,
-                                                   printing_warnings=printing_warnings)
 
                 # Calculation of the new concentrations in hexose and sucrose once all the processes have been done:
                 balance(g, printing_warnings=printing_warnings)
+
+                # Supply of sucrose from the shoots to the roots and spreading into the whole phloem:
+                shoot_sucrose_supply_and_spreading(g, sucrose_input_rate=sucrose_input_rate,
+                                                   time_step_in_seconds=time_step_in_seconds,
+                                                   printing_warnings=printing_warnings)
+                # WARNING: The function "shoot_sucrose_supply_and_spreading" must be called AFTER the function "balance",
+                # otherwise the deficit in sucrose may be counted twice!!!
 
             # A the end of the time step, if the global variable "time_since_adventious_root_emergence" has been unchanged:
             if time_since_last_adventious_root_emergence == initial_time_since_adventious_root_emergence:
@@ -2815,7 +2817,7 @@ time_since_last_adventious_root_emergence = 0.
 # We initiate the global variable that corresponds to a possible general deficit in sucrose of the whole root system:
 global_sucrose_deficit=0.
 # We launch the main simulation program:
-main_simulation(g, simulation_period_in_days=60, time_step_in_days=1, radial_growth="Possible", Archisimple=False,
+main_simulation(g, simulation_period_in_days=50, time_step_in_days=1, radial_growth="Possible", Archisimple=False,
                 property="net_hexose_exudation", vmin=1e-10, vmax=1e-5, log_scale=True,
                 x_center=0, y_center=0, z_center=-2, z_cam=-5,
                 camera_distance = 5, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12*10,
@@ -2823,7 +2825,8 @@ main_simulation(g, simulation_period_in_days=60, time_step_in_days=1, radial_gro
                 printing_sum=True,
                 recording_sum=True,
                 printing_warnings=False,
-                recording_g=True,
+                recording_g=False,
+                recording_g_properties=False,
                 random=True)
 
 print ""
