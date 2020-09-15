@@ -18,19 +18,19 @@ import openalea.plantgl.all as pgl
 
 from collections import deque
 
-class Simulation(object):
-    def __init__(self):
-        g = self.g = MTG()
-        self.root = g.add_component(g.root)
-        self.apices = deque([self.root])
-
-    def growth(self):
-        new_apices = deque([])
-        for aid in apices:
-            new_apex = self.update_apex(aid)
-
-    def update_apex(self):
-        assert(aid in self.g)
+# class Simulation(object):
+#     def __init__(self):
+#         g = self.g = MTG()
+#         self.root = g.add_component(g.root)
+#         self.apices = deque([self.root])
+#
+#     def growth(self):
+#         new_apices = deque([])
+#         for aid in apices:
+#             new_apex = self.update_apex(aid)
+#
+#     def update_apex(self):
+#         assert(aid in self.g)
 
 # Defining functions for diplaying the root system in a 3D graph in PlantGL:
 ############################################################################
