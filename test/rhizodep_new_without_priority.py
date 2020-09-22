@@ -1,8 +1,9 @@
-# Todo: GET A CORRECT CARBON BALANCE!
 # Todo: Impose a delay describing how long the parent segment must sustain the growth of the child - OR define a minimal volume of the new emerged apex?
 # Todo: Consider giving priority to root maintenance, and provoque senescence when root maintenance is not ensured
 # Todo: Watch the calculation of surface and volume for the apices - if they correspond to cones, the mass balance for segmentation may not be correct!
 # Todo: Include cell sloughing and mucilage production
+# Todo: Insert information on (x,y,z) coordinates of the root elements, and introduce a tropism function
+# Todo: Make a distinction between seminal roots and adventious roots
 
 # Importation of functions from the system:
 ###########################################
