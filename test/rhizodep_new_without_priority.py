@@ -144,6 +144,11 @@ gamma_unloading = 5.
 Km_unloading = expected_C_sucrose_root
 # => Explanation: According to Barillot et al. (2016b), this value is 1000 umol C g-1
 
+# Parameters for tropism:
+# ------------------------
+tropism_intensity = 0.1 # Value between 0 and 1.
+tropism_direction = (0,0,-1) # Force of the tropism
+
 ########################################################################################################################
 ########################################################################################################################
 # COMMON FUNCTIONS POSSIBLY USED IN EACH MODULE
@@ -172,6 +177,14 @@ def get_root_visitor():
         # Moving the turtle:
         turtle.down(angle_down)
         turtle.rollL(angle_roll)
+
+        # Adding Tropism (First Try)
+        diameter = 2 * n.radius
+        elong = n.length
+        alpha = tropism_intensity * diameter * elong 
+        turtle.rollToVert(alpha, tropism_direction)
+
+        # Move the turtle
         turtle.setId(v)
         turtle.setWidth(radius)
         turtle.F(length)
