@@ -145,6 +145,11 @@ gamma_unloading = 5.
 Km_unloading = expected_C_sucrose_root
 # => Explanation: According to Barillot et al. (2016b), this value is 1000 umol C g-1
 
+# Parameters for tropism:
+# ------------------------
+tropism_intensity = 0.1 # Value between 0 and 1.
+tropism_direction = (0,0,-1) # Force of the tropism
+
 ########################################################################################################################
 ########################################################################################################################
 # COMMON FUNCTIONS POSSIBLY USED IN EACH MODULE
@@ -173,9 +178,24 @@ def get_root_visitor():
         # Moving the turtle:
         turtle.down(angle_down)
         turtle.rollL(angle_roll)
+
+        # Adding Tropism (First Try)
+        diameter = 2 * n.radius
+        elong = n.length
+        alpha = tropism_intensity * diameter * elong 
+        turtle.rollToVert(alpha, tropism_direction)
+
+        # Move the turtle
         turtle.setId(v)
         turtle.setWidth(radius)
         turtle.F(length)
+        
+        # Get the 3D coordinate of the root tip
+        # You can also get the middle of the segment of the base
+        position = turtle.getPosition()
+        n.x = position[0] 
+        n.y = position[1] 
+        n.z = position[2] 
 
     return root_visitor
 
@@ -2356,7 +2376,7 @@ def initiate_mtg(random=True):
 # We read the data showing the unloading rate of sucrose as a function of time from a file:
 # ------------------------------------------------------------------------------------------
 # We first define the path and the file to read as a .csv:
-PATH = os.path.join('C:/', 'Users', 'frees', 'rhizodep', 'test', 'organs_states.csv')
+PATH = os.path.join('.', 'organs_states.csv')
 # Then we read the file and copy it in a dataframe "df":
 df = pd.read_csv(PATH, sep=',')
 # We only keep the two columns of interest:
