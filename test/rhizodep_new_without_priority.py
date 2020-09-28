@@ -39,16 +39,16 @@ np.random.seed(random_choice)
 # Parameters for root growth:
 # ----------------------------
 # Maximal number of adventitious roots (including primary)(dimensionless):
-MNP = 5
+MNP =1
 # Emission rate of adventious roots (in s-1):
 # ER = 0.5 day-1
-ER = 1. / (60. * 60. * 24.)
+ER = 0.6 / (60. * 60. * 24.)
 # Tip diameter of the emitted root(in s) ():
 # Di=0.5 mm
 Di = 1. / 1000.
 # Slope of the potential elongation rate versus tip diameter (in m m-1 s-1):
 # EL = 5 mm mm-1 day-1 = 5 m m-1 day-1
-EL = 3. / (60. * 60. * 24.)
+EL = 22. / (60. * 60. * 24.)
 # Threshold tip diameter below which there is no possible elongation (diameter of the finest roots)(in m):
 # Dmin=0.05 mm
 Dmin = 0.15 / 1000.
@@ -62,9 +62,9 @@ G = 1.
 emergence_delay = 5.0 * (60. * 60. * 24.)
 # Inter-primordium distance (in m):
 # IPD = 7.6 mm
-IPD = 8 /1000.
+IPD = 3 /1000.
 # Average ratio of the diameter of the daughter root to that of the mother root (dimensionless):
-RMD = 0.3
+RMD = 0.09
 # Relative variation of the daughter root diameter (dimensionless):
 CVDD = 0.20
 # Proportionality coefficient between section area of the segment and the sum of distal section areas (dimensionless):
@@ -75,7 +75,7 @@ RTD = 0.10 * 1e6
 density = RTD
 # Coefficient of the life duration (in s m g-1 m3):
 # LDs = 5000 day mm-1 g-1 cm3
-LDs = 5000. * (60. * 60. * 24.) * 1000 * 1e-6
+LDs = 4000. * (60. * 60. * 24.) * 1000 * 1e-6
 # Length of a segment (in m):
 segment_length = 3. / 1000.
 # C content of biomass (mol of C per g of biomass):
@@ -147,8 +147,8 @@ Km_unloading = expected_C_sucrose_root
 
 # Parameters for tropism:
 # ------------------------
-tropism_intensity = 0.1 # Value between 0 and 1.
-tropism_direction = (0,0,-1) # Force of the tropism
+tropism_intensity = 1e6 # Value between 0 and 1.
+tropism_direction = np.array([0,0,1]) # Force of the tropism
 
 ########################################################################################################################
 ########################################################################################################################
@@ -168,34 +168,41 @@ def get_root_visitor():
     :return: root_visitor
     """
     def root_visitor(g, v, turtle):
+
         n = g.node(v)
-        # For displaying the radius x times larger than in reality:
-        radius = n.radius * 10
-        length = n.length * 10
+        # For displaying the radius or length 10 times larger than in reality:
+        zoom_factor = 10
+        radius = n.radius * zoom_factor
+        length = n.length * zoom_factor
         angle_down = n.angle_down
         angle_roll = n.angle_roll
 
-        # Moving the turtle:
+        # We get the x,y,z coordinates from the beginning of the root segment, before the turtle moves:
+        position1 = turtle.getPosition()
+        n.x1 = position1[0]/zoom_factor
+        n.y1 = position1[1]/zoom_factor
+        n.z1 = position1[2]/zoom_factor
+
+        # The direction of the turtle is changed:
         turtle.down(angle_down)
         turtle.rollL(angle_roll)
 
-        # Adding Tropism (First Try)
-        diameter = 2 * n.radius
-        elong = n.length
-        alpha = tropism_intensity * diameter * elong 
+        # Tropism is then taken into account:
+        diameter = 2 * n.radius * zoom_factor
+        elong = n.length * zoom_factor
+        alpha = tropism_intensity * diameter * elong
         turtle.rollToVert(alpha, tropism_direction)
 
-        # Move the turtle
+        # The turtle is moved:
         turtle.setId(v)
         turtle.setWidth(radius)
         turtle.F(length)
         
-        # Get the 3D coordinate of the root tip
-        # You can also get the middle of the segment of the base
-        position = turtle.getPosition()
-        n.x = position[0] 
-        n.y = position[1] 
-        n.z = position[2] 
+        # We get the x,y,z coordinates from the end of the root segment, after the turtle has moved:
+        position2 = turtle.getPosition()
+        n.x2 = position2[0]/zoom_factor
+        n.y2 = position2[1]/zoom_factor
+        n.z2 = position2[2]/zoom_factor
 
     return root_visitor
 
@@ -470,6 +477,128 @@ def total_root_sucrose_and_biomass(g):
     # We return a list of two numeric values:
     return total_sucrose_root, total_biomass
 
+# Calculation of the length of a root element intercepted between two z coordinates:
+# ----------------------------------------------------------------------------------
+def sub_length_z(x1,y1,z1,x2,y2,z2,z_first_layer,z_second_layer):
+
+    # We make sure that the z coordinates are ordered in the right way:
+    min_z = min(z1, z2)
+    max_z = max(z1, z2)
+    z_start = min(z_first_layer, z_second_layer)
+    z_end = max(z_first_layer, z_second_layer)
+
+    # For each row, if at least a part of the root segment formed between point 1 and 2 is included between z_start and z_end:
+    if min_z < z_end and max_z >= z_start:
+        # The z value to start from is defined as:
+        z_low = max(z_start, min_z)
+        # The z value to stop at is defined as:
+        z_high = min(z_end, max_z)
+
+        # If Z2 is different from Z1:
+        if max_z > min_z:
+            # Then we calculate the (x,y) coordinates of both low and high points between which length will be computed:
+            x_low = (x2-x1) * (z_low - z1) / (z2-z1) + x1
+            y_low = (y2-y1) * (z_low - z1) / (z2-z1) + y1
+            x_high = (x2-x1) * (z_high - z1) / (z2-z1) + x1
+            y_high = (y2-y1) * (z_high - z1) / (z2-z1) + y1
+            # Geometrical explanation:
+            # *************************
+            # # The root segment between Start-point (X1, Y1, Z1) and End-Point (X2, Y2, Z2)
+            # draws a line in the 3D space which is characterized by the following parametric equation:
+            # { x = (X2-X1)*t + X1, y = (Y2-Y1)*t + Y1, z = (Z2-Z1)*t + Z1}
+            # To find the coordinates x and y of a new point of coordinate z on this line, we have to solve this system of equations,
+            # knowing that: z = (Z2-Z1)*t + Z1, which gives t = (z - Z1)/(Z2-Z1), and therefore:
+            # x = (X2-X1)*(z - Z1)/(Z2-Z1) + X1
+            # y = (Y2-Y1)*(z - Z1)/(Z2-Z1) + Y1
+        # Otherwise, the calculation is much easier, since the whole segment is included in the plan x-y:
+        else:
+            x_low = x1
+            y_low = y1
+            x_high = x2
+            y_high = y2
+
+        # In every case, the length between the low and high points is computed as:
+        inter_length = ((x_high-x_low)**2 +(y_high-y_low)**2 +(z_high-z_low)**2)**0.5
+    # Otherwise, the root element is not included between z_first_layer and z_second_layer, and intercepted length is 0:
+    else:
+        inter_length = 0
+
+    # We return the computed length:
+    return inter_length
+
+# Integration of root variables within different z_intervals:
+# -----------------------------------------------------------
+def classifying_on_z(g, z_min=0, z_max=1, z_interval=0.1):
+
+    # We initialize empty dictionnaries:
+    included_length = {}
+    dictionnary_length = {}
+    dictionnary_biomass = {}
+    dictionnary_surface = {}
+    dictionnary_net_hexose_exudation = {}
+    dictionnary_hexose_degradation = {}
+    final_dictionnary = {}
+
+    # For each interval of z values to be considered:
+    for z_start in np.arange(z_min, z_max, z_interval):
+
+        # We create the names of the new properties of the MTG to be computed, based on the current z interval:
+        name_length_z = "length_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
+        name_biomass_z = "biomass_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
+        name_surface_z = "surface_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
+        name_net_hexose_exudation_z = "net_hexose_exudation_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
+        name_hexose_degradation_z = "hexose_degradation_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
+
+        # We (re)initialize total values:
+        total_included_length = 0
+        total_included_biomass = 0
+        total_included_surface = 0
+        total_included_net_hexose_exudation = 0
+        total_included_hexose_degradation = 0
+
+        # We cover all the vertices in the MTG:
+        for vid in g.vertices_iter(scale=1):
+            # n represents the vertex:
+            n = g.node(vid)
+
+            # We make sure that the vertex has a positive length:
+            if n.length > 0.:
+                # We calculate the fraction of the length of this vertex that is included in the current range of z value:
+                fraction_length = sub_length_z(x1=n.x1, y1=n.y1, z1=-n.z1, x2=n.x2, y2=n.y2, z2=-n.z2,
+                                               z_first_layer=z_start,
+                                               z_second_layer=z_start + z_interval) / n.length
+                included_length[vid] = fraction_length * n.length
+            else:
+                # Otherwise, the fraction length and the length included in the range are set to 0:
+                fraction_length = 0.
+                included_length[vid] = 0.
+
+            # We summed different variables based on the fraction of the length included in the z interval:
+            total_included_length += n.length * fraction_length
+            total_included_biomass += n.biomass * fraction_length
+            total_included_surface += n.external_surface * fraction_length
+            total_included_net_hexose_exudation += (n.hexose_exudation - n.hexose_uptake) * fraction_length
+            total_included_hexose_degradation += n.hexose_degradation * fraction_length
+
+        # We record the summed values for this interval of z in several dictionnaries:
+        dictionnary_length[name_length_z] = total_included_length
+        dictionnary_biomass[name_biomass_z] = total_included_biomass
+        dictionnary_surface[name_surface_z] = total_included_surface
+        dictionnary_net_hexose_exudation[name_net_hexose_exudation_z] = total_included_net_hexose_exudation
+        dictionnary_hexose_degradation[name_hexose_degradation_z] = total_included_hexose_degradation
+
+        # We also create a new property of the MTG that corresponds to the fraction of length of each node in the z interval:
+        g.properties()[name_length_z] = included_length
+
+    # Finally, we merge all dictionnaries into a single one that will be returned by the function:
+    final_dictionnary = dict(list(dictionnary_length.items())
+                             + list(dictionnary_biomass.items())
+                             + list(dictionnary_surface.items())
+                             + list(dictionnary_net_hexose_exudation.items())
+                             + list(dictionnary_hexose_degradation.items())
+                             )
+
+    return final_dictionnary
 
 # Calculation of total amounts and dimensions of the root system:
 # ---------------------------------------------------------------
@@ -596,6 +725,8 @@ def summing(g, printing_total_length=True, printing_total_biomass=True, printing
 
     return dictionnary
 
+# Integration of root variables within different z_intervals:
+# -----------------------------------------------------------
 def recording_MTG_properties(g,file_name='g_properties.csv'):
     """
     This function records the properties of each node of the MTG "g" in a csv file.
@@ -2373,31 +2504,18 @@ def initiate_mtg(random=True):
 # SIMULATION OVER TIME:
 #######################
 
-# We read the data showing the unloading rate of sucrose as a function of time from a file:
-# ------------------------------------------------------------------------------------------
-# We first define the path and the file to read as a .csv:
-PATH = os.path.join('.', 'organs_states.csv')
-# Then we read the file and copy it in a dataframe "df":
-df = pd.read_csv(PATH, sep=',')
-# We only keep the two columns of interest:
-df = df[['t', 'Unloading_Sucrose']]
-# We remove any "NA" in the column of interest:
-df = df[pd.notnull(df['Unloading_Sucrose'])]
-# We remove any values below 0:
-sucrose_input_frame = df[(df.Unloading_Sucrose >= 0.)]
-# We reset the indices after having filtered the data:
-sucrose_input_frame = sucrose_input_frame.reset_index(drop=True)
-
 # We define the main simulation program:
-def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1.0/100., radial_growth="Impossible", Archisimple=False,
+def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1., radial_growth="Impossible", Archisimple=False,
                     property="C_hexose_root", vmin=1e-6, vmax=1e-0, log_scale=True,
+                    sucrose_input_file = "None", constant_sucrose_input_rate=1.e-6,
                     x_center=0, y_center=0, z_center=-1, z_cam=-1,
                     camera_distance=10., step_back_coefficient=0., camera_rotation=False, n_rotation_points = 24*5,
-                    recording_images=True,
+                    recording_images=False,
+                    z_classification=False, z_min=0., z_max=1, z_interval=0.5,
                     printing_sum=False,
                     recording_sum=False,
                     printing_warnings=False,
-                    recording_g=True,
+                    recording_g=False,
                     recording_g_properties=True,
                     random=True):
 
@@ -2447,6 +2565,9 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1.0/100
     C_in_the_root_soil_system_series=[]
     C_cumulated_in_the_gazeous_phase_series=[]
 
+    # We create an empty dataframe that will contain the results of z classification:
+    z_dictionnary_series = []
+
     if recording_images:
         # We define the directory "video"
         video_dir = 'video'
@@ -2486,25 +2607,129 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1.0/100
                 for file in files:
                     os.remove(os.path.join(root, file))
 
-    # If the rotation of the camera is allowed:
+    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # # We read the data showing the unloading rate of sucrose as a function of time from a file:
+    # # ------------------------------------------------------------------------------------------
+    #
+    # # If there is a file where the inputs of sucrose in the root system have to be read:
+    # if sucrose_input_file != "None":
+    #     # We first define the path and the file to read as a .csv:
+    #     PATH = os.path.join('.', sucrose_input_file)
+    #     # Then we read the file and copy it in a dataframe "df":
+    #     df = pd.read_csv(PATH, sep=';')
+    #     # We only select the rows corresponding to the roots:
+    #     df = df.loc[df['organ'] == 'roots']
+    #     # # We only keep the two columns of interest:
+    #     # df = df[['t', 'Unloading_Sucrose']]
+    #     # We remove any "NA" in the column of interest:
+    #     df = df[pd.notnull(df['Unloading_Sucrose'])]
+    #     # We remove any values below 0:
+    #     df = df[(df.Unloading_Sucrose >= 0.)]
+    #     # We reset the indices after having filtered the data:
+    #     df = df.reset_index(drop=True)
+    #     # Conversion of sucrose unloading rate from umol_C per g per hour in mol_sucrose per hour:
+    #     df['sucrose_input_per_hour'] =  df['Unloading_Sucrose'] / 12. * 1e-6 * df['mstruct']
+    #     df['time_in_days'] = df['t'] /24.
+    #     # We initialize two new columns in the dataframe:
+    #     df['net_sucrose_input'] = 0.
+    #     df['cumulative_sucrose_input'] = 0.
+    #     # We define the values of these two columns for the first line:
+    #     df.loc[0, 'net_sucrose_input'] = df.loc[0, 'sucrose_input_per_hour'] * df.loc[0,'t']
+    #     df.loc[0, 'cumulative_sucrose_input'] =  df.loc[0, 'net_sucrose_input']
+    #     # We define the values of these two columns for the rest of the lines:
+    #     for i in range(1,len(df)+1):
+    #         df.loc[i, 'net_sucrose_input'] = df.loc[i, 'sucrose_input_per_hour'] * (df.loc[i-1, 't'] - df.loc[i, 't'])
+    #         df.loc[i, 'cumulative_sucrose_input'] = df.loc[i-1, 'cumulative_sucrose_input'] + df.loc[i, 'net_sucrose_input']
+    #
+    #     # We create a new dataframe that will be used to read inputs of sucrose:
+    #     sucrose_input_frame = pd.DataFrame(columns=["step","final_time_in_days","sucrose_input"])
+    #     sucrose_input_frame["step"] = range(1,simulation_period_in_days+1,time_step_in_days)
+    #     sucrose_input_frame["final_time_in_days"] = sucrose_input_frame["step"] * time_step_in_days
+    #
+    #     # We initialize the row ID "j" in which exact sucrose inputs will be recorded:
+    #     j = 0
+    #     # We initialize the time over which sucrose input will be integrated:
+    #     cumulated_time_in_days = df['time_in_days'][0]
+    #     time_in_days = 0.
+    #
+    #     # For each line of the data frame that contains information on sucrose input:
+    #     for t in df['time_in_days']:
+    #
+    #         cumulated_time_in_hours += 1
+    #
+    #         # If the current cumulated time is below the time step of the main simulation:
+    #         if cumulated_time_in_hours < time_step_in_hours:
+    #             sucrose_input += df['sucrose_input_per_hour'][i]*1.
+    #         # Otherwise, the cumulative input of sucrose for this time step can be calculated:
+    #         else:
+    #             # We increase the value of sucrose_input by the exact amount of sucrose brought
+    #             # over the time that has been elapsed until reaching the exact simulation time:
+    #             sucrose_input += df['sucrose_input_per_hour'][i] * (cumulated_time_in_hours - time_step_in_hours)
+    #             # We calculate the current time in days:
+    #             time_in_days += time_step_in_days
+    #             # We record this value and the exact time
+    #             sucrose_input_frame['time_in_days'][j] = time_in_days
+    #             sucrose_input_frame['sucrose_input'][j] = sucrose_input
+    #             # We move to the next row in the sucrose_input_frame:
+    #             j += 1
+    #             # We reinitialize the counter with the exact time that has not been included yet:
+    #             cumulated_time_in_hours = cumulated_time_in_hours - time_step_in_days
+
+    # We first define the path and the file to read as a .csv:
+    PATH = os.path.join('.', sucrose_input_file)
+    # Then we read the file and copy it in a dataframe "df":
+    sucrose_input_frame = pd.read_csv(PATH, sep=',')
+
+    #RECORDING THE INITIAL STATE OF THE MTG:
+    #---------------------------------------
+    step = 0
+
+    # If the rotation of the camera around the root system is required:
     if camera_rotation:
         # We calculate the coordinates of the camera on the circle around the center:
         x_coordinates, y_coordinates, z_coordinates = circle_coordinates(z_center=z_cam, radius=camera_distance, n_points=n_rotation_points)
         # We initialize the index for reading each coordinates:
         index_camera=0
+        x_cam = x_coordinates[index_camera]
+        y_cam = y_coordinates[index_camera]
+        z_cam = z_coordinates[index_camera]
+        sc = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax,
+                      x_center=x_center,
+                      y_center=y_center,
+                      z_center=z_center,
+                      x_cam=x_cam,
+                      y_cam=y_cam,
+                      z_cam=z_cam)
     else:
         x_camera=camera_distance
         x_cam=camera_distance
         z_camera=z_cam
-
-    #RECORDING THE INITIAL STATE OF THE MTG:
-    #---------------------------------------
+        sc = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax,
+                      x_center=x_center,
+                      y_center=y_center,
+                      z_center=z_center,
+                      x_cam=x_camera,
+                      y_cam=0,
+                      z_cam=z_camera)
+        # We move the camera further from the root system:
+        x_camera = x_cam + x_cam * step_back_coefficient * step
+        z_camera = z_cam + z_cam * step_back_coefficient * step
+    # We finally display the MTG on PlantGL:
+    pgl.Viewer.display(sc)
 
     # For recording the graph at each time step to make a video later:
     # -----------------------------------------------------------------
     if recording_images:
         image_name = os.path.join(video_dir, 'root%.4d.png')
         pgl.Viewer.saveSnapshot(image_name % step)
+
+    # For integrating root variables on the z axis:
+    # ----------------------------------------------
+    if z_classification:
+        z_dictionnary = classifying_on_z(g, z_min=z_min, z_max=z_max, z_interval=z_interval)
+        z_dictionnary["time_in_days"] = 0
+        z_dictionnary_series.append(z_dictionnary)
+        print z_dictionnary_series
 
     # For recording the MTG at each time step to load it later on:
     # ------------------------------------------------------------
@@ -2514,7 +2739,7 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1.0/100
             pickle.dump(g, output, protocol=2)
 
     # For recording the properties of g in a csv file:
-    # --------------------------------------------------
+    # ------------------------------------------------
     if recording_g_properties:
         prop_file_name = os.path.join(prop_dir, 'root%.4d.csv')
         recording_MTG_properties(g, file_name=prop_file_name % step)
@@ -2552,6 +2777,7 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1.0/100
         total_hexose_degradation_series.append(dictionnary["total_hexose_degradation"])
         total_net_hexose_exudation_series.append(dictionnary["total_net_hexose_exudation"])
         C_in_the_root_soil_system_series.append(dictionnary["C_in_the_root_soil_system"])
+
         C_cumulated_in_the_gazeous_phase += dictionnary["C_emitted_towards_the_gazeous_phase"]
         C_cumulated_in_the_gazeous_phase_series.append(C_cumulated_in_the_gazeous_phase)
 
@@ -2571,39 +2797,35 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1.0/100
 
             # DEFINING THE INPUT OF CARBON TO THE ROOTS:
             #-------------------------------------------
+            if sucrose_input_file !="None":
+                # # We look for the first item in the time series of sucrose_input_frame for which time is higher
+                # # than the current time in hours (a default value of 0 is given otherwise):
+                # considered_time = next((time for time in sucrose_input_frame.step_number if time > current_time_in_hours), 0)
+                # # If the current time in the loop is higher than any time indicated in the dataframe:
+                # if considered_time > 0:
+                #     time_series=list(sucrose_input_frame.t)
+                #     index=time_series.index(considered_time)
+                #     # If the considered time corresponds to the first item in the list of times from the dataframe:
+                #     if index==0:
+                #         # Then we use the first item in the list of unloading rates:
+                #         sucrose_input_rate = sucrose_input_frame.Unloading_Sucrose[index]
+                #     else:
+                #         # Otherwise, we use a linear function between this considered time and the preceding one,
+                #         # so that we can calculate a plausible value of sucrose unloading rate at the exact time of the loop:
+                #         t1 = sucrose_input_frame.t[index-1]
+                #         t2 = sucrose_input_frame.t[index]
+                #         y1 = sucrose_input_frame.Unloading_Sucrose[index - 1]
+                #         y2 = sucrose_input_frame.Unloading_Sucrose[index]
+                #         a = (y2 - y1)/float(t2 - t1)
+                #         b = y1 - a*t1
+                #         sucrose_input_rate = a*current_time_in_hours + b
 
-            # We look for the first item in the time series of sucrose_input_frame for which time is higher
-            # than the current time (a default value of 0 is given otherwise):
-            considered_time = next((time for time in sucrose_input_frame.t if time > current_time_in_hours), 0)
-            # If the current time in the loop is higher than any time indicated in the dataframe:
-            if considered_time > 0:
-            #     # Then we use the last value of sucrose unloading rate as the sucrose input rate:
-            #     sucrose_input_rate = sucrose_input_frame.Unloading_Sucrose[-1]
-            # else:
-                # Otherwise, we get the index of the considered time in the list of times from the dataframe:
-                time_series=list(sucrose_input_frame.t)
-                index=time_series.index(considered_time)
-                # If the considered time corresponds to the first item in the list of times from the dataframe:
-                if index==0:
-                    # Then we use the first item in the list of unloading rates:
-                    sucrose_input_rate = sucrose_input_frame.Unloading_Sucrose[index]
-                else:
-                    # Otherwise, we use a linear function between this considered time and the preceding one,
-                    # so that we can calculate a plausible value of sucrose unloading rate at the exact time of the loop:
-                    x1 = sucrose_input_frame.t[index-1]
-                    x2 = sucrose_input_frame.t[index]
-                    y1 = sucrose_input_frame.Unloading_Sucrose[index - 1]
-                    y2 = sucrose_input_frame.Unloading_Sucrose[index]
-                    a = (y2 - y1)/float(x2 - x1)
-                    b = y1 - a*x1
-                    sucrose_input_rate = a*current_time_in_hours + b
-            # Conversion of sucrose unloading rate from umol_C per hour in mol_sucrose per second:
-            sucrose_input_rate = sucrose_input_rate/12.*1e-6/(60.*60.)
+                sucrose_input_rate = sucrose_input_frame['sucrose_input_rate'][step]
+            else:
+                sucrose_input_rate = constant_sucrose_input_rate
 
-            # ALTERNATIVE: WE SET THE SUCROSE SUPPLY SO THAT IT IS NOT AFFECTING THE RESULT:!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            sucrose_input_rate = 1e-6
-            # sucrose_input_rate = 0.
-
+            # STARTING THE ACTUAL SIMULATION:
+            #--------------------------------
             print ""
             print "From t =", "{:.2f}".format(Decimal((step-1) * time_step_in_days)), "days to t =", \
                 "{:.2f}".format(Decimal(step * time_step_in_days)), "days:"
@@ -2725,6 +2947,13 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1.0/100
                 image_name = os.path.join(video_dir, 'root%.4d.png')
                 pgl.Viewer.saveSnapshot(image_name % step)
 
+            # For integrating root variables on the z axis:
+            #----------------------------------------------
+            if z_classification:
+                z_dictionnary = classifying_on_z(g,z_min=z_min,z_max=z_max,z_interval=z_interval)
+                z_dictionnary["time_in_days"] = time_step_in_days*step
+                z_dictionnary_series.append(z_dictionnary)
+
             # For recording the MTG at each time step to load it later on:
             # ------------------------------------------------------------
             if recording_g:
@@ -2804,6 +3033,7 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1.0/100
                                        "Total amount of C present in the root-soil system (mol of C)": C_in_the_root_soil_system_series,
                                        "Total amount of C cumulated in the gazeous phase (mol of C)": C_cumulated_in_the_gazeous_phase_series
                                        },
+                                      # We re-order the columns:
                                       columns=["Time (days)",
                                                "Sucrose input (mol of sucrose)",
                                                "Total amount of C present in the root-soil system (mol of C)",
@@ -2819,6 +3049,13 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1.0/100
                                                "CO2 originating from root maintenance (mol of C)"])
             # We save the data_frame in a CSV file:
             data_frame.to_csv('simulation_results.csv', na_rep='NA', index=False, header=True)
+
+        # We create another data frame that contains the results classified by z intervals:
+        if z_classification:
+            # We create a data_frame from the vectors generated in the main program up to this point:
+            data_frame_z = pd.DataFrame.from_dict(z_dictionnary_series)
+            # We save the data_frame in a CSV file:
+            data_frame_z.to_csv('z_classification.csv', na_rep='NA', index=False, header=True)
 
 
 # RUNNING THE SIMULATION:
@@ -2837,17 +3074,20 @@ g = initiate_mtg(random=True)
 time_since_last_adventious_root_emergence = 0.
 # We initiate the global variable that corresponds to a possible general deficit in sucrose of the whole root system:
 global_sucrose_deficit=0.
+
 # We launch the main simulation program:
-main_simulation(g, simulation_period_in_days=50, time_step_in_days=1, radial_growth="Possible", Archisimple=False,
-                property="net_hexose_exudation", vmin=1e-10, vmax=1e-5, log_scale=True,
+main_simulation(g, simulation_period_in_days=20, time_step_in_days=0.5, radial_growth="Possible", Archisimple=False,
+                property="C_hexose_root", vmin=1e-8, vmax=1e-0, log_scale=True,
+                sucrose_input_file="sucrose_input_0059.csv", constant_sucrose_input_rate=1e-6,
                 x_center=0, y_center=0, z_center=-2, z_cam=-5,
                 camera_distance = 5, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12*10,
                 recording_images=False,
+                z_classification=True, z_min=0.0, z_max=0.3, z_interval=0.1,
                 printing_sum=True,
                 recording_sum=True,
                 printing_warnings=False,
                 recording_g=False,
-                recording_g_properties=False,
+                recording_g_properties=True,
                 random=True)
 
 print ""
