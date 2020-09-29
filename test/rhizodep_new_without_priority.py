@@ -148,7 +148,7 @@ Km_unloading = expected_C_sucrose_root
 # Parameters for tropism:
 # ------------------------
 tropism_intensity = 1e6 # Value between 0 and 1.
-tropism_direction = np.array([0,0,1]) # Force of the tropism
+tropism_direction = (0,0,-1) # Force of the tropism
 
 ########################################################################################################################
 ########################################################################################################################
@@ -162,6 +162,9 @@ tropism_direction = np.array([0,0,1]) # Force of the tropism
 # Defining functions for diplaying the root system in a 3D graph in PlantGL:
 # --------------------------------------------------------------------------
 
+def my_tropism(turtle, alpha):
+    pass
+
 def get_root_visitor():
     """
     This function describes the movement of the 'turtle' along the MTG for creating a graph on PlantGL.
@@ -171,7 +174,7 @@ def get_root_visitor():
 
         n = g.node(v)
         # For displaying the radius or length 10 times larger than in reality:
-        zoom_factor = 10
+        zoom_factor = 10.
         radius = n.radius * zoom_factor
         length = n.length * zoom_factor
         angle_down = n.angle_down
@@ -185,19 +188,29 @@ def get_root_visitor():
 
         # The direction of the turtle is changed:
         turtle.down(angle_down)
+    
+        # Tropism is then taken into account:
+        #diameter = 2 * n.radius * zoom_factor
+        #elong = n.length * zoom_factor
+        #alpha = tropism_intensity * diameter * elong
+        #turtle.rollToVert(alpha, tropism_direction)
+        if g.edge_type(v)=='+':
+            diameter = 2 * n.radius * zoom_factor
+            elong = n.length * zoom_factor
+            alpha = tropism_intensity * diameter * elong
+            
+            turtle.elasticity= 0.2 * (n.radius / g.node(1).radius)
+            turtle.tropism = (0,0,-1)
+        
         turtle.rollL(angle_roll)
 
-        # Tropism is then taken into account:
-        diameter = 2 * n.radius * zoom_factor
-        elong = n.length * zoom_factor
-        alpha = tropism_intensity * diameter * elong
-        turtle.rollToVert(alpha, tropism_direction)
 
         # The turtle is moved:
         turtle.setId(v)
         turtle.setWidth(radius)
         turtle.F(length)
-        
+
+    
         # We get the x,y,z coordinates from the end of the root segment, after the turtle has moved:
         position2 = turtle.getPosition()
         n.x2 = position2[0]/zoom_factor
@@ -3062,7 +3075,10 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1., rad
 #########################
 
 # We set the working directory:
-os.chdir('C:\\Users\\frees\\rhizodep\\test')
+my_path = r'C:\\Users\\frees\\rhizodep\\test'
+if not os.path.exists(my_path):
+    my_path = os.path.abspath('.')
+os.chdir(my_path)
 print "The current directory is:", os.getcwd()
 
 # We record the time when the run starts:
