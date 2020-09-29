@@ -195,9 +195,9 @@ def get_root_visitor():
         #alpha = tropism_intensity * diameter * elong
         #turtle.rollToVert(alpha, tropism_direction)
         if g.edge_type(v)=='+':
-            diameter = 2 * n.radius * zoom_factor
-            elong = n.length * zoom_factor
-            alpha = tropism_intensity * diameter * elong
+            #diameter = 2 * n.radius * zoom_factor
+            #elong = n.length * zoom_factor
+            #alpha = tropism_intensity * diameter * elong
             
             turtle.elasticity= 0.2 * (n.radius / g.node(1).radius)
             turtle.tropism = (0,0,-1)
