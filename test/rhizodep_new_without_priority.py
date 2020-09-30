@@ -26,7 +26,7 @@ import pickle
 
 # Setting the randomness in the whole code to reproduce the same root system over different runs:
 # random_choice = int(round(np.random.normal(100,50)))
-random_choice = 122
+random_choice = 99
 print "The random seed used for this run is", random_choice
 np.random.seed(random_choice)
 
@@ -39,7 +39,7 @@ np.random.seed(random_choice)
 # Parameters for root growth:
 # ----------------------------
 # Maximal number of adventitious roots (including primary)(dimensionless):
-MNP =1
+MNP = 40
 # Emission rate of adventious roots (in s-1):
 # ER = 0.5 day-1
 ER = 0.6 / (60. * 60. * 24.)
@@ -48,15 +48,15 @@ ER = 0.6 / (60. * 60. * 24.)
 Di = 1. / 1000.
 # Slope of the potential elongation rate versus tip diameter (in m m-1 s-1):
 # EL = 5 mm mm-1 day-1 = 5 m m-1 day-1
-EL = 22. / (60. * 60. * 24.)
+EL = 10. / (60. * 60. * 24.)
 # Threshold tip diameter below which there is no possible elongation (diameter of the finest roots)(in m):
 # Dmin=0.05 mm
-Dmin = 0.15 / 1000.
+Dmin = 0.12 / 1000.
 # Coefficient of growth duration (in s m-2):
 # GDs=400. day mm-2
 GDs = 120. * (60. * 60. * 24.) * 1000. ** 2.
 # Gravitropism (dimensionless):
-G = 1.
+gravitropism_coefficient = 0.05
 # Delay of emergence of the primordium (in s):
 # emergence_delay = 3. days
 emergence_delay = 5.0 * (60. * 60. * 24.)
@@ -64,11 +64,11 @@ emergence_delay = 5.0 * (60. * 60. * 24.)
 # IPD = 7.6 mm
 IPD = 3 /1000.
 # Average ratio of the diameter of the daughter root to that of the mother root (dimensionless):
-RMD = 0.09
+RMD = 0.15
 # Relative variation of the daughter root diameter (dimensionless):
 CVDD = 0.20
 # Proportionality coefficient between section area of the segment and the sum of distal section areas (dimensionless):
-SGC = 0.6
+SGC = 0.0
 # Root tissue density (in g m-3):
 # RTD=0.1 g cm-3
 RTD = 0.10 * 1e6
@@ -113,8 +113,10 @@ expected_C_hexose_soil = expected_C_hexose_root / 100.
 # => Explanation: We expect the soil concentration to be 2 orders of magnitude lower than the root concentration
 # Permeability coefficient (in g of biomass per m2 per s):
 Pmax_apex = expected_exudation_efflux / (expected_C_hexose_root - expected_C_hexose_soil) / 100.
+Pmax_apex = Pmax_apex*5.
 # => Explanation: We calculate the permeability coefficient according to the expected flux and hexose concentrations.
 # Coefficient affecting the decrease of permeability with distance from the apex (adimensional):
+# gamma_exudation = 0.4
 gamma_exudation = 0.4
 
 # Parameters for root hexose uptake from soil:
@@ -136,11 +138,13 @@ Km_degradation = Km_influx / 50.
 
 # Parameters for sucrose unloading:
 # ----------------------------------
-# Maximum unloading rate of sucrose from the phloem (in mol of sucrose per m2 per s):
-unloading_apex = 5e-6
+# # Maximum unloading rate of sucrose from the phloem (in mol of sucrose per m2 per s):
+# unloading_apex = 5e-6
+# Maximum unloading rate of sucrose from the phloem (in mol of sucrose per s):
+unloading_apex = 0.03*1e-6*(segment_length*Di**2/4.*pi*RTD)*4
 # => Explanation: According to Barillot et al. (2016b), this value is 0.03 umol C g-1 s-1
 # Coefficient affecting the decrease of unloading rate with distance from the apex (adimensional):
-gamma_unloading = 5.
+gamma_unloading = gamma_exudation*3
 # Affinity constant for sucrose unloading (in mol of sucrose per g of biomass):
 Km_unloading = expected_C_sucrose_root
 # => Explanation: According to Barillot et al. (2016b), this value is 1000 umol C g-1
@@ -188,29 +192,25 @@ def get_root_visitor():
 
         # The direction of the turtle is changed:
         turtle.down(angle_down)
-    
+        turtle.rollL(angle_roll)
+
         # Tropism is then taken into account:
         #diameter = 2 * n.radius * zoom_factor
         #elong = n.length * zoom_factor
         #alpha = tropism_intensity * diameter * elong
         #turtle.rollToVert(alpha, tropism_direction)
-        if g.edge_type(v)=='+':
+        # if g.edge_type(v)=='+':
             #diameter = 2 * n.radius * zoom_factor
             #elong = n.length * zoom_factor
             #alpha = tropism_intensity * diameter * elong
-            
-            turtle.elasticity= 0.2 * (n.radius / g.node(1).radius)
-            turtle.tropism = (0,0,-1)
-        
-        turtle.rollL(angle_roll)
-
+        turtle.elasticity = gravitropism_coefficient *(n.original_radius / g.node(1).original_radius)
+        turtle.tropism = (0,0,-1)
 
         # The turtle is moved:
         turtle.setId(v)
         turtle.setWidth(radius)
         turtle.F(length)
 
-    
         # We get the x,y,z coordinates from the end of the root segment, after the turtle has moved:
         position2 = turtle.getPosition()
         n.x2 = position2[0]/zoom_factor
@@ -863,7 +863,7 @@ def root_hexose_exudation(g, time_step_in_seconds=1. * (60. * 60. * 24.), printi
         elif n.lateral_emergence_possibility == "Possible":
             n.permeability_coeff = Pmax_apex / 5.
         else:
-            n.permeability_coeff = Pmax_apex / (1 + n.dist_to_tip * 10) ** gamma_exudation
+            n.permeability_coeff = Pmax_apex / (1 + n.dist_to_tip/n.original_radius) ** gamma_exudation
 
         # hexose_exudation is calculated as an efflux by diffusion, even for dead root elements:
         n.hexose_exudation \
@@ -1007,21 +1007,21 @@ def primordium_formation(apex, elongation_rate=0., time_step_in_seconds=1. * 60.
     # the product of this mean and the coefficient of variation CVDD (Pages et al. 2014).
     # We also set the root angles depending on random:
     if random:
-        potential_radius = np.random.normal((apex.radius - Dmin) * RMD + Dmin, ((apex.radius - Dmin) * RMD + Dmin) * CVDD)
+        potential_radius = np.random.normal((apex.radius - Dmin/2.) * RMD + Dmin/2., ((apex.radius - Dmin) * RMD + Dmin/2.) * CVDD)
         apex_angle_roll = abs(np.random.normal(120, 10))
         if order == 1:
             primordium_angle_down = abs(np.random.normal(45, 10))
         else:
             primordium_angle_down = abs(np.random.normal(70, 10))
-        primordium_angle_roll = abs(np.random.normal(3, 3))
+        primordium_angle_roll = abs(np.random.normal(5, 5))
     else:
-        potential_radius = (apex.radius - Dmin) * RMD + Dmin
+        potential_radius = (apex.radius - Dmin/2) * RMD + Dmin/2
         apex_angle_roll=120
         if order == 1:
             primordium_angle_down = 45
         else:
             primordium_angle_down = 70
-        primordium_angle_roll = 3
+        primordium_angle_roll = 5
 
     # If the distance between the apex and the last emerged root is higher than the inter-primordia distance
     # AND if the potential radius is higher than the minimum diameter:
@@ -1059,6 +1059,7 @@ def primordium_formation(apex, elongation_rate=0., time_step_in_seconds=1. * 60.
                                # The length of the primordium is set to 0:
                                length=0.,
                                radius=potential_radius,
+                               original_radius=potential_radius,
                                potential_length=0.,
                                potential_radius=0.,
                                initial_length=0.,
@@ -1084,6 +1085,7 @@ def primordium_formation(apex, elongation_rate=0., time_step_in_seconds=1. * 60.
                                resp_maintenance=0.,
                                resp_growth=0.,
                                hexose_growth_demand=0.,
+                               hexose_consumption_by_growth=0.,
                                prod_hexose=0.,
                                hexose_exudation=0.,
                                hexose_uptake=0.,
@@ -1455,8 +1457,8 @@ def segmentation_and_primordium_formation(apex, time_step_in_seconds=1. * 60. * 
     # Optional - We can add random geometry, or not:
     if random:
         np.random.seed(random_choice + apex.index())
-        angle_mean=3
-        angle_var=3
+        angle_mean=0
+        angle_var=5
         segment_angle_down = np.random.normal(angle_mean, angle_var)
         segment_angle_roll = np.random.normal(angle_mean, angle_var)
         apex_angle_down = np.random.normal(angle_mean, angle_var)
@@ -1574,6 +1576,7 @@ def segmentation_and_primordium_formation(apex, time_step_in_seconds=1. * 60. * 
                                   # The length of the primordium is set to 0:
                                   length=0.,
                                   radius=apex.radius,
+                                  original_radius=apex.radius,
                                   potential_length=0.,
                                   potential_radius=apex.radius,
                                   initial_length=0.,
@@ -1663,6 +1666,7 @@ def segmentation_and_primordium_formation(apex, time_step_in_seconds=1. * 60. * 
                               # The length of the primordium is set to 0:
                               length=new_length,
                               radius=apex.radius,
+                              original_radius=apex.radius,
                               potential_length=new_length,
                               potential_radius=apex.radius,
                               initial_length=new_length,
@@ -2117,25 +2121,56 @@ def sucrose_to_hexose(g, time_step_in_seconds=1. * (60. * 60. * 24.), printing_w
         # We calculate the unloading coefficient according to the distance from the apex:
         # # OPTION 1 By analogy with what is done for hexose exudation according to Personeni et al. (2007):
         # n.unloading_coeff = unloading_apex / (1 + n.dist_to_tip*100) ** gamma_unloading
+
         # OPTION 2:
-        # We consider that unloading coefficient is maximal at apices, medium when a lateral must emerge, and low everywhere else:
-        if n.label == "Apex" and n.type == "Normal_root_after_emergence":
-            n.unloading_coeff = unloading_apex
-        elif n.lateral_emergence_possibility == "Possible":
-            if n.type == "Base_of_the_root_system":
-                n.unloading_coeff = unloading_apex*10.
-            else:
-                n.unloading_coeff = unloading_apex / 5.
+        # We consider that unloading coefficient is maximal at apices, medium when a lateral must emerge, and lower everywhere else.
+        if n.type=="Base_of_the_root_system":
+            n.unloading_coeff = unloading_apex / (1 + n.dist_to_tip/n.original_radius)
         else:
-            if n.type == "Dead":
-                n.unloading_coeff = 0.
-            elif n.type == "Stopped":
-                n.unloading_coeff = unloading_apex / 100.
-            else:
-                n.unloading_coeff = unloading_apex / 50.
+            # We define the unloading coefficient as dependent on dist_to_tip, as in Option 1:
+            n.unloading_coeff = unloading_apex / (1 + n.dist_to_tip/n.original_radius) ** gamma_unloading
+            # And we modify the unloading according to the radius of the element:
+            n.unloading_coeff = n.unloading_coeff * (n.radius/g.node(1).original_radius)**2
+        # And we deal with special cases:
+        if n.lateral_emergence_possibility == "Possible":
+            # If a new axis may emerge from a root element (e.g. in the base), we add to the "normal" unloading rate
+            # the unloading corresponding to the one needed by the (not yet) emerged apex:
+            primordium = g.node(n.lateral_primordium_index)
+            n.unloading_coeff += unloading_apex * (primordium.radius / g.node(1).original_radius)**2
+        elif n.type == "Stopped" or n.type == "Just_stopped":
+            # If the element has stopped its growth, we decrease its unloading coefficient:
+            n.unloading_coeff = n.unloading_coeff / 50.
+        elif n.type == "Dead" or n.type == "Just_dead":
+            # If the element is dead, there is no unloading anymore:
+            n.unloading_coeff = 0.
+
+        # We add a safety here, so that no root element can remain permanently under hexose deficit:
+        # If there is already some deficit in hexose, the unloading coefficient is allowed to increase:
+        if n.Deficit_hexose_root >0.:
+            n.unloading_coeff = n.unloading_coeff * 500.
+
+        # # If the element corresponds to an apex (already emerged):
+        # if n.label == "Apex":
+        #     n.unloading_coeff = unloading_apex * 5 * (n.radius/g.node(1).original_radius)
+        # # If the element corresponds to a segment from which a new axis may emerge:
+        # elif n.lateral_emergence_possibility == "Possible":
+        #     if n.type == "Base_of_the_root_system":
+        #         n.unloading_coeff = unloading_apex * 1.
+        #     else:
+        #         n.unloading_coeff = unloading_apex / 10.
+        # else:
+        #     if n.type == "Dead":
+        #         n.unloading_coeff = 0.
+        #     elif n.type == "Stopped":
+        #         n.unloading_coeff = unloading_apex / 100.
+        #     else:
+        #         n.unloading_coeff = unloading_apex / 20.
 
         # We calculate the potential production of hexose (in mol) according to the Michaelis-Menten function:
-        n.prod_hexose = 2. * n.external_surface * n.unloading_coeff * n.C_sucrose_root \
+        # n.prod_hexose = 2. * n.external_surface * n.unloading_coeff * n.C_sucrose_root \
+        #                         / (Km_unloading + n.C_sucrose_root) * time_step_in_seconds
+
+        n.prod_hexose = 2. * n.unloading_coeff * n.C_sucrose_root \
                                 / (Km_unloading + n.C_sucrose_root) * time_step_in_seconds
         # The factor 2 originates from the conversion of 1 molecule of sucrose into 2 molecules of hexose.
 
@@ -2284,6 +2319,7 @@ def initiate_mtg(random=True):
     segment.angle_roll = 0
     segment.length = segment_length
     segment.radius = base_radius
+    segment.original_radius = base_radius
     segment.initial_length = segment_length
     segment.initial_radius = base_radius
     segment.external_surface, segment.volume = surface_and_volume(segment, segment.radius, segment.length)
@@ -2309,6 +2345,7 @@ def initiate_mtg(random=True):
     segment.resp_maintenance = 0.
     segment.resp_growth = 0.
     segment.hexose_growth_demand = 0.
+    segment.hexose_consumption_by_growth=0.
     segment.prod_hexose = 0.
     segment.hexose_exudation = 0.
     segment.hexose_uptake = 0.
@@ -2346,6 +2383,7 @@ def initiate_mtg(random=True):
                                         # The length of the primordium is set to 0:
                                         length=0.,
                                         radius=Di/2.,
+                                        original_radius=Di/2.,
                                         potential_length=0.,
                                         potential_radius=0.,
                                         initial_length=0.,
@@ -2370,6 +2408,7 @@ def initiate_mtg(random=True):
                                         resp_maintenance=0.,
                                         resp_growth=0.,
                                         hexose_growth_demand=0.,
+                                        hexose_consumption_by_growth=0.,
                                         prod_hexose=0.,
                                         hexose_exudation=0.,
                                         hexose_uptake=0.,
@@ -2409,6 +2448,7 @@ def initiate_mtg(random=True):
                                                 # The length of the primordium is set to 0:
                                                 length=0.,
                                                 radius=radius_adventious,
+                                                original_radius=radius_adventious,
                                                 potential_length=0.,
                                                 potential_radius=0.,
                                                 initial_length=0.,
@@ -2433,6 +2473,7 @@ def initiate_mtg(random=True):
                                                 resp_maintenance=0.,
                                                 resp_growth=0.,
                                                 hexose_growth_demand=0.,
+                                                hexose_consumption_by_growth=0.,
                                                 prod_hexose=0.,
                                                 hexose_exudation=0.,
                                                 hexose_uptake=0.,
@@ -2466,6 +2507,7 @@ def initiate_mtg(random=True):
                              # The length of the primordium is set to half of the segment length:
                              length=segment_length/2.,
                              radius=Di/2.,
+                             original_radius=Di/2.,
                              potential_length=0.,
                              potential_radius=0.,
                              initial_length=0.,
@@ -2490,6 +2532,7 @@ def initiate_mtg(random=True):
                              resp_maintenance=0.,
                              resp_growth=0.,
                              hexose_growth_demand=0.,
+                             hexose_consumption_by_growth=0.,
                              prod_hexose=0.,
                              hexose_exudation=0.,
                              hexose_uptake=0.,
@@ -2863,7 +2906,7 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1., rad
                 # We calculate the potential growth, already based on ArchiSimple rules:
                 potential_growth(g, time_step_in_seconds=time_step_in_seconds,
                                  radial_growth=radial_growth,
-                                 Archisimple=True, printing_warnings=printing_warnings)
+                                 Archisimple=True)
 
                 # We use the function archisimple_growth to adapt the potential growth to the available biomass:
                 SC = satisfaction_coefficient(g,biomass_input=biomass_input)
@@ -2878,7 +2921,9 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1., rad
             #--------------------------------------------------------------------------
 
                 # Calculation of potential growth without consideration of available hexose:
-                potential_growth(g, time_step_in_seconds=time_step_in_seconds, radial_growth=radial_growth, Archisimple=False)
+                potential_growth(g, time_step_in_seconds=time_step_in_seconds,
+                                 radial_growth=radial_growth,
+                                 Archisimple=False)
 
                 # Calculation of actual growth based on the hexose remaining in the roots,
                 # and corresponding consumption of hexose in the root:
@@ -3059,7 +3104,14 @@ def main_simulation(g, simulation_period_in_days=120., time_step_in_days=1., rad
                                                "Hexose in the root (mol of hexose)",
                                                "Hexose in the soil (mol of hexose)",
                                                "CO2 originating from root growth (mol of C)",
-                                               "CO2 originating from root maintenance (mol of C)"])
+                                               "CO2 originating from root maintenance (mol of C)",
+                                               "Hexose produced in the root (mol of hexose)",
+                                               "Hexose exudated (mol of hexose)",
+                                               "Hexose taken up (mol of hexose)",
+                                               "Hexose degraded (mol of hexose)",
+                                               "Total amount of C present in the root-soil system (mol of C)",
+                                               "Total amount of C cumulated in the gazeous phase (mol of C)"
+                                               ])
             # We save the data_frame in a CSV file:
             data_frame.to_csv('simulation_results.csv', na_rep='NA', index=False, header=True)
 
@@ -3092,17 +3144,17 @@ time_since_last_adventious_root_emergence = 0.
 global_sucrose_deficit=0.
 
 # We launch the main simulation program:
-main_simulation(g, simulation_period_in_days=20, time_step_in_days=0.5, radial_growth="Possible", Archisimple=False,
-                property="C_hexose_root", vmin=1e-8, vmax=1e-0, log_scale=True,
-                sucrose_input_file="sucrose_input_0059.csv", constant_sucrose_input_rate=1e-6,
+main_simulation(g, simulation_period_in_days=80, time_step_in_days=1/24., radial_growth="Possible", Archisimple=False,
+                property="net_hexose_exudation", vmin=1e-12, vmax=1e-9, log_scale=True,
+                sucrose_input_file="sucrose_input_0047_1hour.csv", constant_sucrose_input_rate=1e-6,
                 x_center=0, y_center=0, z_center=-2, z_cam=-5,
                 camera_distance = 5, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12*10,
-                recording_images=False,
-                z_classification=True, z_min=0.0, z_max=0.3, z_interval=0.1,
+                recording_images=True,
+                z_classification=True, z_min=0.0, z_max=1., z_interval=0.1,
                 printing_sum=True,
                 recording_sum=True,
                 printing_warnings=False,
-                recording_g=False,
+                recording_g=True,
                 recording_g_properties=True,
                 random=True)
 
