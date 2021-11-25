@@ -293,11 +293,11 @@ relative_root_thickening_rate_max = 5. / 100. / (24. * 60. * 60.)
 # => We consider that the radius can't increase by more than 5% every day
 
 # We define a probablility (between 0 and 1) of nodule formation for each apex that elongates:
-nodule_formation_probability = 0.2
+nodule_formation_probability = 0.5
 # Maximal radius of nodule (in m):
 nodule_max_radius = D_ini * 20.
 # Affinity constant for nodule thickening (in mol of hexose per g of struct_mass):
-Km_nodule_thickening = Km_elongation
+Km_nodule_thickening = Km_elongation*100
 # Maximal rate of relative increase in nodule radius (in m per m per s):
 relative_nodule_thickening_rate_max = 20. / 100. / (24. * 60. * 60.)
 # => We consider that the radius can't increase by more than 20% every day
@@ -575,7 +575,9 @@ def surfaces_and_volumes(element, radius, length):
         sum_ramif_sections = 0
         for child_vid in g.Sons(vid, EdgeType='+'):
             son = g.node(child_vid)
-            sum_ramif_sections += pi * son.radius ** 2
+            # We avoid to remove the section of the sphere of a nodule:!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if son.type != "Root_nodule":
+                sum_ramif_sections += pi * son.radius ** 2
         # And we subtract this sum of sections from the external area of the main cylinder:
         external_surface = 2 * pi * radius * length - sum_ramif_sections
         volume = pi * radius ** 2 * length
@@ -1593,9 +1595,16 @@ def potential_segment_development(segment, time_step_in_seconds=60. * 60. * 24.,
     #################################
 
     if segment.type == "Root_nodule":
+        # We consider the amount of hexose available in the nodule AND in the parent segment:
+        index_parent = g.Father(segment.index(), EdgeType='+')
+        parent = g.node(index_parent)
+        segment.hexose_available_for_thickening = parent.C_hexose_root * parent.struct_mass \
+                                                  + segment.C_hexose_root * segment.struct_mass
+        # We calculate an average concentration of hexeose that will help to regulate nodule growth:
+        C_hexose_regulating_nodule_growth = segment.hexose_available_for_thickening / (parent.struct_mass + segment.struct_mass)
         # We modulate the relative increase in radius by the amount of C available in the nodule:
         thickening_rate = relative_nodule_thickening_rate_max \
-                          * segment.C_hexose_root / (Km_nodule_thickening + segment.C_hexose_root)
+                          * C_hexose_regulating_nodule_growth / (Km_nodule_thickening + C_hexose_regulating_nodule_growth)
         # We modulate the relative increase in radius by the temperature:
         thickening_rate = thickening_rate * temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                      process_at_T_ref=1,
@@ -1620,6 +1629,9 @@ def potential_segment_development(segment, time_step_in_seconds=60. * 60. * 24.,
     number_of_actual_children =0.
     death_count = 0.
     list_of_times_since_death = []
+
+    # We define the amount of hexose available for thickening:
+    segment.hexose_available_for_thickening = segment.C_hexose_root * segment.struct_mass
 
     # CALCULATING AN EQUIVALENT OF THERMAL TIME:
     # ------------------------------------------
@@ -2186,7 +2198,7 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
         # If radial growth is possible:
         if n.potential_radius > n.radius:
             # We only consider the amount of hexose immediately available in the element that can increase in radius:
-            hexose_available_for_thickening = n.C_hexose_root * n.initial_struct_mass
+            hexose_available_for_thickening = n.hexose_available_for_thickening
 
         # In case no hexose is available at all:
         if (hexose_available_for_elongation + hexose_available_for_thickening) <= 0.:
@@ -2288,10 +2300,19 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
                 hexose_actual_contribution_to_thickening = 1. / 6. * net_increase_in_volume * root_tissue_density * struct_mass_C_content / yield_growth
 
             # REGISTERING THE COSTS FOR THICKENING:
+            fraction_of_available_hexose_in_the_element = (n.C_hexose_root * n.initial_struct_mass) / hexose_available_for_thickening
             # The amount of hexose used for growth in this element is increased:
-            n.hexose_consumption_by_growth += hexose_actual_contribution_to_thickening
+            n.hexose_consumption_by_growth += (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
             # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
-            n.resp_growth += hexose_actual_contribution_to_thickening * (1 - yield_growth) * 6.
+            n.resp_growth += (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) * (1 - yield_growth) * 6.
+            if n.type=="Root_nodule":
+                index_parent = g.Father(n.index(), EdgeType='+')
+                parent = g.node(index_parent)
+                fraction_of_available_hexose_in_the_element = (parent.C_hexose_root * parent.initial_struct_mass) / hexose_available_for_thickening
+                # The amount of hexose used for growth in this element is increased:
+                parent.hexose_consumption_by_growth += (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
+                # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
+                parent.resp_growth += (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) *(1 - yield_growth) * 6.
 
         # RECORDING THE ACTUAL STRUCTURAL MODIFICATIONS:
         # -----------------------------------------------
@@ -2681,6 +2702,14 @@ def exchange_with_phloem(g, time_step_in_seconds=1. * (60. * 60. * 24.),
                     "mol/g and root hexose concentration was", n.C_hexose_root, "mol/g."
             continue
 
+        # We verify that the concentration of sucrose and hexose in root are not negative:!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if n.Deficit_sucrose_root > 0. or n.Deficit_hexose_root > 0.:
+            if printing_warnings:
+                print "WARNING: No exchange with phloem occured for node", n.index(), \
+                    "because there was deficit in sucrose of", n.Deficit_sucrose_root, \
+                    "mol/g and in hexose of", n.Deficit_hexose_root, "mol/g."
+            continue
+
         # We calculate the current external surface of the element:
         n.phloem_surface = surfaces_and_volumes(n, n.radius, n.length)["phloem_surface"]
         # We calculate the surface (m2) corresponding to the section of an emerging primordium (if any):
@@ -2708,8 +2737,8 @@ def exchange_with_phloem(g, time_step_in_seconds=1. * (60. * 60. * 24.),
 
         # #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # if n.type == "Root_nodule":
-        #     n.max_unloading_rate = n.max_unloading_rate*1.
-        #     n.max_loading_rate = n.max_loading_rate/10.
+        #     n.max_unloading_rate = n.max_unloading_rate/10.
+        #     n.max_loading_rate = n.max_loading_rate/100.
 
         # We correct both loading and unloading rates according to soil temperature:
         n.max_unloading_rate = n.max_unloading_rate * temperature_modification(
@@ -4158,33 +4187,11 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # We reset to 0 all growth-associated C costs:
                 reinitializing_growth_variables(g)
 
-                # Supply of sucrose from the shoots to the roots and spreading into the whole phloem:
-                shoot_sucrose_supply_and_spreading(g, sucrose_input_rate=sucrose_input_rate,
-                                                   time_step_in_seconds=time_step_in_seconds,
-                                                   printing_warnings=printing_warnings)
-                # WARNING: The function "shoot_sucrose_supply_and_spreading" must be called AFTER the function "balance",!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                # otherwise the deficit in sucrose may be counted twice!!!
-
                 # Calculation of potential growth without consideration of available hexose:
                 potential_growth(g, time_step_in_seconds=time_step_in_seconds,
                                  radial_growth=radial_growth,
                                  soil_temperature_in_Celsius=soil_temperature,
                                  ArchiSimple=False)
-
-                # #NODULE FORMATION: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                # # We consider the possibility of nodule formation:
-                # if nodules:
-                #     # We select a random element within the MTG:
-                #     list_apices = [g.node(v) for v in pre_order(g, root) if g.label(v) == 'Segment'] #and g.Successor(v).type=="Apex"]
-                #     print list_apices
-                #     supporting_element = np.random.choice(list_apices)
-                #     # if supporting_element.type=="Normal_root_after_emergence" and len(supporting_element.children())<2:
-                #     if supporting_element.type == "Normal_root_after_emergence" \
-                #             and supporting_element.label=="Segment" \
-                #             and len(supporting_element.children())<2\
-                #             and np.random.normal(1.,0.5)<1\
-                #             and step>1*24.: # We add a temporal condition here!
-                #         nodule_formation(mother_element=supporting_element)
 
                 # Calculation of actual growth based on the hexose remaining in the roots,
                 # and corresponding consumption of hexose in the root:
@@ -4230,8 +4237,16 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # Calculation of the new concentrations in hexose and sucrose once all the processes have been done:
                 tip_C_hexose_root = balance(g, printing_warnings=printing_warnings)
 
+
+                # Supply of sucrose from the shoots to the roots and spreading into the whole phloem:
+                shoot_sucrose_supply_and_spreading(g, sucrose_input_rate=sucrose_input_rate,
+                                                   time_step_in_seconds=time_step_in_seconds,
+                                                   printing_warnings=printing_warnings)
+                # WARNING: The function "shoot_sucrose_supply_and_spreading" must be called AFTER the function "balance",!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                # otherwise the deficit in sucrose may be counted twice!!!
+
                 # # OPTIONAL: checking of possible anomalies in the root system:
-                # control_of_anomalies(g)
+                control_of_anomalies(g)
 
             # A the end of the time step, if the global variable "time_since_adventious_root_emergence" has been unchanged:
             if thermal_time_since_last_adventious_root_emergence == initial_time_since_adventious_root_emergence:
@@ -4493,7 +4508,7 @@ thermal_time_since_last_adventious_root_emergence = 0.
 global_sucrose_deficit = 0.
 
 # We launch the main simulation program:
-main_simulation(g, simulation_period_in_days=12., time_step_in_days=1./24., radial_growth="Possible",
+main_simulation(g, simulation_period_in_days=20., time_step_in_days=1./24., radial_growth="Possible",
                 ArchiSimple=False,
                 # property="net_hexose_exudation_rate_per_day_per_cm", vmin=1e-9, vmax=1e-6, log_scale=True, cmap='jet',
                 property="C_hexose_root", vmin=1e-4, vmax=1e-1, log_scale=True, cmap='jet',
@@ -4506,10 +4521,10 @@ main_simulation(g, simulation_period_in_days=12., time_step_in_days=1./24., radi
                 x_center=0, y_center=0, z_center=-1, z_cam=-2,
                 camera_distance=4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
                 z_classification=False, z_min=0.00, z_max=1., z_interval=0.05,
-                recording_images=False,
-                printing_sum=False,
-                recording_sum=False,
-                printing_warnings=False,
+                recording_images=True,
+                printing_sum=True,
+                recording_sum=True,
+                printing_warnings=True,
                 recording_g=False,
                 recording_g_properties=False,
                 random=True)
