@@ -4,16 +4,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from math import exp, trunc
 from matplotlib.ticker import StrMethodFormatter
-plt.rcdefaults()
-import time
 
-# Tranforming dataset:
-#---------------------
+plt.rcdefaults()
+
+
+# Transforming dataset:
+# ---------------------
 def treating_z_dataframe(file_name='z_classification.csv',
                          z_min=0., z_max=1., z_interval=0.05,
                          plants_per_m2=35,
                          input_treatment=False):
-
     # Reading the z_classification file:
     PATH1 = os.path.join('.', file_name)
     # Then we read the file and copy it in a dataframe "df":
@@ -24,7 +24,7 @@ def treating_z_dataframe(file_name='z_classification.csv',
         """
         This will return a list containing all headers related to the specified property.
         """
-        list=[]
+        list = []
         # For each interval of z values to be considered:
         for z_start in np.arange(z_min, z_max, z_interval):
             # We recreate the exact name of the category to display on the graph:
@@ -57,9 +57,9 @@ def treating_z_dataframe(file_name='z_classification.csv',
         new_var = 'cum_' + col
         df_cum[new_var] = np.cumsum(df[col])
     # We remove unnecessary cumulative time columns:
-    df_cum=df_cum.drop(columns=['cum_time_in_days', 'cum_day_number'])
+    df_cum = df_cum.drop(columns=['cum_time_in_days', 'cum_day_number'])
     # We select only the lines where a new day is reached:
-    df_cum = df_cum.loc[df_cum['time_in_days']==df_cum['day_number']]
+    df_cum = df_cum.loc[df_cum['time_in_days'] == df_cum['day_number']]
     # # We remove the column 'day_number':
     # df_cum = df_cum.drop(columns=['day_number'])
     # We move the column 'time_in_days' at the beginning of the file:
@@ -81,7 +81,7 @@ def treating_z_dataframe(file_name='z_classification.csv',
     df_sum.to_csv('z_classification_sum_by_day.csv', na_rep='NA', index=False, header=True)
 
     # We group by day_number and average each variable:
-    df_mean= df.groupby(by=['day_number'], as_index=False).mean()
+    df_mean = df.groupby(by=['day_number'], as_index=False).mean()
     # We adjust the time in days according to day_number:
     df_mean['time_in_days'] = df_mean['day_number'] + 1
     # We remove the column 'day_number':
@@ -93,7 +93,7 @@ def treating_z_dataframe(file_name='z_classification.csv',
     df_mean.to_csv('z_classification_mean_by_day.csv', na_rep='NA', index=False, header=True)
 
     # We group by day_number and take the max of each variable:
-    df_max= df.groupby(by=['day_number'], as_index=False).max()
+    df_max = df.groupby(by=['day_number'], as_index=False).max()
     # We adjust the time in days according to day_number:
     df_max['time_in_days'] = df_max['day_number'] + 1
     # We remove the column 'day_number':
@@ -121,8 +121,8 @@ def treating_z_dataframe(file_name='z_classification.csv',
         df3.reset_index(drop=True, inplace=True)
         df4.reset_index(drop=True, inplace=True)
 
-        frames=[df1,df2,df3,df4]
-        df_input=pd.concat(frames, axis=1, sort=False, ignore_index=False)
+        frames = [df1, df2, df3, df4]
+        df_input = pd.concat(frames, axis=1, sort=False, ignore_index=False)
         df_input.to_csv('z_classification_input_by_day.csv', na_rep='NA', index=False, header=True)
 
         # We cumulate input values:
@@ -132,7 +132,7 @@ def treating_z_dataframe(file_name='z_classification.csv',
             new_var = 'cum_' + col
             df_input_cum[new_var] = np.cumsum(df_input[col])
         # We remove unnecessary cumulative time columns:
-        df_input_cum=df_input_cum.drop(columns=['cum_time_in_days'])
+        df_input_cum = df_input_cum.drop(columns=['cum_time_in_days'])
         # We move the column 'time_in_days' at the beginning of the file:
         first_column = df_input_cum.pop('time_in_days')
         df_input_cum.insert(0, 'time_in_days', first_column)
@@ -140,19 +140,26 @@ def treating_z_dataframe(file_name='z_classification.csv',
         df_input_cum.to_csv('z_classification_input_cum_by_day.csv', na_rep='NA', index=False, header=True)
 
     # Finally:
-    print "Additional tables have been created from file", file_name, "(check the files!)."
+    print("Additional tables have been created from file", file_name, "(check the files!).")
 
     return
 
-# Creating a bar plot:
-#---------------------
-def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=1e-12, value_max=1e0, log=True, title="",
-                       format_x='%.2E', label=[""], color=["blue","green"]):
 
-    fig, ax = plt.subplots(figsize=(8,6))  # Create the figure
+# Creating a bar plot:
+# ---------------------
+def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=1e-12, value_max=1e0, log=True, title="",
+                       format_x='%.2E', label=None, color=None):
+
+    # Default values
+    if label is None:
+        label = [""]
+    if color is None:
+        color = ["blue", "green"]
+
+    fig, ax = plt.subplots(figsize=(8, 6))  # Create the figure
     # fig.subplots_adjust(left=0.115, right=0.88)
     y_pos = np.arange(len(categories))
-    values=np.array(values)
+    values = np.array(values)
     values_cum = values.cumsum(axis=1)
 
     if stacked_barplot:
@@ -160,11 +167,11 @@ def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=1e-1
         y = 0
         # Stacked horizontal bar plot:
         # ---------------------
-        for x in range(0,len(values[0,:])):
+        for x in range(0, len(values[0, :])):
             # legend_name= label[x]
             # y += values[:, x]
             # ax.barh(y_pos, y, log=log, align='center', color=color[x], height=1, label = legend_name)
-            legend_name= label[x]
+            legend_name = label[x]
             y = values[:, x]
             y_start = values_cum[:, x] - values[:, x]
             ax.barh(y_pos, y, left=y_start, log=log, align='center', color=color[x], height=1, label=legend_name)
@@ -185,7 +192,7 @@ def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=1e-1
     else:
 
         # Horizontal bar plot:
-        #---------------------
+        # ---------------------
         # ax.barh(y_pos, values, 0.3, align='center', color='green')
         ax.barh(y_pos, values, log=log, align='center', color=color[0], height=1)
         ax.set_yticks(y_pos)
@@ -203,18 +210,23 @@ def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=1e-1
 
     return
 
+
 # Plotting several graphs:
-#-------------------------
+# -------------------------
 def plotting_on_z(file_name='z_classification.csv',
                   property='hexose_exudation',
                   title="",
-                  color=['green'],
+                  color=None,
                   z_min=0., z_max=1., z_interval=0.1,
                   value_min=1e-12,
                   value_max=1e0,
                   log=True,
                   recording_images=True
                   ):
+
+    # Default value
+    if color is None:
+        color = ['green']
 
     # Reading the z_classification file:
     PATH1 = os.path.join('.', file_name)
@@ -235,13 +247,13 @@ def plotting_on_z(file_name='z_classification.csv',
                     os.remove(os.path.join(root, file))
 
     # We initialize empty lists:
-    categories=[]
+    categories = []
     values = []
 
     # For each line of the data frame that contains information on sucrose input:
     for i in range(0, len(df['time_in_days'])):
 
-        print "Printing plot", i+1, "out of", len(df['time_in_days']), "..."
+        print("Printing plot", i + 1, "out of", len(df['time_in_days']), "...")
 
         # For each interval of z values to be considered:
         for z_start in np.arange(z_min, z_max, z_interval):
@@ -274,13 +286,14 @@ def plotting_on_z(file_name='z_classification.csv',
 
     return
 
+
 # Plotting several graphs:
-#-------------------------
+# -------------------------
 def plotting_on_z_stacked(file_name='z_classification.csv',
-                          property=['hexose_exudation','struct_mass'],
-                          label = ['Cumulated hexose exudation', 'Cumulated hexose degradation'],
+                          property=None,
+                          label=None,
                           title="",
-                          color=['blue','green'],
+                          color=None,
                           z_min=0., z_max=1., z_interval=0.1,
                           value_min=1e-12,
                           value_max=1e0,
@@ -288,6 +301,14 @@ def plotting_on_z_stacked(file_name='z_classification.csv',
                           log=True,
                           recording_images=True
                           ):
+
+    # Default values
+    if color is None:
+        color = ['blue', 'green']
+    if label is None:
+        label = ['Cumulated hexose exudation', 'Cumulated hexose degradation']
+    if property is None:
+        property = ['hexose_exudation', 'struct_mass']
 
     # Reading the z_classification file:
     PATH1 = os.path.join('.', file_name)
@@ -308,16 +329,16 @@ def plotting_on_z_stacked(file_name='z_classification.csv',
                     os.remove(os.path.join(root, file))
 
     # We initialize empty lists:
-    categories_z=[]
-    name_values_z=[]
+    categories_z = []
+    name_values_z = []
     # We initialize an empty Numpy array:
-    n_z_categories = trunc((z_max - z_min)/z_interval)
-    values = np.zeros([n_z_categories,len(property)])
+    n_z_categories = trunc((z_max - z_min) / z_interval)
+    values = np.zeros([n_z_categories, len(property)])
 
     # For each line of the data frame that contains information on sucrose input:
-    for i in range(0, len(df['time_in_days'])-1):
+    for i in range(0, len(df['time_in_days']) - 1):
 
-        print "Printing plot", i+1, "out of", len(df['time_in_days'])-1, "..."
+        print("Printing plot", i + 1, "out of", len(df['time_in_days']) - 1, "...")
         index_z = 0
         # For each interval of z values to be considered:
         for z_start in np.arange(z_min, z_max, z_interval):
@@ -331,8 +352,8 @@ def plotting_on_z_stacked(file_name='z_classification.csv',
             for x in range(0, len(property)):
                 name_values_z.append(property[x] + '_' + str(z_start) + "-" + str(z_start + z_interval) + "_m")
                 # np.append(values, df.loc[i, name_values_z[x]], x)
-                values[index_z][x]= df.loc[i, name_values_z[-1]]
-            index_z+=1
+                values[index_z][x] = df.loc[i, name_values_z[-1]]
+            index_z += 1
 
         # Creating the chart for this time step:
         making_a_bar_graph(categories=categories_z, values=values, stacked_barplot=True, value_min=value_min, value_max=value_max,
@@ -353,6 +374,7 @@ def plotting_on_z_stacked(file_name='z_classification.csv',
 
     return
 
+
 ########################################################################################################################
 ########################################################################################################################
 
@@ -360,7 +382,7 @@ def plotting_on_z_stacked(file_name='z_classification.csv',
 ###################
 
 # Plotting the evolution of one rate over time:
-#----------------------------------------------
+# ----------------------------------------------
 # treating_z_dataframe(file_name='z_classification.csv')
 # plotting_on_z(file_name='z_classification_sum_by_day.csv',
 #               property='net_hexose_exudation',
@@ -416,7 +438,7 @@ treating_z_dataframe(file_name='z_classification.csv',
                      input_treatment=True)
 plotting_on_z_stacked(file_name='z_classification_input_cum_by_day.csv',
                       property=['cum_net_hexose_exudation', 'cum_net_root_necromass'],
-                      label = ['Exudates', 'Dead roots'],
+                      label=['Exudates', 'Dead roots'],
                       color=['royalblue', 'darkkhaki'],
                       title="\n Cumulated root-derived C inputs (gC m-2) per 5-cm layer",
                       z_min=0., z_max=1., z_interval=0.05,
@@ -445,7 +467,7 @@ plotting_on_z_stacked(file_name='z_classification_input_cum_by_day.csv',
 #                       )
 
 # Plotting the accumulation over time:
-#-------------------------------------
+# -------------------------------------
 
 # # Exudation:
 # plotting_on_z(file_name='z_classification_cum.csv',
