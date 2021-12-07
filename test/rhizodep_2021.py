@@ -1486,7 +1486,7 @@ def potential_apex_development(apex, time_step_in_seconds=1. * 60. * 60. * 24., 
                 apex.actual_time_since_growth_stopped += time_step_in_seconds
                 apex.thermal_time_since_growth_stopped += time_step_in_seconds * temperature_time_adjustment
                 # The type is (re)declared "Stopped":
-                apex.type = "Stopped"  # TODO: was == instead of =, check with Fred Rees
+                apex.type = "Stopped"
                 # The times are incremented:
                 apex.actual_time_since_primordium_formation += time_step_in_seconds
                 apex.thermal_time_since_primordium_formation += time_step_in_seconds * temperature_time_adjustment
@@ -4529,13 +4529,13 @@ if __name__ == "__main__":
                     # property="C_sucrose_root", vmin=1e-4, vmax=1e2, log_scale=True, cmap='brg',
                     # property="C_hexose_reserve", vmin=1e-4, vmax=1e4, log_scale=True, cmap='brg',
                     input_file="sucrose_input_0047.csv",
-                    constant_sucrose_input_rate=5e-9,
-                    constant_soil_temperature_in_Celsius=20,
+                    constant_sucrose_input_rate=0,
+                    constant_soil_temperature_in_Celsius=0,
                     nodules=False,
                     x_center=0, y_center=0, z_center=-1, z_cam=-2,
                     camera_distance=4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
                     z_classification=False, z_min=0.00, z_max=1., z_interval=0.05,
-                    recording_images=False,
+                    recording_images=True,
                     printing_sum=False,
                     recording_sum=True,
                     printing_warnings=False,
