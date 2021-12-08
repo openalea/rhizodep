@@ -4009,7 +4009,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         x_camera = camera_distance
         x_cam = camera_distance
         z_camera = z_cam
-        print("OK")
         sc = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
                       x_center=x_center,
                       y_center=y_center,
@@ -4522,7 +4521,7 @@ if __name__ == "__main__":
 
     # We launch the main simulation program:
     print("Simulation starts ...")
-    main_simulation(g, simulation_period_in_days=20., time_step_in_days=1. / 24., radial_growth="Possible",
+    main_simulation(g, simulation_period_in_days=2., time_step_in_days=1. / 24., radial_growth="Possible",
                     ArchiSimple=False,
                     # property="net_hexose_exudation_rate_per_day_per_cm", vmin=1e-9, vmax=1e-6, log_scale=True, cmap='jet',
                     property="C_hexose_root", vmin=1e-4, vmax=1e-1, log_scale=True, cmap='jet',
