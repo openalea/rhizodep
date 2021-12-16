@@ -1,17 +1,248 @@
+#  -*- coding: utf-8 -*-
 
-from math import pi, cos, sin
+"""
+    rhizodep.tools
+    ~~~~~~~~~~~~~
+
+    The module :mod:`rhizodep.tools` defines useful functions for data preprocessing, graph making...
+
+    :copyright: see AUTHORS.
+    :license: see LICENSE for details.
+"""
+
+# TODO: add functions from graph_making.py and video.py
+
+import os
+from math import pi, cos, sin, floor
 import numpy as np
+import pandas as pd
 
 from openalea.mtg import turtle as turt
 from openalea.mtg.plantframe import color
 import openalea.plantgl.all as pgl
 import rhizodep.parameters as param
 
-########################################################################################################################
-########################################################################################################################
-# COMMON GENERAL FUNCTIONS POSSIBLY USED IN EACH MODULE
-########################################################################################################################
-########################################################################################################################
+
+# FUNCTIONS FOR DATA PREPROCESSING :
+####################################
+
+# TODO: see if this function should stay in tools, or move to simulations/run_rhizodep.py
+
+def formatted_inputs(original_input_file="None", original_time_step_in_days=1 / 24., final_time_step_in_days=1.,
+                     simulation_period_in_days=60., do_not_execute_if_file_with_suitable_size_exists=False):
+    """
+    This function creates a new input file containing data on soil temperature and sucrose input rate (in mol of sucrose per second),
+    based on an original file. The new file is adapted to the required time step (higher, equal or lower than the original time step).
+    If the option 'do_not_execute_if_file_with_suitable_size_exists' is set to True, a new file will be created only if the already-
+    existing 'input_file.csv' does not contain the correct number of lines.
+    """
+
+    # If there is a file where the inputs of sucrose in the root system have to be read:
+    if original_input_file != "None":
+
+        # We first define the path and the file to read as a .csv:
+        PATH1 = os.path.join('.', original_input_file)
+        # Then we read the file and copy it in a dataframe "df":
+        df = pd.read_csv(PATH1, sep=',', header=0)
+
+        # simulation_period_in_days = df['time_in_days'].max()-df['time_in_days'].min()
+        n_steps = int(floor(simulation_period_in_days / final_time_step_in_days)) + 1
+
+        if do_not_execute_if_file_with_suitable_size_exists:
+            PATH2 = os.path.join('.', 'input_file.csv')
+            previous_file = pd.read_csv(PATH2, sep=',', header=0)
+
+            if len(previous_file['step_number']) == n_steps:
+                print("There is already an 'input_file.csv' of proper length for this simulation, "
+                      "we therefore did not create a new input file here (if you wish to do so, please select 'do_not_execute_if_file_with_suitable_size_exists=False').")
+                return previous_file
+
+        # We create a new, final dataframe that will be used to read inputs of sucrose:
+        input_frame = pd.DataFrame(
+            columns=["step_number", "initial_time_in_days", "final_time_in_days", "soil_temperature_in_degree_Celsius",
+                     "sucrose_input_rate"])
+        input_frame["step_number"] = range(1, n_steps + 1)
+        input_frame["initial_time_in_days"] = (input_frame["step_number"] - 1) * final_time_step_in_days * 1.
+        input_frame["final_time_in_days"] = input_frame["initial_time_in_days"] + final_time_step_in_days
+
+        print("Creating a new input file adapted to the required time step (time step =", final_time_step_in_days, "days):")
+
+        # CASE 1: the final time step is higher than the original one, so we have to calculate an average value:
+        # -------------------------------------------------------------------------------------------------------
+        if final_time_step_in_days >= original_time_step_in_days:
+
+            # We initialize the row ID "j" in which exact sucrose inputs will be recorded:
+            j = 0
+            # We initialize the time over which sucrose input will be integrated:
+            cumulated_time_in_days = 0.
+            time_in_days = 0.
+            sucrose_input = 0.
+            sum_of_temperature_in_degree_days = 0.
+
+            # For each line of the data frame that contains information on sucrose input:
+            for i in range(0, len(df['time_in_days'])):
+
+                # If the current cumulated time is below the time step of the main simulation:
+                if (cumulated_time_in_days + original_time_step_in_days) < 0.9999 * final_time_step_in_days:
+                    # Then the amount of time elapsed here is the initial time step:
+                    net_elapsed_time_in_days = original_time_step_in_days
+                    remaining_time = 0.
+                else:
+                    # Otherwise, we limit the elapsed time to the one necessary for reaching a round number of final_time_step_in_days:
+                    net_elapsed_time_in_days = original_time_step_in_days - (
+                            cumulated_time_in_days + original_time_step_in_days - final_time_step_in_days)
+                    remaining_time = (cumulated_time_in_days + original_time_step_in_days - final_time_step_in_days)
+
+                # In any case, the sucrose input and the sum of temperature are increased according to the elapsed time considered here:
+                sucrose_input += df.loc[i, 'sucrose_input_rate'] * net_elapsed_time_in_days * 60 * 60 * 24.
+                sum_of_temperature_in_degree_days += df.loc[i, 'soil_temperature_in_Celsius'] * net_elapsed_time_in_days
+
+                # If at the end of the original time step corresponding to the line i in df, one final time step has been reached
+                # or if this is the last line of the original table df to be read:
+                if cumulated_time_in_days + original_time_step_in_days >= 0.9999 * final_time_step_in_days \
+                        or i == len(df['time_in_days']) - 1:
+
+                    # We move to the next row in the table to create:
+                    j += 1
+                    print("   Creating line", j, "on", n_steps, "lines in the new input frame...")
+                    # We record the final temperature and sucrose input rate:
+                    input_frame.loc[j - 1, 'sucrose_input_rate'] = sucrose_input / (
+                            (cumulated_time_in_days + net_elapsed_time_in_days) * 60. * 60. * 24.)
+                    input_frame.loc[j - 1, 'soil_temperature_in_degree_Celsius'] = sum_of_temperature_in_degree_days \
+                                                                                   / ((
+                            cumulated_time_in_days + net_elapsed_time_in_days))
+
+                    # We reinitialize the counter with the exact time that has not been included yet:
+                    cumulated_time_in_days = remaining_time
+                    # print "After reinitializing cumulated time, it is equal to", cumulated_time_in_days
+                    # We reinitialize the sucrose input with the remaining sucrose that has not been taken into account:
+                    sucrose_input = df.loc[i, 'sucrose_input_rate'] * (cumulated_time_in_days) * 60 * 60 * 24.
+                    sum_of_temperature_in_degree_days = df.loc[i, 'soil_temperature_in_Celsius'] * (
+                        cumulated_time_in_days)
+
+                else:
+                    cumulated_time_in_days += original_time_step_in_days
+
+                # If the number of total lines of the final input frame has been reached:
+                if j >= n_steps:
+                    # Then we stop the loop here:
+                    break
+
+        # CASE 2: the final time step is higher than the original one, so we have to calculate an average value:
+        # -------------------------------------------------------------------------------------------------------
+        if final_time_step_in_days < original_time_step_in_days:
+
+            # We initialize the row ID "i" in which the original values are read:
+            i = 1
+            # print "      Considering now line", i, "in the original table for time = ", df.loc[i, 'time_in_days']
+
+            # We initialize the time over which sucrose input will be integrated:
+            cumulated_time_in_days = 0.
+            time_in_days = 0.
+            sucrose_input = 0.
+            sum_of_temperature_in_degree_days = 0.
+
+            sucrose_input_rate_initial = df.loc[0, 'sucrose_input_rate']
+            temperature_initial = df.loc[0, 'soil_temperature_in_Celsius']
+
+            # For each line of the final table:
+            for j in range(0, n_steps):
+
+                # If the current cumulated time is below the time step of the main simulation:
+                if cumulated_time_in_days + final_time_step_in_days < 0.9999 * original_time_step_in_days:
+                    # Then the amount of time elapsed here is the initial time step:
+                    net_elapsed_time_in_days = final_time_step_in_days
+                    remaining_time = 0.
+                else:
+                    # Otherwise, we limit the elapsed time to the one necessary for reaching a round number of original_time_step_in_days:
+                    net_elapsed_time_in_days = final_time_step_in_days - (
+                            cumulated_time_in_days + final_time_step_in_days - original_time_step_in_days)
+                    remaining_time = (cumulated_time_in_days + final_time_step_in_days - original_time_step_in_days)
+
+                sucrose_input_rate = sucrose_input_rate_initial \
+                                     + (df.loc[
+                                            i, 'sucrose_input_rate'] - sucrose_input_rate_initial) / original_time_step_in_days * cumulated_time_in_days
+                temperature = temperature_initial \
+                              + (df.loc[
+                                     i, 'soil_temperature_in_Celsius'] - temperature_initial) / original_time_step_in_days * cumulated_time_in_days
+
+                print("   Creating line", j + 1, "on", n_steps, "lines in the new input frame...")
+                # We record the final temperature and sucrose input rate:
+                input_frame.loc[j, 'sucrose_input_rate'] = sucrose_input_rate
+                input_frame.loc[j, 'soil_temperature_in_degree_Celsius'] = temperature
+
+                # If at the end of the final time step corresponding to the line j in input_frame, one original time step has been reached:
+                if cumulated_time_in_days + final_time_step_in_days >= 0.9999 * original_time_step_in_days:
+
+                    # We record the current sucrose input rate and temperature in the original table:
+                    sucrose_input_rate_initial = df.loc[i, 'sucrose_input_rate']
+                    temperature = df.loc[i, 'soil_temperature_in_Celsius']
+
+                    # We move to the next row in the original table, unless we are already at the last line:
+                    if i < len(df['time_in_days']) - 1:
+                        i += 1
+                        # print "      Considering now line", i, "in the original table for time = ", df.loc[i, 'time_in_days']
+
+                    # We reinitialize the counter with the exact time that has not been included yet:
+                    cumulated_time_in_days = remaining_time
+
+                else:
+
+                    cumulated_time_in_days += final_time_step_in_days
+
+                # If the number of total lines of the final input frame has been reached:
+                if j >= n_steps:
+                    # Then we stop the loop here:
+                    break
+
+    input_frame.to_csv('input_file.csv', na_rep='NA', index=False, header=True)
+    print("The new input file adapted to the required time step has been created and saved as 'input_file.csv'.")
+
+    return input_frame
+
+
+def is_int(dt):
+    """
+    Returns True if dt is an integer, False in other cases.
+    """
+    try:
+        num = int(dt)
+    except ValueError:
+        return False
+    return True
+
+
+def _buildDic(keyList, val, dic):
+    if len(keyList) == 1:
+        dic[keyList[0]] = val
+        return
+
+    newDic = dic.get(keyList[0], {})
+    dic[keyList[0]] = newDic
+    _buildDic(keyList[1:], val, newDic)
+
+
+def buildDic(dict_scenario, dic=None):
+    """
+    Function that build a nested dictionary (dict of dict), which is used in simulations/scenario_parameters/maine_one_scenario.py
+    e.g. buildDic({'a:b:c': 1, 'a:b:d': 2}) returns {'a': {'b': {'c': 1, 'd': 2}}}
+    """
+    if not dic:
+        dic = {}
+
+    for k, v in dict_scenario.items():
+        if not pd.isnull(v):
+            keyList = k.split(':')
+            keyList_converted = []
+            for kk in keyList:
+                if is_int(kk):
+                    keyList_converted.append(int(kk))
+                else:
+                    keyList_converted.append(kk)
+            _buildDic(keyList_converted, v, dic)
+
+    return dic
+
 
 # FUNCTIONS TO DISPLAY THE RESULTS IN A GRAPH:
 ##############################################
@@ -250,4 +481,3 @@ def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-
     # Consider: https://learnopengl.com/In-Practice/Text-Rendering
 
     return new_scene
-

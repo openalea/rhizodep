@@ -9,6 +9,8 @@
 
 """
 
+random_choice = 8
+
 # ArchiSimple parameters for root growth:
 # ---------------------------------------
 

@@ -1,0 +1,3 @@
+Scenario,input_file,simulation_period_in_days,CVDD
+1,sucrose_input_0047.csv,15,0.2
+2,sucrose_input_0047.csv,15,0.5

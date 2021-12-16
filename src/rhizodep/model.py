@@ -1,4 +1,16 @@
-from math import sqrt, pi, trunc, floor, cos, sin
+#  -*- coding: utf-8 -*-
+
+"""
+    rhizodep.model
+    ~~~~~~~~~~~~~
+
+    The module :mod:`rhizodep.model` defines the equations of root functioning.
+
+    :copyright: see AUTHORS.
+    :license: see LICENSE for details.
+"""
+
+from math import sqrt, pi, floor
 from decimal import Decimal
 import numpy as np
 import pandas as pd
@@ -796,19 +808,16 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
     # If the adventitious root has not emerged yet:
     if apex.type == "adventitious_root_before_emergence":
 
-        global thermal_time_since_last_adventitious_root_emergence
-        global adventitious_root_emergence
-
         # If the time elapsed since the last emergence of adventitious root is higher than the prescribed frequency
         # of adventitious root emission, and if no other adventitious root has already been allowed to emerge:
-        if thermal_time_since_last_adventitious_root_emergence + time_step_in_seconds * temperature_time_adjustment > 1. / param.ER \
-                and adventitious_root_emergence == "Possible":
+        if g.property('thermal_time_since_last_adventitious_root_emergence')[g.root] + time_step_in_seconds * temperature_time_adjustment > 1. / param.ER \
+                and g.property('adventitious_root_emergence')[g.root] == "Possible":
             # The time since primordium formation is incremented:
             apex.actual_time_since_primordium_formation += time_step_in_seconds
             apex.thermal_time_since_primordium_formation += time_step_in_seconds * temperature_time_adjustment
             # The adventitious root may have emerged, and the potential time elapsed
             # since its possible emergence over this time step is calculated:
-            apex.thermal_potential_time_since_emergence = thermal_time_since_last_adventitious_root_emergence \
+            apex.thermal_potential_time_since_emergence = g.property('thermal_time_since_last_adventitious_root_emergence')[g.root]  \
                                                           + time_step_in_seconds * temperature_time_adjustment - 1. / param.ER
             # If the apex could have emerged sooner:
             if apex.thermal_potential_time_since_emergence > time_step_in_seconds * temperature_time_adjustment:
@@ -829,9 +838,9 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
             if ArchiSimple:
                 apex.type = "Normal_root_after_emergence"
                 # We reset the time since an adventitious root may have emerged (REMINDER: it is a "global" value):
-                thermal_time_since_last_adventitious_root_emergence = apex.thermal_potential_time_since_emergence
+                g.property('thermal_time_since_last_adventitious_root_emergence')[g.root] = apex.thermal_potential_time_since_emergence
                 # We forbid the emergence of other adventitious root for the current time step (REMINDER: it is a "global" value):
-                adventitious_root_emergence = "Impossible"
+                g.property('adventitious_root_emergence')[g.root] = "Impossible"
                 new_apex.append(apex)
                 # And the function returns this new apex and stops here:
                 return new_apex
@@ -847,7 +856,7 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
                 parent.lateral_primordium_index = apex.index()
                 # WATCH OUT: THE CODE DOESN'T HANDLE THE SITUATION WHERE MORE THAN ONE adventitious ROOT SHOULD EMERGE IN THE SAME TIME STEP!!!!!!!!!!!!!!!!!!!!!!!!!
                 # We forbid the emergence of other adventitious root for the current time step (REMINDER: it is a "global" value):
-                adventitious_root_emergence = "Impossible"
+                g.property('adventitious_root_emergence')[g.root] = "Impossible"
                 # The new element returned by the function corresponds to the potentially emerging apex:
                 new_apex.append(apex)
                 # And the function returns this new apex and stops here:
@@ -958,6 +967,7 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
                 new_apex.append(apex)
                 # And the function returns this new apex and stops here:
                 return new_apex
+
             # OTHERWISE, THE APEX HAS TO STOP DURING THIS TIME STEP:
             else:
                 # The type is declared "Just stopped":
@@ -1540,7 +1550,7 @@ class Simulate_segmentation_and_primordia_formation(object):
         for apex in apices_list:
             if apex.type == "Normal_root_after_emergence" and apex.length > 0.:  # Is it needed? !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 # We define the new list of apices with the function apex_development:
-                new_apex = segmentation_and_primordium_formation(apex, time_step_in_seconds,
+                new_apex = segmentation_and_primordium_formation(self.g, apex, time_step_in_seconds,
                                                                  soil_temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                  random=random,
                                                                  nodules=nodules)
@@ -1595,8 +1605,6 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
 
     # PROCEEDING TO ACTUAL GROWTH:
     # -----------------------------
-
-    global adventitious_root_emergence
 
     # We have to cover each vertex from the apices up to the base one time:
     root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
@@ -1809,8 +1817,7 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
             # If the elongated apex corresponded to an adventitious root:
             if n.type == "adventitious_root_before_emergence":
                 # We reset the time since an adventitious root has emerged (REMINDER: it is a "global" value):
-                global thermal_time_since_last_adventitious_root_emergence
-                thermal_time_since_last_adventitious_root_emergence = n.thermal_potential_time_since_emergence
+                g.property('thermal_time_since_last_adventitious_root_emergence')[g.root] = n.thermal_potential_time_since_emergence
 
             # If the elongated apex corresponded to any primordium that has emerged:
             if n.type == "adventitious_root_before_emergence" or n.type == "Normal_root_before_emergence":
@@ -1818,7 +1825,7 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
                 # We select the parent from which the primordium has emerged:
                 if n.type == "adventitious_root_before_emergence":
                     parent = g.node(1)
-                    adventitious_root_emergence = "Impossible"
+                    g.property('adventitious_root_emergence')[g.root] = "Impossible"
                 else:
                     index_parent = g.Father(n.index(), EdgeType='+')
                     parent = g.node(index_parent)
@@ -1956,8 +1963,8 @@ def ArchiSimple_growth(g, SC, time_step_in_seconds, soil_temperature_in_Celsius=
 
 
 def reinitializing_growth_variables(g):
-    global adventitious_root_emergence
-    adventitious_root_emergence = "Possible"
+
+    g.property('adventitious_root_emergence')[g.root] = "Possible"
 
     # We cover all the vertices in the MTG:
     for vid in g.vertices_iter(scale=1):
@@ -2079,11 +2086,10 @@ def shoot_sucrose_supply_and_spreading(g, sucrose_input_rate=1e-9, time_step_in_
 
     # We use a global variable recorded outside this function, that corresponds to the possible deficit of sucrose
     # (in moles of sucrose) of the whole root system calculated at the previous time_step:
-    global global_sucrose_deficit
+    global_sucrose_deficit = g.property('global_sucrose_deficit')[g.root]
     if global_sucrose_deficit > 0.:
         print("!!! Before homogenizing sucrose concentration, the deficit in sucrose is", global_sucrose_deficit)
-        C_sucrose_root_after_supply = (
-                                              total_sucrose_root + sucrose_input) / total_living_struct_mass  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        C_sucrose_root_after_supply = (total_sucrose_root + sucrose_input) / total_living_struct_mass  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     else:
         # The new average sucrose concentration in the root system is calculated as:
         C_sucrose_root_after_supply = (total_sucrose_root + sucrose_input - global_sucrose_deficit) / total_living_struct_mass
@@ -2091,11 +2097,11 @@ def shoot_sucrose_supply_and_spreading(g, sucrose_input_rate=1e-9, time_step_in_
     if C_sucrose_root_after_supply >= 0.:
         new_C_sucrose_root = C_sucrose_root_after_supply
         # We reset the global variable global_sucrose_deficit:
-        global_sucrose_deficit = 0.
+        g.property('global_sucrose_deficit')[g.root] = 0.
     else:
         # We record the general deficit in sucrose:
-        global_sucrose_deficit = - C_sucrose_root_after_supply * total_living_struct_mass
-        print("!!! After homogenizing sucrose concentration, the deficit in sucrose is", global_sucrose_deficit)
+        g.property('global_sucrose_deficit')[g.root] = - C_sucrose_root_after_supply * total_living_struct_mass
+        print("!!! After homogenizing sucrose concentration, the deficit in sucrose is", g.property('global_sucrose_deficit')[g.root])
         # We defined the new concentration of sucrose as 0:
         new_C_sucrose_root = 0.
 
@@ -2824,8 +2830,6 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
     C_degraded = 0.
     C_respired_by_roots = 0.
 
-    global global_sucrose_deficit
-
     # We cover all the vertices in the MTG:
     for vid in g.vertices_iter(scale=1):
 
@@ -2877,7 +2881,7 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
         #         "; Deficit_sucrose_root:", n.Deficit_sucrose_root, "; loading:", n.sucrose_loading_in_phloem, "; unloading:", n.hexose_production_from_phloem
 
     # We add to the sum of local deficits in sucrose the possible global deficit in sucrose used in shoot_supply function:
-    total_sucrose_root_deficit += global_sucrose_deficit
+    total_sucrose_root_deficit += g.property('global_sucrose_deficit')[g.root]
 
     # CARBON BALANCE:
     # --------------
@@ -2995,7 +2999,21 @@ def initiate_mtg(random=True):
 
     base_radius = param.D_ini / 2.
 
+    # Properties shared by the whole root system:
+    # -----------------
+    # We initiate the global variable that corresponds to a possible general deficit in sucrose of the whole root system:
+    g.add_property('global_sucrose_deficit')
+    g.property('global_sucrose_deficit')[g.root] = 0.
+
+    # We initiate the time variable that will be used to determine the emergence of adventitious roots:
+    g.add_property('thermal_time_since_last_adventitious_root_emergence')
+    g.property('thermal_time_since_last_adventitious_root_emergence')[g.root] = 0.
+
+    g.add_property('adventitious_root_emergence')
+    g.property('adventitious_root_emergence')[g.root] = "Possible"
+
     # We first add one initial element:
+    # -----------------
     root = g.add_component(g.root, label='Segment')
     segment = g.node(root)
 
