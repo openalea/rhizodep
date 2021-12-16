@@ -4307,6 +4307,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 image_name = os.path.join(video_dir, 'root%.5d.png')
                 pgl.Viewer.saveSnapshot(image_name % step)
 
+
             # For integrating root variables on the z axis:
             # ----------------------------------------------
             if z_classification:
@@ -4521,7 +4522,7 @@ if __name__ == "__main__":
 
     # We launch the main simulation program:
     print("Simulation starts ...")
-    main_simulation(g, simulation_period_in_days=2., time_step_in_days=1. / 24., radial_growth="Possible",
+    main_simulation(g, simulation_period_in_days=1., time_step_in_days=1. / 24., radial_growth="Possible",
                     ArchiSimple=False,
                     # property="net_hexose_exudation_rate_per_day_per_cm", vmin=1e-9, vmax=1e-6, log_scale=True, cmap='jet',
                     property="C_hexose_root", vmin=1e-4, vmax=1e-1, log_scale=True, cmap='jet',
@@ -4554,4 +4555,5 @@ if __name__ == "__main__":
     print("The whole root system has been saved in the file 'g_file.pckl'.")
 
     # To avoid closing PlantGL as soon as the run is done:
-    input()
+    pgl.Viewer.exit()
+    # input()
