@@ -203,7 +203,7 @@ def resizing_and_film_making(image_transforming=True, resizing=True, dividing_si
 
                 # Adding colorbar:
                 if colorbar:
-                    path_colorbar = os.path.join('C:/', 'Users', 'frees', 'rhizodep', 'test', 'colorbar.png')
+                    path_colorbar = os.path.join( 'colorbar.png')
                     colorbar = Image.open(path_colorbar)
                     new_size = (1200, 200)
                     colorbar = colorbar.resize(new_size)
@@ -313,12 +313,6 @@ def resizing_and_film_making(image_transforming=True, resizing=True, dividing_si
 
 if __name__ == "__main__":
 
-    # We set the working directory:
-    my_path = r'C:\\Users\\frees\\rhizodep\\test'
-    if not os.path.exists(my_path):
-        my_path = os.path.abspath('.')
-    os.chdir(my_path)
-    print("The current directory is:", os.getcwd())
 
     # # Creating a new colobar:
     # fig = colorbar(
