@@ -1,4 +1,4 @@
-import os, os.path
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,17 +7,16 @@ from matplotlib.ticker import StrMethodFormatter
 
 plt.rcdefaults()
 
-
 # Transforming dataset:
 # ---------------------
-def treating_z_dataframe(file_name='z_classification.csv',
+def treating_z_dataframe(directory='outputs',
                          z_min=0., z_max=1., z_interval=0.05,
                          plants_per_m2=35,
                          input_treatment=False):
-    # Reading the z_classification file:
-    PATH1 = os.path.join('.', file_name)
+
     # Then we read the file and copy it in a dataframe "df":
-    df = pd.read_csv(PATH1, sep=',', header=0)
+    input_file_path=os.path.join(directory, 'z_classification.csv')
+    df = pd.read_csv(input_file_path, sep=',', header=0)
 
     # We will use a function that gives a list containing the useful names of the variables with each z range:
     def grouping_z_columns_by_property(property):
@@ -32,7 +31,8 @@ def treating_z_dataframe(file_name='z_classification.csv',
             part_1 = '{:.2f}'.format(z_start)
             part_2 = '{:.2f}'.format(z_start + z_interval)
             # We recreate the exact name of the header where to read the value
-            name_values_z = property + '_' + str(z_start) + "-" + str(z_start + z_interval) + "_m"
+            name_values_z = property + '_' + str(round(z_start, 3)) + "-" \
+                            + str(round(z_start + z_interval, 3)) + "_m"
             list.append(name_values_z)
         return list
 
@@ -66,7 +66,8 @@ def treating_z_dataframe(file_name='z_classification.csv',
     first_column = df_cum.pop('time_in_days')
     df_cum.insert(0, 'time_in_days', first_column)
     # We record the table in a new csv file:
-    df_cum.to_csv('z_classification_cum_by_day.csv', na_rep='NA', index=False, header=True)
+    cum_by_day_path=os.path.join(directory, 'z_classification_cum_by_day.csv')
+    df_cum.to_csv(cum_by_day_path, na_rep='NA', index=False, header=True)
 
     # We group by day_number and sum each variable:
     df_sum = df.groupby(by=['day_number'], as_index=False).sum()
@@ -78,7 +79,8 @@ def treating_z_dataframe(file_name='z_classification.csv',
     first_column = df_sum.pop('time_in_days')
     df_sum.insert(0, 'time_in_days', first_column)
     # We record the table in a new csv file:
-    df_sum.to_csv('z_classification_sum_by_day.csv', na_rep='NA', index=False, header=True)
+    sum_by_day_path = os.path.join(directory, 'z_classification_sum_by_day.csv')
+    df_sum.to_csv(sum_by_day_path, na_rep='NA', index=False, header=True)
 
     # We group by day_number and average each variable:
     df_mean = df.groupby(by=['day_number'], as_index=False).mean()
@@ -90,7 +92,8 @@ def treating_z_dataframe(file_name='z_classification.csv',
     first_column = df_mean.pop('time_in_days')
     df_mean.insert(0, 'time_in_days', first_column)
     # We record the table in a new csv file:
-    df_mean.to_csv('z_classification_mean_by_day.csv', na_rep='NA', index=False, header=True)
+    mean_by_day_path = os.path.join(directory, 'z_classification_mean_by_day.csv')
+    df_mean.to_csv(mean_by_day_path, na_rep='NA', index=False, header=True)
 
     # We group by day_number and take the max of each variable:
     df_max = df.groupby(by=['day_number'], as_index=False).max()
@@ -102,7 +105,8 @@ def treating_z_dataframe(file_name='z_classification.csv',
     first_column = df_max.pop('time_in_days')
     df_max.insert(0, 'time_in_days', first_column)
     # We record the table in a new csv file:
-    df_max.to_csv('z_classification_max_by_day.csv', na_rep='NA', index=False, header=True)
+    max_by_day_path = os.path.join(directory, 'z_classification_max_by_day.csv')
+    df_max.to_csv(max_by_day_path, na_rep='NA', index=False, header=True)
 
     if input_treatment:
         # We create a special table for root C inputs by day:
@@ -123,7 +127,8 @@ def treating_z_dataframe(file_name='z_classification.csv',
 
         frames = [df1, df2, df3, df4]
         df_input = pd.concat(frames, axis=1, sort=False, ignore_index=False)
-        df_input.to_csv('z_classification_input_by_day.csv', na_rep='NA', index=False, header=True)
+        input_by_day_path = os.path.join(directory, 'z_classification_input_by_day.csv')
+        df_input.to_csv(input_by_day_path, na_rep='NA', index=False, header=True)
 
         # We cumulate input values:
         df_input_cum = df_input.copy(deep=True)
@@ -137,10 +142,12 @@ def treating_z_dataframe(file_name='z_classification.csv',
         first_column = df_input_cum.pop('time_in_days')
         df_input_cum.insert(0, 'time_in_days', first_column)
         # We record the table in a new csv file:
-        df_input_cum.to_csv('z_classification_input_cum_by_day.csv', na_rep='NA', index=False, header=True)
+        cum_input_path = os.path.join(directory, 'z_classification_cum_input_by_day.csv')
+        df_input_cum.to_csv(cum_input_path, na_rep='NA', index=False, header=True)
 
     # Finally:
-    print("Additional tables have been created from file", file_name, "(check the files!).")
+    print("")
+    print("Additional tables have been created in the folder", directory, "(check the files!).")
 
     return
 
@@ -213,7 +220,7 @@ def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=1e-1
 
 # Plotting several graphs:
 # -------------------------
-def plotting_on_z(file_name='z_classification.csv',
+def plotting_on_z(input_file_path='z_classification.csv',
                   property='hexose_exudation',
                   title="",
                   color=None,
@@ -221,21 +228,20 @@ def plotting_on_z(file_name='z_classification.csv',
                   value_min=1e-12,
                   value_max=1e0,
                   log=True,
-                  recording_images=True
+                  recording_images=True,
+                  outputs_path='outputs'
                   ):
 
     # Default value
     if color is None:
         color = ['green']
 
-    # Reading the z_classification file:
-    PATH1 = os.path.join('.', file_name)
     # Then we read the file and copy it in a dataframe "df":
-    df = pd.read_csv(PATH1, sep=',', header=0)
+    df = pd.read_csv(input_file_path, sep=',', header=0)
 
     if recording_images:
         # We define the directory "z_barplots":
-        z_bar_dir = 'z_barplots'
+        z_bar_dir = os.path.join('z_barplots')
         # If this directory doesn't exist:
         if not os.path.exists(z_bar_dir):
             # Then we create it:
@@ -264,7 +270,8 @@ def plotting_on_z(file_name='z_classification.csv',
             name_category_z = part_1 + "-" + part_2 + " m"
             categories.append(name_category_z)
             # We recreate the exact name of the header where to read the value
-            name_values_z = property + '_' + str(z_start) + "-" + str(z_start + z_interval) + "_m"
+            name_values_z = property + '_' + str(round(z_start, 3)) + "-" \
+                            + str(round(z_start + z_interval, 3)) + "_m"
             values.append(df.loc[i, name_values_z])
 
         # Creating the chart for this time step:
@@ -289,7 +296,7 @@ def plotting_on_z(file_name='z_classification.csv',
 
 # Plotting several graphs:
 # -------------------------
-def plotting_on_z_stacked(file_name='z_classification.csv',
+def plotting_on_z_stacked(input_file_path='z_classification.csv',
                           property=None,
                           label=None,
                           title="",
@@ -299,7 +306,8 @@ def plotting_on_z_stacked(file_name='z_classification.csv',
                           value_max=1e0,
                           format_x='%.2E',
                           log=True,
-                          recording_images=True
+                          recording_images=True,
+                          outputs_path='outputs'
                           ):
 
     # Default values
@@ -310,14 +318,12 @@ def plotting_on_z_stacked(file_name='z_classification.csv',
     if property is None:
         property = ['hexose_exudation', 'struct_mass']
 
-    # Reading the z_classification file:
-    PATH1 = os.path.join('.', file_name)
     # Then we read the file and copy it in a dataframe "df":
-    df = pd.read_csv(PATH1, sep=',', header=0)
+    df = pd.read_csv(input_file_path, sep=',', header=0)
 
     if recording_images:
         # We define the directory "z_barplots":
-        z_bar_dir = 'z_barplots'
+        z_bar_dir = os.path.join(outputs_path, 'z_barplots')
         # If this directory doesn't exist:
         if not os.path.exists(z_bar_dir):
             # Then we create it:
@@ -350,7 +356,8 @@ def plotting_on_z_stacked(file_name='z_classification.csv',
             categories_z.append(name_category_z)
             # We recreate the exact name of the header where to read the value
             for x in range(0, len(property)):
-                name_values_z.append(property[x] + '_' + str(z_start) + "-" + str(z_start + z_interval) + "_m")
+                name_x = property[x] + "_" + str(round(z_start, 3)) + "-" + str(round(z_start + z_interval, 3)) + "_m"
+                name_values_z.append(name_x)
                 # np.append(values, df.loc[i, name_values_z[x]], x)
                 values[index_z][x] = df.loc[i, name_values_z[-1]]
             index_z += 1
@@ -430,23 +437,52 @@ def plotting_on_z_stacked(file_name='z_classification.csv',
 #                       recording_images=True
 #                       )
 
-# For creating plots of cumulated inputs over time:
-# -------------------------------------------------
-treating_z_dataframe(file_name='z_classification.csv',
-                     z_min=0., z_max=1., z_interval=0.05,
-                     plants_per_m2=35,
-                     input_treatment=True)
-plotting_on_z_stacked(file_name='z_classification_input_cum_by_day.csv',
-                      property=['cum_net_hexose_exudation', 'cum_net_root_necromass'],
-                      label=['Exudates', 'Dead roots'],
-                      color=['royalblue', 'darkkhaki'],
-                      title="\n Cumulated root-derived C inputs (gC m-2) per 5-cm layer",
-                      z_min=0., z_max=1., z_interval=0.05,
-                      value_min=0,
-                      value_max=0.6,
-                      log=False,
-                      recording_images=True
-                      )
+# # For creating plots of cumulated inputs over time:
+# # -------------------------------------------------
+#
+# targeted_path=os.path.join('outputs', 'Scenario_0001')
+#
+# treating_z_dataframe(directory=targeted_path,
+#                      z_min=0., z_max=1., z_interval=0.1,
+#                      plants_per_m2=35,
+#                      input_treatment=True)
+# plotting_on_z_stacked(input_file_path=os.path.join(targeted_path,'z_classification_cum_input_by_day.csv'),
+#                       property=['cum_net_hexose_exudation', 'cum_net_root_necromass'],
+#                       label=['Exudates', 'Dead roots'],
+#                       color=['royalblue', 'darkkhaki'],
+#                       title="\n Cumulated root-derived C inputs (gC m-2) per 5-cm layer",
+#                       z_min=0., z_max=1., z_interval=0.1,
+#                       value_min=0,
+#                       value_max=0.6,
+#                       log=False,
+#                       recording_images=True,
+#                       outputs_path=targeted_path
+#                       )
+
+# For creating plots of cumulated inputs over time for a list of scenarios:
+# -------------------------------------------------------------------------
+scenario_numbers=[1, 2, 3, 4]
+for i in scenario_numbers:
+
+    scenario_name = 'Scenario_%.4d' % i
+    targeted_path=os.path.join('outputs', scenario_name)
+
+    treating_z_dataframe(directory=targeted_path,
+                         z_min=0., z_max=1., z_interval=0.1,
+                         plants_per_m2=35,
+                         input_treatment=True)
+    plotting_on_z_stacked(input_file_path=os.path.join(targeted_path,'z_classification_cum_input_by_day.csv'),
+                          property=['cum_net_hexose_exudation', 'cum_net_root_necromass'],
+                          label=['Exudates', 'Dead roots'],
+                          color=['royalblue', 'darkkhaki'],
+                          title="\n Cumulated root-derived C inputs (gC m-2) per 5-cm layer",
+                          z_min=0., z_max=1., z_interval=0.1,
+                          value_min=0,
+                          value_max=0.6,
+                          log=False,
+                          recording_images=True,
+                          outputs_path=targeted_path
+                          )
 
 # # For plotting the SOM pools over time:
 # # --------------------------------------

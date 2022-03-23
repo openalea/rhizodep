@@ -67,3 +67,4 @@ nosetests.xml
 
 # Mac dirs
 .DS_Store
+saving_outputs

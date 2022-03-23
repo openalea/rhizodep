@@ -300,7 +300,7 @@ def loading_MTG_files(my_path='',
 
     if recording_images:
         # We define the directory "video"
-        video_dir = 'video'
+        video_dir = os.path.join(my_path, 'root_new_images')
         # If this directory doesn't exist:
         if not os.path.exists(video_dir):
             # Then we create it:
@@ -313,7 +313,7 @@ def loading_MTG_files(my_path='',
 
     if recording_g_properties:
         # We define the directory "MTG_properties"
-        prop_dir = 'MTG_properties'
+        prop_dir = os.path.join(my_path, 'MTG_properties')
         # If this directory doesn't exist:
         if not os.path.exists(prop_dir):
             # Then we create it:
@@ -479,15 +479,15 @@ def loading_MTG_files(my_path='',
 # im_resized.save('colorbar_new.png', quality=95)
 # # im_new.save('colorbar_new.png', quality=95)
 
-loading_MTG_files(my_path='',
-                  file_name='g_file.pckl',
-                  opening_list=False,
+loading_MTG_files(my_path='C:\\Users\\frees\\rhizodep\\simulations\\running_scenarios\\outputs\\Scenario_0001',
+                  file_name='root02400.pckl',
+                  opening_list=True,
                   # property="C_hexose_reserve", vmin=1e-3, vmax=5e-3, log_scale=False,
                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
                   property="net_hexose_exudation_rate_per_day_per_cm", vmin=1e-9, vmax=1e-7, log_scale=True, cmap='jet',
-                  x_center=0, y_center=0, z_center=0, z_cam=-1,
-                  camera_distance=8, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+                  x_center=0, y_center=0, z_center=-1, z_cam=-2,
+                  camera_distance=4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
                   adding_images_on_plot=False,
                   recording_images=True,
                   printing_sum=False,

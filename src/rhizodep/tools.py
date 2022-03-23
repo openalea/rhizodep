@@ -10,9 +10,10 @@
     :license: see LICENSE for details.
 """
 
-# TODO: add functions from graph_making.py and video.py
+# TODO: add functions from making_graph.py and video.py
 
 import os
+from decimal import Decimal
 from math import pi, cos, sin, floor
 import numpy as np
 import pandas as pd
@@ -28,7 +29,7 @@ import rhizodep.parameters as param
 
 # TODO: see if this function should stay in tools, or move to simulations/run_rhizodep.py
 
-def formatted_inputs(original_input_file="None", original_time_step_in_days=1 / 24., final_time_step_in_days=1.,
+def formatted_inputs(original_input_file="None", final_input_file='updated_input_file.csv', original_time_step_in_days=1 / 24., final_time_step_in_days=1.,
                      simulation_period_in_days=60., do_not_execute_if_file_with_suitable_size_exists=False):
     """
     This function creates a new input file containing data on soil temperature and sucrose input rate (in mol of sucrose per second),
@@ -65,7 +66,8 @@ def formatted_inputs(original_input_file="None", original_time_step_in_days=1 / 
         input_frame["initial_time_in_days"] = (input_frame["step_number"] - 1) * final_time_step_in_days * 1.
         input_frame["final_time_in_days"] = input_frame["initial_time_in_days"] + final_time_step_in_days
 
-        print("Creating a new input file adapted to the required time step (time step =", final_time_step_in_days, "days):")
+        print("Creating a new input file adapted to the required time step (time step =",
+              "{:.2f}".format(Decimal(final_time_step_in_days)), "days)...")
 
         # CASE 1: the final time step is higher than the original one, so we have to calculate an average value:
         # -------------------------------------------------------------------------------------------------------
@@ -104,7 +106,7 @@ def formatted_inputs(original_input_file="None", original_time_step_in_days=1 / 
 
                     # We move to the next row in the table to create:
                     j += 1
-                    print("   Creating line", j, "on", n_steps, "lines in the new input frame...")
+                    # print("   Creating line", j, "on", n_steps, "lines in the new input frame...")
                     # We record the final temperature and sucrose input rate:
                     input_frame.loc[j - 1, 'sucrose_input_rate'] = sucrose_input / (
                             (cumulated_time_in_days + net_elapsed_time_in_days) * 60. * 60. * 24.)
@@ -195,8 +197,8 @@ def formatted_inputs(original_input_file="None", original_time_step_in_days=1 / 
                     # Then we stop the loop here:
                     break
 
-    input_frame.to_csv('input_file.csv', na_rep='NA', index=False, header=True)
-    print("The new input file adapted to the required time step has been created and saved as 'input_file.csv'.")
+    input_frame.to_csv(final_input_file, na_rep='NA', index=False, header=True)
+    print("The new input file adapted to the required time step has been created and saved as 'updated_input_file.csv'.")
 
     return input_frame
 
@@ -453,11 +455,14 @@ def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-
             else:
                 # Otherwise, we print it in black:
                 shapes[vid].appearance = pgl.Material([0, 0, 0])
+            # property=g.property(prop_cmap)
+            # if n.property <=0:
+            #     shapes[vid].appearance = pgl.Material([0, 0, 200])
 
     # Changing some shapes geometry according to the element:
     for vid in shapes:
         n = g.node(vid)
-        # If the element is a nodule, we transform the cylinder into a sphere:!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # If the element is a nodule, we transform the cylinder into a sphere:
         if n.type == "Root_nodule":
             # We create a sphere corresponding to the radius of the element:
             s = pgl.Sphere(n.radius * 1.)

@@ -20,6 +20,7 @@ from openalea.mtg.traversal import pre_order, post_order
 
 import rhizodep.parameters as param
 
+#TODO: Problem of option random=False - some elements have a decreasing radius...
 
 # FUNCTIONS FOR CALCULATING PROPERTIES ON THE MTG
 #################################################
@@ -198,12 +199,12 @@ def classifying_on_z(g, z_min=0., z_max=1., z_interval=0.1):
     for z_start in np.arange(z_min, z_max, z_interval):
 
         # We create the names of the new properties of the MTG to be computed, based on the current z interval:
-        name_length_z = "length_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
-        name_struct_mass_z = "struct_mass_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
-        name_root_necromass_z = "root_necromass_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
-        name_surface_z = "surface_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
-        name_net_hexose_exudation_z = "net_hexose_exudation_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
-        name_hexose_degradation_z = "hexose_degradation_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
+        name_length_z = "length_" + str(round(z_start,3)) + "-" + str(round(z_start + z_interval,3)) + "_m"
+        name_struct_mass_z = "struct_mass_" + str(round(z_start,3)) + "-" + str(round(z_start + z_interval,3)) + "_m"
+        name_root_necromass_z = "root_necromass_" + str(round(z_start,3)) + "-" + str(round(z_start + z_interval,3)) + "_m"
+        name_surface_z = "surface_" + str(round(z_start,3)) + "-" + str(round(z_start + z_interval,3)) + "_m"
+        name_net_hexose_exudation_z = "net_hexose_exudation_" + str(round(z_start,3)) + "-" + str(round(z_start + z_interval,3)) + "_m"
+        name_hexose_degradation_z = "hexose_degradation_" + str(round(z_start,3)) + "-" + str(round(z_start + z_interval,3)) + "_m"
 
         # We (re)initialize total values:
         total_included_length = 0
@@ -252,12 +253,12 @@ def classifying_on_z(g, z_min=0., z_max=1., z_interval=0.1):
 
     # Finally, we merge all dictionaries into a single one that will be returned by the function:
     final_dictionary = {}
-    for d in [dictionary_length, dictionary_struct_mass, dictionary_root_necromass, dictionary_surface, dictionary_net_hexose_exudation,
+    for d in [dictionary_length, dictionary_struct_mass, dictionary_root_necromass, dictionary_surface,
+              dictionary_net_hexose_exudation,
               dictionary_hexose_degradation]:
         final_dictionary.update(d)
 
     return final_dictionary
-
 
 # Integration of root variables within different z_intervals:
 # -----------------------------------------------------------
@@ -321,7 +322,8 @@ def temperature_modification(temperature_in_Celsius, process_at_T_ref=1., T_ref=
         return 0.
     elif C == 1:
         if (A * (temperature_in_Celsius - T_ref) + B) < 0.:
-            print("The modification of the process at T =", temperature_in_Celsius, "is unstable with this set of parameters!")
+            print("The modification of the process at T =", temperature_in_Celsius,
+                  "is unstable with this set of parameters!")
             print("The modified process has been set to 0.")
             modified_process = process_at_T_ref
             return modified_process
@@ -409,7 +411,7 @@ def ADDING_A_CHILD(mother_element, edge_type='+', label='Apex', type='Normal_roo
                                              specific_net_exudation=0.,
                                              # Time indications:
                                              # ------------------
-                                             growth_duration=param.GDs * radius ** 2 * 4,
+                                             growth_duration=param.GDs * (2 * radius) ** 2,
                                              life_duration=param.LDs * 2. * radius * param.root_tissue_density,
                                              actual_time_since_primordium_formation=0.,
                                              actual_time_since_emergence=0.,
@@ -512,7 +514,8 @@ def ADDING_A_CHILD(mother_element, edge_type='+', label='Apex', type='Normal_roo
 # A FUNCTION FOR CALCULATING THE NEW LENGTH AFTER ELONGATION:
 ##########################################################
 
-def elongated_length(initial_length=0., radius=0., C_hexose_root=param.expected_C_hexose_root, elongation_time_in_seconds=0.,
+def elongated_length(initial_length=0., radius=0., C_hexose_root=1,
+                     elongation_time_in_seconds=0.,
                      ArchiSimple=True, printing_warnings=False, soil_temperature_in_Celsius=20):
     """
 
@@ -533,7 +536,8 @@ def elongated_length(initial_length=0., radius=0., C_hexose_root=param.expected_
         # Otherwise, we additionally consider a limitation of the elongation according to the local concentration of hexose,
         # based on a Michaelis-Menten formalism:
         if C_hexose_root > 0.:
-            elongation = param.EL * 2. * radius * C_hexose_root / (param.Km_elongation + C_hexose_root) * elongation_time_in_seconds
+            elongation = param.EL * 2. * radius * C_hexose_root / (
+                        param.Km_elongation + C_hexose_root) * elongation_time_in_seconds
         else:
             elongation = 0.
 
@@ -557,7 +561,8 @@ def elongated_length(initial_length=0., radius=0., C_hexose_root=param.expected_
 ###############################################
 
 def primordium_formation(g, apex, elongation_rate=0., time_step_in_seconds=1. * 60. * 60. * 24.,
-                         soil_temperature_in_Celsius=20, random=False):
+                         soil_temperature_in_Celsius=20, random=False,
+                         root_order_limitation=False, root_order_treshold=2):
     """
 
     :param apex:
@@ -599,9 +604,8 @@ def primordium_formation(g, apex, elongation_rate=0., time_step_in_seconds=1. * 
     vid = apex.index()
     order = g.order(vid)
 
-    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     # If the order of the current apex is too high, we forbid the formation of a new primordium of higher order:
-    if order >= 2:
+    if root_order_limitation and order > root_order_treshold:
         # Then we don't add any primordium and simply return the unaltered apex:
         new_apex.append(apex)
         return new_apex
@@ -611,8 +615,10 @@ def primordium_formation(g, apex, elongation_rate=0., time_step_in_seconds=1. * 
     # the product of this mean and the coefficient of variation CVDD (Pages et al. 2014).
     # We also set the root angles depending on random:
     if random:
+        # The seed used to generate random values is defined according to a parameter random_choice and the index of the apex:
+        np.random.seed(param.random_choice * apex.index())
         potential_radius = np.random.normal((apex.radius - param.Dmin / 2.) * param.RMD + param.Dmin / 2.,
-                                            ((apex.radius - param.Dmin) * param.RMD + param.Dmin / 2.) * param.CVDD)
+                                                ((apex.radius - param.Dmin / 2.) * param.RMD + param.Dmin / 2.) * param.CVDD)
         apex_angle_roll = abs(np.random.normal(120, 10))
         if order == 1:
             primordium_angle_down = abs(np.random.normal(45, 10))
@@ -768,7 +774,6 @@ def calculating_C_supply_for_elongation(g, element):
 
     return list_of_elongation_supporting_elements, list_of_elongation_supporting_elements_hexose, list_of_elongation_supporting_elements_mass
 
-
 # FUNCTION: POTENTIAL APEX DEVELOPMENT
 #######################################
 
@@ -810,15 +815,17 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
 
         # If the time elapsed since the last emergence of adventitious root is higher than the prescribed frequency
         # of adventitious root emission, and if no other adventitious root has already been allowed to emerge:
-        if g.property('thermal_time_since_last_adventitious_root_emergence')[g.root] + time_step_in_seconds * temperature_time_adjustment > 1. / param.ER \
+        if g.property('thermal_time_since_last_adventitious_root_emergence')[
+            g.root] + time_step_in_seconds * temperature_time_adjustment > 1. / param.ER \
                 and g.property('adventitious_root_emergence')[g.root] == "Possible":
             # The time since primordium formation is incremented:
             apex.actual_time_since_primordium_formation += time_step_in_seconds
             apex.thermal_time_since_primordium_formation += time_step_in_seconds * temperature_time_adjustment
             # The adventitious root may have emerged, and the potential time elapsed
             # since its possible emergence over this time step is calculated:
-            apex.thermal_potential_time_since_emergence = g.property('thermal_time_since_last_adventitious_root_emergence')[g.root]  \
-                                                          + time_step_in_seconds * temperature_time_adjustment - 1. / param.ER
+            apex.thermal_potential_time_since_emergence = \
+            g.property('thermal_time_since_last_adventitious_root_emergence')[g.root] \
+            + time_step_in_seconds * temperature_time_adjustment - 1. / param.ER
             # If the apex could have emerged sooner:
             if apex.thermal_potential_time_since_emergence > time_step_in_seconds * temperature_time_adjustment:
                 # The time since emergence is equal to the time elapsed during this time step (since it must have emerged at this time step):???????????????????????????
@@ -838,7 +845,8 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
             if ArchiSimple:
                 apex.type = "Normal_root_after_emergence"
                 # We reset the time since an adventitious root may have emerged (REMINDER: it is a "global" value):
-                g.property('thermal_time_since_last_adventitious_root_emergence')[g.root] = apex.thermal_potential_time_since_emergence
+                g.property('thermal_time_since_last_adventitious_root_emergence')[
+                    g.root] = apex.thermal_potential_time_since_emergence
                 # We forbid the emergence of other adventitious root for the current time step (REMINDER: it is a "global" value):
                 g.property('adventitious_root_emergence')[g.root] = "Impossible"
                 new_apex.append(apex)
@@ -987,7 +995,8 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
                                                          soil_temperature_in_Celsius=soil_temperature_in_Celsius)
                 # VERIFICATION:
                 if time_step_in_seconds * temperature_time_adjustment - apex.thermal_time_since_growth_stopped < 0.:
-                    print("!!! ERROR: The apex", apex.index(), "has stopped since", apex.actual_time_since_growth_stopped,
+                    print("!!! ERROR: The apex", apex.index(), "has stopped since",
+                          apex.actual_time_since_growth_stopped,
                           "seconds; the time step is", time_step_in_seconds)
                     print("We set the potential length of this apex equal to its initial length.")
                     apex.potential_length = apex.initial_length
@@ -1075,10 +1084,12 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
         segment.hexose_available_for_thickening = parent.C_hexose_root * parent.struct_mass \
                                                   + segment.C_hexose_root * segment.struct_mass
         # We calculate an average concentration of hexose that will help to regulate nodule growth:
-        C_hexose_regulating_nodule_growth = segment.hexose_available_for_thickening / (parent.struct_mass + segment.struct_mass)
+        C_hexose_regulating_nodule_growth = segment.hexose_available_for_thickening / (
+                    parent.struct_mass + segment.struct_mass)
         # We modulate the relative increase in radius by the amount of C available in the nodule:
         thickening_rate = param.relative_nodule_thickening_rate_max \
-                          * C_hexose_regulating_nodule_growth / (param.Km_nodule_thickening + C_hexose_regulating_nodule_growth)
+                          * C_hexose_regulating_nodule_growth / (
+                                      param.Km_nodule_thickening + C_hexose_regulating_nodule_growth)
         # We modulate the relative increase in radius by the temperature:
         thickening_rate = thickening_rate * temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                      process_at_T_ref=1,
@@ -1186,11 +1197,12 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
             thickening_rate = param.relative_root_thickening_rate_max \
                               * segment.C_hexose_root / (param.Km_thickening + segment.C_hexose_root)
             # We add a correction factor for temperature:
-            thickening_rate = thickening_rate * temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
-                                                                         process_at_T_ref=1,
-                                                                         T_ref=param.T_ref_growth,
-                                                                         A=param.growth_increase_with_temperature,
-                                                                         C=0)
+            thickening_rate = thickening_rate * temperature_modification(
+                temperature_in_Celsius=soil_temperature_in_Celsius,
+                process_at_T_ref=1,
+                T_ref=param.T_ref_growth,
+                A=param.growth_increase_with_temperature,
+                C=0)
             # The maximal possible new radius according to this regulation is therefore:
             new_radius_max = (1 + thickening_rate * time_step_in_seconds) * segment.initial_radius
             # If the potential new radius is higher than the maximal new radius:
@@ -1257,7 +1269,8 @@ class Simulate_potential_growth(object):
         # For each apex in the list of apices:
         for apex in list_of_apices:
             # We define the new list of apices with the function apex_development:
-            new_apices = [potential_apex_development(self.g, apex, time_step_in_seconds=time_step_in_seconds, ArchiSimple=ArchiSimple,
+            new_apices = [potential_apex_development(self.g, apex, time_step_in_seconds=time_step_in_seconds,
+                                                     ArchiSimple=ArchiSimple,
                                                      soil_temperature_in_Celsius=soil_temperature_in_Celsius)]
 
             # We add these new apices to apex:
@@ -1287,13 +1300,14 @@ def potential_growth(g, time_step_in_seconds=1. * (60. * 60. * 24.), radial_grow
 
 def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60. * 60. * 24.,
                                           soil_temperature_in_Celsius=20, ArchiSimple=False, random=True,
-                                          nodules=True):
+                                          nodules=True, root_order_limitation=False, root_order_treshold=2):
     # NOTE: This function is supposed to be called AFTER the actual elongation of the apex has been done and the distance
     # between the tip of the apex and the last ramification (dist_to_ramif) has been increased!
 
     # Optional - We can add random geometry, or not:
     if random:
-        np.random.seed(param.random_choice + apex.index())
+        #The seed used to generate random values is defined according to a parameter random_choice and the index of the apex:
+        np.random.seed(param.random_choice*apex.index())
         angle_mean = 0
         angle_var = 5
         segment_angle_down = np.random.normal(angle_mean, angle_var)
@@ -1373,7 +1387,9 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
         # so that in this case, only 0 or 1 primordium may have been formed - the function is called only once):
         new_apex.append(primordium_formation(g, apex, elongation_rate=initial_elongation_rate,
                                              time_step_in_seconds=time_step_in_seconds,
-                                             soil_temperature_in_Celsius=soil_temperature_in_Celsius, random=random))
+                                             soil_temperature_in_Celsius=soil_temperature_in_Celsius, random=random,
+                                             root_order_limitation=root_order_limitation,
+                                             root_order_treshold=root_order_treshold))
 
     # Otherwise, we have to calculate the number of entire segments within the apex.
     else:
@@ -1427,7 +1443,9 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
             new_apex.append(primordium_formation(g, apex, elongation_rate=initial_elongation_rate,
                                                  time_step_in_seconds=time_step_in_seconds,
                                                  soil_temperature_in_Celsius=soil_temperature_in_Celsius,
-                                                 random=random))
+                                                 random=random,
+                                                 root_order_limitation=root_order_limitation,
+                                                 root_order_treshold=root_order_treshold))
             # The current element that has been elongated up to segment_length is now considered as a segment:
             apex.label = 'Segment'
 
@@ -1475,7 +1493,9 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
         # We call the function that can add a primordium on the current apex depending on the new dist_to_ramif:
         new_apex.append(primordium_formation(g, apex, elongation_rate=initial_elongation_rate,
                                              time_step_in_seconds=time_step_in_seconds,
-                                             soil_temperature_in_Celsius=soil_temperature_in_Celsius, random=random))
+                                             soil_temperature_in_Celsius=soil_temperature_in_Celsius, random=random,
+                                             root_order_limitation=root_order_limitation,
+                                             root_order_treshold=root_order_treshold))
         # The current element that has been elongated up to segment_length is now considered as a segment:
         apex.label = 'Segment'
 
@@ -1525,7 +1545,9 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
         # And we call the function primordium_formation to check whether a primordium should have been formed
         new_apex.append(primordium_formation(g, apex, elongation_rate=initial_elongation_rate,
                                              time_step_in_seconds=time_step_in_seconds,
-                                             soil_temperature_in_Celsius=soil_temperature_in_Celsius, random=random))
+                                             soil_temperature_in_Celsius=soil_temperature_in_Celsius, random=random,
+                                             root_order_limitation=root_order_limitation,
+                                             root_order_treshold=root_order_treshold))
         # And we add the last apex present at the end of the elongated axis:
         new_apex.append(apex)
 
@@ -1543,7 +1565,8 @@ class Simulate_segmentation_and_primordia_formation(object):
         # We define the list of apices for all vertices labelled as "Apex":
         self._apices = [g.node(v) for v in g.vertices_iter(scale=1) if g.label(v) == 'Apex']
 
-    def step(self, time_step_in_seconds, soil_temperature_in_Celsius=20, random=True, nodules=False):
+    def step(self, time_step_in_seconds, soil_temperature_in_Celsius=20, random=True, nodules=False,
+             root_order_limitation=False, root_order_treshold=2):
         # We define "apices_list" as the list of all apices in g:
         apices_list = list(self._apices)
         # For each apex in the list of apices:
@@ -1553,7 +1576,9 @@ class Simulate_segmentation_and_primordia_formation(object):
                 new_apex = segmentation_and_primordium_formation(self.g, apex, time_step_in_seconds,
                                                                  soil_temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                  random=random,
-                                                                 nodules=nodules)
+                                                                 nodules=nodules,
+                                                                 root_order_limitation=root_order_limitation,
+                                                                 root_order_treshold=root_order_treshold)
                 # We add these new apices to apex:
                 self._apices.extend(new_apex)
 
@@ -1562,11 +1587,14 @@ class Simulate_segmentation_and_primordia_formation(object):
 def segmentation_and_primordia_formation(g, time_step_in_seconds=1. * 60. * 60. * 24.,
                                          soil_temperature_in_Celsius=20,
                                          random=True, printing_warnings=False,
-                                         nodules=False):
+                                         nodules=False,
+                                         root_order_limitation=False,
+                                         root_order_treshold=2):
     # We simulate the segmentation of all apices:
     simulator = Simulate_segmentation_and_primordia_formation(g)
     simulator.step(time_step_in_seconds, soil_temperature_in_Celsius=soil_temperature_in_Celsius, random=random,
-                   nodules=nodules)
+                   nodules=nodules,
+                   root_order_limitation=root_order_limitation, root_order_treshold=root_order_treshold)
 
 
 ########################################################################################################################
@@ -1722,7 +1750,8 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
                     # The amount of hexose used for growth in this element is increased:
                     supplying_element.hexose_consumption_by_growth += hexose_actual_contribution_to_elongation
                     # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
-                    supplying_element.resp_growth += hexose_actual_contribution_to_elongation * (1 - param.yield_growth) * 6.
+                    supplying_element.resp_growth += hexose_actual_contribution_to_elongation * (
+                                1 - param.yield_growth) * 6.
 
                     # # POSSIBLE LIMITATION OF UPCOMING RADIAL GROWTH:
                     # # In the case of the first supplying element, i.e. the element that has elongated,
@@ -1771,20 +1800,27 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
                 hexose_actual_contribution_to_thickening = 1. / 6. * net_increase_in_volume * param.root_tissue_density * param.struct_mass_C_content / param.yield_growth
 
             # REGISTERING THE COSTS FOR THICKENING:
-            fraction_of_available_hexose_in_the_element = (n.C_hexose_root * n.initial_struct_mass) / hexose_available_for_thickening
+            fraction_of_available_hexose_in_the_element = (
+                                                                      n.C_hexose_root * n.initial_struct_mass) / hexose_available_for_thickening
             # The amount of hexose used for growth in this element is increased:
-            n.hexose_consumption_by_growth += (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
+            n.hexose_consumption_by_growth += (
+                        hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
             # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
-            n.resp_growth += (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) * (1 - param.yield_growth) * 6.
+            n.resp_growth += (
+                                         hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) * (
+                                         1 - param.yield_growth) * 6.
             if n.type == "Root_nodule":
                 index_parent = g.Father(n.index(), EdgeType='+')
                 parent = g.node(index_parent)
-                fraction_of_available_hexose_in_the_element = (parent.C_hexose_root * parent.initial_struct_mass) / hexose_available_for_thickening
+                fraction_of_available_hexose_in_the_element = (
+                                                                          parent.C_hexose_root * parent.initial_struct_mass) / hexose_available_for_thickening
                 # The amount of hexose used for growth in this element is increased:
-                parent.hexose_consumption_by_growth += (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
+                parent.hexose_consumption_by_growth += (
+                            hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
                 # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
-                parent.resp_growth += (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) * (
-                        1 - param.yield_growth) * 6.
+                parent.resp_growth += (
+                                                  hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) * (
+                                              1 - param.yield_growth) * 6.
 
         # RECORDING THE ACTUAL STRUCTURAL MODIFICATIONS:
         # -----------------------------------------------
@@ -1800,13 +1836,14 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
 
         # Verification: we check that no negative length or struct_mass have been generated!
         if n.volume < 0:
-            print("!!! ERROR: the element", n.index(), "of class", n.label, "has a length of", n.length, "and a mass of", n.struct_mass)
+            print("!!! ERROR: the element", n.index(), "of class", n.label, "has a length of", n.length,
+                  "and a mass of", n.struct_mass)
             # We then reset all the geometrical values to their initial values:
             n.length = n.initial_length
             n.radius = n.initial_radius
             n.struct_mass = n.initial_struct_mass
             n.struct_mass_produced = 0.
-            n.external_surface = param.initial_surface  # TODO : unresolved reference
+            n.external_surface = n.initial_surface
             n.volume = initial_volume
 
         # If there has been an actual elongation:
@@ -1817,7 +1854,8 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
             # If the elongated apex corresponded to an adventitious root:
             if n.type == "adventitious_root_before_emergence":
                 # We reset the time since an adventitious root has emerged (REMINDER: it is a "global" value):
-                g.property('thermal_time_since_last_adventitious_root_emergence')[g.root] = n.thermal_potential_time_since_emergence
+                g.property('thermal_time_since_last_adventitious_root_emergence')[
+                    g.root] = n.thermal_potential_time_since_emergence
 
             # If the elongated apex corresponded to any primordium that has emerged:
             if n.type == "adventitious_root_before_emergence" or n.type == "Normal_root_before_emergence":
@@ -1879,8 +1917,14 @@ def satisfaction_coefficient(g, struct_mass_input):
         n.growth_demand_in_struct_mass = (potential_volume - initial_volume) * param.root_tissue_density
         sum_struct_mass_demand += n.growth_demand_in_struct_mass
 
+    # We make sure that the structural mass input is not negative, as this case does not work with ArchiSimple:
+    if struct_mass_input < 0.:
+        struct_mass_input = 0.
+
     # We calculate the overall satisfaction coefficient SC described by Pages et al. (2014):
     if sum_struct_mass_demand <= 0:
+        print("!!! ERROR: The total growth demand calculated for ArchiSimple was nil or negative. "
+              "The satisfaction coefficient of ArchiSimple has been set to 1.")
         SC = 1.
     else:
         SC = struct_mass_input / sum_struct_mass_demand
@@ -1929,23 +1973,27 @@ def ArchiSimple_growth(g, SC, time_step_in_seconds, soil_temperature_in_Celsius=
 
         # We perform each type of growth according to the satisfaction coefficient SC:
         if SC > 1.:
-            relative_reduction = 1.
+            relative_growth_increase = 1.
+        elif SC <0:
+            print("!!! ERROR: Satisfaction coefficient was negative!!! We set it to 0.")
+            relative_growth_increase = 0.
         else:
-            relative_reduction = SC
+            relative_growth_increase = SC
 
         # WARNING: This approach is not an exact C balance on the root system! The relative reduction of growth caused
         # by SC should not be the same between elongation and radial growth!
-        n.length += (n.potential_length - n.initial_length) * relative_reduction
+        n.length += (n.potential_length - n.initial_length) * relative_growth_increase
         n.actual_elongation = n.length - n.initial_length
 
         # We calculate the actual elongation rate of this element:
-        if (n.thermal_potential_time_since_emergence > 0) and (n.thermal_potential_time_since_emergence < time_step_in_seconds):
+        if (n.thermal_potential_time_since_emergence > 0) and (
+                n.thermal_potential_time_since_emergence < time_step_in_seconds):
             n.actual_elongation_rate = n.actual_elongation / (
                     n.thermal_potential_time_since_emergence / temperature_time_adjustment)
         else:
             n.actual_elongation_rate = n.actual_elongation / time_step_in_seconds
 
-        n.radius += (n.potential_radius - n.initial_radius) * relative_reduction
+        n.radius += (n.potential_radius - n.initial_radius) * relative_growth_increase
         # The volume of the element is automatically calculated:
         n.volume = surfaces_and_volumes(g, n, n.radius, n.length)["volume"]
         # The new dry structural struct_mass of the element is calculated from its new volume:
@@ -1957,13 +2005,13 @@ def ArchiSimple_growth(g, SC, time_step_in_seconds, soil_temperature_in_Celsius=
 
         # VERIFICATION:
         if n.length < 0 or n.struct_mass < 0:
-            print("!!! ERROR: the element", n.index(), "of class", n.label, "has a length of", n.length, "and a mass of", n.struct_mass)
+            print("!!! ERROR: the element", n.index(), "of class", n.label, "has a length of", n.length,
+                  "and a mass of", n.struct_mass)
 
     return g
 
 
 def reinitializing_growth_variables(g):
-
     g.property('adventitious_root_emergence')[g.root] = "Possible"
 
     # We cover all the vertices in the MTG:
@@ -1985,6 +2033,7 @@ def reinitializing_growth_variables(g):
         n.potential_radius = n.radius
         n.theoretical_radius = n.radius
         n.initial_struct_mass = n.struct_mass
+        n.initial_surface = n.external_surface
 
 
 # FUNCTION: FORMATION OF NODULES
@@ -2016,7 +2065,7 @@ def nodule_formation(g, mother_element,
     nodule.symplasm_surface = dict['symplasm_surface']
     nodule.struct_mass = nodule.volume * param.root_tissue_density * param.struct_mass_C_content
 
-    print("Nodule", nodule.index(), "has been formed!")
+    # print("Nodule", nodule.index(), "has been formed!")
 
     return nodule
 
@@ -2089,10 +2138,12 @@ def shoot_sucrose_supply_and_spreading(g, sucrose_input_rate=1e-9, time_step_in_
     global_sucrose_deficit = g.property('global_sucrose_deficit')[g.root]
     if global_sucrose_deficit > 0.:
         print("!!! Before homogenizing sucrose concentration, the deficit in sucrose is", global_sucrose_deficit)
-        C_sucrose_root_after_supply = (total_sucrose_root + sucrose_input) / total_living_struct_mass  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        C_sucrose_root_after_supply = (
+                                                  total_sucrose_root + sucrose_input) / total_living_struct_mass  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     else:
         # The new average sucrose concentration in the root system is calculated as:
-        C_sucrose_root_after_supply = (total_sucrose_root + sucrose_input - global_sucrose_deficit) / total_living_struct_mass
+        C_sucrose_root_after_supply = (
+                                                  total_sucrose_root + sucrose_input - global_sucrose_deficit) / total_living_struct_mass
 
     if C_sucrose_root_after_supply >= 0.:
         new_C_sucrose_root = C_sucrose_root_after_supply
@@ -2101,7 +2152,8 @@ def shoot_sucrose_supply_and_spreading(g, sucrose_input_rate=1e-9, time_step_in_
     else:
         # We record the general deficit in sucrose:
         g.property('global_sucrose_deficit')[g.root] = - C_sucrose_root_after_supply * total_living_struct_mass
-        print("!!! After homogenizing sucrose concentration, the deficit in sucrose is", g.property('global_sucrose_deficit')[g.root])
+        print("!!! After homogenizing sucrose concentration, the deficit in sucrose is",
+              g.property('global_sucrose_deficit')[g.root])
         # We defined the new concentration of sucrose as 0:
         new_C_sucrose_root = 0.
 
@@ -2226,11 +2278,11 @@ def exchange_with_phloem(g, time_step_in_seconds=1. * (60. * 60. * 24.),
             A=-0.02,
             B=2,
             C=1)
-        #
+
         # # # In case n corresponds to an apex, we increase the unloading:!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # # if n.label=="Apex":
         # #     n.max_unloading_rate = n.max_unloading_rate * 2.
-
+        #
         # We calculate the potential production of hexose from sucrose (in mol) according to the Michaelis-Menten function:
         # n.hexose_production_from_phloem = 2. * n.max_unloading_rate * n.C_sucrose_root \
         #                         / (Km_unloading + n.C_sucrose_root) * time_step_in_seconds
@@ -2247,21 +2299,12 @@ def exchange_with_phloem(g, time_step_in_seconds=1. * (60. * 60. * 24.),
         # else:
         #     n.phloem_permeability = phloem_permeability / (1 + n.dist_to_tip / n.original_radius) ** gamma_unloading
 
-        # # We deal with special cases:
-        # if n.type == "Stopped" or n.type == "Just_stopped":
-        #     # If the element has stopped its growth, we decrease its unloading coefficient:
-        #     n.phloem_permeability = n.phloem_permeability / 50.
-
         n.phloem_permeability = param.phloem_permeability
 
         # We deal with special cases:
         if n.type == "Stopped" or n.type == "Just_stopped":
             # If the element has stopped its growth, we decrease its unloading coefficient:
             n.phloem_permeability = n.phloem_permeability / 50.
-
-        # #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # if n.type == "Root_nodule":
-        #     n.phloem_permeability = n.phloem_permeability*1.
 
         n.hexose_production_from_phloem = 2. * n.phloem_permeability * (n.C_sucrose_root - n.C_hexose_root / 2.) \
                                           * n.phloem_surface * time_step_in_seconds
@@ -2274,7 +2317,8 @@ def exchange_with_phloem(g, time_step_in_seconds=1. * (60. * 60. * 24.),
         # ---------
 
         # We correct the max loading rate according to the distance from the tip
-        n.max_loading_rate = n.max_loading_rate * (1. - 1. / (1. + n.dist_to_tip / n.original_radius) ** param.gamma_loading)
+        n.max_loading_rate = n.max_loading_rate * (
+                    1. - 1. / (1. + n.dist_to_tip / n.original_radius) ** param.gamma_loading)
 
         # We calculate the potential production of sucrose from hexose (in mol) according to the Michaelis-Menten function:!!!!!!!!!!!!!!!!!!!WHERE IS S ????
         n.sucrose_loading_in_phloem = 0.5 * n.max_loading_rate * n.C_hexose_root \
@@ -2364,14 +2408,16 @@ def exchange_with_reserve(g, time_step_in_seconds=1. * (60. * 60. * 24.),
         # CALCULATIONS OF THEORETICAL MOBILIZATION / IMMOBILIZATION RATES:
         # We calculate the potential mobilization of hexose from reserve (in mol) according to the Michaelis-Menten function:
         n.hexose_mobilization_from_reserve = corrected_max_mobilization_rate * n.C_hexose_reserve \
-                                             / (param.Km_mobilization + n.C_hexose_reserve) * time_step_in_seconds * n.struct_mass
+                                             / (
+                                                         param.Km_mobilization + n.C_hexose_reserve) * time_step_in_seconds * n.struct_mass
         # We calculate the potential immobilization of hexose as reserve (in mol) according to the Michaelis-Menten function:
         if n.C_hexose_root < param.C_hexose_root_min_for_reserve:
             # If the concentration of mobile hexose is already too low, there is no immobilization:
             n.hexose_immobilization_as_reserve = 0.
         else:
             n.hexose_immobilization_as_reserve = corrected_max_immobilization_rate * n.C_hexose_root \
-                                                 / (param.Km_immobilization + n.C_hexose_root) * time_step_in_seconds * n.struct_mass
+                                                 / (
+                                                             param.Km_immobilization + n.C_hexose_root) * time_step_in_seconds * n.struct_mass
 
         # CARBON BALANCE AND ADJUSTMENTS:
         # We control the balance on the reserve by calculating the new theoretical concentration in the reserve pool:
@@ -2488,8 +2534,8 @@ def root_hexose_exudation(g, time_step_in_seconds=1. * (60. * 60. * 24.),
     outside the root or hexose uptake by the root.
     Exudation corresponds to the difference between the efflux of hexose from the root
     to the soil by a passive diffusion. The efflux by diffusion is calculated from the product of the root external
-    surface (m2), the permeability coefficient (g m-2) and the gradient of hexose concentration (mol of hexose per gram of dry
-    root structural struct_mass).
+    surface (m2), the permeability coefficient (g m-2) and the gradient of hexose concentration (mol of hexose
+    per gram of dry root structural struct_mass).
     """
 
     # We cover all the vertices in the MTG:
@@ -2688,12 +2734,12 @@ def balance(g, time_step_in_seconds=1. * (60. * 60. * 24.), printing_warnings=Fa
         n.biomass = n.struct_mass + (
                 n.C_hexose_root * 6 * 12.01 + n.C_hexose_reserve * 6 * 12.01 + n.C_sucrose_root * 12 * 12.01) * n.struct_mass
         # We calculate a net rate of exudation, in gram of C per gram of dry structural mass per day:
-        n.net_hexose_exudation_rate_per_day_per_gram = (
-                                                               n.net_hexose_exudation / time_step_in_seconds) * 24. * 60. * 60. * 6. * 12.01 / n.struct_mass
+        n.net_hexose_exudation_rate_per_day_per_gram \
+            = ( n.net_hexose_exudation / time_step_in_seconds) * 24. * 60. * 60. * 6. * 12.01 / n.struct_mass
 
         # We calculate a net rate of exudation, in gram of C per cm of root per day:
-        n.net_hexose_exudation_rate_per_day_per_cm = (
-                                                             n.net_hexose_exudation / time_step_in_seconds) * 24. * 60. * 60. * 6. * 12.01 / n.length / 100
+        n.net_hexose_exudation_rate_per_day_per_cm \
+            = (n.net_hexose_exudation / time_step_in_seconds) * 24. * 60. * 60. * 6. * 12.01 / n.length / 100
 
         # BALANCE ON HEXOSE AT THE SOIL/ROOT INTERFACE:
         # We calculate the new concentration of hexose in the soil according to hexose degradation, exudation and uptake:
@@ -2966,7 +3012,7 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
 # ----------------------------------
 def control_of_anomalies(g):
     """
-
+    The function contol_of_anomalies checks for the presence of elements with negative measurable properties (e.g. length, concentrations).
     """
 
     # CHECKING THAT UNEMERGED ROOT ELEMENTS DO NOT CONTAIN CARBON:
@@ -3079,9 +3125,8 @@ def initiate_mtg(random=True):
 
     # Time indications:
     # ------------------
-    segment.growth_duration = param.GDs * 100 * (
-            2. * base_radius) ** 2  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    segment.life_duration = param.LDs * 2. * base_radius * param.root_tissue_density
+    segment.growth_duration = param.GDs * (2. * base_radius) ** 2
+    segment.life_duration = param.LDs * (2. * base_radius) * param.root_tissue_density
     segment.actual_time_since_primordium_formation = 0.
     segment.actual_time_since_emergence = 0.
     segment.actual_time_since_growth_stopped = 0.
@@ -3112,11 +3157,12 @@ def initiate_mtg(random=True):
             # We define the radius of an adventitious root according to the parameter Di:
             if random:
                 radius_adventitious = abs(
-                    np.random.normal(param.D_ini / 2. * param.D_ini_to_D_adv_ratio, param.D_ini / 2. * param.D_ini_to_D_adv_ratio * param.CVDD))
+                    np.random.normal(param.D_ini / 2. * param.D_adv_to_D_ini_ratio,
+                                     param.D_ini / 2. * param.D_adv_to_D_ini_ratio * param.CVDD))
                 if radius_adventitious > param.D_ini:
                     radius_adventitious = param.D_ini
             else:
-                radius_adventitious = param.D_ini / 2. * param.D_ini_to_D_adv_ratio
+                radius_adventitious = param.D_ini / 2. * param.D_adv_to_D_ini_ratio
             # And we add one new primordium of adventitious root on the previously defined segment:
             apex_adventitious = ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Apex',
                                                type='adventitious_root_before_emergence',
@@ -3128,8 +3174,8 @@ def initiate_mtg(random=True):
                                                nil_properties=True)
             apex_adventitious.original_radius = radius_adventitious
             apex_adventitious.initial_radius = radius_adventitious
-            apex_adventitious.growth_duration = param.GDs * 100 * (
-                    2. * radius_adventitious) ** 2  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            apex_adventitious.growth_duration = param.GDs * (2. * radius_adventitious) ** 2
+            apex_adventitious.life_duration = param.LDs * (2. * radius_adventitious) * param.root_tissue_density
 
     # Finally, we add the apex that is going to develop the main axis:
     apex = ADDING_A_CHILD(mother_element=segment, edge_type='<', label='Apex',
@@ -3142,8 +3188,8 @@ def initiate_mtg(random=True):
                           nil_properties=True)
     apex.original_radius = apex.radius
     apex.initial_radius = apex.radius
-    apex.growth_duration = param.GDs * 100 * (
-            2. * base_radius) ** 2  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    apex.growth_duration = param.GDs * (2. * base_radius) ** 2
+    apex.life_duration = param.LDs * (2. * base_radius) * param.root_tissue_density
 
     apex.volume = surfaces_and_volumes(g, apex, apex.radius, apex.length)["volume"]
     apex.struct_mass = apex.volume * param.root_tissue_density
@@ -3153,723 +3199,4 @@ def initiate_mtg(random=True):
     apex.C_hexose_reserve = 0.
     apex.C_hexose_soil = 0.
 
-<<<<<<< HEAD:test/rhizodep_2021.py
-    input_frame.to_csv('input_file.csv', na_rep='NA', index=False, header=True)
-    print("The new input file adapted to the required time step has been created and saved as 'input_file.csv'.")
-
-    return input_frame
-
-
-# We define the main simulation program:
-def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
-                    radial_growth="Impossible", ArchiSimple=False,
-                    property="C_hexose_root", vmin=1e-6, vmax=1e-0, log_scale=True, cmap='brg',
-                    input_file="None",
-                    constant_sucrose_input_rate=1.e-6,
-                    constant_soil_temperature_in_Celsius=20,
-                    nodules=False,
-                    x_center=0, y_center=0, z_center=-1, z_cam=-1,
-                    camera_distance=10., step_back_coefficient=0., camera_rotation=False, n_rotation_points=24 * 5,
-                    recording_images=False,
-                    z_classification=False, z_min=0., z_max=1., z_interval=0.5,
-                    printing_sum=False,
-                    recording_sum=False,
-                    printing_warnings=False,
-                    recording_g=False,
-                    recording_g_properties=True,
-                    random=False):
-    # We convert the time step in seconds:
-    time_step_in_seconds = time_step_in_days * 60. * 60. * 24.
-    # We calculate the number of steps necessary to reach the end of the simulation period:
-    if simulation_period_in_days == 0. or time_step_in_days == 0.:
-        print("WATCH OUT: No simulation was done, as time input was 0.")
-        n_steps = 0
-    else:
-        n_steps = trunc(simulation_period_in_days / time_step_in_days) + 1
-
-    print("n_steps is ", n_steps)  # TODO: delete
-
-    # We call global variables:
-    global thermal_time_since_last_adventitious_root_emergence
-    global adventitious_root_emergence
-
-    # We initialize empty variables at t=0:
-    step = 0
-    time = 0.
-    total_struct_mass = 0.
-    cumulated_hexose_exudation = 0.
-    cumulated_respired_CO2 = 0.
-    cumulated_struct_mass_production = 0.
-    sucrose_input_rate = 0.
-    C_cumulated_in_the_degraded_pool = 0.
-    C_cumulated_in_the_gaz_phase = 0.
-
-    # We initialize empty lists for recording the macro-results:
-    time_in_days_series = []
-    sucrose_input_series = []
-    total_living_root_length_series = []
-    total_dead_root_length_series = []
-    total_living_root_surface_series = []
-    total_dead_root_surface_series = []
-    total_living_root_struct_mass_series = []
-    total_dead_root_struct_mass_series = []
-    total_sucrose_root_series = []
-    total_hexose_root_series = []
-    total_hexose_reserve_series = []
-    total_hexose_soil_series = []
-
-    total_sucrose_root_deficit_series = []
-    total_hexose_root_deficit_series = []
-    total_hexose_soil_deficit_series = []
-
-    total_respiration_series = []
-    total_respiration_root_growth_series = []
-    total_respiration_root_maintenance_series = []
-    total_structural_mass_production_series = []
-    total_hexose_production_from_phloem_series = []
-    total_sucrose_loading_in_phloem_series = []
-    total_hexose_mobilization_from_reserve_series = []
-    total_hexose_immobilization_as_reserve_series = []
-    total_hexose_exudation_series = []
-    total_hexose_uptake_series = []
-    total_hexose_degradation_series = []
-    total_net_hexose_exudation_series = []
-    C_in_the_root_soil_system_series = []
-    C_cumulated_in_the_degraded_pool_series = []
-    C_cumulated_in_the_gaz_phase_series = []
-    global_sucrose_deficit_series = []
-    tip_C_hexose_root_series = []
-
-    # We create an empty dictionary that will contain the results of z classification:
-    z_dictionary_series = {}
-
-    if recording_images:
-        # We define the directory "video"
-        video_dir = 'video'
-        # If this directory doesn't exist:
-        if not os.path.exists(video_dir):
-            # Then we create it:
-            os.mkdir(video_dir)
-        else:
-            # Otherwise, we delete all the images that are already present inside:
-            for root, dirs, files in os.walk(video_dir):
-                for file in files:
-                    os.remove(os.path.join(root, file))
-
-    if recording_g:
-        # We define the directory "MTG_files"
-        g_dir = 'MTG_files'
-        # If this directory doesn't exist:
-        if not os.path.exists(g_dir):
-            # Then we create it:
-            os.mkdir(g_dir)
-        else:
-            # Otherwise, we delete all the files that are already present inside:
-            for root, dirs, files in os.walk(g_dir):
-                for file in files:
-                    os.remove(os.path.join(root, file))
-
-    if recording_g_properties:
-        # We define the directory "MTG_properties"
-        prop_dir = 'MTG_properties'
-        # If this directory doesn't exist:
-        if not os.path.exists(prop_dir):
-            # Then we create it:
-            os.mkdir(prop_dir)
-        else:
-            # Otherwise, we delete all the files that are already present inside:
-            for root, dirs, files in os.walk(prop_dir):
-                for file in files:
-                    os.remove(os.path.join(root, file))
-
-    # READING THE INPUT FILE:
-    # -----------------------
-    if input_file != "None" and (constant_sucrose_input_rate <= 0 or constant_soil_temperature_in_Celsius <= 0):
-        # # We first define the path and the file to read as a .csv:
-        # PATH = os.path.join('.', input_file)
-        # # Then we read the file and copy it in a dataframe "df":
-        # input_frame = pd.read_csv(PATH, sep=',')
-        # We use the function 'formatted inputs' to create a table containing the input data (soil temperature and sucrose input)
-        # for each required step, depending on the chosen time step:
-        input_frame = formatted_inputs(original_input_file=input_file,
-                                       original_time_step_in_days=1 / 24.,
-                                       final_time_step_in_days=time_step_in_days,
-                                       simulation_period_in_days=simulation_period_in_days,
-                                       do_not_execute_if_file_with_suitable_size_exists=False)
-
-    # RECORDING THE INITIAL STATE OF THE MTG:
-    # ---------------------------------------
-    step = 0
-
-    # If the rotation of the camera around the root system is required:
-    if camera_rotation:
-        # We calculate the coordinates of the camera on the circle around the center:
-        x_coordinates, y_coordinates, z_coordinates = circle_coordinates(z_center=z_cam, radius=camera_distance,
-                                                                         n_points=n_rotation_points)
-        # We initialize the index for reading each coordinates:
-        index_camera = 0
-        x_cam = x_coordinates[index_camera]
-        y_cam = y_coordinates[index_camera]
-        z_cam = z_coordinates[index_camera]
-        sc = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
-                      x_center=x_center,
-                      y_center=y_center,
-                      z_center=z_center,
-                      x_cam=x_cam,
-                      y_cam=y_cam,
-                      z_cam=z_cam)
-    else:
-        x_camera = camera_distance
-        x_cam = camera_distance
-        z_camera = z_cam
-        sc = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
-                      x_center=x_center,
-                      y_center=y_center,
-                      z_center=z_center,
-                      x_cam=x_camera,
-                      y_cam=0,
-                      z_cam=z_camera)
-        # We move the camera further from the root system:
-        x_camera = x_cam + x_cam * step_back_coefficient * step
-        z_camera = z_cam + z_cam * step_back_coefficient * step
-    # We finally display the MTG on PlantGL:
-    print("OK")
-    pgl.Viewer.display(sc)
-
-    # For recording the graph at each time step to make a video later:
-    # -----------------------------------------------------------------
-    if recording_images:
-        image_name = os.path.join(video_dir, 'root%.5d.png')
-        pgl.Viewer.saveSnapshot(image_name % step)
-
-    # For integrating root variables on the z axis:
-    # ----------------------------------------------
-    if z_classification:
-        z_dictionary = classifying_on_z(g, z_min=z_min, z_max=z_max, z_interval=z_interval)
-        z_dictionary["time_in_days"] = 0
-        z_dictionary_series.update(z_dictionary)
-        print(z_dictionary_series)
-
-    # For recording the MTG at each time step to load it later on:
-    # ------------------------------------------------------------
-    if recording_g:
-        g_file_name = os.path.join(g_dir, 'root%.5d.pckl')
-        with open(g_file_name % step, 'wb') as output:
-            pickle.dump(g, output, protocol=2)
-
-    # For recording the properties of g in a csv file:
-    # ------------------------------------------------
-    if recording_g_properties:
-        prop_file_name = os.path.join(prop_dir, 'root%.5d.csv')
-        recording_MTG_properties(g, file_name=prop_file_name % step)
-
-    # SUMMING AND PRINTING VARIABLES ON THE ROOT SYSTEM:
-    # --------------------------------------------------
-
-    # We reset to 0 all growth-associated C costs:
-    reinitializing_growth_variables(g)
-
-    if printing_sum:
-        dictionary = summing(g,
-                             printing_total_length=True,
-                             printing_total_struct_mass=True,
-                             printing_all=True)
-    elif not printing_sum and recording_sum:
-        dictionary = summing(g,
-                             printing_total_length=True,
-                             printing_total_struct_mass=True,
-                             printing_all=False)
-    if recording_sum:
-        time_in_days_series.append(time_step_in_days * step)
-        sucrose_input_series.append(sucrose_input_rate * time_step_in_seconds)
-        total_living_root_length_series.append(dictionary["total_living_root_length"])
-        total_dead_root_length_series.append(dictionary["total_dead_root_length"])
-        total_living_root_struct_mass_series.append(dictionary["total_living_root_struct_mass"])
-        total_dead_root_struct_mass_series.append(dictionary["total_dead_root_struct_mass"])
-        total_living_root_surface_series.append(dictionary["total_living_root_surface"])
-        total_dead_root_surface_series.append(dictionary["total_dead_root_surface"])
-        total_sucrose_root_series.append(dictionary["total_sucrose_root"])
-        total_hexose_root_series.append(dictionary["total_hexose_root"])
-        total_hexose_reserve_series.append(dictionary["total_hexose_reserve"])
-        total_hexose_soil_series.append(dictionary["total_hexose_soil"])
-
-        total_sucrose_root_deficit_series.append(dictionary["total_sucrose_root_deficit"])
-        total_hexose_root_deficit_series.append(dictionary["total_hexose_root_deficit"])
-        total_hexose_soil_deficit_series.append(dictionary["total_hexose_soil_deficit"])
-
-        total_respiration_series.append(dictionary["total_respiration"])
-        total_respiration_root_growth_series.append(dictionary["total_respiration_root_growth"])
-        total_respiration_root_maintenance_series.append(dictionary["total_respiration_root_maintenance"])
-        total_structural_mass_production_series.append(dictionary["total_structural_mass_production"])
-        total_hexose_production_from_phloem_series.append(dictionary["total_hexose_production_from_phloem"])
-        total_sucrose_loading_in_phloem_series.append(dictionary["total_sucrose_loading_in_phloem"])
-        total_hexose_mobilization_from_reserve_series.append(dictionary["total_hexose_mobilization_from_reserve"])
-        total_hexose_immobilization_as_reserve_series.append(dictionary["total_hexose_immobilization_as_reserve"])
-        total_hexose_exudation_series.append(dictionary["total_hexose_exudation"])
-        total_hexose_uptake_series.append(dictionary["total_hexose_uptake"])
-        total_hexose_degradation_series.append(dictionary["total_hexose_degradation"])
-        total_net_hexose_exudation_series.append(dictionary["total_net_hexose_exudation"])
-
-        C_in_the_root_soil_system_series.append(dictionary["C_in_the_root_soil_system"])
-        C_cumulated_in_the_degraded_pool += dictionary["C_degraded_in_the_soil"]
-        C_cumulated_in_the_degraded_pool_series.append(C_cumulated_in_the_degraded_pool)
-        C_cumulated_in_the_gaz_phase += dictionary["C_respired_by_roots"]
-        C_cumulated_in_the_gaz_phase_series.append(C_cumulated_in_the_gaz_phase)
-        global_sucrose_deficit_series.append(global_sucrose_deficit)
-
-        tip_C_hexose_root_series.append(g.node(0).C_hexose_root)
-
-        # Initializing the amount of C in the root_soil_CO2 system:
-        previous_C_in_the_system = dictionary["C_in_the_root_soil_system"] + C_cumulated_in_the_gaz_phase
-        theoretical_cumulated_C_in_the_system = previous_C_in_the_system
-
-    # ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    # The code will try to run the following code until it is finished or an error has been raised:
-    try:
-        # An iteration is done for each time step:
-        for step in range(1, n_steps):
-
-            # At the beginning of the time step, we reset the global variable allowing the emergence of adventitious roots:
-            adventitious_root_emergence = "Possible"
-            # We keep in memory the value of the global variable time_since_adventitious_root_emergence at the beginning of the time steo:
-            initial_time_since_adventitious_root_emergence = thermal_time_since_last_adventitious_root_emergence
-
-            # We calculate the current time in hours:
-            current_time_in_hours = step * time_step_in_days * 24.
-
-            # DEFINING THE INPUT OF CARBON TO THE ROOTS FOR THIS TIME STEP:
-            # --------------------------------------------------------------
-            if constant_sucrose_input_rate > 0 or input_file == "None":
-                sucrose_input_rate = constant_sucrose_input_rate
-            else:
-                sucrose_input_rate = input_frame.loc[step, 'sucrose_input_rate']
-
-            # DEFINING THE TEMPERATURE OF THE SOIL FOR THIS TIME STEP:
-            # --------------------------------------------------------
-            if constant_soil_temperature_in_Celsius > 0 or input_file == "None":
-                soil_temperature = constant_soil_temperature_in_Celsius
-            else:
-                soil_temperature = input_frame.loc[step, 'soil_temperature_in_degree_Celsius']
-
-            # CALCULATING AN EQUIVALENT OF THERMAL TIME:
-            # -------------------------------------------
-
-            # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil temperature:
-            temperature_time_adjustment = temperature_modification(temperature_in_Celsius=soil_temperature,
-                                                                   process_at_T_ref=1,
-                                                                   T_ref=T_ref_growth,
-                                                                   A=growth_increase_with_temperature,
-                                                                   B=1,
-                                                                   C=0)
-
-            # STARTING THE ACTUAL SIMULATION:
-            # --------------------------------
-            print("")
-            print("From t =", "{:.2f}".format(Decimal((step - 1) * time_step_in_days)), "days to t =",
-                  "{:.2f}".format(Decimal(step * time_step_in_days)), "days:")
-            print("------------------------------------")
-            print("   Soil temperature is", soil_temperature, "degree Celsius.")
-            print("   The input rate of sucrose to the root for time=", current_time_in_hours, "h is",
-                  "{:.2E}".format(Decimal(sucrose_input_rate)), "mol of sucrose per second, i.e.",
-                  "{:.2E}".format(Decimal(sucrose_input_rate * 60. * 60. * 24.)), "mol of sucrose per day.")
-
-            print("   The root system initially includes", len(g) - 1, "root elements.")
-
-            # CASE 1: WE REPRODUCE THE GROWTH WITHOUT CONSIDERATIONS OF LOCAL CONCENTRATIONS
-            # -------------------------------------------------------------------------------
-
-            if ArchiSimple:
-
-                # The input of C (gram of C) from shoots is calculated from the input of sucrose:
-                C_input = sucrose_input_rate * 12 * 12.01 * time_step_in_seconds
-                # We assume that only a fraction of this C_input will be used for producing struct_mass:
-                fraction = 0.20
-                struct_mass_input = C_input / struct_mass_C_content * fraction
-
-                # We calculate the potential growth, already based on ArchiSimple rules:
-                potential_growth(g, time_step_in_seconds=time_step_in_seconds,
-                                 radial_growth=radial_growth,
-                                 ArchiSimple=True,
-                                 soil_temperature_in_Celsius=soil_temperature)
-
-                # We use the function ArchiSimple_growth to adapt the potential growth to the available struct_mass:
-                SC = satisfaction_coefficient(g, struct_mass_input=struct_mass_input)
-                ArchiSimple_growth(g, SC, time_step_in_seconds,
-                                   soil_temperature_in_Celsius=soil_temperature,
-                                   printing_warnings=printing_warnings)
-
-                # We proceed to the segmentation of the whole root system (NOTE: segmentation should always occur AFTER actual growth):
-                segmentation_and_primordia_formation(g, time_step_in_seconds, printing_warnings=printing_warnings,
-                                                     soil_temperature_in_Celsius=soil_temperature, random=random,
-                                                     nodules=nodules)
-
-            else:
-
-                # CASE 2: WE PERFORM THE COMPLETE MODEL WITH C BALANCE IN EACH ROOT ELEMENT
-                # --------------------------------------------------------------------------
-
-                # We reset to 0 all growth-associated C costs:
-                reinitializing_growth_variables(g)
-
-                # Calculation of potential growth without consideration of available hexose:
-                potential_growth(g, time_step_in_seconds=time_step_in_seconds,
-                                 radial_growth=radial_growth,
-                                 soil_temperature_in_Celsius=soil_temperature,
-                                 ArchiSimple=False)
-
-                # Calculation of actual growth based on the hexose remaining in the roots,
-                # and corresponding consumption of hexose in the root:
-                actual_growth_and_corresponding_respiration(g, time_step_in_seconds=time_step_in_seconds,
-                                                            soil_temperature_in_Celsius=soil_temperature,
-                                                            printing_warnings=printing_warnings)
-                # # We proceed to the segmentation of the whole root system (NOTE: segmentation should always occur AFTER actual growth):
-                segmentation_and_primordia_formation(g, time_step_in_seconds,
-                                                     soil_temperature_in_Celsius=soil_temperature,
-                                                     random=random,
-                                                     nodules=nodules)
-                dist_to_tip(g)
-
-                # Consumption of hexose in the soil:
-                soil_hexose_degradation(g, time_step_in_seconds=time_step_in_seconds,
-                                        soil_temperature_in_Celsius=soil_temperature,
-                                        printing_warnings=printing_warnings)
-
-                # Transfer of hexose from the root to the soil, consumption of hexose inside the roots:
-                root_hexose_exudation(g, time_step_in_seconds=time_step_in_seconds,
-                                      soil_temperature_in_Celsius=soil_temperature,
-                                      printing_warnings=printing_warnings)
-                # Transfer of hexose from the soil to the root, consumption of hexose in the soil:
-                root_hexose_uptake(g, time_step_in_seconds=time_step_in_seconds,
-                                   soil_temperature_in_Celsius=soil_temperature,
-                                   printing_warnings=printing_warnings)
-
-                # Consumption of hexose in the root by maintenance respiration:
-                maintenance_respiration(g, time_step_in_seconds=time_step_in_seconds,
-                                        soil_temperature_in_Celsius=soil_temperature,
-                                        printing_warnings=printing_warnings)
-
-                # Unloading of sucrose from phloem and conversion of sucrose into hexose:
-                exchange_with_phloem(g, time_step_in_seconds=time_step_in_seconds,
-                                     soil_temperature_in_Celsius=soil_temperature,
-                                     printing_warnings=printing_warnings)
-
-                # Net immobilization of hexose within a reserve pool:
-                exchange_with_reserve(g, time_step_in_seconds=time_step_in_seconds,
-                                      soil_temperature_in_Celsius=soil_temperature,
-                                      printing_warnings=printing_warnings)
-
-                # Calculation of the new concentrations in hexose and sucrose once all the processes have been done:
-                tip_C_hexose_root = balance(g, printing_warnings=printing_warnings)
-
-                # Supply of sucrose from the shoots to the roots and spreading into the whole phloem:
-                shoot_sucrose_supply_and_spreading(g, sucrose_input_rate=sucrose_input_rate,
-                                                   time_step_in_seconds=time_step_in_seconds,
-                                                   printing_warnings=printing_warnings)
-                # WARNING: The function "shoot_sucrose_supply_and_spreading" must be called AFTER the function "balance",!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                # otherwise the deficit in sucrose may be counted twice!!!
-
-                # # OPTIONAL: checking of possible anomalies in the root system:
-                control_of_anomalies(g)
-
-            # A the end of the time step, if the global variable "time_since_adventitious_root_emergence" has been unchanged:
-            if thermal_time_since_last_adventitious_root_emergence == initial_time_since_adventitious_root_emergence:
-                # Then we increment it by the time step:
-                thermal_time_since_last_adventitious_root_emergence += time_step_in_seconds * temperature_time_adjustment
-            # Otherwise, the variable has already been reset when the emergence of one adventitious root has been allowed.
-
-            # PLOTTING THE MTG:
-            # ------------------
-
-            # If the rotation of the camera around the root system is required:
-            if camera_rotation:
-                x_cam = x_coordinates[index_camera]
-                y_cam = y_coordinates[index_camera]
-                z_cam = z_coordinates[index_camera]
-                sc = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
-                              x_center=x_center,
-                              y_center=y_center,
-                              z_center=z_center,
-                              x_cam=x_cam,
-                              y_cam=y_cam,
-                              z_cam=z_cam)
-                # We define the index of the coordinates to read at the next step:
-                index_camera = index_camera + 1
-                # If this index is higher than the number of coordinates in each vector:
-                if index_camera >= n_rotation_points:
-                    # Then we reset the index to 0:
-                    index_camera = 0
-            # Otherwise, the camera will stay on a fixed position:
-            else:
-
-                sc = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
-                              x_center=x_center,
-                              y_center=y_center,
-                              z_center=z_center,
-                              x_cam=x_camera,
-                              y_cam=0,
-                              z_cam=z_camera)
-                # We move the camera further from the root system:
-                x_camera = x_cam + x_cam * step_back_coefficient * step
-                z_camera = z_cam + z_cam * step_back_coefficient * step
-            # We finally display the MTG on PlantGL:
-            pgl.Viewer.display(sc)
-
-            # For recording the graph at each time step to make a video later:
-            # -----------------------------------------------------------------
-            if recording_images:
-                image_name = os.path.join(video_dir, 'root%.5d.png')
-                pgl.Viewer.saveSnapshot(image_name % step)
-
-
-            # For integrating root variables on the z axis:
-            # ----------------------------------------------
-            if z_classification:
-                z_dictionary = classifying_on_z(g, z_min=z_min, z_max=z_max, z_interval=z_interval)
-                z_dictionary["time_in_days"] = time_step_in_days * step
-                z_dictionary_series.update(z_dictionary)
-
-            # For recording the MTG at each time step to load it later on:
-            # ------------------------------------------------------------
-            if recording_g:
-                g_file_name = os.path.join(g_dir, 'root%.5d.pckl')
-                with open(g_file_name % step, 'wb') as output:
-                    pickle.dump(g, output, protocol=2)
-
-            # For recording the properties of g in a csv file:
-            # --------------------------------------------------
-            if recording_g_properties:
-                prop_file_name = os.path.join(prop_dir, 'root%.5d.csv')
-                recording_MTG_properties(g, file_name=prop_file_name % step)
-
-            # SUMMING AND PRINTING VARIABLES ON THE ROOT SYSTEM:
-            # --------------------------------------------------
-            if printing_sum:
-                dictionary = summing(g,
-                                     printing_total_length=True,
-                                     printing_total_struct_mass=True,
-                                     printing_all=True)
-            elif not printing_sum and recording_sum:
-                dictionary = summing(g,
-                                     printing_total_length=True,
-                                     printing_total_struct_mass=True,
-                                     printing_all=False)
-            if recording_sum:
-                time_in_days_series.append(time_step_in_days * step)
-                sucrose_input_series.append(sucrose_input_rate * time_step_in_seconds)
-                total_living_root_length_series.append(dictionary["total_living_root_length"])
-                total_dead_root_length_series.append(dictionary["total_dead_root_length"])
-                total_living_root_struct_mass_series.append(dictionary["total_living_root_struct_mass"])
-                total_dead_root_struct_mass_series.append(dictionary["total_dead_root_struct_mass"])
-                total_living_root_surface_series.append(dictionary["total_living_root_surface"])
-                total_dead_root_surface_series.append(dictionary["total_dead_root_surface"])
-                total_sucrose_root_series.append(dictionary["total_sucrose_root"])
-                total_hexose_root_series.append(dictionary["total_hexose_root"])
-                total_hexose_reserve_series.append(dictionary["total_hexose_reserve"])
-                total_hexose_soil_series.append(dictionary["total_hexose_soil"])
-
-                total_sucrose_root_deficit_series.append(dictionary["total_sucrose_root_deficit"])
-                total_hexose_root_deficit_series.append(dictionary["total_hexose_root_deficit"])
-                total_hexose_soil_deficit_series.append(dictionary["total_hexose_soil_deficit"])
-
-                total_respiration_series.append(dictionary["total_respiration"])
-                total_respiration_root_growth_series.append(dictionary["total_respiration_root_growth"])
-                total_respiration_root_maintenance_series.append(dictionary["total_respiration_root_maintenance"])
-                total_structural_mass_production_series.append(dictionary["total_structural_mass_production"])
-                total_hexose_production_from_phloem_series.append(dictionary["total_hexose_production_from_phloem"])
-                total_sucrose_loading_in_phloem_series.append(dictionary["total_sucrose_loading_in_phloem"])
-                total_hexose_mobilization_from_reserve_series.append(
-                    dictionary["total_hexose_mobilization_from_reserve"])
-                total_hexose_immobilization_as_reserve_series.append(
-                    dictionary["total_hexose_immobilization_as_reserve"])
-                total_hexose_exudation_series.append(dictionary["total_hexose_exudation"])
-                total_hexose_uptake_series.append(dictionary["total_hexose_uptake"])
-                total_hexose_degradation_series.append(dictionary["total_hexose_degradation"])
-                total_net_hexose_exudation_series.append(dictionary["total_net_hexose_exudation"])
-
-                C_in_the_root_soil_system_series.append(dictionary["C_in_the_root_soil_system"])
-                C_cumulated_in_the_degraded_pool += dictionary["C_degraded_in_the_soil"]
-                C_cumulated_in_the_degraded_pool_series.append(C_cumulated_in_the_degraded_pool)
-                C_cumulated_in_the_gaz_phase += dictionary["C_respired_by_roots"]
-                C_cumulated_in_the_gaz_phase_series.append(C_cumulated_in_the_gaz_phase)
-                global_sucrose_deficit_series.append(global_sucrose_deficit)
-
-                tip_C_hexose_root_series.append(tip_C_hexose_root)
-
-                # CHECKING CARBON BALANCE:
-                current_C_in_the_system = dictionary[
-                                              "C_in_the_root_soil_system"] + C_cumulated_in_the_gaz_phase + C_cumulated_in_the_degraded_pool
-                theoretical_current_C_in_the_system = (
-                        previous_C_in_the_system + sucrose_input_rate * time_step_in_seconds * 12.)
-                theoretical_cumulated_C_in_the_system += sucrose_input_rate * time_step_in_seconds * 12.
-
-                if abs(
-                        current_C_in_the_system - theoretical_cumulated_C_in_the_system) / current_C_in_the_system > 1e-10:
-                    print("!!! ERROR ON CARBON BALANCE: the current amount of C in the system is",
-                          "{:.2E}".format(Decimal(current_C_in_the_system)), "but it should be",
-                          "{:.2E}".format(Decimal(theoretical_current_C_in_the_system)), "mol of C")
-                    print("This corresponds to a net disappearance of C of",
-                          "{:.2E}".format(Decimal(theoretical_current_C_in_the_system - current_C_in_the_system)),
-                          "mol of C, and the cumulated difference since the start of the simulation and the current one is",
-                          "{:.2E}".format(
-                              Decimal(theoretical_cumulated_C_in_the_system - current_C_in_the_system)), "mol of C.")
-
-                    # We reinitialize the "previous" amount of C in the system with the current one for the next time step:
-                previous_C_in_the_system = current_C_in_the_system
-
-            print("      The root system finally includes", len(g) - 1, "root elements.")
-
-
-    # ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    # At the end of the simulation (or just before an error is about to interrupt the program!):
-    # -------------------------------------------------------------------------------------------
-    finally:
-        print("")
-        print("The program has stopped at time t = {:.2f}".format(Decimal(step * time_step_in_days)), "days.")
-        # We can record all the results in a CSV file:
-        if recording_sum:
-            # We create a data_frame from the vectors generated in the main program up to this point:
-            data_frame = pd.DataFrame({"Time (days)": time_in_days_series,
-                                       "Sucrose input (mol of sucrose)": sucrose_input_series,
-                                       "Root structural mass (g)": total_living_root_struct_mass_series,
-                                       "Root necromass (g)": total_dead_root_struct_mass_series,
-                                       "Root length (m)": total_living_root_length_series,
-                                       "Root surface (m2)": total_living_root_surface_series,
-                                       "Sucrose in the root (mol of sucrose)": total_sucrose_root_series,
-                                       "Hexose in the mobile pool of the roots (mol of hexose)": total_hexose_root_series,
-                                       "Hexose in the reserve pool of the roots (mol of hexose)": total_hexose_reserve_series,
-                                       "Hexose in the soil (mol of hexose)": total_hexose_soil_series,
-
-                                       "Deficit of sucrose in the root (mol of sucrose)": total_sucrose_root_deficit_series,
-                                       "Deficit of hexose in the mobile pool of the roots (mol of hexose)": total_hexose_root_deficit_series,
-                                       "Deficit of hexose in the soil (mol of hexose)": total_hexose_soil_deficit_series,
-
-                                       "CO2 originating from root growth (mol of C)": total_respiration_root_growth_series,
-                                       "CO2 originating from root maintenance (mol of C)": total_respiration_root_maintenance_series,
-                                       "Structural mass produced (g)": total_structural_mass_production_series,
-                                       "Hexose unloaded from phloem (mol of hexose)": total_hexose_production_from_phloem_series,
-                                       "Sucrose reloaded in the phloem (mol of hexose)": total_sucrose_loading_in_phloem_series,
-                                       "Hexose mobilized from reserve (mol of hexose)": total_hexose_mobilization_from_reserve_series,
-                                       "Hexose stored as reserve (mol of hexose)": total_hexose_immobilization_as_reserve_series,
-                                       "Hexose emitted in the soil (mol of hexose)": total_hexose_exudation_series,
-                                       "Hexose taken up from the soil (mol of hexose)": total_hexose_uptake_series,
-                                       "Hexose degraded in the soil (mol of hexose)": total_hexose_degradation_series,
-
-                                       "Cumulated amount of C present in the root-soil system (mol of C)": C_in_the_root_soil_system_series,
-                                       "Cumulated amount of C that has been degraded in the soil (mol of C)": C_cumulated_in_the_degraded_pool_series,
-                                       "Cumulated amount of C that has been respired by roots (mol of C)": C_cumulated_in_the_gaz_phase_series,
-                                       "Final deficit in sucrose of the whole root system (mol of sucrose)": global_sucrose_deficit_series,
-
-                                       "Concentration of hexose in the main root tip (mol of hexose per g)": tip_C_hexose_root_series
-                                       },
-                                      # We re-order the columns:
-                                      columns=["Time (days)",
-                                               "Sucrose input (mol of sucrose)",
-                                               "Final deficit in sucrose of the whole root system (mol of sucrose)",
-                                               "Cumulated amount of C present in the root-soil system (mol of C)",
-                                               "Cumulated amount of C that has been respired by roots (mol of C)",
-                                               "Cumulated amount of C that has been degraded in the soil (mol of C)",
-                                               "Root structural mass (g)",
-                                               "Root necromass (g)",
-                                               "Root length (m)",
-                                               "Root surface (m2)",
-                                               "Sucrose in the root (mol of sucrose)",
-                                               "Hexose in the mobile pool of the roots (mol of hexose)",
-                                               "Hexose in the reserve pool of the roots (mol of hexose)",
-                                               "Hexose in the soil (mol of hexose)",
-                                               "Deficit of sucrose in the root (mol of sucrose)",
-                                               "Deficit of hexose in the mobile pool of the roots (mol of hexose)",
-                                               "Deficit of hexose in the soil (mol of hexose)",
-                                               "CO2 originating from root growth (mol of C)",
-                                               "CO2 originating from root maintenance (mol of C)",
-                                               "Structural mass produced (g)",
-                                               "Hexose unloaded from phloem (mol of hexose)",
-                                               "Sucrose reloaded in the phloem (mol of hexose)",
-                                               "Hexose mobilized from reserve (mol of hexose)",
-                                               "Hexose stored as reserve (mol of hexose)",
-                                               "Hexose emitted in the soil (mol of hexose)",
-                                               "Hexose taken up from the soil (mol of hexose)",
-                                               "Hexose degraded in the soil (mol of hexose)",
-                                               "Concentration of hexose in the main root tip (mol of hexose per g)"
-                                               ])
-            # We save the data_frame in a CSV file:
-            try:
-                # In case the results file is not opened, we simply re-write it:
-                data_frame.to_csv('simulation_results.csv', na_rep='NA', index=False, header=True)
-                print("The main results have been written in the file 'simulation_results.csv'.")
-            except:
-                # Otherwise we write the data in a new result file as back-up option:
-                data_frame.to_csv('simulation_results_BACKUP.csv', na_rep='NA', index=False, header=True)
-                print("")
-                print("WATCH OUT: The main results have been written in the alternative file 'simulation_results_BACKUP.csv'.")
-
-        # We create another data frame that contains the results classified by z intervals:
-        if z_classification:
-            # We create a data_frame from the vectors generated in the main program up to this point:
-            data_frame_z = pd.DataFrame.from_dict(z_dictionary_series)
-            # We save the data_frame in a CSV file:
-            data_frame_z.to_csv('z_classification.csv', na_rep='NA', index=False, header=True)
-
-
-# RUNNING THE SIMULATION:
-#########################
-
-if __name__ == "__main__":
-
-    # We set the working directory:
-    my_path = r'C:\\Users\\Marion\\Documents\\Marion\\rhizodep\\test'
-    if not os.path.exists(my_path):
-        my_path = os.path.abspath('.')
-    os.chdir(my_path)
-    print("The current directory is:", os.getcwd())
-
-    # We record the time when the run starts:
-    start_time = timeit.default_timer()
-
-    # We initiate the properties of the MTG "g":
-    g = initiate_mtg(random=True)
-    # We initiate the time variable that will be used to determine the emergence of adventitious roots:
-    thermal_time_since_last_adventitious_root_emergence = 0.
-    # We initiate the global variable that corresponds to a possible general deficit in sucrose of the whole root system:
-    global_sucrose_deficit = 0.
-
-    # We launch the main simulation program:
-    print("Simulation starts ...")
-    main_simulation(g, simulation_period_in_days=1., time_step_in_days=1. / 24., radial_growth="Possible",
-                    ArchiSimple=False,
-                    # property="net_hexose_exudation_rate_per_day_per_cm", vmin=1e-9, vmax=1e-6, log_scale=True, cmap='jet',
-                    property="C_hexose_root", vmin=1e-4, vmax=1e-1, log_scale=True, cmap='jet',
-                    # property="C_sucrose_root", vmin=1e-4, vmax=1e2, log_scale=True, cmap='brg',
-                    # property="C_hexose_reserve", vmin=1e-4, vmax=1e4, log_scale=True, cmap='brg',
-                    input_file="sucrose_input_0047.csv",
-                    constant_sucrose_input_rate=0,
-                    constant_soil_temperature_in_Celsius=0,
-                    nodules=False,
-                    x_center=0, y_center=0, z_center=-1, z_cam=-2,
-                    camera_distance=4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-                    z_classification=False, z_min=0.00, z_max=1., z_interval=0.05,
-                    recording_images=True,
-                    printing_sum=False,
-                    recording_sum=True,
-                    printing_warnings=False,
-                    recording_g=True,
-                    recording_g_properties=False,
-                    random=True)
-
-    print("")
-    print("***************************************************************")
-    end_time = timeit.default_timer()
-    print("Run is done! The system took", round(end_time - start_time, 1), "seconds to complete the run.")
-
-    # We save the final MTG:
-    with open('g_file.pckl', 'wb') as output:
-        pickle.dump(g, output, protocol=2)
-
-    print("The whole root system has been saved in the file 'g_file.pckl'.")
-
-    # To avoid closing PlantGL as soon as the run is done:
-    pgl.Viewer.exit()
-    # input()
-=======
     return g
->>>>>>> 7279d95fcd1fe97d316b469fd96a5d88f3139a3d:src/rhizodep/model.py
