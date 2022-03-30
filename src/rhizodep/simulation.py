@@ -14,7 +14,6 @@ from math import trunc
 from decimal import Decimal
 import pandas as pd
 import os
-import os.path
 
 import openalea.plantgl.all as pgl
 import rhizodep.model as model
@@ -373,7 +372,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # In case the results file is not opened, we simply re-write it:
                 data_frame.to_csv(os.path.join(outputs_directory, simulation_results_file),
                                   na_rep='NA', index=False, header=True)
-                print("The main results have been written in the file 'simulation_results.csv'.")
+                print("The main results have been written in the file", simulation_results_file, " .")
             except Exception as ex:
                 # Otherwise we write the data in a new result file as back-up option:
                 data_frame.to_csv(os.path.join(outputs_directory, 'simulation_results_BACKUP.csv'),

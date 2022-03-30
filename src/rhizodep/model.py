@@ -20,7 +20,8 @@ from openalea.mtg.traversal import pre_order, post_order
 
 import rhizodep.parameters as param
 
-#TODO: Problem of option random=False - some elements have a decreasing radius...
+
+# TODO: Problem of option random=False - some elements have a decreasing radius...
 
 # FUNCTIONS FOR CALCULATING PROPERTIES ON THE MTG
 #################################################
@@ -199,12 +200,15 @@ def classifying_on_z(g, z_min=0., z_max=1., z_interval=0.1):
     for z_start in np.arange(z_min, z_max, z_interval):
 
         # We create the names of the new properties of the MTG to be computed, based on the current z interval:
-        name_length_z = "length_" + str(round(z_start,3)) + "-" + str(round(z_start + z_interval,3)) + "_m"
-        name_struct_mass_z = "struct_mass_" + str(round(z_start,3)) + "-" + str(round(z_start + z_interval,3)) + "_m"
-        name_root_necromass_z = "root_necromass_" + str(round(z_start,3)) + "-" + str(round(z_start + z_interval,3)) + "_m"
-        name_surface_z = "surface_" + str(round(z_start,3)) + "-" + str(round(z_start + z_interval,3)) + "_m"
-        name_net_hexose_exudation_z = "net_hexose_exudation_" + str(round(z_start,3)) + "-" + str(round(z_start + z_interval,3)) + "_m"
-        name_hexose_degradation_z = "hexose_degradation_" + str(round(z_start,3)) + "-" + str(round(z_start + z_interval,3)) + "_m"
+        name_length_z = "length_" + str(round(z_start, 3)) + "-" + str(round(z_start + z_interval, 3)) + "_m"
+        name_struct_mass_z = "struct_mass_" + str(round(z_start, 3)) + "-" + str(round(z_start + z_interval, 3)) + "_m"
+        name_root_necromass_z = "root_necromass_" + str(round(z_start, 3)) + "-" + str(
+            round(z_start + z_interval, 3)) + "_m"
+        name_surface_z = "surface_" + str(round(z_start, 3)) + "-" + str(round(z_start + z_interval, 3)) + "_m"
+        name_net_hexose_exudation_z = "net_hexose_exudation_" + str(round(z_start, 3)) + "-" + str(
+            round(z_start + z_interval, 3)) + "_m"
+        name_hexose_degradation_z = "hexose_degradation_" + str(round(z_start, 3)) + "-" + str(
+            round(z_start + z_interval, 3)) + "_m"
 
         # We (re)initialize total values:
         total_included_length = 0
@@ -259,6 +263,7 @@ def classifying_on_z(g, z_min=0., z_max=1., z_interval=0.1):
         final_dictionary.update(d)
 
     return final_dictionary
+
 
 # Integration of root variables within different z_intervals:
 # -----------------------------------------------------------
@@ -537,7 +542,7 @@ def elongated_length(initial_length=0., radius=0., C_hexose_root=1,
         # based on a Michaelis-Menten formalism:
         if C_hexose_root > 0.:
             elongation = param.EL * 2. * radius * C_hexose_root / (
-                        param.Km_elongation + C_hexose_root) * elongation_time_in_seconds
+                    param.Km_elongation + C_hexose_root) * elongation_time_in_seconds
         else:
             elongation = 0.
 
@@ -618,7 +623,8 @@ def primordium_formation(g, apex, elongation_rate=0., time_step_in_seconds=1. * 
         # The seed used to generate random values is defined according to a parameter random_choice and the index of the apex:
         np.random.seed(param.random_choice * apex.index())
         potential_radius = np.random.normal((apex.radius - param.Dmin / 2.) * param.RMD + param.Dmin / 2.,
-                                                ((apex.radius - param.Dmin / 2.) * param.RMD + param.Dmin / 2.) * param.CVDD)
+                                            ((
+                                                         apex.radius - param.Dmin / 2.) * param.RMD + param.Dmin / 2.) * param.CVDD)
         apex_angle_roll = abs(np.random.normal(120, 10))
         if order == 1:
             primordium_angle_down = abs(np.random.normal(45, 10))
@@ -774,6 +780,7 @@ def calculating_C_supply_for_elongation(g, element):
 
     return list_of_elongation_supporting_elements, list_of_elongation_supporting_elements_hexose, list_of_elongation_supporting_elements_mass
 
+
 # FUNCTION: POTENTIAL APEX DEVELOPMENT
 #######################################
 
@@ -824,8 +831,8 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
             # The adventitious root may have emerged, and the potential time elapsed
             # since its possible emergence over this time step is calculated:
             apex.thermal_potential_time_since_emergence = \
-            g.property('thermal_time_since_last_adventitious_root_emergence')[g.root] \
-            + time_step_in_seconds * temperature_time_adjustment - 1. / param.ER
+                g.property('thermal_time_since_last_adventitious_root_emergence')[g.root] \
+                + time_step_in_seconds * temperature_time_adjustment - 1. / param.ER
             # If the apex could have emerged sooner:
             if apex.thermal_potential_time_since_emergence > time_step_in_seconds * temperature_time_adjustment:
                 # The time since emergence is equal to the time elapsed during this time step (since it must have emerged at this time step):???????????????????????????
@@ -1085,11 +1092,11 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
                                                   + segment.C_hexose_root * segment.struct_mass
         # We calculate an average concentration of hexose that will help to regulate nodule growth:
         C_hexose_regulating_nodule_growth = segment.hexose_available_for_thickening / (
-                    parent.struct_mass + segment.struct_mass)
+                parent.struct_mass + segment.struct_mass)
         # We modulate the relative increase in radius by the amount of C available in the nodule:
         thickening_rate = param.relative_nodule_thickening_rate_max \
                           * C_hexose_regulating_nodule_growth / (
-                                      param.Km_nodule_thickening + C_hexose_regulating_nodule_growth)
+                                  param.Km_nodule_thickening + C_hexose_regulating_nodule_growth)
         # We modulate the relative increase in radius by the temperature:
         thickening_rate = thickening_rate * temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                      process_at_T_ref=1,
@@ -1306,8 +1313,8 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
 
     # Optional - We can add random geometry, or not:
     if random:
-        #The seed used to generate random values is defined according to a parameter random_choice and the index of the apex:
-        np.random.seed(param.random_choice*apex.index())
+        # The seed used to generate random values is defined according to a parameter random_choice and the index of the apex:
+        np.random.seed(param.random_choice * apex.index())
         angle_mean = 0
         angle_var = 5
         segment_angle_down = np.random.normal(angle_mean, angle_var)
@@ -1751,7 +1758,7 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
                     supplying_element.hexose_consumption_by_growth += hexose_actual_contribution_to_elongation
                     # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
                     supplying_element.resp_growth += hexose_actual_contribution_to_elongation * (
-                                1 - param.yield_growth) * 6.
+                            1 - param.yield_growth) * 6.
 
                     # # POSSIBLE LIMITATION OF UPCOMING RADIAL GROWTH:
                     # # In the case of the first supplying element, i.e. the element that has elongated,
@@ -1801,25 +1808,25 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
 
             # REGISTERING THE COSTS FOR THICKENING:
             fraction_of_available_hexose_in_the_element = (
-                                                                      n.C_hexose_root * n.initial_struct_mass) / hexose_available_for_thickening
+                                                                  n.C_hexose_root * n.initial_struct_mass) / hexose_available_for_thickening
             # The amount of hexose used for growth in this element is increased:
             n.hexose_consumption_by_growth += (
-                        hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
+                    hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
             # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
             n.resp_growth += (
-                                         hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) * (
-                                         1 - param.yield_growth) * 6.
+                                     hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) * (
+                                     1 - param.yield_growth) * 6.
             if n.type == "Root_nodule":
                 index_parent = g.Father(n.index(), EdgeType='+')
                 parent = g.node(index_parent)
                 fraction_of_available_hexose_in_the_element = (
-                                                                          parent.C_hexose_root * parent.initial_struct_mass) / hexose_available_for_thickening
+                                                                      parent.C_hexose_root * parent.initial_struct_mass) / hexose_available_for_thickening
                 # The amount of hexose used for growth in this element is increased:
                 parent.hexose_consumption_by_growth += (
-                            hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
+                        hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
                 # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
                 parent.resp_growth += (
-                                                  hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) * (
+                                              hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) * (
                                               1 - param.yield_growth) * 6.
 
         # RECORDING THE ACTUAL STRUCTURAL MODIFICATIONS:
@@ -1974,7 +1981,7 @@ def ArchiSimple_growth(g, SC, time_step_in_seconds, soil_temperature_in_Celsius=
         # We perform each type of growth according to the satisfaction coefficient SC:
         if SC > 1.:
             relative_growth_increase = 1.
-        elif SC <0:
+        elif SC < 0:
             print("!!! ERROR: Satisfaction coefficient was negative!!! We set it to 0.")
             relative_growth_increase = 0.
         else:
@@ -2139,11 +2146,11 @@ def shoot_sucrose_supply_and_spreading(g, sucrose_input_rate=1e-9, time_step_in_
     if global_sucrose_deficit > 0.:
         print("!!! Before homogenizing sucrose concentration, the deficit in sucrose is", global_sucrose_deficit)
         C_sucrose_root_after_supply = (
-                                                  total_sucrose_root + sucrose_input) / total_living_struct_mass  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                                              total_sucrose_root + sucrose_input) / total_living_struct_mass  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     else:
         # The new average sucrose concentration in the root system is calculated as:
         C_sucrose_root_after_supply = (
-                                                  total_sucrose_root + sucrose_input - global_sucrose_deficit) / total_living_struct_mass
+                                              total_sucrose_root + sucrose_input - global_sucrose_deficit) / total_living_struct_mass
 
     if C_sucrose_root_after_supply >= 0.:
         new_C_sucrose_root = C_sucrose_root_after_supply
@@ -2318,7 +2325,7 @@ def exchange_with_phloem(g, time_step_in_seconds=1. * (60. * 60. * 24.),
 
         # We correct the max loading rate according to the distance from the tip
         n.max_loading_rate = n.max_loading_rate * (
-                    1. - 1. / (1. + n.dist_to_tip / n.original_radius) ** param.gamma_loading)
+                1. - 1. / (1. + n.dist_to_tip / n.original_radius) ** param.gamma_loading)
 
         # We calculate the potential production of sucrose from hexose (in mol) according to the Michaelis-Menten function:!!!!!!!!!!!!!!!!!!!WHERE IS S ????
         n.sucrose_loading_in_phloem = 0.5 * n.max_loading_rate * n.C_hexose_root \
@@ -2409,7 +2416,7 @@ def exchange_with_reserve(g, time_step_in_seconds=1. * (60. * 60. * 24.),
         # We calculate the potential mobilization of hexose from reserve (in mol) according to the Michaelis-Menten function:
         n.hexose_mobilization_from_reserve = corrected_max_mobilization_rate * n.C_hexose_reserve \
                                              / (
-                                                         param.Km_mobilization + n.C_hexose_reserve) * time_step_in_seconds * n.struct_mass
+                                                     param.Km_mobilization + n.C_hexose_reserve) * time_step_in_seconds * n.struct_mass
         # We calculate the potential immobilization of hexose as reserve (in mol) according to the Michaelis-Menten function:
         if n.C_hexose_root < param.C_hexose_root_min_for_reserve:
             # If the concentration of mobile hexose is already too low, there is no immobilization:
@@ -2417,7 +2424,7 @@ def exchange_with_reserve(g, time_step_in_seconds=1. * (60. * 60. * 24.),
         else:
             n.hexose_immobilization_as_reserve = corrected_max_immobilization_rate * n.C_hexose_root \
                                                  / (
-                                                             param.Km_immobilization + n.C_hexose_root) * time_step_in_seconds * n.struct_mass
+                                                         param.Km_immobilization + n.C_hexose_root) * time_step_in_seconds * n.struct_mass
 
         # CARBON BALANCE AND ADJUSTMENTS:
         # We control the balance on the reserve by calculating the new theoretical concentration in the reserve pool:
@@ -2735,7 +2742,7 @@ def balance(g, time_step_in_seconds=1. * (60. * 60. * 24.), printing_warnings=Fa
                 n.C_hexose_root * 6 * 12.01 + n.C_hexose_reserve * 6 * 12.01 + n.C_sucrose_root * 12 * 12.01) * n.struct_mass
         # We calculate a net rate of exudation, in gram of C per gram of dry structural mass per day:
         n.net_hexose_exudation_rate_per_day_per_gram \
-            = ( n.net_hexose_exudation / time_step_in_seconds) * 24. * 60. * 60. * 6. * 12.01 / n.struct_mass
+            = (n.net_hexose_exudation / time_step_in_seconds) * 24. * 60. * 60. * 6. * 12.01 / n.struct_mass
 
         # We calculate a net rate of exudation, in gram of C per cm of root per day:
         n.net_hexose_exudation_rate_per_day_per_cm \
