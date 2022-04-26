@@ -14,7 +14,6 @@ from math import trunc
 from decimal import Decimal
 import pandas as pd
 import os
-import os.path
 
 import openalea.plantgl.all as pgl
 import rhizodep.model as model
@@ -23,12 +22,14 @@ import rhizodep.parameters as param
 
 import pickle
 
+
 # We define the main simulation program:
 def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     radial_growth="Impossible", ArchiSimple=False, ArchiSimple_C_fraction=0.10,
                     input_file="None",
                     outputs_directory='outputs',
-                    forcing_constant_inputs=False, constant_sucrose_input_rate=1.e-6, constant_soil_temperature_in_Celsius=20,
+                    forcing_constant_inputs=False, constant_sucrose_input_rate=1.e-6,
+                    constant_soil_temperature_in_Celsius=20,
                     nodules=False,
                     root_order_limitation=False,
                     root_order_treshold=2,
@@ -149,7 +150,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     # READING THE INPUT FILE:
     # -----------------------
-    if input_file != "None" and not forcing_constant_inputs: #and (constant_sucrose_input_rate <= 0 or constant_soil_temperature_in_Celsius <= 0):
+    if input_file != "None" and not forcing_constant_inputs:  # and (constant_sucrose_input_rate <= 0 or constant_soil_temperature_in_Celsius <= 0):
         # # We first define the path and the file to read as a .csv:
         # PATH = os.path.join('.', input_file)
         # # Then we read the file and copy it in a dataframe "df":
@@ -177,7 +178,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         x_cam = x_coordinates[index_camera]
         y_cam = y_coordinates[index_camera]
         z_cam = z_coordinates[index_camera]
-        sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin, vmax=displayed_vmax, cmap=cmap,
+        sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+                            vmax=displayed_vmax, cmap=cmap,
                             x_center=x_center,
                             y_center=y_center,
                             z_center=z_center,
@@ -188,7 +190,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         x_camera = camera_distance
         x_cam = camera_distance
         z_camera = z_cam
-        sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin, vmax=displayed_vmax, cmap=cmap,
+        sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+                            vmax=displayed_vmax, cmap=cmap,
                             x_center=x_center,
                             y_center=y_center,
                             z_center=z_center,
@@ -369,7 +372,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # In case the results file is not opened, we simply re-write it:
                 data_frame.to_csv(os.path.join(outputs_directory, simulation_results_file),
                                   na_rep='NA', index=False, header=True)
-                print("The main results have been written in the file 'simulation_results.csv'.")
+                print("The main results have been written in the file", simulation_results_file, " .")
             except Exception as ex:
                 # Otherwise we write the data in a new result file as back-up option:
                 data_frame.to_csv(os.path.join(outputs_directory, 'simulation_results_BACKUP.csv'),
@@ -389,6 +392,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             print("The data classified by layers has been written in the file 'z_classification.csv'.")
 
         return
+
     # ------------------------------------------------------------------------------------------------------------------
 
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -401,21 +405,22 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             # At the beginning of the time step, we reset the global variable allowing the emergence of adventitious roots:
             g.property('adventitious_root_emergence')[g.root] = "Possible"
             # We keep in memory the value of the global variable time_since_adventitious_root_emergence at the beginning of the time steo:
-            initial_time_since_adventitious_root_emergence = g.property('thermal_time_since_last_adventitious_root_emergence')[g.root]
+            initial_time_since_adventitious_root_emergence = \
+            g.property('thermal_time_since_last_adventitious_root_emergence')[g.root]
 
             # We calculate the current time in hours:
             current_time_in_hours = step * time_step_in_days * 24.
 
             # DEFINING THE INPUT OF CARBON TO THE ROOTS FOR THIS TIME STEP:
             # --------------------------------------------------------------
-            if constant_sucrose_input_rate > 0 and forcing_constant_inputs: #or input_file == "None":
+            if constant_sucrose_input_rate > 0 and forcing_constant_inputs:  # or input_file == "None":
                 sucrose_input_rate = constant_sucrose_input_rate
             else:
                 sucrose_input_rate = input_frame.loc[step, 'sucrose_input_rate']
 
             # DEFINING THE TEMPERATURE OF THE SOIL FOR THIS TIME STEP:
             # --------------------------------------------------------
-            if constant_soil_temperature_in_Celsius > 0 and forcing_constant_inputs: #or input_file == "None":
+            if constant_soil_temperature_in_Celsius > 0 and forcing_constant_inputs:  # or input_file == "None":
                 soil_temperature = constant_soil_temperature_in_Celsius
             else:
                 soil_temperature = input_frame.loc[step, 'soil_temperature_in_degree_Celsius']
@@ -439,7 +444,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                   "{:.2f}".format(Decimal(step * time_step_in_days)), "days:")
             print("------------------------------------")
             print("   Soil temperature is", soil_temperature, "degree Celsius.")
-            print("   The input rate of sucrose to the root for time=", "{:.2f}".format(Decimal(current_time_in_hours)), "h is",
+            print("   The input rate of sucrose to the root for time=", "{:.2f}".format(Decimal(current_time_in_hours)),
+                  "h is",
                   "{:.2E}".format(Decimal(sucrose_input_rate)), "mol of sucrose per second, i.e.",
                   "{:.2E}".format(Decimal(sucrose_input_rate * 60. * 60. * 24.)), "mol of sucrose per day.")
 
@@ -548,9 +554,11 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # model.control_of_anomalies(g)
 
             # A the end of the time step, if the global variable "time_since_adventitious_root_emergence" has been unchanged:
-            if g.property('thermal_time_since_last_adventitious_root_emergence')[g.root] == initial_time_since_adventitious_root_emergence:
+            if g.property('thermal_time_since_last_adventitious_root_emergence')[
+                g.root] == initial_time_since_adventitious_root_emergence:
                 # Then we increment it by the time step:
-                g.property('thermal_time_since_last_adventitious_root_emergence')[g.root] += time_step_in_seconds * temperature_time_adjustment
+                g.property('thermal_time_since_last_adventitious_root_emergence')[
+                    g.root] += time_step_in_seconds * temperature_time_adjustment
             # Otherwise, the variable has already been reset when the emergence of one adventitious root has been allowed.
 
             # PLOTTING THE MTG:
@@ -561,7 +569,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 x_cam = x_coordinates[index_camera]
                 y_cam = y_coordinates[index_camera]
                 z_cam = z_coordinates[index_camera]
-                sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin, vmax=displayed_vmax, cmap=cmap,
+                sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+                                    vmax=displayed_vmax, cmap=cmap,
                                     x_center=x_center,
                                     y_center=y_center,
                                     z_center=z_center,
@@ -577,7 +586,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
             # Otherwise, the camera will stay on a fixed position:
             else:
-                sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin, vmax=displayed_vmax, cmap=cmap,
+                sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+                                    vmax=displayed_vmax, cmap=cmap,
                                     x_center=x_center,
                                     y_center=y_center,
                                     z_center=z_center,
@@ -692,7 +702,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                               "{:.2E}".format(Decimal(theoretical_current_C_in_the_system - current_C_in_the_system)),
                               "mol of C, and the cumulated difference since the start of the simulation and the current one is",
                               "{:.2E}".format(
-                                  Decimal(theoretical_cumulated_C_in_the_system - current_C_in_the_system)), "mol of C.")
+                                  Decimal(theoretical_cumulated_C_in_the_system - current_C_in_the_system)),
+                              "mol of C.")
 
                         # We reinitialize the "previous" amount of C in the system with the current one for the next time step:
                     previous_C_in_the_system = current_C_in_the_system
@@ -701,13 +712,14 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             print("(SCENARIO {})".format(scenario_id))
 
             # If we want to save all results at specified time intervals:
-            recording_steps_list = list(range(0,n_steps,trunc(recording_interval_in_days/time_step_in_days)))
+            recording_steps_list = list(range(0, n_steps, trunc(recording_interval_in_days / time_step_in_days)))
             # We remove the first element of the list, as it makes no sense to record the properties at the beginning:
             recording_steps_list.pop(0)
             # If the current iteration correspond to the time where one full time interval for recording has been reached:
             if step in recording_steps_list:
                 # Then we record the current simulation results:
-                print("Recording the simulation results obtained so far (time t = {:.2f}".format(Decimal(step * time_step_in_days)), "days)...")
+                print("Recording the simulation results obtained so far (time t = {:.2f}".format(
+                    Decimal(step * time_step_in_days)), "days)...")
                 recording_attempt()
 
     # ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

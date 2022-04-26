@@ -85,7 +85,7 @@ def run_one_scenario(scenario_id=1, inputs_dir_path=None, outputs_dir_path='outp
     param.__dict__.update(scenario_parameters)
     # OPTIONAL: We can print a CSV file containing the updated parameters:
     data_frame_parameters = pd.DataFrame.from_dict(param.__dict__)
-    useless_columns = ["__name__","__doc__", "__package__", "__loader__", "__spec__", "__file__", "__cached__", "__builtins__"]
+    useless_columns = ["__name__", "__doc__", "__package__", "__loader__", "__spec__", "__file__", "__cached__", "__builtins__"]
     data_frame_parameters.drop(useless_columns, axis=1, inplace=True)
     data_frame_parameters.head(1).to_csv(os.path.join(scenario_dirpath, 'updated_parameters.csv'),
                                  na_rep='NA', index=False, header=True)
