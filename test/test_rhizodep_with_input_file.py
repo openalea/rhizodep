@@ -49,9 +49,14 @@ def compare_actual_to_desired(data_dirpath, desired_data_filename, actual_data_f
                 del desired_data_df[column]
                 del actual_data_df[column]
 
-    # compare to the desired data
-    np.testing.assert_allclose(actual_data_df.values, desired_data_df.values, RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE)
-
+    # compare to the desired data:
+    error_message = "Sorry, the test failed, the new outputs are different from the previous ones!" +\
+                    "\nIn particular, final root length is " + str(desired_data_df['Root length (m)'].iloc[-1]) +\
+                    " cm in the original outputs, and " + str(actual_data_df['Root length (m)'].iloc[-1]) + \
+                    " cm in the new outputs." + " \nSee details below:"
+    np.testing.assert_allclose(actual_data_df.values, desired_data_df.values, RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE,
+                               err_msg=error_message,
+                               verbose=False)
 
 def run_ref_simulation_with_input_file():
     # We initiate the properties of the MTG "g":
@@ -59,14 +64,19 @@ def run_ref_simulation_with_input_file():
 
     # We launch the main simulation program:
     print("Simulation starts ...")
-    simulation.main_simulation(g, simulation_period_in_days=20., time_step_in_days=1. / 24., radial_growth="Possible",
+    simulation.main_simulation(g,
+                               simulation_period_in_days=20., time_step_in_days=1. / 24., radial_growth="Possible",
                                ArchiSimple=False,
                                displayed_property="C_hexose_root",
                                input_file=os.path.join("inputs", "sucrose_input_0047.csv"),
+                               forcing_constant_inputs=True,
                                constant_sucrose_input_rate=5e-9,
                                constant_soil_temperature_in_Celsius=20,
                                nodules=False,
+                               root_order_limitation=True,
+                               root_order_treshold=2,
                                outputs_directory=OUTPUTS_DIRPATH,
+                               root_images_directory="root_images",
                                simulation_results_file=ACTUAL_RESULTS_FILENAME,
                                x_center=0, y_center=0, z_center=-1, z_cam=-2,
                                camera_distance=4, step_back_coefficient=0., camera_rotation=False,
@@ -76,10 +86,9 @@ def run_ref_simulation_with_input_file():
                                printing_sum=False,
                                recording_sum=True,
                                printing_warnings=False,
-                               recording_g=True,
+                               recording_g=False,
                                recording_g_properties=False,
                                random=True)
-
 
 def test_run(overwrite_desired_data=False):
     """
@@ -92,7 +101,8 @@ def test_run(overwrite_desired_data=False):
     run_ref_simulation_with_input_file()
 
     # compare actual to desired outputs (an exception is raised if the test failed)
-    print('Compare {} to {}'.format(ACTUAL_RESULTS_FILENAME, DESIRED_RESULTS_FILENAME))
+    print('')
+    print('Comparing {} to {}'.format(ACTUAL_RESULTS_FILENAME, DESIRED_RESULTS_FILENAME),'...')
     compare_actual_to_desired(OUTPUTS_DIRPATH, DESIRED_RESULTS_FILENAME, ACTUAL_RESULTS_FILENAME,
                               overwrite_desired_data)
     print('{} OK!'.format(ACTUAL_RESULTS_FILENAME))

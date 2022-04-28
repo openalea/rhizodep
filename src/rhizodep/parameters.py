@@ -19,7 +19,7 @@ D_ini = 0.80 / 1000.
 # => Reference: Di=0.5 mm
 
 # Proportionality coefficient between the tip diameter of an adventitious root and D_ini (dimensionless):
-D_ini_to_D_adv_ratio = 0.8
+D_adv_to_D_ini_ratio = 0.8
 
 # Threshold tip diameter, below which there is no elongation (i.e. the diameter of the finest observable roots)(in m):
 Dmin = 0.35 / 1000.
@@ -55,7 +55,7 @@ ER = 1.0 / (60. * 60. * 24.)
 # => Reference: ER = 0.5 day-1
 
 # Coefficient of growth duration (in s m-2):
-GDs = 800 * (60. * 60. * 24.) * 1000. ** 2.
+GDs = 800 * (60. * 60. * 24.) * 1000. ** 2. * 100. # We introduce here *100 as it was before in the main code of model.py prior to March 2022!
 # => Reference: GDs=400. day mm-2
 
 # Coefficient of the life duration (in s m g-1 m3):
