@@ -5,19 +5,50 @@ import os
 import rhizodep.simulation as simulation
 import rhizodep.model as model
 
-# outputs directory path
+# outputs directory path:
 OUTPUTS_DIRPATH = 'outputs'
 
-# desired outputs filenames
-DESIRED_RESULTS_FILENAME = 'desired_simulation_results.csv'
+# root images directory path:
+IMAGES_DIRPATH = os.path.join('outputs','root_images')
+if not os.path.exists(IMAGES_DIRPATH):
+    # Then we create it:
+    os.mkdir(IMAGES_DIRPATH)
+else:
+    # Otherwise, we delete all the images that are already present inside:
+    for root, dirs, files in os.walk(IMAGES_DIRPATH):
+        for file in files:
+            os.remove(os.path.join(root, file))
 
-# actual outputs filenames
+# MTG files directory path:
+MTG_DIRPATH = os.path.join('outputs','MTG_files')
+if not os.path.exists(MTG_DIRPATH):
+    # Then we create it:
+    os.mkdir(MTG_DIRPATH)
+else:
+    # Otherwise, we delete all the images that are already present inside:
+    for root, dirs, files in os.walk(MTG_DIRPATH):
+        for file in files:
+            os.remove(os.path.join(root, file))
+
+# MTG properties directory path:
+MTG_PROP_DIRPATH = os.path.join('outputs','MTG_properties')
+if not os.path.exists(MTG_PROP_DIRPATH):
+    # Then we create it:
+    os.mkdir(MTG_PROP_DIRPATH)
+else:
+    # Otherwise, we delete all the images that are already present inside:
+    for root, dirs, files in os.walk(MTG_PROP_DIRPATH):
+        for file in files:
+            os.remove(os.path.join(root, file))
+
+# desired outputs filename:
+DESIRED_RESULTS_FILENAME = 'desired_simulation_results.csv'
+# actual outputs filename:
 ACTUAL_RESULTS_FILENAME = 'actual_simulation_results.csv'
 
 PRECISION = 6
 RELATIVE_TOLERANCE = 10 ** -PRECISION
 ABSOLUTE_TOLERANCE = RELATIVE_TOLERANCE
-
 
 def compare_actual_to_desired(data_dirpath, desired_data_filename, actual_data_filename, overwrite_desired_data=False):
     """
@@ -64,31 +95,36 @@ def run_ref_simulation_with_input_file():
 
     # We launch the main simulation program:
     print("Simulation starts ...")
-    simulation.main_simulation(g,
-                               simulation_period_in_days=20., time_step_in_days=1. / 24., radial_growth="Possible",
-                               ArchiSimple=False,
-                               displayed_property="C_hexose_root",
-                               input_file=os.path.join("inputs", "sucrose_input_0047.csv"),
-                               forcing_constant_inputs=True,
-                               constant_sucrose_input_rate=5e-9,
+    simulation.main_simulation(g, simulation_period_in_days=20., time_step_in_days=1./24.,
+                               radial_growth="Possible", ArchiSimple=False, ArchiSimple_C_fraction=0.10,
+                               input_file=os.path.join("inputs", "sucrose_input_test.csv"),
+                               outputs_directory=OUTPUTS_DIRPATH,
+                               forcing_constant_inputs=False, constant_sucrose_input_rate=1.e-6,
                                constant_soil_temperature_in_Celsius=20,
                                nodules=False,
-                               root_order_limitation=True,
+                               root_order_limitation=False,
                                root_order_treshold=2,
-                               outputs_directory=OUTPUTS_DIRPATH,
-                               root_images_directory="root_images",
+                               specific_model_option=None,
                                simulation_results_file=ACTUAL_RESULTS_FILENAME,
-                               x_center=0, y_center=0, z_center=-1, z_cam=-2,
-                               camera_distance=4, step_back_coefficient=0., camera_rotation=False,
-                               n_rotation_points=12 * 10,
-                               z_classification=False, z_min=0.00, z_max=1., z_interval=0.05,
+                               recording_interval_in_days=5,
                                recording_images=True,
+                               root_images_directory=IMAGES_DIRPATH,
+                               z_classification=False, z_min=0., z_max=1., z_interval=0.5,
+                               z_classification_file='z_classification.csv',
                                printing_sum=False,
                                recording_sum=True,
                                printing_warnings=False,
                                recording_g=False,
-                               recording_g_properties=False,
-                               random=True)
+                               g_directory=MTG_DIRPATH,
+                               recording_g_properties=True,
+                               g_properties_directory=MTG_PROP_DIRPATH,
+                               random=True,
+                               plotting=True,
+                               scenario_id=1,
+                               displayed_property="C_hexose_root", displayed_vmin=1e-6, displayed_vmax=1e-0,
+                               log_scale=True, cmap='jet',
+                               x_center=0, y_center=0, z_center=-1, z_cam=-2,
+                               camera_distance=4., step_back_coefficient=0., camera_rotation=False, n_rotation_points=24 * 5)
 
 def test_run(overwrite_desired_data=False):
     """
@@ -105,7 +141,7 @@ def test_run(overwrite_desired_data=False):
     print('Comparing {} to {}'.format(ACTUAL_RESULTS_FILENAME, DESIRED_RESULTS_FILENAME),'...')
     compare_actual_to_desired(OUTPUTS_DIRPATH, DESIRED_RESULTS_FILENAME, ACTUAL_RESULTS_FILENAME,
                               overwrite_desired_data)
-    print('{} OK!'.format(ACTUAL_RESULTS_FILENAME))
+    print('The test is passed! {} is OK!'.format(ACTUAL_RESULTS_FILENAME))
 
 
 if __name__ == '__main__':

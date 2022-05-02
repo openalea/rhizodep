@@ -22,7 +22,7 @@ D_ini = 0.80 / 1000.
 D_adv_to_D_ini_ratio = 0.8
 
 # Threshold tip diameter, below which there is no elongation (i.e. the diameter of the finest observable roots)(in m):
-Dmin = 0.35 / 1000.
+Dmin = 0.1 / 1000.
 # => Reference: Dmin=0.05 mm
 
 # Slope of the potential elongation rate versus tip diameter (in m m-1 s-1):
@@ -31,31 +31,31 @@ EL = 1.39 * 20 / (60. * 60. * 24.)
 
 # Proportionality coefficient between the section area of the segment and the sum of distal section areas
 # (dimensionless, 0 = no radial growth):
-SGC = 0.2
+SGC = 0.5
 
 # Average ratio of the diameter of the daughter root to that of the mother root (dimensionless):
-RMD = 0.638
+RMD = 0.3
 
 # Relative variation of the daughter root diameter (dimensionless):
 CVDD = 0.2
 
 # Delay of emergence of the primordium (in s):
-emergence_delay = 158 / 20. * (60. * 60. * 24.)
+emergence_delay = 3. * (60. * 60. * 24.)
 # => Reference: emergence_delay = 3 days
 
 # Inter-primordium distance (in m):
-IPD = 5.11 / 1000.
+IPD = 5. / 1000.
 # => Reference: IPD = 7.6 mm
 
 # Maximal number of roots emerging from the base (including primary and seminal roots)(dimensionless):
-n_adventitious_roots = 0
+n_adventitious_roots = 5
 
 # Emission rate of adventitious roots (in s-1):
-ER = 1.0 / (60. * 60. * 24.)
+ER = 0.2 / (60. * 60. * 24.)
 # => Reference: ER = 0.5 day-1
 
 # Coefficient of growth duration (in s m-2):
-GDs = 800 * (60. * 60. * 24.) * 1000. ** 2. * 100. # We introduce here *100 as it was before in the main code of model.py prior to March 2022!
+GDs = 800 * (60. * 60. * 24.) * 1000. ** 2.
 # => Reference: GDs=400. day mm-2
 
 # Coefficient of the life duration (in s m g-1 m3):
