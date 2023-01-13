@@ -27,6 +27,7 @@ import pickle
 def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     radial_growth="Impossible", ArchiSimple=False, ArchiSimple_C_fraction=0.10,
                     input_file="None",
+                    input_file_time_step_in_days=1/24.,
                     outputs_directory='outputs',
                     forcing_constant_inputs=False, constant_sucrose_input_rate=1.e-6,
                     constant_soil_temperature_in_Celsius=20,
@@ -52,6 +53,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     scenario_id=1,
                     displayed_property="C_hexose_root", displayed_vmin=1e-6, displayed_vmax=1e-0,
                     log_scale=True, cmap='brg',
+                    root_hairs_display=True,
                     x_center=0, y_center=0, z_center=-1, z_cam=-1,
                     camera_distance=10., step_back_coefficient=0., camera_rotation=False, n_rotation_points=24 * 5):
     # TODO: docstring
@@ -83,16 +85,22 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     total_dead_root_length_series = []
     total_living_root_surface_series = []
     total_dead_root_surface_series = []
+    total_living_root_hairs_surface_series = []
     total_living_root_struct_mass_series = []
     total_dead_root_struct_mass_series = []
+    total_root_hairs_mass_series = []
     total_sucrose_root_series = []
     total_hexose_root_series = []
     total_hexose_reserve_series = []
     total_hexose_soil_series = []
+    total_mucilage_soil_series = []
+    total_cells_soil_series = []
 
     total_sucrose_root_deficit_series = []
     total_hexose_root_deficit_series = []
     total_hexose_soil_deficit_series = []
+    total_mucilage_soil_deficit_series = []
+    total_cells_soil_deficit_series = []
 
     total_respiration_series = []
     total_respiration_root_growth_series = []
@@ -104,13 +112,19 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     total_hexose_immobilization_as_reserve_series = []
     total_hexose_exudation_series = []
     total_hexose_uptake_series = []
-    total_hexose_degradation_series = []
+    total_mucilage_secretion_series = []
+    total_cells_release_series = []
     total_net_hexose_exudation_series = []
+    total_rhizodeposition_series = []
+    total_hexose_degradation_series = []
+    total_mucilage_degradation_series = []
+    total_cells_degradation_series = []
     C_in_the_root_soil_system_series = []
     C_cumulated_in_the_degraded_pool_series = []
     C_cumulated_in_the_gaz_phase_series = []
     global_sucrose_deficit_series = []
     tip_C_hexose_root_series = []
+    soil_temperature_series = []
 
     # We create an empty list that will contain the results of z classification:
     z_dictionary_series = []
@@ -159,7 +173,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         # for each required step, depending on the chosen time step:
         input_frame = tools.formatted_inputs(original_input_file=input_file,
                                              final_input_file=os.path.join(outputs_directory, 'updated_input_file.csv'),
-                                             original_time_step_in_days=1 / 24.,
+                                             original_time_step_in_days=input_file_time_step_in_days,
                                              final_time_step_in_days=time_step_in_days,
                                              simulation_period_in_days=simulation_period_in_days,
                                              do_not_execute_if_file_with_suitable_size_exists=False)
@@ -180,6 +194,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         z_cam = z_coordinates[index_camera]
         sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                             vmax=displayed_vmax, cmap=cmap,
+                            root_hairs_display=root_hairs_display,
                             x_center=x_center,
                             y_center=y_center,
                             z_center=z_center,
@@ -192,6 +207,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         z_camera = z_cam
         sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                             vmax=displayed_vmax, cmap=cmap,
+                            root_hairs_display=root_hairs_display,
                             x_center=x_center,
                             y_center=y_center,
                             z_center=z_center,
@@ -252,16 +268,22 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         total_dead_root_length_series.append(dictionary["total_dead_root_length"])
         total_living_root_struct_mass_series.append(dictionary["total_living_root_struct_mass"])
         total_dead_root_struct_mass_series.append(dictionary["total_dead_root_struct_mass"])
+        total_root_hairs_mass_series.append(dictionary["total_root_hairs_mass"])
         total_living_root_surface_series.append(dictionary["total_living_root_surface"])
         total_dead_root_surface_series.append(dictionary["total_dead_root_surface"])
+        total_living_root_hairs_surface_series.append(dictionary["total_living_root_hairs_surface"])
         total_sucrose_root_series.append(dictionary["total_sucrose_root"])
         total_hexose_root_series.append(dictionary["total_hexose_root"])
         total_hexose_reserve_series.append(dictionary["total_hexose_reserve"])
         total_hexose_soil_series.append(dictionary["total_hexose_soil"])
+        total_mucilage_soil_series.append(dictionary["total_mucilage_soil"])
+        total_cells_soil_series.append(dictionary["total_cells_soil"])
 
         total_sucrose_root_deficit_series.append(dictionary["total_sucrose_root_deficit"])
         total_hexose_root_deficit_series.append(dictionary["total_hexose_root_deficit"])
         total_hexose_soil_deficit_series.append(dictionary["total_hexose_soil_deficit"])
+        total_mucilage_soil_deficit_series.append(dictionary["total_mucilage_soil_deficit"])
+        total_cells_soil_deficit_series.append(dictionary["total_cells_soil_deficit"])
 
         total_respiration_series.append(dictionary["total_respiration"])
         total_respiration_root_growth_series.append(dictionary["total_respiration_root_growth"])
@@ -273,8 +295,13 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         total_hexose_immobilization_as_reserve_series.append(dictionary["total_hexose_immobilization_as_reserve"])
         total_hexose_exudation_series.append(dictionary["total_hexose_exudation"])
         total_hexose_uptake_series.append(dictionary["total_hexose_uptake"])
-        total_hexose_degradation_series.append(dictionary["total_hexose_degradation"])
+        total_mucilage_secretion_series.append(dictionary["total_mucilage_secretion"])
+        total_cells_release_series.append(dictionary["total_cells_release"])
+        total_rhizodeposition_series.append(dictionary["total_rhizodeposition"])
         total_net_hexose_exudation_series.append(dictionary["total_net_hexose_exudation"])
+        total_hexose_degradation_series.append(dictionary["total_hexose_degradation"])
+        total_mucilage_degradation_series.append(dictionary["total_mucilage_degradation"])
+        total_cells_degradation_series.append(dictionary["total_cells_degradation"])
 
         C_in_the_root_soil_system_series.append(dictionary["C_in_the_root_soil_system"])
         C_cumulated_in_the_degraded_pool += dictionary["C_degraded_in_the_soil"]
@@ -285,6 +312,9 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         # Values that are integrative for the whole root system have been stored as properties in node 0 of the root system:
         global_sucrose_deficit_series.append(g.node(0).global_sucrose_deficit)
         tip_C_hexose_root_series.append(g.node(0).C_hexose_root)
+
+        # Adding soil temperature:
+        soil_temperature_series.append("NA")
 
         # Initializing the amount of C in the root_soil_CO2 system:
         previous_C_in_the_system = dictionary["C_in_the_root_soil_system"] + C_cumulated_in_the_gaz_phase
@@ -310,14 +340,20 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                        "Root necromass (g)": total_dead_root_struct_mass_series,
                                        "Root length (m)": total_living_root_length_series,
                                        "Root surface (m2)": total_living_root_surface_series,
+                                       "Total root hairs mass (g)": total_root_hairs_mass_series,
+                                       "Total living root hairs surface (m2)": total_living_root_hairs_surface_series,
                                        "Sucrose in the root (mol of sucrose)": total_sucrose_root_series,
                                        "Hexose in the mobile pool of the roots (mol of hexose)": total_hexose_root_series,
                                        "Hexose in the reserve pool of the roots (mol of hexose)": total_hexose_reserve_series,
                                        "Hexose in the soil (mol of hexose)": total_hexose_soil_series,
+                                       "Mucilage in the soil (mol of hexose)": total_mucilage_soil_series,
+                                       "Cells in the soil (mol of equivalent-hexose)": total_cells_soil_series,
 
                                        "Deficit of sucrose in the root (mol of sucrose)": total_sucrose_root_deficit_series,
                                        "Deficit of hexose in the mobile pool of the roots (mol of hexose)": total_hexose_root_deficit_series,
                                        "Deficit of hexose in the soil (mol of hexose)": total_hexose_soil_deficit_series,
+                                       "Deficit of mucilage in the soil (mol of hexose)": total_mucilage_soil_deficit_series,
+                                       "Deficit of cells in the soil (mol of hexose)": total_cells_soil_deficit_series,
 
                                        "CO2 originating from root growth (mol of C)": total_respiration_root_growth_series,
                                        "CO2 originating from root maintenance (mol of C)": total_respiration_root_maintenance_series,
@@ -328,14 +364,21 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                        "Hexose stored as reserve (mol of hexose)": total_hexose_immobilization_as_reserve_series,
                                        "Hexose emitted in the soil (mol of hexose)": total_hexose_exudation_series,
                                        "Hexose taken up from the soil (mol of hexose)": total_hexose_uptake_series,
+                                       "Mucilage secreted in the soil (mol of hexose)": total_mucilage_secretion_series,
+                                       "Cells release in the soil (mol of equivalent-hexose)": total_cells_release_series,
+                                       "Total rhizodeposition (mol of hexose)": total_rhizodeposition_series,
                                        "Hexose degraded in the soil (mol of hexose)": total_hexose_degradation_series,
+                                       "Mucilage degraded in the soil (mol of hexose)": total_mucilage_degradation_series,
+                                       "Cells degraded in the soil (mol of equivalent-hexose)": total_cells_degradation_series,
 
                                        "Cumulated amount of C present in the root-soil system (mol of C)": C_in_the_root_soil_system_series,
                                        "Cumulated amount of C that has been degraded in the soil (mol of C)": C_cumulated_in_the_degraded_pool_series,
                                        "Cumulated amount of C that has been respired by roots (mol of C)": C_cumulated_in_the_gaz_phase_series,
                                        "Final deficit in sucrose of the whole root system (mol of sucrose)": global_sucrose_deficit_series,
 
-                                       "Concentration of hexose in the main root tip (mol of hexose per g)": tip_C_hexose_root_series
+                                       "Concentration of hexose in the main root tip (mol of hexose per g)": tip_C_hexose_root_series,
+
+                                       "Soil temperature (degree Celsius)": soil_temperature_series
                                        },
                                       # We re-order the columns:
                                       columns=["Time (days)",
@@ -348,13 +391,19 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                                "Root necromass (g)",
                                                "Root length (m)",
                                                "Root surface (m2)",
+                                               "Total root hairs mass (g)",
+                                               "Total living root hairs surface (m2)",
                                                "Sucrose in the root (mol of sucrose)",
                                                "Hexose in the mobile pool of the roots (mol of hexose)",
                                                "Hexose in the reserve pool of the roots (mol of hexose)",
                                                "Hexose in the soil (mol of hexose)",
+                                               "Mucilage in the soil (mol of hexose)",
+                                               "Cells in the soil (mol of equivalent-hexose)",
                                                "Deficit of sucrose in the root (mol of sucrose)",
                                                "Deficit of hexose in the mobile pool of the roots (mol of hexose)",
                                                "Deficit of hexose in the soil (mol of hexose)",
+                                               "Deficit of mucilage in the soil (mol of hexose)",
+                                               "Deficit of cells in the soil (mol of hexose)",
                                                "CO2 originating from root growth (mol of C)",
                                                "CO2 originating from root maintenance (mol of C)",
                                                "Structural mass produced (g)",
@@ -364,8 +413,14 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                                "Hexose stored as reserve (mol of hexose)",
                                                "Hexose emitted in the soil (mol of hexose)",
                                                "Hexose taken up from the soil (mol of hexose)",
+                                               "Mucilage secreted in the soil (mol of hexose)",
+                                               "Cells release in the soil (mol of equivalent-hexose)",
+                                               "Total rhizodeposition (mol of hexose)",
                                                "Hexose degraded in the soil (mol of hexose)",
-                                               "Concentration of hexose in the main root tip (mol of hexose per g)"
+                                               "Mucilage degraded in the soil (mol of hexose)",
+                                               "Cells degraded in the soil (mol of equivalent-hexose)",
+                                               "Concentration of hexose in the main root tip (mol of hexose per g)",
+                                               "Soil temperature (degree Celsius)"
                                                ])
             # We save the data_frame in a CSV file:
             try:
@@ -402,12 +457,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         # An iteration is done for each time step:
         for step in range(1, n_steps):
 
-            # At the beginning of the time step, we reset the global variable allowing the emergence of adventitious roots:
-            g.property('adventitious_root_emergence')[g.root] = "Possible"
-            # We keep in memory the value of the global variable time_since_adventitious_root_emergence at the beginning of the time steo:
-            initial_time_since_adventitious_root_emergence = \
-            g.property('thermal_time_since_last_adventitious_root_emergence')[g.root]
-
             # We calculate the current time in hours:
             current_time_in_hours = step * time_step_in_days * 24.
 
@@ -431,10 +480,10 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil temperature:
             temperature_time_adjustment = model.temperature_modification(temperature_in_Celsius=soil_temperature,
                                                                          process_at_T_ref=1,
-                                                                         T_ref=param.T_ref_growth,
-                                                                         A=param.growth_increase_with_temperature,
-                                                                         B=1,
-                                                                         C=0)
+                                                                         T_ref=param.root_growth_T_ref,
+                                                                         A=param.root_growth_A,
+                                                                         B=param.root_growth_B,
+                                                                         C=param.root_growth_C)
 
             # STARTING THE ACTUAL SIMULATION:
             # --------------------------------
@@ -443,7 +492,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             print("From t =", "{:.2f}".format(Decimal((step - 1) * time_step_in_days)), "days to t =",
                   "{:.2f}".format(Decimal(step * time_step_in_days)), "days:")
             print("------------------------------------")
-            print("   Soil temperature is", soil_temperature, "degree Celsius.")
+            print("   Soil temperature is", "{:.2f}".format(Decimal(soil_temperature)), "degree Celsius.")
             print("   The input rate of sucrose to the root for time=", "{:.2f}".format(Decimal(current_time_in_hours)),
                   "h is",
                   "{:.2E}".format(Decimal(sucrose_input_rate)), "mol of sucrose per second, i.e.",
@@ -461,6 +510,9 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 C_input_for_growth = sucrose_input_rate * 12 * time_step_in_seconds * ArchiSimple_C_fraction
                 # We convert this input of C into an input of "biomass" as considered in ArchiSimple:
                 struct_mass_input = C_input_for_growth / param.struct_mass_C_content
+
+                # We reset to 0 all growth-associated C costs:
+                model.reinitializing_growth_variables(g)
 
                 # We calculate the potential growth, already based on ArchiSimple rules:
                 model.potential_growth(g, time_step_in_seconds=time_step_in_seconds,
@@ -486,7 +538,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # CASE 2: WE PERFORM THE COMPLETE MODEL WITH C BALANCE IN EACH ROOT ELEMENT
                 # --------------------------------------------------------------------------
 
-                # We reset to 0 all growth-associated C costs:
+                # We reset to 0 all growth-associated C costs and initialize the initial dimensions or masses:
                 model.reinitializing_growth_variables(g)
 
                 # Calculation of potential growth without consideration of available hexose:
@@ -501,27 +553,45 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                                                   soil_temperature_in_Celsius=soil_temperature,
                                                                   printing_warnings=printing_warnings)
 
-                # # We proceed to the segmentation of the whole root system (NOTE: segmentation should always occur AFTER actual growth):
+                # We proceed to the segmentation of the whole root system (NOTE: segmentation should always occur AFTER actual growth):
                 model.segmentation_and_primordia_formation(g, time_step_in_seconds,
                                                            soil_temperature_in_Celsius=soil_temperature,
                                                            random=random,
                                                            nodules=nodules,
                                                            root_order_limitation=root_order_limitation,
                                                            root_order_treshold=root_order_treshold)
-
+                # We re-calculate the distance to tip for each root element:
                 model.dist_to_tip(g)
+                # We modifiy root hairs characteristics:
+                model.root_hairs_dynamics(g, time_step_in_seconds=time_step_in_seconds,
+                                          soil_temperature_in_Celsius=soil_temperature,
+                                          printing_warnings=printing_warnings)
 
-                # Consumption of hexose in the soil:
+                # Consumption of hexose, mucilage and root cells at the soil/root interface:
                 model.soil_hexose_degradation(g, time_step_in_seconds=time_step_in_seconds,
                                               soil_temperature_in_Celsius=soil_temperature,
                                               printing_warnings=printing_warnings)
+                model.soil_mucilage_degradation(g, time_step_in_seconds=time_step_in_seconds,
+                                                 soil_temperature_in_Celsius=soil_temperature,
+                                                 printing_warnings=printing_warnings)
+                model.soil_cells_degradation(g, time_step_in_seconds=time_step_in_seconds,
+                                             soil_temperature_in_Celsius=soil_temperature,
+                                             printing_warnings=printing_warnings)
 
-                # Transfer of hexose from the root to the soil, consumption of hexose inside the roots:
+                # Transfer of hexose from the root to the soil, consumption of hexose inside the root:
                 model.root_hexose_exudation(g, time_step_in_seconds=time_step_in_seconds,
                                             soil_temperature_in_Celsius=soil_temperature,
                                             printing_warnings=printing_warnings)
                 # Transfer of hexose from the soil to the root, consumption of hexose in the soil:
                 model.root_hexose_uptake(g, time_step_in_seconds=time_step_in_seconds,
+                                         soil_temperature_in_Celsius=soil_temperature,
+                                         printing_warnings=printing_warnings)
+                # Secretion of mucilage from the root, consumption of hexose inside the root:
+                model.root_mucilage_secretion(g, time_step_in_seconds=time_step_in_seconds,
+                                              soil_temperature_in_Celsius=soil_temperature,
+                                              printing_warnings=printing_warnings)
+                # Release of root epidermal cells, consumption of hexose inside the root:
+                model.root_cells_release(g, time_step_in_seconds=time_step_in_seconds,
                                          soil_temperature_in_Celsius=soil_temperature,
                                          printing_warnings=printing_warnings)
 
@@ -553,14 +623,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # # OPTIONAL: checking of possible anomalies in the root system:
                 # model.control_of_anomalies(g)
 
-            # A the end of the time step, if the global variable "time_since_adventitious_root_emergence" has been unchanged:
-            if g.property('thermal_time_since_last_adventitious_root_emergence')[
-                g.root] == initial_time_since_adventitious_root_emergence:
-                # Then we increment it by the time step:
-                g.property('thermal_time_since_last_adventitious_root_emergence')[
-                    g.root] += time_step_in_seconds * temperature_time_adjustment
-            # Otherwise, the variable has already been reset when the emergence of one adventitious root has been allowed.
-
             # PLOTTING THE MTG:
             # ------------------
 
@@ -571,6 +633,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 z_cam = z_coordinates[index_camera]
                 sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                                     vmax=displayed_vmax, cmap=cmap,
+                                    root_hairs_display=root_hairs_display,
                                     x_center=x_center,
                                     y_center=y_center,
                                     z_center=z_center,
@@ -588,6 +651,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             else:
                 sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                                     vmax=displayed_vmax, cmap=cmap,
+                                    root_hairs_display=root_hairs_display,
                                     x_center=x_center,
                                     y_center=y_center,
                                     z_center=z_center,
@@ -645,16 +709,22 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 total_dead_root_length_series.append(dictionary["total_dead_root_length"])
                 total_living_root_struct_mass_series.append(dictionary["total_living_root_struct_mass"])
                 total_dead_root_struct_mass_series.append(dictionary["total_dead_root_struct_mass"])
+                total_root_hairs_mass_series.append(dictionary["total_root_hairs_mass"])
                 total_living_root_surface_series.append(dictionary["total_living_root_surface"])
                 total_dead_root_surface_series.append(dictionary["total_dead_root_surface"])
+                total_living_root_hairs_surface_series.append(dictionary["total_living_root_hairs_surface"])
                 total_sucrose_root_series.append(dictionary["total_sucrose_root"])
                 total_hexose_root_series.append(dictionary["total_hexose_root"])
                 total_hexose_reserve_series.append(dictionary["total_hexose_reserve"])
                 total_hexose_soil_series.append(dictionary["total_hexose_soil"])
+                total_mucilage_soil_series.append(dictionary["total_mucilage_soil"])
+                total_cells_soil_series.append(dictionary["total_cells_soil"])
 
                 total_sucrose_root_deficit_series.append(dictionary["total_sucrose_root_deficit"])
                 total_hexose_root_deficit_series.append(dictionary["total_hexose_root_deficit"])
                 total_hexose_soil_deficit_series.append(dictionary["total_hexose_soil_deficit"])
+                total_mucilage_soil_deficit_series.append(dictionary["total_mucilage_soil_deficit"])
+                total_cells_soil_deficit_series.append(dictionary["total_cells_soil_deficit"])
 
                 total_respiration_series.append(dictionary["total_respiration"])
                 total_respiration_root_growth_series.append(dictionary["total_respiration_root_growth"])
@@ -662,20 +732,25 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 total_structural_mass_production_series.append(dictionary["total_structural_mass_production"])
                 total_hexose_production_from_phloem_series.append(dictionary["total_hexose_production_from_phloem"])
                 total_sucrose_loading_in_phloem_series.append(dictionary["total_sucrose_loading_in_phloem"])
-                total_hexose_mobilization_from_reserve_series.append(
-                    dictionary["total_hexose_mobilization_from_reserve"])
-                total_hexose_immobilization_as_reserve_series.append(
-                    dictionary["total_hexose_immobilization_as_reserve"])
+                total_hexose_mobilization_from_reserve_series.append(dictionary["total_hexose_mobilization_from_reserve"])
+                total_hexose_immobilization_as_reserve_series.append(dictionary["total_hexose_immobilization_as_reserve"])
                 total_hexose_exudation_series.append(dictionary["total_hexose_exudation"])
                 total_hexose_uptake_series.append(dictionary["total_hexose_uptake"])
-                total_hexose_degradation_series.append(dictionary["total_hexose_degradation"])
+                total_mucilage_secretion_series.append(dictionary["total_mucilage_secretion"])
+                total_cells_release_series.append(dictionary["total_cells_release"])
+                total_rhizodeposition_series.append(dictionary["total_rhizodeposition"])
                 total_net_hexose_exudation_series.append(dictionary["total_net_hexose_exudation"])
+                total_hexose_degradation_series.append(dictionary["total_hexose_degradation"])
+                total_mucilage_degradation_series.append(dictionary["total_mucilage_degradation"])
+                total_cells_degradation_series.append(dictionary["total_cells_degradation"])
 
                 C_in_the_root_soil_system_series.append(dictionary["C_in_the_root_soil_system"])
                 C_cumulated_in_the_degraded_pool += dictionary["C_degraded_in_the_soil"]
                 C_cumulated_in_the_degraded_pool_series.append(C_cumulated_in_the_degraded_pool)
                 C_cumulated_in_the_gaz_phase += dictionary["C_respired_by_roots"]
                 C_cumulated_in_the_gaz_phase_series.append(C_cumulated_in_the_gaz_phase)
+
+                soil_temperature_series.append(soil_temperature)
 
                 # In case of ArchiSimple:
                 if ArchiSimple:
@@ -694,7 +769,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                                            + sucrose_input_rate * time_step_in_seconds * 12.)
                     theoretical_cumulated_C_in_the_system += sucrose_input_rate * time_step_in_seconds * 12.
 
-                    if abs(current_C_in_the_system - theoretical_cumulated_C_in_the_system) / current_C_in_the_system > 1e-10:
+                    if abs(current_C_in_the_system - theoretical_cumulated_C_in_the_system) / current_C_in_the_system > 1e-3:
                         print("!!! ERROR ON CARBON BALANCE: the current amount of C in the system is",
                               "{:.2E}".format(Decimal(current_C_in_the_system)), "but it should be",
                               "{:.2E}".format(Decimal(theoretical_current_C_in_the_system)), "mol of C")
@@ -722,7 +797,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     Decimal(step * time_step_in_days)), "days)...")
                 recording_attempt()
 
-    # ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    # //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     # At the end of the simulation (or just before an error is about to interrupt the program!):
     # -------------------------------------------------------------------------------------------

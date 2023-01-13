@@ -17,6 +17,7 @@ from decimal import Decimal
 from math import pi, cos, sin, floor
 import numpy as np
 import pandas as pd
+from copy import deepcopy # Allows to make a copy of a dictionnary and change it without modifying the original, whatever it is
 
 from openalea.mtg import turtle as turt
 from openalea.mtg.plantframe import color
@@ -130,8 +131,8 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
                     # Then we stop the loop here:
                     break
 
-        # CASE 2: the final time step is higher than the original one, so we have to calculate an average value:
-        # -------------------------------------------------------------------------------------------------------
+        # CASE 2: the final time step is lower than the original one, so we have to interpolate values between two points:
+        # ----------------------------------------------------------------------------------------------------------------
         if final_time_step_in_days < original_time_step_in_days:
 
             # We initialize the row ID "i" in which the original values are read:
@@ -161,12 +162,13 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
                             cumulated_time_in_days + final_time_step_in_days - original_time_step_in_days)
                     remaining_time = (cumulated_time_in_days + final_time_step_in_days - original_time_step_in_days)
 
+                # Then we calculate the input rate and the temperature for the current line:
                 sucrose_input_rate = sucrose_input_rate_initial \
-                                     + (df.loc[
-                                            i, 'sucrose_input_rate'] - sucrose_input_rate_initial) / original_time_step_in_days * cumulated_time_in_days
+                                     + (df.loc[i, 'sucrose_input_rate'] - sucrose_input_rate_initial) \
+                                     / original_time_step_in_days * cumulated_time_in_days
                 temperature = temperature_initial \
-                              + (df.loc[
-                                     i, 'soil_temperature_in_Celsius'] - temperature_initial) / original_time_step_in_days * cumulated_time_in_days
+                              + (df.loc[i, 'soil_temperature_in_Celsius'] - temperature_initial) \
+                              / original_time_step_in_days * cumulated_time_in_days
 
                 print("   Creating line", j + 1, "on", n_steps, "lines in the new input frame...")
                 # We record the final temperature and sucrose input rate:
@@ -178,7 +180,7 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
 
                     # We record the current sucrose input rate and temperature in the original table:
                     sucrose_input_rate_initial = df.loc[i, 'sucrose_input_rate']
-                    temperature = df.loc[i, 'soil_temperature_in_Celsius']
+                    temperature_initial = df.loc[i, 'soil_temperature_in_Celsius']
 
                     # We move to the next row in the original table, unless we are already at the last line:
                     if i < len(df['time_in_days']) - 1:
@@ -260,8 +262,10 @@ def get_root_visitor():
 
     def root_visitor(g, v, turtle):
         n = g.node(v)
-        # For displaying the radius or length 10 times larger than in reality:
-        zoom_factor = 10.
+
+        # For displaying the radius or length X times larger than in reality, we can define a zoom factor:
+        zoom_factor = 1.
+        # We look at the geometrical properties already defined within the root element:
         radius = n.radius * zoom_factor
         length = n.length * zoom_factor
         angle_down = n.angle_down
@@ -291,16 +295,16 @@ def get_root_visitor():
 
         # The turtle is moved:
         turtle.setId(v)
-        if n.type == "Root_nodule":
-            # s=turt.Sphere(radius)
-            # turtle.draw(s)
+        if n.type != "Root_nodule":
+            # We define the radius of the cylinder to be displayed:
             turtle.setWidth(radius)
-            index_parent = g.Father(v, EdgeType='+')
-            parent = g.node(index_parent)
-            turtle.F()
-        else:
-            turtle.setWidth(radius)
+            # We move the turtle by the length of the root segment:
             turtle.F(length)
+        else: # SPECIAL CASE FOR NODULES
+            # We define the radius of the sphere to be displayed:
+            turtle.setWidth(radius)
+            # We "move" the turtle, but not according to the length (?):
+            turtle.F()
 
         # We get the x,y,z coordinates from the end of the root segment, after the turtle has moved:
         position2 = turtle.getPosition()
@@ -336,6 +340,7 @@ def my_colormap(g, property_name, cmap='jet', vmin=None, vmax=None, lognorm=True
     colors = np.array(colors, dtype=np.int).tolist()
 
     g.properties()['color'] = dict(zip(keys, colors))
+
     return g
 
 
@@ -410,6 +415,7 @@ def circle_coordinates(x_center=0., y_center=0., z_center=0., radius=1., n_point
 
 
 def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-12, vmax=3e-7,
+             root_hairs_display=True,
              x_center=0., y_center=0., z_center=0.,
              x_cam=1., y_cam=0., z_cam=0.):
     """
@@ -429,6 +435,10 @@ def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-
     :return: the updated scene
     """
 
+    # Consider: https://learnopengl.com/In-Practice/Text-Rendering
+
+    # DISPLAYING ROOTS:
+    #------------------
     visitor = get_root_visitor()
     # We initialize a turtle in PlantGL:
     turtle = turt.PglTurtle()
@@ -451,38 +461,99 @@ def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-
             # If the element is not dead:
             if n.type != "Dead":
                 # We color it according to the property cmap defined by the user:
-                shapes[vid].appearance = pgl.Material(colors[vid])
+                shapes[vid].appearance = pgl.Material(colors[vid], transparency=0.0)
             else:
-                # Otherwise, we print it in black:
-                shapes[vid].appearance = pgl.Material([0, 0, 0])
+                # Otherwise, we print it in black in a semi-transparent way:
+                shapes[vid].appearance = pgl.Material([0, 0, 0], transparency=0.8)
             # property=g.property(prop_cmap)
             # if n.property <=0:
             #     shapes[vid].appearance = pgl.Material([0, 0, 200])
 
-    # Changing some shapes geometry according to the element:
-    for vid in shapes:
-        n = g.node(vid)
-        # If the element is a nodule, we transform the cylinder into a sphere:
-        if n.type == "Root_nodule":
-            # We create a sphere corresponding to the radius of the element:
-            s = pgl.Sphere(n.radius * 1.)
-            # We transform the cylinder into the sphere:
-            shapes[vid].geometry.geometry = pgl.Shape(s).geometry
-            # We select the parent element supporting the nodule:
-            index_parent = g.Father(vid, EdgeType='+')
-            parent = g.node(index_parent)
-            # We move the center of the sphere on the circle corresponding to the external envelop of the parent:
-            angle = parent.angle_roll
-            circle_x = parent.radius * 10 * cos(angle)
-            circle_y = parent.radius * 10 * sin(angle)
-            circle_z = 0
-            shapes[vid].geometry.translation += (circle_x, circle_y, circle_z)
+            # SPECIAL CASE: If the element is a nodule, we transform the cylinder into a sphere:
+            if n.type == "Root_nodule":
+                # We create a sphere corresponding to the radius of the element:
+                s = pgl.Sphere(n.radius * 1.)
+                # We transform the cylinder into the sphere:
+                shapes[vid].geometry.geometry = pgl.Shape(s).geometry
+                # We select the parent element supporting the nodule:
+                index_parent = g.Father(vid, EdgeType='+')
+                parent = g.node(index_parent)
+                # We move the center of the sphere on the circle corresponding to the external envelop of the
+                # parent:
+                angle = parent.angle_roll
+                circle_x = parent.radius * cos(angle)
+                circle_y = parent.radius * sin(angle)
+                circle_z = 0
+                shapes[vid].geometry.translation += (circle_x, circle_y, circle_z)
 
-    # We return the new updated scene:
+    # DISPLAYING ROOT HAIRS:
+    #-----------------------
+    if root_hairs_display:
+        visitor_for_hair = get_root_visitor()
+        # We initialize a turtle in PlantGL:
+        turtle_for_hair = turt.PglTurtle()
+        # We make the graph upside down:
+        turtle_for_hair.down(180)
+        # We initialize the scene with the MTG g:
+        # scene_for_hair = turt.TurtleFrame(g, visitor=visitor_for_hair, turtle=turtle_for_hair, gc=False)
+        scene_for_hair = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_hair, gc=False)
+        # We update the scene with the specified position of the center of the graph and the camera:
+        prepareScene(scene_for_hair, x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+        # We get a list of all shapes in the scene:
+        shapes_for_hair = dict((sh.id, sh) for sh in scene_for_hair)
+
+        # We cover each node of the MTG:
+        for vid in colors:
+            if vid in shapes_for_hair:
+                n = g.node(vid)
+                # If the element has no detectable root hairs:
+                if n.root_hair_length<=0.:
+                    # Then the element is set to be transparent:
+                    shapes_for_hair[vid].appearance = pgl.Material(colors[vid], transparency=1)
+                else:
+                    # We color the root hairs according to the proportion of living and dead root hairs:
+                    dead_transparency = 0.9
+                    dead_color_vector=[0,0,0]
+                    dead_color_vector_Red=dead_color_vector[0]
+                    dead_color_vector_Green=dead_color_vector[1]
+                    dead_color_vector_Blue=dead_color_vector[2]
+
+                    living_transparency = 0.8
+                    living_color_vector=colors[vid]
+                    living_color_vector_Red = colors[vid][0]
+                    living_color_vector_Green = colors[vid][1]
+                    living_color_vector_Blue = colors[vid][2]
+
+                    living_fraction = n.living_root_hairs_number/n.total_root_hairs_number
+                    # print("Living fraction is", living_fraction)
+
+                    transparency = dead_transparency + (living_transparency - dead_transparency) * living_fraction
+                    color_vector_Red = floor(dead_color_vector_Red
+                                             + (living_color_vector_Red - dead_color_vector_Red) * living_fraction)
+                    color_vector_Green = floor(dead_color_vector_Green
+                                               + (living_color_vector_Green - dead_color_vector_Green) * living_fraction)
+                    color_vector_Blue = floor(dead_color_vector_Blue
+                                              + (living_color_vector_Blue - dead_color_vector_Blue) * living_fraction)
+                    color_vector = [color_vector_Red,color_vector_Green,color_vector_Blue]
+
+                    shapes_for_hair[vid].appearance = pgl.Material(color_vector, transparency=transparency)
+
+                    # We finally transform the radius of the cylinder:
+                    if vid > 1:
+                        # For normal cases:
+                        shapes_for_hair[vid].geometry.geometry.geometry.radius = n.radius + n.root_hair_length
+                    else:
+                        # For the base of the root system [don't ask why this has not the same formalism..!]:
+                        shapes_for_hair[vid].geometry.geometry.radius = n.radius + n.root_hair_length
+
+    # CREATING THE ACTUAL SCENE:
+    #---------------------------
+    # Finally, we update the scene with shapes from roots and, if specified, shapes from root hairs:
     new_scene = pgl.Scene()
     for vid in shapes:
         new_scene += shapes[vid]
-
-    # Consider: https://learnopengl.com/In-Practice/Text-Rendering
+    if root_hairs_display:
+        for vid in shapes_for_hair:
+            new_scene += shapes_for_hair[vid]
 
     return new_scene

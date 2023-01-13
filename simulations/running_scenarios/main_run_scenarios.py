@@ -22,11 +22,14 @@ import rhizodep.parameters as param
 import rhizodep.model as model
 
 
-def run_one_scenario(scenario_id=1, inputs_dir_path=None, outputs_dir_path='outputs'):
+def run_one_scenario(scenario_id=1,
+                     inputs_dir_path=None,
+                     outputs_dir_path='outputs',
+                     scenarios_list="scenarios_list.xlsx"):
     """
     Run main_simulation() of simulation.py using parameters of a specific scenario
 
-    :param int scenario_id: the index of the scenario to be read in the CSV file containing the list of scenarios
+    :param int scenario_id: the index of the scenario to be read in the file containing the list of scenarios
     :param str inputs_dir_path: the path directory of inputs
     :param str outputs_dir_path: the path to save outputs
     """
@@ -40,16 +43,38 @@ def run_one_scenario(scenario_id=1, inputs_dir_path=None, outputs_dir_path='outp
         # We create it:
         os.mkdir(OUTPUTS_DIRPATH)
 
+    # -- INPUTS DIRECTORY OF THE SCENARIO --
     # We define the path of the directory that contains the inputs of the model:
     if inputs_dir_path:
         INPUTS_DIRPATH = inputs_dir_path
     else:
         INPUTS_DIRPATH = 'inputs'
 
-    # We read the scenario to be run:
-    scenarios_df = pd.read_csv(os.path.join(INPUTS_DIRPATH, 'scenarios_list.csv'), index_col='Scenario')
-    scenario = scenarios_df.loc[scenario_id].to_dict()
-    scenario_name = 'Scenario_%.4d' % scenario_id
+    # READING SCENARIO INSTRUCTIONS:
+    if os.path.splitext(scenarios_list)[1]==".csv":
+        # FOR A CSV FILE, ONE SCENARIO CORRESPONDS TO ONE LINE:
+        # We read the scenario to be run:
+        scenarios_df = pd.read_csv(os.path.join(INPUTS_DIRPATH, scenarios_list), index_col='Scenario')
+        scenario = scenarios_df.loc[scenario_id].to_dict()
+        scenario_name = 'Scenario_%.4d' % scenario_id
+    elif os.path.splitext(scenarios_list)[1]==".xlsx":
+        # ONE SCENARIO CORRESPONDS TO ONE COLUMN (from EXCEL FILE):
+        # We read the scenario to be run:
+        scenarios_df = pd.read_excel(os.path.join(INPUTS_DIRPATH, scenarios_list), header=0, sheet_name="scenarios_as_columns")
+        # We remove the columns containing unnecessary details about parameters:
+        useless_columns = ["Explanation", "Type/ Unit"]
+        scenarios_df.drop(useless_columns, axis=1, inplace=True)
+        # Before transposing the dataframe, we rename the first column as 'Scenario':
+        scenarios_df.rename(columns={'Parameter':'Scenario'}, inplace= True)
+        # Because the way of dealing with data type is not well suited with the current Excel file, we transpose the
+        # dataframe, record it as a CSV file in the outputs folder, and reload it with the proper type for each parameter:
+        transposed_df = scenarios_df.T
+        transposed_df.to_csv(os.path.join('outputs', 'scenarios_list.csv'), na_rep='NA', header=False)
+        new_scenarios_df = pd.read_csv(os.path.join('outputs', 'scenarios_list.csv'), index_col='Scenario', header=0)
+        scenario = new_scenarios_df.loc[scenario_id].to_dict()
+        scenario_name = 'Scenario_%.4d' % scenario_id
+    else:
+        print("The extension of the 'scenarios_list' file has not been recognized (either .csv or .xlsx)!")
 
     # We define the specific directory in which the outputs of this scenario will be recorded:
     scenario_dirpath = os.path.join(OUTPUTS_DIRPATH, scenario_name)
@@ -98,9 +123,12 @@ def run_one_scenario(scenario_id=1, inputs_dir_path=None, outputs_dir_path='outp
         SCENARIO_INPUT_FILE = os.path.join(INPUTS_DIRPATH, SCENARIO_INPUT_FILENAME)
     else:
         SCENARIO_INPUT_FILE = None
+
     # We read the other specific instructions of the scenario that don't correspond to the parameters in the list:
+    INPUT_FILE_TIME_STEP = scenario_parameters.get('input_file_time_step_in_days', 1.)
     SIMULATION_PERIOD = scenario_parameters.get('simulation_period_in_days', 10.)
     TIME_STEP = scenario_parameters.get('time_step_in_days', 1. / 24.)
+
     RADIAL_GROWTH = scenario_parameters.get('radial_growth', True)
     ARCHISIMPLE_OPTION = scenario_parameters.get('ArchiSimple', False)
     ARCHISIMPLE_C_FRACTION = scenario_parameters.get('ArchiSimple_C_fraction', 0.20)
@@ -112,14 +140,19 @@ def run_one_scenario(scenario_id=1, inputs_dir_path=None, outputs_dir_path='outp
     SUCROSE_INPUT_RATE = scenario_parameters.get('constant_sucrose_input_rate', 5e-9)
     SOIL_TEMPERATURE = scenario_parameters.get('constant_soil_temperature_in_Celsius', 20)
 
+    INITIAL_SEGMENT_LENGTH = scenario_parameters.get('initial_segment_length', 1e-3)
+    INITIAL_C_SUCROSE_ROOT = scenario_parameters.get('initial_C_sucrose_root', 1e-4)
+    INITIAL_C_HEXOSE_ROOT = scenario_parameters.get('initial_C_hexose_root', 1e-4)
+
     PLOTTING = scenario_parameters.get('plotting', True)
     DISPLAYED_PROPERTY = scenario_parameters.get('displayed_property', 'C_hexose_root')
     DISPLAYED_MIN_VALUE = scenario_parameters.get('displayed_min_value', 1e-15)
     DISPLAYED_MAX_VALUE = scenario_parameters.get('displayed_max_value', 1000)
     LOG_SCALE = scenario_parameters.get('log_scale', True)
     COLOR_MAP = scenario_parameters.get('color_map', 'jet')
+    ROOT_HAIRS_DISPLAY = scenario_parameters.get('root_hairs_display', True)
     CAMERA_ROTATION_OPTION = scenario_parameters.get('camera_rotation', False)
-    CAMERA_ROTATION_N_POINTS = scenario_parameters.get('camera_rotation_n_points', 12 * 10)
+    CAMERA_ROTATION_N_POINTS = scenario_parameters.get('camera_rotation_n_points', 120)
     X_CENTER = scenario_parameters.get('x_center', 0)
     Y_CENTER = scenario_parameters.get('y_center', 0)
     Z_CENTER = scenario_parameters.get('z_center', -1)
@@ -141,59 +174,12 @@ def run_one_scenario(scenario_id=1, inputs_dir_path=None, outputs_dir_path='outp
     RECORDING_MTG_PROPERTIES_OPTION = scenario_parameters.get('recording_MTG_properties', False)
     RANDOM_OPTION = scenario_parameters.get('random', True)
 
-
-    # # -- RUN main_simulation --
-    # try:
-    #     # We initiate the properties of the MTG "g":
-    #     g = model.initiate_mtg(random=True)
-    #
-    #     # We launch the main simulation program:
-    #     simulation.main_simulation(g, simulation_period_in_days=SIMULATION_PERIOD, time_step_in_days=TIME_STEP,
-    #                                radial_growth=RADIAL_GROWTH,
-    #                                ArchiSimple=ARCHISIMPLE_OPTION,
-    #                                ArchiSimple_C_fraction= ARCHISIMPLE_C_FRACTION,
-    #                                input_file=SCENARIO_INPUT_FILE,
-    #                                outputs_directory=scenario_dirpath,
-    #                                forcing_constant_inputs=FORCING_INPUTS,
-    #                                constant_sucrose_input_rate=SUCROSE_INPUT_RATE,
-    #                                constant_soil_temperature_in_Celsius=SOIL_TEMPERATURE,
-    #                                nodules=NODULES_OPTION,
-    #                                root_order_limitation=ROOT_ORDER_LIMITATION_OPTION,
-    #                                root_order_treshold=ROOT_ORDER_TRESHOLD,
-    #                                specific_model_option=SPECIFIC_MODEL_OPTION,
-    #                                simulation_results_file='simulation_results.csv',
-    #                                z_classification=CLASSIFICATION_BY_LAYERS,
-    #                                z_classification_file='z_classification.csv',
-    #                                recording_interval_in_days=RECORDING_INTERVAL_IN_DAYS,
-    #                                z_min=LAYERS_Z_MIN, z_max=LAYERS_Z_MAX, z_interval=LAYERS_THICKNESS,
-    #                                recording_images=RECORDING_IMAGES_OPTION,
-    #                                root_images_directory=images_dirpath,
-    #                                printing_sum=PRINTING_SUM_OPTION,
-    #                                recording_sum=RECORDING_SUM_OPTION,
-    #                                printing_warnings=PRINTING_WARNINGS_OPTION,
-    #                                recording_g=RECORDING_MTG_FILES_OPTION,
-    #                                g_directory=MTG_files_dirpath,
-    #                                recording_g_properties=RECORDING_MTG_PROPERTIES_OPTION,
-    #                                g_properties_directory=MTG_properties_dirpath,
-    #                                random=RANDOM_OPTION,
-    #                                plotting=PLOTTING,
-    #                                scenario_id=scenario_id,
-    #                                displayed_property=DISPLAYED_PROPERTY,
-    #                                displayed_vmin=DISPLAYED_MIN_VALUE, displayed_vmax=DISPLAYED_MAX_VALUE,
-    #                                log_scale=LOG_SCALE, cmap=COLOR_MAP,
-    #                                x_center=X_CENTER, y_center=Y_CENTER, z_center=Z_CENTER, z_cam=Z_CAMERA,
-    #                                camera_distance=CAMERA_DISTANCE, step_back_coefficient=STEP_BACK_COEFFICIENT,
-    #                                camera_rotation=CAMERA_ROTATION_OPTION, n_rotation_points=CAMERA_ROTATION_N_POINTS)
-    #
-    # except Exception as ex:
-    #     exc_type, exc_obj, exc_tb = sys.exc_info()
-    #     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    #     template = "PROBLEM: an exception of type {0} occurred. Message:\n{1!r}"
-    #     message = template.format(type(ex).__name__, ex.args)
-    #     print(message, fname, exc_tb.tb_lineno)
-
     # We initiate the properties of the MTG "g":
-    g = model.initiate_mtg(random=True)
+    g = model.initiate_mtg(random=True,
+                           initial_segment_length=INITIAL_SEGMENT_LENGTH,
+                           initial_C_sucrose_root=INITIAL_C_SUCROSE_ROOT,
+                           initial_C_hexose_root=INITIAL_C_HEXOSE_ROOT
+                           )
 
     # We launch the main simulation program:
     simulation.main_simulation(g, simulation_period_in_days=SIMULATION_PERIOD, time_step_in_days=TIME_STEP,
@@ -201,6 +187,7 @@ def run_one_scenario(scenario_id=1, inputs_dir_path=None, outputs_dir_path='outp
                                ArchiSimple=ARCHISIMPLE_OPTION,
                                ArchiSimple_C_fraction=ARCHISIMPLE_C_FRACTION,
                                input_file=SCENARIO_INPUT_FILE,
+                               input_file_time_step_in_days=INPUT_FILE_TIME_STEP,
                                outputs_directory=scenario_dirpath,
                                forcing_constant_inputs=FORCING_INPUTS,
                                constant_sucrose_input_rate=SUCROSE_INPUT_RATE,
@@ -229,6 +216,7 @@ def run_one_scenario(scenario_id=1, inputs_dir_path=None, outputs_dir_path='outp
                                displayed_property=DISPLAYED_PROPERTY,
                                displayed_vmin=DISPLAYED_MIN_VALUE, displayed_vmax=DISPLAYED_MAX_VALUE,
                                log_scale=LOG_SCALE, cmap=COLOR_MAP,
+                               root_hairs_display=ROOT_HAIRS_DISPLAY,
                                x_center=X_CENTER, y_center=Y_CENTER, z_center=Z_CENTER, z_cam=Z_CAMERA,
                                camera_distance=CAMERA_DISTANCE, step_back_coefficient=STEP_BACK_COEFFICIENT,
                                camera_rotation=CAMERA_ROTATION_OPTION, n_rotation_points=CAMERA_ROTATION_N_POINTS)
@@ -240,15 +228,6 @@ def previous_outputs_clearing(clearing = False):
     if clearing:
         # If the output directory already exists:
         if os.path.exists('outputs'):
-            # print("Deleting the files in the 'outputs' folder...")
-            # # We delete all the directories and files that are already present inside:
-            # for root, dirs, files in os.walk('outputs'):
-            #     # We first remove all the files:
-            #     for file in files:
-            #         os.remove(os.path.join(root, file))
-            #     # # Then we remove empty folders:
-            #     # for dir in dirs:
-            #     #     os.rmdir(os.path.join(root, dir))
             try:
                 # We remove all files and subfolders:
                 print("Deleting the 'outputs' folder...")
@@ -263,16 +242,28 @@ def previous_outputs_clearing(clearing = False):
             os.mkdir('outputs')
     return
 
-def run_multiple_scenarios():
+def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx"):
 
-    # We read the data frame containing the different scenarios to be simulated:
-    print("Loading the instructions of scenarios...")
-    scenarios_df = pd.read_csv(os.path.join('inputs', 'scenarios_list.csv'), index_col='Scenario')
-    # We copy the list of scenarios' properties in the 'outputs' directory:
-    scenarios_df.to_csv(os.path.join('outputs', 'scenarios_list.csv'), na_rep='NA', index=False, header=True)
-    # We record the number of each scenario to be simulated:
-    scenarios_df['Scenario'] = scenarios_df.index
-    scenarios = scenarios_df.Scenario
+    # READING SCENARIO INSTRUCTIONS:
+    # FROM A CSV FILE where scenarios are present in different lines:
+    if os.path.splitext(scenarios_list)[1] == ".csv":
+        # We read the data frame containing the different scenarios to be simulated:
+        print("Loading the instructions of scenarios...")
+        scenarios_df = pd.read_csv(os.path.join('inputs', scenarios_list), index_col='Scenario')
+        # We copy the list of scenarios' properties in the 'outputs' directory:
+        scenarios_df.to_csv(os.path.join('outputs', 'scenarios_list.csv'), na_rep='NA', index=False, header=True)
+        # We record the number of each scenario to be simulated:
+        scenarios_df['Scenario'] = scenarios_df.index
+        scenarios = scenarios_df.Scenario
+    # FROM AN EXCEL FILE where scenarios are present in different columns:
+    elif os.path.splitext(scenarios_list)[1] == ".xlsx":
+        # We read the data frame containing the different scenarios to be simulated:
+        print("Loading the instructions of scenario(s)...")
+        scenarios_df = pd.read_excel(os.path.join('inputs', scenarios_list), sheet_name="scenarios_as_columns")
+        # We get a list of the names of the columns, which correspond to the scenarios' numbers:
+        scenarios = list(scenarios_df.columns)
+        # We remove the unnecessary names of the first 3 columns, so that scenarios only contains the scenario numbers:
+        del scenarios[0:3]
 
     # We record the starting time of the simulation:
     t_start = time.time()
@@ -282,6 +273,8 @@ def run_multiple_scenarios():
 
     # We run all scenarios in parallel:
     p.map(run_one_scenario, list(scenarios))
+    # WATCH OUT: p.map does not allow to have multiple arguments in the function to be run in parallel!!!
+    # Arguments of 'run_one_scenario' should be modifed directly in the default parameters of the function.
     p.terminate()
     p.join()
 
@@ -297,29 +290,33 @@ def run_multiple_scenarios():
 if __name__ == '__main__':
 # (Note: this condition avoids launching automatically the program when imported in another file)
 
-    #CALLING ONE SCENARIO ONLY:
-#     inputs = None
-#     outputs = None
-#     scenario = 1
-#
-#     try:
-#         opts, args = getopt.getopt(sys.argv[1:], "i:o:s:d", ["inputs=", "outputs=", "scenario="])
-#     except getopt.GetoptError as err:
-#         print(str(err))
-#         sys.exit(2)
-#
-#     for opt, arg in opts:
-#         if opt in ("-i", "--inputs"):
-#             inputs = arg
-#         elif opt in ("-o", "--outputs"):
-#             outputs = arg
-#         elif opt in ("-s", "--scenario"):
-#             scenario = int(arg)
-#
-#     run_one_scenario(inputs_dir_path=inputs, outputs_dir_path=outputs, scenario_id=scenario)
+    # # CASE 1 - CALLING ONE SCENARIO ONLY:
+    # #####################################
+    #
+    # inputs = None
+    # outputs = 'outputs'
+    # scenario = 4
+    #
+    # try:
+    #     opts, args = getopt.getopt(sys.argv[1:], "i:o:s:d", ["inputs=", "outputs=", "scenario="])
+    # except getopt.GetoptError as err:
+    #     print(str(err))
+    #     sys.exit(2)
+    # for opt, arg in opts:
+    #     if opt in ("-i", "--inputs"):
+    #         inputs = arg
+    #     elif opt in ("-o", "--outputs"):
+    #         outputs = arg
+    #     elif opt in ("-s", "--scenario"):
+    #         scenario = int(arg)
+    #
+    # run_one_scenario(inputs_dir_path=inputs, outputs_dir_path=outputs, scenario_id=scenario)
 
-    # CALLING MULTIPLE SCENARIOS:
+    # CASE 2 - CALLING MULTIPLE SCENARIOS:
+    ######################################
     # We can clear the folder containing previous outputs:
     previous_outputs_clearing(clearing=True)
-    # We run the scenarios in parallel:
-    run_multiple_scenarios()
+    # We run the scenarios in parallel :
+    # WATCH OUT: you will still need to manually modify the default arguments of 'run_one_scenarios',
+    # e.g. the name of the file where to read scenario instructions, even if you have entered it below!!!!!!!!!!!!!!!!!!
+    run_multiple_scenarios(scenarios_list="scenarios_list.xlsx")

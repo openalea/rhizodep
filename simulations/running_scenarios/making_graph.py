@@ -114,18 +114,21 @@ def treating_z_dataframe(directory='outputs',
         df2 = pd.DataFrame(df_sum[grouping_z_columns_by_property("net_struct_mass")])
         df3 = pd.DataFrame(df_sum[grouping_z_columns_by_property("net_root_necromass")])
         df4 = pd.DataFrame(df_sum[grouping_z_columns_by_property("net_hexose_exudation")])
+        df5 = pd.DataFrame(df_sum[grouping_z_columns_by_property("total_rhizodeposition")])
 
         # We convert the inputs into the proper units (gC m-2):
         df2 = df2 * 0.44 * plants_per_m2
         df3 = df3 * 0.44 * plants_per_m2
         df4 = df4 * 6 * 12.01 * plants_per_m2
+        df5 = df5 * 6 * 12.01 * plants_per_m2
 
         df1.reset_index(drop=True, inplace=True)
         df2.reset_index(drop=True, inplace=True)
         df3.reset_index(drop=True, inplace=True)
         df4.reset_index(drop=True, inplace=True)
+        df5.reset_index(drop=True, inplace=True)
 
-        frames = [df1, df2, df3, df4]
+        frames = [df1, df2, df3, df4, df5]
         df_input = pd.concat(frames, axis=1, sort=False, ignore_index=False)
         input_by_day_path = os.path.join(directory, 'z_classification_input_by_day.csv')
         df_input.to_csv(input_by_day_path, na_rep='NA', index=False, header=True)
@@ -461,24 +464,24 @@ def plotting_on_z_stacked(input_file_path='z_classification.csv',
 
 # For creating plots of cumulated inputs over time for a list of scenarios:
 # -------------------------------------------------------------------------
-scenario_numbers=[1, 2, 3, 4]
+scenario_numbers=[1]
 for i in scenario_numbers:
 
     scenario_name = 'Scenario_%.4d' % i
     targeted_path=os.path.join('outputs', scenario_name)
 
     treating_z_dataframe(directory=targeted_path,
-                         z_min=0., z_max=1., z_interval=0.1,
-                         plants_per_m2=35,
+                         z_min=0., z_max=0.5, z_interval=0.05,
+                         plants_per_m2=240,
                          input_treatment=True)
     plotting_on_z_stacked(input_file_path=os.path.join(targeted_path,'z_classification_cum_input_by_day.csv'),
-                          property=['cum_net_hexose_exudation', 'cum_net_root_necromass'],
-                          label=['Exudates', 'Dead roots'],
+                          property=['cum_total_rhizodeposition', 'cum_net_root_necromass'],
+                          label=['Rhizodeposits', 'Dead roots'],
                           color=['royalblue', 'darkkhaki'],
                           title="\n Cumulated root-derived C inputs (gC m-2) per 5-cm layer",
-                          z_min=0., z_max=1., z_interval=0.1,
+                          z_min=0., z_max=0.5, z_interval=0.05,
                           value_min=0,
-                          value_max=0.6,
+                          value_max=1.,
                           log=False,
                           recording_images=True,
                           outputs_path=targeted_path
