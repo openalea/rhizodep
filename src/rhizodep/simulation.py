@@ -22,6 +22,7 @@ import rhizodep.parameters as param
 
 import pickle
 
+# TODO: explicitly add 'surfaces_and_volumes()' in the sequence of modelling!
 
 # We define the main simulation program:
 def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
@@ -34,6 +35,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     nodules=False,
                     root_order_limitation=False,
                     root_order_treshold=2,
+                    using_solver=False,
+                    printing_solver_outputs=False,
                     specific_model_option=None,
                     simulation_results_file='simulation_results.csv',
                     recording_interval_in_days=5,
@@ -526,7 +529,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                          soil_temperature_in_Celsius=soil_temperature,
                                          printing_warnings=printing_warnings)
 
-                # We proceed to the segmentation of the whole root system (NOTE: segmentation should always occur AFTER actual growth):
+                # We proceed to the segmentation of the whole root system
+                # (NOTE: segmentation should always occur AFTER actual growth):
                 model.segmentation_and_primordia_formation(g, time_step_in_seconds, printing_warnings=printing_warnings,
                                                            soil_temperature_in_Celsius=soil_temperature, random=random,
                                                            nodules=nodules,
@@ -538,87 +542,73 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # CASE 2: WE PERFORM THE COMPLETE MODEL WITH C BALANCE IN EACH ROOT ELEMENT
                 # --------------------------------------------------------------------------
 
+                # 2a - ROOT GROWTH
+                # ================
+
                 # We reset to 0 all growth-associated C costs and initialize the initial dimensions or masses:
                 model.reinitializing_growth_variables(g)
 
-                # Calculation of potential growth without consideration of available hexose:
+                # We calculate the potential growth of the root system without consideration of the amount of available hexose:
                 model.potential_growth(g, time_step_in_seconds=time_step_in_seconds,
-                                       radial_growth=radial_growth,
-                                       soil_temperature_in_Celsius=soil_temperature,
-                                       ArchiSimple=False)
+                                         radial_growth=radial_growth,
+                                         soil_temperature_in_Celsius=soil_temperature,
+                                         ArchiSimple=False)
 
-                # Calculation of actual growth based on the hexose remaining in the roots,
-                # and corresponding consumption of hexose in the root:
+                # We calculate the actual growth based on the amount of hexose remaining in the roots, and we record
+                # the corresponding consumption of hexose in the root:
                 model.actual_growth_and_corresponding_respiration(g, time_step_in_seconds=time_step_in_seconds,
-                                                                  soil_temperature_in_Celsius=soil_temperature,
-                                                                  printing_warnings=printing_warnings)
+                                                                    soil_temperature_in_Celsius=soil_temperature,
+                                                                    printing_warnings=printing_warnings)
 
-                # We proceed to the segmentation of the whole root system (NOTE: segmentation should always occur AFTER actual growth):
+                # 2b - NEW GEOMETRY
+                # =================
+
+                # We proceed to the segmentation of the whole root system
+                # (NOTE: segmentation should always occur AFTER actual growth):
                 model.segmentation_and_primordia_formation(g, time_step_in_seconds,
-                                                           soil_temperature_in_Celsius=soil_temperature,
-                                                           random=random,
-                                                           nodules=nodules,
-                                                           root_order_limitation=root_order_limitation,
-                                                           root_order_treshold=root_order_treshold)
-                # We re-calculate the distance to tip for each root element:
-                model.dist_to_tip(g)
-                # We modifiy root hairs characteristics:
+                                                             soil_temperature_in_Celsius=soil_temperature,
+                                                             random=random,
+                                                             nodules=nodules,
+                                                             root_order_limitation=root_order_limitation,
+                                                             root_order_treshold=root_order_treshold)
+
+                # We update the distance from tip for each root element in each root axis:
+                model.update_distance_from_tip(g)
+
+                # We update the surfaces and the volume for each root element in each root axis:
+                model.update_surfaces_and_volumes(g)
+
+                # 2c - SPECIFIC ROOT HAIR DYNAMICS
+                # ================================
+
+                # We modifiy root hairs characteristics according to their specific dynamics:
                 model.root_hairs_dynamics(g, time_step_in_seconds=time_step_in_seconds,
                                           soil_temperature_in_Celsius=soil_temperature,
                                           printing_warnings=printing_warnings)
 
-                # Consumption of hexose, mucilage and root cells at the soil/root interface:
-                model.soil_hexose_degradation(g, time_step_in_seconds=time_step_in_seconds,
-                                              soil_temperature_in_Celsius=soil_temperature,
-                                              printing_warnings=printing_warnings)
-                model.soil_mucilage_degradation(g, time_step_in_seconds=time_step_in_seconds,
-                                                 soil_temperature_in_Celsius=soil_temperature,
-                                                 printing_warnings=printing_warnings)
-                model.soil_cells_degradation(g, time_step_in_seconds=time_step_in_seconds,
-                                             soil_temperature_in_Celsius=soil_temperature,
-                                             printing_warnings=printing_warnings)
+                # 2d - CARBON EXCHANGE
+                # ====================
 
-                # Transfer of hexose from the root to the soil, consumption of hexose inside the root:
-                model.root_hexose_exudation(g, time_step_in_seconds=time_step_in_seconds,
-                                            soil_temperature_in_Celsius=soil_temperature,
-                                            printing_warnings=printing_warnings)
-                # Transfer of hexose from the soil to the root, consumption of hexose in the soil:
-                model.root_hexose_uptake(g, time_step_in_seconds=time_step_in_seconds,
-                                         soil_temperature_in_Celsius=soil_temperature,
-                                         printing_warnings=printing_warnings)
-                # Secretion of mucilage from the root, consumption of hexose inside the root:
-                model.root_mucilage_secretion(g, time_step_in_seconds=time_step_in_seconds,
-                                              soil_temperature_in_Celsius=soil_temperature,
-                                              printing_warnings=printing_warnings)
-                # Release of root epidermal cells, consumption of hexose inside the root:
-                model.root_cells_release(g, time_step_in_seconds=time_step_in_seconds,
-                                         soil_temperature_in_Celsius=soil_temperature,
-                                         printing_warnings=printing_warnings)
-
-                # Consumption of hexose in the root by maintenance respiration:
-                model.maintenance_respiration(g, time_step_in_seconds=time_step_in_seconds,
-                                              soil_temperature_in_Celsius=soil_temperature,
-                                              printing_warnings=printing_warnings)
-
-                # Unloading of sucrose from phloem and conversion of sucrose into hexose:
-                model.exchange_with_phloem(g, time_step_in_seconds=time_step_in_seconds,
-                                           soil_temperature_in_Celsius=soil_temperature,
-                                           printing_warnings=printing_warnings)
-
-                # Net immobilization of hexose within a reserve pool:
-                model.exchange_with_reserve(g, time_step_in_seconds=time_step_in_seconds,
-                                            soil_temperature_in_Celsius=soil_temperature,
-                                            printing_warnings=printing_warnings)
-
-                # Calculation of the new concentrations in hexose and sucrose once all the processes have been done:
-                tip_C_hexose_root = model.balance(g, printing_warnings=printing_warnings)
+                # We now proceed to all the exchanges of C for each root element in each root axis
+                # (NOTE: the supply of the shoot is excluded in this calculation):
+                tip_C_hexose_root = \
+                    model.C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(
+                        g,
+                        time_step_in_seconds=time_step_in_seconds,
+                        soil_temperature_in_Celsius=soil_temperature,
+                        using_solver=using_solver,
+                        printing_solver_outputs=printing_solver_outputs,
+                        printing_warnings=printing_warnings)
+                # NOTE: we also use this function to record specifically the concentration of hexose in the root apex
+                # of the primary root!
 
                 # Supply of sucrose from the shoots to the roots and spreading into the whole phloem:
                 model.shoot_sucrose_supply_and_spreading(g, sucrose_input_rate=sucrose_input_rate,
                                                          time_step_in_seconds=time_step_in_seconds,
                                                          printing_warnings=printing_warnings)
-                # WARNING: The function "shoot_sucrose_supply_and_spreading" must be called AFTER the function "balance",!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                # WARNING: The function "shoot_sucrose_supply_and_spreading" must be called AFTER the function "balance",
                 # otherwise the deficit in sucrose may be counted twice!!!
+                # TODO: check this affirmation about the position of shoot_sucrose_supply_and_spreading
 
                 # # OPTIONAL: checking of possible anomalies in the root system:
                 # model.control_of_anomalies(g)
