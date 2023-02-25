@@ -2,8 +2,8 @@
 import numpy as np
 import pandas as pd
 import os
-import rhizodep.simulation as simulation
-import rhizodep.model as model
+import rhizodep.simulation_2 as simulation
+import rhizodep.model_2 as model
 
 # outputs directory path:
 OUTPUTS_DIRPATH = 'outputs'

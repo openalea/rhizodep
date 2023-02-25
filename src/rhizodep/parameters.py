@@ -462,6 +462,11 @@ Km_secretion = Km_loading/2.
 gamma_secretion = 1
 # => We assume that the mucilage secretion rapidly decreases when moving away from the apex.
 
+# Maximal surfacic concentration of mucilage at the soil-root interface, above which no mucilage secretion is possible:
+#----------------------------------------------------------------------------------------------------------------------
+# (in mol of equivalent-hexose per m2 of external surface):
+Cs_mucilage_soil_max = 10. # TODO: do a real estimation!
+
 #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Parameters for root cells release:
 #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -485,13 +490,10 @@ surfacic_cells_release_rate_C = 1
 # => This corresponds to a bell-shape where the maximum is obtained at 31 degree Celsius, obtained by fitting the data
 # from Clowes and Wadekar (1988) on Zea mays roots between 15 and 35 degree.
 
-# Maximal concentration of root cells in soil, above which no release of cells is possible
-#-----------------------------------------------------------------------------------------
-# (in mol of equivalent-hexose per gram of dry structural mass):
-C_cells_soil_max = 0.1 * 0.44 / 12.01 / 6.
-# We assume that this treshold corresponds to 10%, i.e. no biomass higher than 10% of the dry structural mass of the cap
-# (i.e. 0.1 g of dry structural mass per gram of root dry structural mass) can accumulate at the external surface of the
-# cap.
+# Maximal surfacic concentration of root cells in soil, above which no release of cells is possible
+#--------------------------------------------------------------------------------------------------
+# (in mol of equivalent-hexose per m2 of root external surface):
+Cs_cells_soil_max = 10 # TODO: do a real estimation!
 
 #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Parameters for soil degradation of root-released materials:
@@ -499,14 +501,14 @@ C_cells_soil_max = 0.1 * 0.44 / 12.01 / 6.
 
 # Maximum degradation rate of hexose in soil (in mol of hexose per m2 per s):
 #----------------------------------------------------------------------------
-hexose_degradation_rate_max = uptake_rate_max * 10.
+soil_hexose_degradation_rate_max = uptake_rate_max * 10.
 # => We assume that the maximum degradation rate is 10 times higher than the maximum uptake rate
 # Temperature dependence for this parameter:
 #"""""""""""""""""""""""""""""""""""""""""""
-hexose_degradation_rate_max_T_ref = 20
-hexose_degradation_rate_max_A = 0
-hexose_degradation_rate_max_B = 3.98
-hexose_degradation_rate_max_C = 1
+soil_hexose_degradation_rate_max_T_ref = 20
+soil_hexose_degradation_rate_max_A = 0
+soil_hexose_degradation_rate_max_B = 3.98
+soil_hexose_degradation_rate_max_C = 1
 # => The value for B (Q10) has been fitted from the evolution of Vmax measured by Coody et al. (1986, SBB),
 # who provided the evolution of the maximal uptake of glucose by soil microorganisms at 4, 12 and 25 degree C.
 
@@ -518,14 +520,14 @@ Km_hexose_degradation = Km_uptake / 2.
 
 # Maximum degradation rate of mucilage in soil (in mol of equivalent-hexose per m2 per s):
 #-----------------------------------------------------------------------------------------
-mucilage_degradation_rate_max = hexose_degradation_rate_max
+soil_mucilage_degradation_rate_max = soil_hexose_degradation_rate_max
 # => We assume that the maximum degradation rate for mucilage is equivalent to the one defined for hexose.
 # Temperature dependence for this parameter:
 #"""""""""""""""""""""""""""""""""""""""""""
-mucilage_degradation_rate_max_T_ref = hexose_degradation_rate_max_T_ref
-mucilage_degradation_rate_max_A = hexose_degradation_rate_max_A
-mucilage_degradation_rate_max_B = hexose_degradation_rate_max_B
-mucilage_degradation_rate_max_C = hexose_degradation_rate_max_C
+soil_mucilage_degradation_rate_max_T_ref = soil_hexose_degradation_rate_max_T_ref
+soil_mucilage_degradation_rate_max_A = soil_hexose_degradation_rate_max_A
+soil_mucilage_degradation_rate_max_B = soil_hexose_degradation_rate_max_B
+soil_mucilage_degradation_rate_max_C = soil_hexose_degradation_rate_max_C
 # => We assume that all other parameters for mucilage degradation are identical to the ones for hexose degradation.
 
 # Affinity constant for soil mucilage degradation (in mol of hexose per g of struct_mass):
@@ -535,14 +537,14 @@ Km_mucilage_degradation = Km_hexose_degradation
 
 # Maximum degradation rate of root cells at the soil/root interface (in mol of equivalent-hexose per m2 per s):
 #---------------------------------------------------------------------------------------------------------
-cells_degradation_rate_max = hexose_degradation_rate_max / 2.
+soil_cells_degradation_rate_max = soil_hexose_degradation_rate_max / 2.
 # => We assume that the maximum degradation rate for cells is equivalent to the half of the one defined for hexose.
 # Temperature dependence for this parameter:
 #"""""""""""""""""""""""""""""""""""""""""""
-cells_degradation_rate_max_T_ref = hexose_degradation_rate_max_T_ref
-cells_degradation_rate_max_A = hexose_degradation_rate_max_A
-cells_degradation_rate_max_B = hexose_degradation_rate_max_B
-cells_degradation_rate_max_C = hexose_degradation_rate_max_C
+soil_cells_degradation_rate_max_T_ref = soil_hexose_degradation_rate_max_T_ref
+soil_cells_degradation_rate_max_A = soil_hexose_degradation_rate_max_A
+soil_cells_degradation_rate_max_B = soil_hexose_degradation_rate_max_B
+soil_cells_degradation_rate_max_C = soil_hexose_degradation_rate_max_C
 # => We assume that all other parameters for cells degradation are identical to the ones for hexose degradation.
 
 # Affinity constant for soil cells degradation (in mol of equivalent-hexose per g of struct_mass):

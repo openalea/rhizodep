@@ -16,18 +16,17 @@ import multiprocessing as mp
 import shutil
 import time
 
-import rhizodep.tools as tools
+import rhizodep.model as model
 import rhizodep.simulation as simulation
 import rhizodep.parameters as param
-import rhizodep.model as model
-
+import rhizodep.tools as tools
 
 def run_one_scenario(scenario_id=1,
                      inputs_dir_path=None,
                      outputs_dir_path='outputs',
                      scenarios_list="scenarios_list.xlsx"):
     """
-    Run main_simulation() of simulation.py using parameters of a specific scenario
+    Run main_simulation() of simulation_old.py using parameters of a specific scenario
 
     :param int scenario_id: the index of the scenario to be read in the file containing the list of scenarios
     :param str inputs_dir_path: the path directory of inputs
@@ -135,6 +134,8 @@ def run_one_scenario(scenario_id=1,
     NODULES_OPTION = scenario_parameters.get('nodules_option', False)
     ROOT_ORDER_LIMITATION_OPTION = scenario_parameters.get('root_order_limitation', False)
     ROOT_ORDER_TRESHOLD = scenario_parameters.get('root_order_treshold', 2)
+    USING_SOLVER = scenario_parameters.get('using_solver', False)
+    PRINTING_SOLVER_OUTPUTS = scenario_parameters.get('printing_solver_outputs', False)
     SPECIFIC_MODEL_OPTION = scenario_parameters.get('specific_model_option', None)
     FORCING_INPUTS = scenario_parameters.get('forcing_constant_inputs', False)
     SUCROSE_INPUT_RATE = scenario_parameters.get('constant_sucrose_input_rate', 5e-9)
@@ -174,6 +175,10 @@ def run_one_scenario(scenario_id=1,
     RECORDING_MTG_PROPERTIES_OPTION = scenario_parameters.get('recording_MTG_properties', False)
     RANDOM_OPTION = scenario_parameters.get('random', True)
 
+    if USING_SOLVER:
+        print("NOTE: a solver will be used to compute the balance between C pools within each time step!")
+        print("")
+
     # We initiate the properties of the MTG "g":
     g = model.initiate_mtg(random=True,
                            initial_segment_length=INITIAL_SEGMENT_LENGTH,
@@ -195,6 +200,8 @@ def run_one_scenario(scenario_id=1,
                                nodules=NODULES_OPTION,
                                root_order_limitation=ROOT_ORDER_LIMITATION_OPTION,
                                root_order_treshold=ROOT_ORDER_TRESHOLD,
+                               using_solver=USING_SOLVER,
+                               printing_solver_outputs=PRINTING_SOLVER_OUTPUTS,
                                specific_model_option=SPECIFIC_MODEL_OPTION,
                                simulation_results_file='simulation_results.csv',
                                z_classification=CLASSIFICATION_BY_LAYERS,
