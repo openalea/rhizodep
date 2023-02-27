@@ -37,7 +37,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     root_order_treshold=2,
                     using_solver=False,
                     printing_solver_outputs=False,
-                    specific_model_option=None,
                     simulation_results_file='simulation_results.csv',
                     recording_interval_in_days=5,
                     recording_images=False,
@@ -59,7 +58,60 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     root_hairs_display=True,
                     x_center=0, y_center=0, z_center=-1, z_cam=-1,
                     camera_distance=10., step_back_coefficient=0., camera_rotation=False, n_rotation_points=24 * 5):
-    # TODO: docstring
+    """
+    This general function controls the actual simulation of root growth and C fluxes over the whole simulation period.
+    :param g: the root MTG to consider
+    :param simulation_period_in_days: the length of the simulation period (days)
+    :param time_step_in_days: the regular time step over the simulation (days)
+    :param radial_growth: if True, radial growth will be enabled
+    :param ArchiSimple: if True, only original ArchiSimple rules will be used, without C fluxes
+    :param ArchiSimple_C_fraction: in case of ArchiSimple only, this fraction is used to determine the fraction of the incoming C that us actually used to produce “root biomass”
+    :param input_file: the path/name of the CSV file where inputs (sucrose and temperature) are read
+    :param input_file_time_step_in_days: the time step used in the input file (days)
+    :param outputs_directory: the name of the folder where simulation outputs will be registered
+    :param forcing_constant_inputs: if True, input file will be ignored and a constant sucrose input rate and a constant soil temperature will be applied as inputs
+    :param constant_sucrose_input_rate: input of sucrose applied at every time step (mol of sucrose per second per plant)
+    :param constant_soil_temperature_in_Celsius: soil temperature applied to every root at every time step (degree Celsius)
+    :param nodules: if True, a new type of element - “nodule” - that feeds from the mobile hexose of a mother root will be simulated
+    :param root_order_limitation: if True, lateral roots of higher orders will not be formed
+    :param root_order_treshold: root order above which no lateral roots can be formed
+    :param using_solver: if True, a solver will be used to compute C fluxes and concentrations
+    :param printing_solver_outputs: if True, the intermediate calculations of the solver will be printed for each root element
+    :param simulation_results_file: the name of the CSV file where outputs will be written
+    :param recording_interval_in_days: the time interval of distinct recordings of the current simulation (useful for checking the outputs while the simulation is still running)
+    :param recording_images: if True, every PlantGL graph will be recorded as an image
+    :param root_images_directory: the name of the folder where root images will be registered
+    :param z_classification: if True, root variables will be intercepted and summed within distinct z-layers of the soil
+    :param z_min: the upper z-coordinate in the soil, at which we start to compute root data
+    :param z_max: the lower z-coordinate in the soil, at which we stop to compute root data
+    :param z_interval: the thickness of each soil layer, in which root data will be individually computed
+    :param z_classification_file: the name of the CSV file where z-classified root data will be registered
+    :param printing_sum: if True, more variables summed over the whole root system will be printed.
+    :param recording_sum: if True, variables summed over the whole root system will be registered in a file
+    :param printing_warnings: if True, warning messages will be printed, if any
+    :param recording_g: if True, the root MTG will be recorded as a pickle file for each time step
+    :param g_directory: the name of the folder where MTG files are recorded
+    :param recording_g_properties: if True, all the properties of all the root elements of the root MTG will be registered in a file
+    :param g_properties_directory: the name of the folder where MTG properties are recorded
+    :param random: if True, stochastic data will be simulated (e.g. variations of angles and diameters)
+    :param plotting: if True, a PlantGL graph is generated and displayed at each time step
+    :param scenario_id: indicates the scenario identifier to which the current printing relates (useful when running different scenarios in parallel)
+    :param displayed_property: name of the property to be displayed on the PlantGL graph
+    :param displayed_vmin: the minimum value of the scale used to display the property in the PlantGL graph
+    :param displayed_vmax: the maximum value of the scale used to display the property in the PlantGL graph
+    :param log_scale: if True, the scale of values displayed in the PlantGL Graph will be in log-scale
+    :param cmap: name of the color map to be used when displaying the property in the PlantGL graph
+    :param root_hairs_display: if True, root hairs density will be displayed on the PlantGL graph
+    :param x_center: x-coordinate of the center of the PlantGL graph
+    :param y_center: y-coordinate of the center of the PlantGL graph
+    :param z_center: z-coordinate of the center of the PlantGL graph
+    :param z_cam: z-coordinate of the camera looking at the center of the PlantGL graph
+    :param camera_distance: distance between the camera and the center of the PlantGL graph
+    :param step_back_coefficient: if this coefficient is not 0, the distance between the camera and the center of the PlantGL graph will be proportionally increased at every time step (useful when the MTG gets too large)
+    :param camera_rotation: if True, the camera will rotate around the center of the PlantGL graph
+    :param n_rotation_points: number of intermediates positions of the camera when rotating around the center of the PlantGL graph before coming back to the same position
+    :return:
+    """
 
     # We convert the time step in seconds:
     time_step_in_seconds = time_step_in_days * 60. * 60. * 24.
@@ -242,8 +294,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         with open(g_file_name % step, 'wb') as output_file:
             pickle.dump(g, output_file, protocol=2)
 
-    # For recording the properties of g in a csv file:
-    # ------------------------------------------------
+    # For recording the properties of g in a csv file at each time step :
+    # -------------------------------------------------------------------
     if recording_g_properties:
         prop_file_name = os.path.join(g_properties_directory, 'root%.5d.csv')
         model.recording_MTG_properties(g, file_name=prop_file_name % step)
@@ -673,8 +725,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 with open(g_file_name % step, 'wb') as output:
                     pickle.dump(g, output, protocol=2)
 
-            # For recording the properties of g in a csv file:
-            # --------------------------------------------------
+            # For recording the properties of g in a csv file at each time step:
+            # ------------------------------------------------------------------
             if recording_g_properties:
                 prop_file_name = os.path.join(g_properties_directory, 'root%.5d.csv')
                 model.recording_MTG_properties(g, file_name=prop_file_name % step)

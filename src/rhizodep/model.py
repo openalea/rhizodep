@@ -48,24 +48,26 @@ import rhizodep.parameters as param
 # FUNCTIONS FOR CALCULATING PROPERTIES ON THE MTG
 #################################################
 
-# Defining the different surfaces and volumes of a given root element:
-# --------------------------------------------------------------------
-def surfaces_and_volumes(g, element, radius, length):
+# Defining the volume and external surface of a given root element:
+# -----------------------------------------------------------------
+def volume_and_external_surface_from_radius_and_length(g, element, radius, length):
     """
-    The function "surfaces_and_volumes" computes different surfaces (m2) and volumes (m3) of a root element,
-    based on the properties radius (m) and length (m).
+    This function computes the volume (m3) of a root element and its external surface (excluding possible root hairs)
+    based on the properties radius (m) and length (m) and possibly on its type.
     :param g: the investigated MTG
     :param element: the investigated node of the MTG
-    :param radius: the radius of the root element (m)
-    :param length: the length of the root element (m)
-    :return: a dictionary containing the calculated surfaces and volumes of the given element
+    :return: a dictionary containing the volume and the external surface of the given element
     """
 
+    # READING THE VALUES:
+    #--------------------
     n = element
     vid = n.index()
     number_of_children = n.nb_children()
 
-    # CALCULATIONS OF EXTERNAL SURFACE AND VOLUME:
+    # CALCULATIONS OF EXTERNAL SURFACE AND VOLUME
+    #############################################
+
     # If the root element corresponds to an apex or a segment without lateral roots:
     if number_of_children == 0 or number_of_children == 1:
         external_surface = 2 * pi * radius * length
@@ -77,41 +79,282 @@ def surfaces_and_volumes(g, element, radius, length):
         for child_vid in g.Sons(vid, EdgeType='+'):
             son = g.node(child_vid)
             # We avoid to remove the section of the sphere of a nodule:
-            # TODO: Should the section of a son nodule be removed from the section of the mother element?
+            # TODO: Should the section of a son nodule also be removed from the section of the mother element?
             if son.type != "Root_nodule":
                 sum_ramif_sections += pi * son.radius ** 2
         # And we subtract this sum of sections from the external area of the main cylinder:
         external_surface = 2 * pi * radius * length - sum_ramif_sections
         volume = pi * radius ** 2 * length
+        # NOTE: we consider that there is no "dead" volume in the cylinder, even when a lateral root occupies part of
+        # the mother root element. The volume of the daughter root included within the mother root element is assumed to
+        # belong to the mother root element.
 
     # SPECIAL CASE FOR NODULE:
+    ##########################
+    
     if n.type == "Root_nodule":
         # We consider the surface and volume of a sphere:
         external_surface = 4 * pi * radius ** 2
         volume = 4 / 3. * pi * radius ** 3
 
-    # CALCULATIONS OF THE TOTAL EXCHANGE SURFACE OF PHLOEM VESSELS:
+    # CREATION OF A DICTIONARY THAT WILL BE USED TO RECORD THE OUTPUTS:
+    ###################################################################
+    dictionary = {"volume": volume, "external_surface": external_surface}
+
+    # NOTE: the volume and external surface of the element have not been updated at this stage!
+    return dictionary
+
+# Defining specific surfaces of exchange within a root element:
+# -------------------------------------------------------------
+def specific_surfaces(element):
+    """
+    This function estimates the differents surfaces within the root section, e.g. from phloem vessels, stelar parenchyma, 
+    cortical parenchyma and epidermal parenchyma.
+    :param element: the root element to be considered
+    :return: the updated root element
+    """
+
+    # READING THE VALUES:
+    # --------------------
+    n = element
+    external_surface = n.external_surface
+
+    # TODO: Improve the calculation of phloem surface and stellar/cortical/epidermal surfaces, e.g. taking into 
+    #  account an age factor?
+
+    # PHLOEM VESSELS:
+    # We assume that the total surface of the phloem vessels is proportional to the external surface:
     phloem_surface = param.phloem_surfacic_fraction * external_surface
 
-    # CALCULATIONS OF THE TOTAL EXCHANGE SURFACE BETWEEN ROOT SYMPLASM AND APOPLASM:
-    # We consider that the total surface of exchange with the symplasm corresponds to the fraction of symplasm
-    # inside the root cylinder, which is proportional to the external surfaceof that cylinder
-    # (we therefore EXCLUDE root hairs surface):
-    symplasm_surface = param.symplasm_surfacic_fraction * external_surface
+    # STELAR PARENCHYMA:
+    stelar_parenchyma_surface = param.stelar_parenchyma_surfacic_fraction * external_surface
 
-    # CREATION OF A DICTIONARY THAT WILL BE USED TO RECORD THE OUTPUTS:
-    dictionary = {"volume": volume,
-                  "external_surface": external_surface,
-                  "phloem_surface": phloem_surface,
-                  "symplasm_surface": symplasm_surface
-                  }
+    # CORTICAL PARENCHYMA:
+    cortical_parenchyma_surface = param.cortical_parenchyma_surfacic_fraction * external_surface
 
-    # TODO: add the endodermis and exodermis barriers!
+    # EPIDERMIS (WITHOUT ROOT HAIRS !!!):
+    epidermis_surface_without_hairs = param.epidermal_parenchyma_surfacic_fraction * external_surface
+
+    # RECORDING THE VALUES:
+    # ----------------------
+    n.phloem_surface = phloem_surface
+    n.stelar_parenchyma_surface = stelar_parenchyma_surface
+    n.cortical_parenchyma_surface = cortical_parenchyma_surface
+    n.epidermis_surface_without_hairs = epidermis_surface_without_hairs
+
+    return n
+
+# Function for calculating, any given distance from root tip, the relative conductances of the endo- and exodermis:
+#------------------------------------------------------------------------------------------------------------------
+def endodermis_and_exodermis_conductances_as_a_function_of_x(distance_from_tip,
+                                                             starting_distance_endodermis,
+                                                             starting_distance_exodermis):
+    """
+    This simple function caclulates what should be the relative conductance of the endodermis and exodermis barriers,
+    based on the distance from root tip.
+    :param distance_from_tip: the distance from root tip (meter)
+    :param starting_distance_endodermis: the distance at which the endodermis starts to mature (meter)
+    :param starting_distance_exodermis: the distance at which the exodermis starts to mature (meter)
+    :return: a dictionary containing conductance_endodermis and conductance_exodermis
+    """
+    # TODO: Find a better way to describe how endodermis and exodermis barriers are formed along the root. In particular,
+    #  consider using root segment age instead of the distance from the tip!
+
+    # ENDODERMIS:
+    # Above the starting distance, we consider that the conductance rapidly decreases as the endodermis is formed:
+    if distance_from_tip > starting_distance_endodermis:
+        conductance_endodermis = starting_distance_endodermis / distance_from_tip
+    # Below the starting distance, the conductance is necessarily maximal:
+    else:
+        conductance_endodermis = 1
+
+    # EXODERMIS:
+    # Above the starting distance, we consider that the conductance rapidly decreases as the exodermis is
+    # formed:
+    if distance_from_tip > starting_distance_exodermis:
+        conductance_exodermis = starting_distance_exodermis / distance_from_tip
+    # Below the starting distance, the conductance is necessarily maximal:
+    else:
+        conductance_exodermis = 1
+
+    # We create a dictionary containing the values of the two conductances:
+    dictionary = {"conductance_endodermis": conductance_endodermis, "conductance_exodermis": conductance_exodermis}
+
     return dictionary
+
+# Function that integrates length-dependent values of endodermis and exodermis conductances between two points:
+#--------------------------------------------------------------------------------------------------------------
+def root_barriers_length_integrator(length_start,
+                                    length_stop,
+                                    number_of_length_steps,
+                                    starting_distance_endodermis,
+                                    starting_distance_exodermis):
+    """
+    This function calculates the mean conductance of endodermis and exodermis along a specified length, by sub-dividing
+    this length into little subsegments, and by eventually summing their individual, weighted conductances.
+    :param length_start: the position along the root where calculations start
+    :param length_stop: the position along the root where calculations stop
+    :param number_of_length_steps: the number of intermediate positions to compute along the path to get a good estimation of the mean conductances
+    :param starting_distance_endodermis: the distance at which the endodermis starts to mature (meter)
+    :param starting_distance_exodermis: the distance at which the exodermis starts to mature (meter)
+    :return: a dictionary containing conductance_endodermis and conductance_exodermis
+    """
+
+    # We calculate the length step, by which we will progressively increase length between start and stop:
+    length_step = (length_stop - length_start) / number_of_length_steps
+
+    # We initialize the value to be computed:
+    integrated_value_endodermis = 0.
+    integrated_value_exodermis = 0.
+   # We initialize the progressive_length:
+    progressive_length = length_start + length_step / 2.
+
+    # We cover the whole distance between length_start and length_stop, by the number of steps specified.
+    # For each new sublength:
+    for i in range(0, number_of_length_steps):
+        # The new conductances are calculated in the middle of the current sub-length:
+        dict_cond = endodermis_and_exodermis_conductances_as_a_function_of_x(distance_from_tip = progressive_length,
+                                                                             starting_distance_endodermis =  starting_distance_endodermis,
+                                                                             starting_distance_exodermis = starting_distance_exodermis)
+        # The integrated values for endodermis and exodermis conductances are increased:
+        integrated_value_endodermis += dict_cond['conductance_endodermis'] / number_of_length_steps
+        integrated_value_exodermis += dict_cond['conductance_exodermis'] / number_of_length_steps
+
+        # We move the length to the next length step:
+        progressive_length += length_step
+
+    # We create a dictionary containing the values of the two conductances:
+    dictionary = {"conductance_endodermis": integrated_value_endodermis, "conductance_exodermis": integrated_value_exodermis}
+
+    return dictionary
+
+def transport_barriers(g, n):
+    """
+    This function computes the actual relative conductances of cell walls, endodermis and exodermis for a given root element.
+    :param g: the root MTG to work on
+    :param n: the root element where calculations will be made
+    :return: the updated element n with the new relative conductances
+    """
+
+    # READING THE VALUES:
+    #--------------------
+    vid = n.index()
+    number_of_children = n.nb_children()
+    length = n.length
+    radius = n.radius
+    distance_from_tip = n.distance_from_tip
+
+    # CELL WALLS RESISTANCE INCREASED IN THE MERISTEMATIC ZONE:
+    # ---------------------------------------------------------
+
+    meristem_zone_length = param.meristem_limite_zone_factor * radius
+    relative_conductance_at_meristem = param.relative_conductance_at_meristem
+    # We assume that the relative conductance of cell walls is homogeneously reduced over the length of the meristem
+    # zone, and then is maximal, i.e. equal to 1.
+    # If the current element encompasses part of all of the meristem zone:
+    if (distance_from_tip - length) < meristem_zone_length:
+        # Then we calculate the fraction of the length of the current element where the meristem is present:
+        fraction_of_meristem_zone = 1 - (distance_from_tip - length) / meristem_zone_length
+        # And the relative conductance of the cell walls in the whole element is a linear combination of the meristem
+        # zone and the non-meristem zone:
+        relative_conductance_walls = relative_conductance_at_meristem * fraction_of_meristem_zone \
+                                     + 1. * (1 - fraction_of_meristem_zone)
+    else:
+        # Otherwise, the relative conductance of the cell walls is considered to be 1 by definition.
+        relative_conductance_walls = 1.
+
+    # BARRIERS OF ENDODERMIS & EXODERMIS:
+    #------------------------------------
+
+    # We define the length over which the endodermis has not started to form:
+    zone_without_endodermis = param.endodermis_limite_zone_factor * radius
+    # We define the length over which the exodermis has not started to form:
+    zone_without_exodermis = param.exodermis_limite_zone_factor * radius
+
+    # We call a function that integrates the values of relative conductances between the beginning and the end of the
+    # root element, knowing the evolution of the conductances with x (the distance from root tip):
+    dict_cond = root_barriers_length_integrator(length_start = distance_from_tip - length,
+                                                length_stop = distance_from_tip,
+                                                number_of_length_steps = 10,
+                                                starting_distance_endodermis = zone_without_endodermis,
+                                                starting_distance_exodermis = zone_without_exodermis)
+    relative_conductance_endodermis = dict_cond['conductance_endodermis']
+    relative_conductance_exodermis = dict_cond['conductance_exodermis']
+    # We now consider a special case where the endodermis and/or exodermis barriers are temporarily opened because of
+    # the emergence of a lateral root!
+    # If there are more than one child, then it means there are lateral roots:
+    if number_of_children > 1:
+        # We define two maximal thermal durations, above which the barriers are not considered to be affected anymore:
+        t_max_endo = param.max_thermal_time_since_endodermis_disruption
+        t_max_exo = param.max_thermal_time_since_exodermis_disruption
+        # We initialize empty lists of new conductances:
+        possible_conductances_endo = []
+        possible_conductances_exo = []
+        # We cover all possible lateral roots emerging from the current element:
+        for child_vid in g.Sons(vid, EdgeType='+'):
+            # We get the lateral root as "son":
+            son = g.node(child_vid)
+            # We register the time since this lateral root emerged, and its current length:
+            t = son.thermal_time_since_emergence
+            lateral_length = son.length
+            # If there is a lateral root and this has not emerged yet:
+            if lateral_length <=0.:
+                # Then we move to the next possible lateral root (otherwise, the loop stops and conductance remains unaltered):
+                continue
+            # ENDODERMIS: If the lateral root has emerged recently, its endodermis barrier has been diminished as soon
+            # as the lateral started to elongate:
+            t_since_endodermis_was_disrupted = t
+            if t_since_endodermis_was_disrupted < t_max_endo:
+                # We increase the relative conductance of endodermis according to the age of the lateral root,
+                # considering that the barrier starts at 1 and linearily decreases with time until reaching 0. However,
+                # if the barrier was not completely formed initially, we should not set it to zero, and therefore
+                # define the new conductance as the maximal value between the original conductance and the new one:
+                new_conductance = max(relative_conductance_endodermis,
+                                      (t_max_endo - t_since_endodermis_was_disrupted) / t_max_endo)
+                possible_conductances_endo.append(new_conductance)
+
+            # EXODERMIS: If the lateral root has emerged recently, its exodermis barrier may have been diminished,
+            # provided that the length of the lateral root is actually higher than the radius of the mother root
+            # (i.e. that the lateral root tip has actually crossed the exodermis of the mother root):
+            if lateral_length >= radius:
+                # We approximate the time since the exodermis was disrupted, considering the the lateral root has
+                # elongated at a constant speed:
+                t_since_exodermis_was_disrupted = t * (lateral_length - radius) / lateral_length
+                # If this time is small enough, the exodermis barrier may have been compromised:
+                if t_since_exodermis_was_disrupted < t_max_exo:
+                    # We increase the relative conductance of exodermis according to the time elapsed since the lateral
+                    # root crossed the exodermis, considering that the barrier starts at 1 and linearily decreases with
+                    # time until reaching 0. However, if the barrier was not completely formed initially, we should not
+                    # set it to zero, and we therefore define the new conductance as the maximal value between the
+                    # original conductance and the new one:
+                    new_conductance = max(relative_conductance_exodermis,
+                                          (t_max_exo - t_since_exodermis_was_disrupted) / t_max_exo)
+                    possible_conductances_exo.append(new_conductance)
+        # Now that we have covered all lateral roots, we limit the conductance of the barriers of the mother root
+        # element by choosing the least limiting lateral root (only active if the lists did not remain empty):
+        if possible_conductances_endo:
+            relative_conductance_endodermis = max(possible_conductances_endo)
+        if possible_conductances_exo:
+            relative_conductance_exodermis = max(possible_conductances_exo)
+
+    # RECORDING THE RESULTS:
+    # ----------------------
+    # Eventually, we record the new conductances of cell walls, endodermis and exodermis:
+    n.relative_conductance_walls = relative_conductance_walls
+    n.relative_conductance_endodermis = relative_conductance_endodermis
+    n.relative_conductance_exodermis = relative_conductance_exodermis
+
+    return n
 
 # Defining the different surfaces and volumes for all root elements:
 # ------------------------------------------------------------------
 def update_surfaces_and_volumes(g):
+
+    """
+    This function go through each root element and updates their surfaces, transport barriers and volume.
+    :param g: the root MTG to be considered
+    :return: the updated root MTG
+    """
 
     # We cover all the vertices in the MTG:
     for vid in g.vertices_iter(scale=1):
@@ -123,18 +366,19 @@ def update_surfaces_and_volumes(g):
         if n.length <= 0.:
             continue
         
-        # We call the function that automatically calculates all relevant surfaces:
-        surfaces_and_volumes_dict = surfaces_and_volumes(g, n, n.radius, n.length)
-        
+        # We call the function that automatically calculates the volume and external surface:
+        surfaces_and_volumes_dict = volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)
         # We compute the total volume of the element:
         n.volume = surfaces_and_volumes_dict["volume"]
         # We calculate the current external surface of the element:
         n.external_surface = surfaces_and_volumes_dict["external_surface"]
-        # We calculate the total surface of exchange between symplasm and external soil solution:
-        n.symplasm_surface = surfaces_and_volumes_dict["symplasm_surface"]     
-        # We calculate the total surface of exchange between phloem vessels and symplasm:
-        n.phloem_surface = surfaces_and_volumes_dict["phloem_surface"]
-    
+
+        # We call the function that automatically updates the other surfaces of exchange:
+        specific_surfaces(n)
+
+        # We call the function that automatically updates the transport barriers:
+        transport_barriers(g, n)
+
     return g
 
 # Defining the distance of a vertex from the tip for the whole root system:
@@ -1492,6 +1736,9 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
                                           nodules=True, root_order_limitation=False, root_order_treshold=2):
     # NOTE: This function is supposed to be called AFTER the actual elongation of the apex has been done and the distance
     # between the tip of the apex and the last ramification (dist_to_ramif) has been increased!
+
+    # TODO: Modify the times since... and calculate an actual age of each segment?
+
     """
     This function transforms an elongated root apex into a list of segments and a terminal, smaller apex. A primordium
     of a lateral root can be formed on the new segment in some cases, depending on the distance to tip and the root orders.
@@ -1581,7 +1828,7 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
         # We assume that the growth functions that may have been called previously have only modified radius and length,
         # but not the struct_mass and the total amounts present in the root element.
         # We modify the geometrical features of the present element according to the new length and radius:
-        apex.volume = surfaces_and_volumes(g, apex, apex.radius, apex.potential_length)["volume"]
+        apex.volume = volume_and_external_surface_from_radius_and_length(g, apex, apex.radius, apex.potential_length)["volume"]
         apex.struct_mass = apex.volume * param.root_tissue_density
 
         # We simply call the function primordium_formation to check whether a primordium should have been formed
@@ -1614,7 +1861,7 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
             # We define the new dist_to_ramif, which is smaller than the one of the initial apex:
             apex.dist_to_ramif = initial_dist_to_ramif - (initial_length - param.segment_length * i)
             # We modify the geometrical features of the present element according to the new length:
-            apex.volume = surfaces_and_volumes(g, apex, apex.radius, apex.length)["volume"]
+            apex.volume = volume_and_external_surface_from_radius_and_length(g, apex, apex.radius, apex.length)["volume"]
             apex.struct_mass = apex.volume * param.root_tissue_density
 
             # We calculate the mass fraction that the segment represents compared to the whole element prior to segmentation:
@@ -1691,7 +1938,7 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
         # We define the new dist_to_ramif, which is smaller than the one of the initial apex:
         apex.dist_to_ramif = initial_dist_to_ramif - (initial_length - param.segment_length * n_segments)
         # We modify the geometrical features of the present element according to the new length:
-        apex.volume = surfaces_and_volumes(g, apex, apex.radius, apex.length)["volume"]
+        apex.volume = volume_and_external_surface_from_radius_and_length(g, apex, apex.radius, apex.length)["volume"]
         apex.struct_mass = apex.volume * param.root_tissue_density
         # We modify the variables representing total amounts according to the mass fraction:
         mass_fraction = apex.struct_mass / initial_struct_mass
@@ -1762,7 +2009,7 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
         apex.actual_elongation = initial_elongation
 
         # We modify the geometrical features of the new apex according to the defined length:
-        apex.volume = surfaces_and_volumes(g, apex, apex.radius, apex.length)["volume"]
+        apex.volume = volume_and_external_surface_from_radius_and_length(g, apex, apex.radius, apex.length)["volume"]
         apex.struct_mass = apex.volume * param.root_tissue_density
         # We modify the variables representing total amounts according to the new struct_mass:
         mass_fraction = apex.struct_mass / initial_struct_mass
@@ -1944,9 +2191,9 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
         # WARNING: All growth related variables should have been initialized by another module at the beginning of the time step!!!
 
         # We calculate the initial volume of the element:
-        initial_volume = surfaces_and_volumes(g, n, n.initial_radius, n.initial_length)["volume"]
+        initial_volume = volume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.initial_length)["volume"]
         # We calculate the potential volume of the element based on the potential radius and potential length:
-        potential_volume = surfaces_and_volumes(g, n, n.potential_radius, n.potential_length)["volume"]
+        potential_volume = volume_and_external_surface_from_radius_and_length(g, n, n.potential_radius, n.potential_length)["volume"]
         # We calculate the number of moles of hexose required for growth, including the respiration cost according to
         # the yield growth included in the model of Thornley and Cannell (2000), where root_tissue_density is the dry structural
         # weight per volume (g m-3) and struct_mass_C_content is the amount of C per gram of dry structural mass (mol_C g-1):
@@ -2050,7 +2297,7 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
                 / (param.root_tissue_density * param.struct_mass_C_content)
             # We calculate the maximal possible volume based on the volume of the new cylinder after elongation
             # and the increase in volume that could be achieved by consuming all the remaining hexose:
-            volume_max = surfaces_and_volumes(g, n, n.initial_radius, n.length)["volume"] \
+            volume_max = volume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.length)["volume"] \
                          + possible_radial_increase_in_volume
             # We then calculate the corresponding new possible radius corresponding to this maximum volume:
             if n.type == "Root_nodule":
@@ -2072,8 +2319,8 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
             else:
                 # Otherwise, radial growth is done up to the full potential and the remaining hexose is calculated:
                 n.radius = n.potential_radius
-                net_increase_in_volume = surfaces_and_volumes(g, n, n.radius, n.length)["volume"] \
-                                         - surfaces_and_volumes(g, n, n.initial_radius, n.length)["volume"]
+                net_increase_in_volume = volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"] \
+                                         - volume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.length)["volume"]
                 # net_increase_in_volume = pi * (n.radius ** 2 - n.initial_radius ** 2) * n.length
                 # We then calculate the remaining amount of hexose after thickening:
                 hexose_actual_contribution_to_thickening = \
@@ -2108,10 +2355,8 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
         # -----------------------------------------------
 
         # The new volume and surfaces of the element is automatically calculated:
-        n.external_surface = surfaces_and_volumes(g, n, n.radius, n.length)["external_surface"]
-        n.volume = surfaces_and_volumes(g, n, n.radius, n.length)["volume"]
-        n.phloem_surface = surfaces_and_volumes(g, n, n.radius, n.length)["phloem_surface"]
-        n.symplasm_surface = surfaces_and_volumes(g, n, n.radius, n.length)["symplasm_surface"]
+        n.external_surface = volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["external_surface"]
+        n.volume = volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"]
         # The new dry structural struct_mass of the element is calculated from its new volume:
         n.struct_mass = n.volume * param.root_tissue_density
         n.struct_mass_produced = (n.volume - initial_volume) * param.root_tissue_density
@@ -2183,9 +2428,9 @@ def satisfaction_coefficient(g, struct_mass_input):
         n = g.node(vid)
 
         # We calculate the initial volume of the element:
-        initial_volume = surfaces_and_volumes(g, n, n.initial_radius, n.initial_length)["volume"]
+        initial_volume = volume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.initial_length)["volume"]
         # We calculate the potential volume of the element based on the potential radius and potential length:
-        potential_volume = surfaces_and_volumes(g, n, n.potential_radius, n.potential_length)["volume"]
+        potential_volume = volume_and_external_surface_from_radius_and_length(g, n, n.potential_radius, n.potential_length)["volume"]
 
         # The growth demand of the element in struct_mass is calculated:
         n.growth_demand_in_struct_mass = (potential_volume - initial_volume) * param.root_tissue_density
@@ -2277,7 +2522,7 @@ def ArchiSimple_growth(g, SC, time_step_in_seconds, soil_temperature_in_Celsius=
 
         n.radius += (n.potential_radius - n.initial_radius) * relative_growth_increase
         # The volume of the element is automatically calculated:
-        n.volume = surfaces_and_volumes(g, n, n.radius, n.length)["volume"]
+        n.volume = volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"]
         # The new dry structural struct_mass of the element is calculated from its new volume:
         n.struct_mass = n.volume * param.root_tissue_density
 
@@ -2334,7 +2579,7 @@ def reinitializing_growth_variables(g):
 def root_hairs_dynamics(g, time_step_in_seconds=1. * (60. * 60. * 24.),
                         soil_temperature_in_Celsius=20, printing_warnings=False):
     """
-    This function computes the evolution of the density and average length of root hairs along each root axis,
+    This function computes the evolution of the density and average length of root hairs along each root,
     and specifies which hairs are alive or dead.
     :param g: the root MTG to be considered
     :param time_step_in_seconds: the time step over which growth is considered
@@ -2392,7 +2637,7 @@ def root_hairs_dynamics(g, time_step_in_seconds=1. * (60. * 60. * 24.),
             # The corresponding number of root hairs is calculated:
             n.total_root_hairs_number = param.root_hairs_density * n.radius * n.actual_length_with_hairs
             # The time since root hair formation started is then calculated, using the recent increase in the length
-            # of the current root hair zone and the elongation rate the corresponding root tip. The latter is
+            # of the current root hair zone and the elongation rate of the corresponding root tip. The latter is
             # calculated using the difference between the new distance_from_tip of the element and the previous one:
             elongation_rate_in_actual_time = (n.distance_from_tip - n.former_distance_from_tip) / time_step_in_seconds
             elongation_rate_in_thermal_time = (n.distance_from_tip - n.former_distance_from_tip) / elapsed_thermal_time
@@ -2532,11 +2777,9 @@ def nodule_formation(g, mother_element):
     nodule.length = mother_element.radius
     nodule.radius = mother_element.radius
     nodule.original_radius = nodule.radius
-    dict = surfaces_and_volumes(g, element=nodule, radius=nodule.radius, length=nodule.length)
+    dict = volume_and_external_surface_from_radius_and_length(g, element=nodule, radius=nodule.radius, length=nodule.length)
     nodule.external_surface = dict['external_surface']
     nodule.volume = dict['volume']
-    nodule.phloem_surface = dict['phloem_surface']
-    nodule.symplasm_surface = dict['symplasm_surface']
     nodule.struct_mass = nodule.volume * param.root_tissue_density * param.struct_mass_C_content
 
     # print("Nodule", nodule.index(), "has been formed!")
@@ -2688,7 +2931,6 @@ def exchange_with_phloem_rate(n, soil_temperature_in_Celsius=20, printing_warnin
     hexose_growth_demand = n.hexose_growth_demand
 
     # We also calculate the relevant surface of the element:
-    # phloem_surface = surfaces_and_volumes(g, n, n.radius, n.length)["phloem_surface"]
     exchange_surface = n.phloem_surface
 
     # CONSIDERING CASES THAT SHOULD BE AVOIDED:
@@ -3018,34 +3260,45 @@ def root_hexose_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warni
     """
 
     # READING THE VALUES:
-    # --------------------
+    # -------------------
     # We read the values of interest in the element n only once, so that it's not called too many times:
     type = n.type
     length = n.length
     original_radius = n.original_radius
     distance_from_tip = n.distance_from_tip
+
+    C_sucrose_root = n.C_sucrose_root
     C_hexose_root = n.C_hexose_root
     C_hexose_soil = n.C_hexose_soil
 
-    # We calculate the total surface of exchange between symplasm and apoplasm in the root parenchyma pool of hexose:
-    # TODO: Check whether symplasm surface has already been updated, and how
-    #  (this should depend on successive barriers and lateral root emergence)!
-    # symplasm_surface = surfaces_and_volumes(g, n, n.radius, n.length)["symplasm_surface"]
-    symplasm_surface = n.symplasm_surface
-    # We will also use the external surface of root hairs, in addition to the previously calculated symplasm surface:
-    living_root_hairs_external_surface = n.living_root_hairs_external_surface
-    exchange_surface = symplasm_surface + living_root_hairs_external_surface
+    S_epid =  n.epidermis_surface_without_hairs
+    S_hairs = n.living_root_hairs_external_surface
+    S_cortex = n.cortical_parenchyma_surface
+    S_stele = n.stelar_parenchyma_surface
+    S_vessels = n.phloem_surface
+
+    cond_walls = n.relative_conductance_walls
+    cond_exo = n.relative_conductance_exodermis
+    cond_endo = n.relative_conductance_endodermis
+
+    # We calculate the total surface of exchange between symplasm and apoplasm in the root parenchyma, modulated by the 
+    # conductance of cell walls (reduced in the meristematic zone) and the conductances of endodermis and exodermis 
+    # barriers (when these barriers are mature, conductance is expected to be 0 in general, and part of the symplasm is 
+    # not accessible anymore to the soil solution:
+    non_vascular_exchange_surface = (S_epid + S_hairs) + cond_walls * (cond_exo * S_cortex + cond_endo * S_stele)
+    vascular_exchange_surface = cond_walls * cond_exo * cond_endo * S_vessels
 
     # CONSIDERING CASES THAT SHOULD BE AVOIDED:
     # ------------------------------------------
     # We initialize the rate and the permeability coefficient of the element n:
     hexose_exudation_rate = 0.
+    phloem_hexose_exudation_rate = 0.
     corrected_permeability_coeff = 0.
 
     # We initialize the possibility of exudation:
     possible_exudation = True
     # First, we ensure that the element has a positive length and surface of exchange:
-    if length <= 0 or exchange_surface <=0.:
+    if length <= 0 or non_vascular_exchange_surface <=0.:
         possible_exudation = False
     # We check whether the concentration of hexose in root is positive or not:
     if C_hexose_root <= 0.:
@@ -3078,7 +3331,7 @@ def root_hexose_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warni
         # CALCULATIONS OF EXUDATION RATE:
         #--------------------------------
         # We calculate the rate of hexose exudation, even for dead root elements:
-        hexose_exudation_rate = corrected_permeability_coeff * (C_hexose_root - C_hexose_soil) * exchange_surface
+        hexose_exudation_rate = corrected_permeability_coeff * (C_hexose_root - C_hexose_soil) * non_vascular_exchange_surface
         # NOTE : We consider that dead elements still liberate hexose in the soil, until they are empty.
         if hexose_exudation_rate < 0.:
             if printing_warnings:
@@ -3087,10 +3340,16 @@ def root_hexose_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warni
             hexose_exudation_rate = 0.
             # TODO: Should we really limit the influx of hexose when the concentration of hexose in the soil is higher than in the root?
 
+        # NEW: we also include the direct exchange between soil solution and phloem vessels, when these are in direct
+        # contact with the soil solution (e.g. in the meristem, or if a lateral roots disturbs all the barriers):
+        phloem_hexose_exudation_rate = corrected_permeability_coeff * (2 * C_sucrose_root - C_hexose_soil) \
+                                       * vascular_exchange_surface
+
     # RECORDING THE RESULTS:
     # ----------------------
     # Eventually, we record all new values in the element n:
     n.hexose_exudation_rate = hexose_exudation_rate
+    n.phloem_hexose_exudation_rate = phloem_hexose_exudation_rate
     n.permeability_coeff = corrected_permeability_coeff
 
     return n
@@ -3115,21 +3374,33 @@ def root_hexose_uptake_rate(n, soil_temperature_in_Celsius=20, printing_warnings
     length = n.length
     C_hexose_soil = n.C_hexose_soil
 
-    # We calculate the total surface of exchange, identical to that of root hexose exudation:
-    # TODO: Check how surfaces have been updated!
-    symplasm_surface = n.symplasm_surface
-    living_root_hairs_external_surface = n.living_root_hairs_external_surface
-    exchange_surface = symplasm_surface + living_root_hairs_external_surface
+    S_epid = n.epidermis_surface_without_hairs
+    S_hairs = n.living_root_hairs_external_surface
+    S_cortex = n.cortical_parenchyma_surface
+    S_stele = n.stelar_parenchyma_surface
+    S_vessels = n.phloem_surface
+
+    cond_walls = n.relative_conductance_walls
+    cond_exo = n.relative_conductance_exodermis
+    cond_endo = n.relative_conductance_endodermis
+
+    # We calculate the total surface of exchange between symplasm and apoplasm in the root parenchyma, modulated by the
+    # conductance of cell walls (reduced in the meristematic zone) and the conductances of endodermis and exodermis
+    # barriers (when these barriers are mature, conductance is expected to be 0 in general, and part of the symplasm is
+    # not accessible anymore to the soil solution:
+    non_vascular_exchange_surface = (S_epid + S_hairs) + cond_walls * (cond_exo * S_cortex + cond_endo * S_stele)
+    vascular_exchange_surface = cond_walls * cond_exo * cond_endo * S_vessels
 
     # CONSIDERING CASES THAT SHOULD BE AVOIDED:
     # ------------------------------------------
     # We initialize the rate of the element n:
     hexose_uptake_rate = 0.
+    phloem_hexose_uptake_rate = 0.
 
     # We initialize the possibility of uptake:
     possible_uptake = True
     # First, we ensure that the element has a positive length and surface of exchange:
-    if length <= 0 or exchange_surface <= 0.:
+    if length <= 0 or non_vascular_exchange_surface <= 0.:
         possible_uptake = False
     # We check whether the concentration of hexose in root is positive or not:
     if C_hexose_soil <= 0.:
@@ -3158,13 +3429,21 @@ def root_hexose_uptake_rate(n, soil_temperature_in_Celsius=20, printing_warnings
         # CALCULATIONS OF UPTAKE RATE:
         # ----------------------------
         # We calculate the rate of hexose uptake:
-        hexose_uptake_rate = corrected_uptake_rate_max * exchange_surface \
+        hexose_uptake_rate = corrected_uptake_rate_max * non_vascular_exchange_surface \
                              * C_hexose_soil / (param.Km_uptake + C_hexose_soil)
+
+        # NEW: we also include the direct exchange between soil solution and phloem vessels, when these are in direct
+        # contact with the soil solution (e.g. in the meristem, or if a lateral roots disturbs all the barriers):
+        phloem_hexose_uptake_rate = corrected_uptake_rate_max * vascular_exchange_surface \
+                             * C_hexose_soil / (param.Km_uptake + C_hexose_soil)
+        # NOTE: We consider that the uptake rate though the surface of the phloem vessels in contact with
+        # the solution is the same as through the surface of the parenchyma cells where the mobile pool is kept!
 
     # RECORDING THE RESULTS:
     # ----------------------
     # Eventually, we record the new rate:
     n.hexose_uptake_rate = hexose_uptake_rate
+    n.phloem_hexose_uptake_rate = phloem_hexose_uptake_rate
 
     return n
 
@@ -3190,8 +3469,6 @@ def root_mucilage_secretion_rate(n, soil_temperature_in_Celsius=20, printing_war
     Cs_mucilage_soil = n.Cs_mucilage_soil
 
     # We calculate the total surface of exchange with the soil for mucilage secretion:
-    # TODO: Check whether surfaces have already been updated, and how
-    #  (this should depend on successive barriers and lateral root emergence)!
     exchange_surface = n.external_surface + n.living_root_hairs_external_surface
 
     # CONSIDERING CASES THAT SHOULD BE AVOIDED:
@@ -3286,10 +3563,8 @@ def root_cells_release_rate(n, soil_temperature_in_Celsius=20, printing_warnings
     radius = n.radius
     distance_from_tip = n.distance_from_tip
     Cs_cells_soil = n.Cs_cells_soil
-    # TODO: check that Cs_cells_soil has been updated elsewhere!
 
     # We calculate the total surface of exchange with the soil for mucilage secretion:
-    # TODO: Check whether surfaces have already been updated!
     exchange_surface = n.external_surface
 
     # CONSIDERING CASES THAT SHOULD BE AVOIDED:
@@ -3391,12 +3666,20 @@ def soil_hexose_degradation_rate(n, soil_temperature_in_Celsius=20, printing_war
     # We read the values of interest in the element n only once, so that it's not called too many times:
     length = n.length
     C_hexose_soil = n.C_hexose_soil
+
+    S_epid = n.epidermis_surface_without_hairs
+    S_hairs = n.living_root_hairs_external_surface
+    S_cortex = n.cortical_parenchyma_surface
+    S_stele = n.stelar_parenchyma_surface
+
+    cond_walls = n.relative_conductance_walls
+    cond_exo = n.relative_conductance_exodermis
+    cond_endo = n.relative_conductance_endodermis
+
     # We calculate the total surface of exchange, identical to that of root hexose exudation and root hexose uptake,
     # assuming that degradation may occur in the apoplasm in contact with soil solution, within the root itself...
-    # TODO: Check how surfaces have been updated!
-    symplasm_surface = n.symplasm_surface
-    living_root_hairs_external_surface = n.living_root_hairs_external_surface
-    exchange_surface = symplasm_surface + living_root_hairs_external_surface
+
+    non_vascular_exchange_surface = (S_epid + S_hairs) + cond_walls * (cond_exo * S_cortex + cond_endo * S_stele)
 
     # CONSIDERING CASES THAT SHOULD BE AVOIDED:
     # ------------------------------------------
@@ -3433,7 +3716,7 @@ def soil_hexose_degradation_rate(n, soil_temperature_in_Celsius=20, printing_war
         # ---------------------------------------------
         # The degradation rate is defined according to a Michaelis-Menten function of the concentration of hexose
         # in the soil:
-        soil_hexose_degradation_rate = corrected_hexose_degradation_rate_max * exchange_surface \
+        soil_hexose_degradation_rate = corrected_hexose_degradation_rate_max * non_vascular_exchange_surface \
                                        * C_hexose_soil / (param.Km_hexose_degradation + C_hexose_soil)
 
     # RECORDING THE RESULTS:
@@ -3462,7 +3745,6 @@ def soil_mucilage_degradation_rate(n, soil_temperature_in_Celsius=20, printing_w
     length = n.length
     Cs_mucilage_soil = n.Cs_mucilage_soil
     # We calculate the total surface of exchange, identical to that of root mucilage secretion:
-    # TODO: Check how surfaces have been updated!
     external_surface = n.external_surface
     living_root_hairs_external_surface = n.living_root_hairs_external_surface
     exchange_surface = external_surface + living_root_hairs_external_surface
@@ -3531,7 +3813,6 @@ def soil_cells_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warn
     length = n.length
     Cs_cells_soil = n.Cs_cells_soil
     # We calculate the total surface of exchange, identical to that of root cells release:
-    # TODO: Check how surfaces have been updated!
     exchange_surface = n.external_surface
 
     # CONSIDERING CASES THAT SHOULD BE AVOIDED:
@@ -3668,12 +3949,12 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
     This function calculates the time derivative (dQ/dt) of the amount in each pool, for a given root element, based on 
     a C balance.
     :param n: the root element to be considered
-    :return: a dictionnary "y_derivatives" containing the values of net evolution rates for each pool.
+    :return: a dictionary "y_derivatives" containing the values of net evolution rates for each pool.
     """
 
     #TODO: Is the notion of Deficit_rate really relevant?
     
-    # We initialize an empty dictionnary which will contain the different fluxes:
+    # We initialize an empty dictionary which will contain the different fluxes:
     y_derivatives = {}
 
     # We calculate the derivative of the amount of sucrose for this element
@@ -3741,7 +4022,7 @@ class Differential_Equation_System(object):
         # We initialize an index and a dictionary:
         index = 0
         y_mapping = {}
-        # We create a mapping, so that there is a dictionnary containing the link between the variable name and the index in the list:
+        # We create a mapping, so that there is a dictionary containing the link between the variable name and the index in the list:
         for var in y_variables:
             y_mapping[var] = index
             self.initial_conditions.append(0)
@@ -3753,7 +4034,7 @@ class Differential_Equation_System(object):
 
     def _C_fluxes_within_each_segment_derivatives(self, t, y):
         """
-        This computes the derivative of the vector y (containing the amounts in the different pools) at `t`.
+        This internal function computes the derivative of the vector y (containing the amounts in the different pools) at `t`.
         :return: The derivatives of `y` at `t`.
         :rtype: list [float]
         """
@@ -3774,8 +4055,9 @@ class Differential_Equation_System(object):
         mass = (self.n.initial_struct_mass + self.n.initial_living_root_hairs_struct_mass)
         # We make sure that the mass is positive:
         if isnan(mass) or mass <=0.:
-                # If the mass is not positive, it could be that a new axis just emerged, so its initial mass was 0.
-                # In this case, we set the concentrations to 0.
+                # If the initial mass is not positive, it could be that a new axis just emerged, so its initial mass was 0.
+                # In this case, we set the concentrations to 0, as no fluxes (except Deficit) should be calculated before
+                # growth is finished and sucrose is supplied there!
                 self.n.C_hexose_root = 0.
                 self.n.C_hexose_reserve = 0.
                 self.n.C_hexose_soil = 0.
@@ -3793,10 +4075,16 @@ class Differential_Equation_System(object):
         # surface of roots:
         surface = (self.n.initial_external_surface + self.n.initial_living_root_hairs_external_surface)
         if isnan(surface) or surface <=0.:
-            print("!!! For element", self.n.index(),
-                  "the initial surface before updating concentrations in the solver was 0 or NA!")
+            # If the initial surface is not positive, it could be that a new axis just emerged.
+            # In this case, we set the concentrations to 0, as no fluxes (except Deficit) should be calculated before
+            # growth is finished and sucrose is supplied there!
             self.n.Cs_mucilage_soil = 0.
             self.n.Cs_cells_soil = 0.
+            # In the case the element did not emerge (i.e. its age is higher that the normal simulation time step),
+            # there must have been a problem:
+            if self.n.actual_time_since_emergence > param.time_step_in_days * (24. * 60. * 60.):
+                print("!!! For element", self.n.index(),
+                      "the initial surface before updating concentrations in the solver was 0 or NA!")
         else:
             self.n.Cs_mucilage_soil = self.n.mucilage_soil / surface
             self.n.Cs_cells_soil = self.n.cells_soil / surface
@@ -3821,6 +4109,11 @@ class Differential_Equation_System(object):
         return y_derivatives
 
     def _update_initial_conditions(self):
+        """
+        This internal function simply updates the initial conditions in y, calculating the amount in each pool from its
+        concentration.
+        :return:
+        """
 
         mass = (self.n.initial_struct_mass + self.n.initial_living_root_hairs_struct_mass)
         if isnan(mass):
@@ -3843,15 +4136,13 @@ class Differential_Equation_System(object):
         self.initial_conditions[self.initial_conditions_mapping['cells_soil']] \
             = self.n.Cs_cells_soil * surface
 
-        # # CHECKING:
-        # if isnan(self.initial_conditions[self.initial_conditions_mapping['hexose_root']]):
-        #     print("Problem with Nan during _update_initial_conditions!")
+        return
 
     def run(self):
         """
-        This function actually solves the system of differential equations for a given root element. Within a given run,
-        it updates the new amounts because of the function '_update_initial_conditions', then the new concentrations
-        because of the function '_C_fluxes_within_each_segment_derivatives'.
+        This internal function actually solves the system of differential equations for a given root element.
+        Within a given run, it first updates the new amounts because of the function '_update_initial_conditions',
+        then the new concentrations because of the function '_C_fluxes_within_each_segment_derivatives'.
         """
 
         # print("Here are the initial conditions before update:")
@@ -3896,8 +4187,8 @@ class Differential_Equation_System(object):
 
 # Performing a complete C balance on each root element:
 #------------------------------------------------------
-# NOTE: The function first calls all processes of C exchange between pools on each root element,
-# then performs a new C balance:
+# NOTE: The function alls all processes of C exchange between pools on each root element and performs a new C balance,
+# with or without using a solver:
 def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
                                                                    time_step_in_seconds=1. * (60. * 60. * 24.),
                                                                    soil_temperature_in_Celsius=20,
@@ -3910,6 +4201,7 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
     :param time_step_in_seconds:
     :param soil_temperature_in_Celsius:
     :param using_solver:
+    :param printing_solver_outputs:
     :param printing_warnings:
     :return:
     """
@@ -3944,7 +4236,7 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
 
             # Calculating the new variations of the quantities in each pool over time:
             #-------------------------------------------------------------------------
-            # We call a dictionnary containing the time derivative (dQ/dt) of the amount present in each pool,
+            # We call a dictionary containing the time derivative (dQ/dt) of the amount present in each pool,
             # based on the C balance:
             y_time_derivatives = calculating_time_derivatives_of_the_amount_in_each_pool(n)
 
@@ -4021,7 +4313,7 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
 
             # SPECIAL CASE FOR SUCROSE: As sucrose was not included in the solver, we update C_sucrose_root based on
             # 'last' exchange rates during the time_step.
-            # We call again a dictionnary containing the time derivative (dQ/dt) of the amount
+            # We call again a dictionary containing the time derivative (dQ/dt) of the amount
             # present in each pool, e.g. sucrose, based on the C balance (NOTE: the transfer of sucrose between elements
             # through the phloem is not considered at this stage):
             y_time_derivatives = calculating_time_derivatives_of_the_amount_in_each_pool(n)
@@ -4159,6 +4451,7 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
     total_cells_soil = 0.
     total_sucrose_root_deficit = 0.
     total_hexose_root_deficit = 0.
+    total_hexose_reserve_deficit = 0.
     total_hexose_soil_deficit = 0.
     total_mucilage_soil_deficit = 0.
     total_cells_soil_deficit = 0.
@@ -4199,11 +4492,11 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
             # Note: we only include dead root hairs in the necromass balance when the root element itself has died!
             total_dead_struct_mass += n.struct_mass + n.root_hairs_struct_mass
             total_dead_length += n.length
-            total_dead_surface += surfaces_and_volumes(g, n, n.radius, n.length)["external_surface"]
+            total_dead_surface += volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["external_surface"]
         else:
             total_length += n.length
             total_struct_mass += n.struct_mass + n.root_hairs_struct_mass
-            total_surface += surfaces_and_volumes(g, n, n.radius, n.length)["external_surface"]
+            total_surface += volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["external_surface"]
             # Note that living root hairs are NOT included in the total surface of living roots!
             # Additionaly, we calculate the total surface of living root hairs:
             total_living_root_hairs_surface +=  n.living_root_hairs_external_surface
@@ -4221,6 +4514,7 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
 
         total_sucrose_root_deficit += n.Deficit_sucrose_root
         total_hexose_root_deficit += n.Deficit_hexose_root
+        total_hexose_reserve_deficit += n.Deficit_hexose_reserve
         total_hexose_soil_deficit += n.Deficit_hexose_soil
         total_mucilage_soil_deficit += n.Deficit_mucilage_soil
         total_cells_soil_deficit += n.Deficit_cells_soil
@@ -4252,7 +4546,7 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
     C_in_the_root_soil_system = (total_struct_mass + total_dead_struct_mass) * param.struct_mass_C_content \
                                 + (total_sucrose_root - total_sucrose_root_deficit) * 12. \
                                 + (total_hexose_root - total_hexose_root_deficit) * 6. \
-                                + (total_hexose_reserve) * 6. \
+                                + (total_hexose_reserve - total_hexose_reserve_deficit) * 6. \
                                 + (total_hexose_soil - total_hexose_soil_deficit) * 6. \
                                 + (total_mucilage_soil - total_mucilage_soil_deficit) * 6. \
                                 + (total_cells_soil - total_cells_soil_deficit) * 6.
@@ -4446,12 +4740,10 @@ def initiate_mtg(random=True,
     base_segment.root_hairs_struct_mass_produced = 0.
     base_segment.living_root_hairs_struct_mass = 0.
 
-    surface_dictionary = surfaces_and_volumes(g, base_segment, base_segment.radius, base_segment.length)
+    surface_dictionary = volume_and_external_surface_from_radius_and_length(g, base_segment, base_segment.radius, base_segment.length)
     base_segment.external_surface = surface_dictionary["external_surface"]
     base_segment.initial_external_surface = base_segment.external_surface
     base_segment.volume = surface_dictionary["volume"]
-    base_segment.phloem_surface = surface_dictionary["phloem_surface"]
-    base_segment.symplasm_surface = surface_dictionary["symplasm_surface"]
 
     base_segment.distance_from_tip = base_segment.length
     base_segment.former_distance_from_tip = base_segment.length
@@ -4683,7 +4975,7 @@ def initiate_mtg(random=True,
     apex.C_sucrose_root=initial_C_sucrose_root
     apex.C_hexose_root=initial_C_hexose_root
 
-    apex.volume = surfaces_and_volumes(g, apex, apex.radius, apex.length)["volume"]
+    apex.volume = volume_and_external_surface_from_radius_and_length(g, apex, apex.radius, apex.length)["volume"]
     apex.struct_mass = apex.volume * param.root_tissue_density
     apex.initial_struct_mass = apex.struct_mass
     apex.initial_living_root_hairs_struct_mass = apex.living_root_hairs_struct_mass

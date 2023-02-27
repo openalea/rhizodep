@@ -2,8 +2,8 @@
 import numpy as np
 import pandas as pd
 import os
-import rhizodep.simulation_2 as simulation
-import rhizodep.model_2 as model
+import rhizodep.simulation as simulation
+import rhizodep.model as model
 
 # outputs directory path:
 OUTPUTS_DIRPATH = 'outputs'
@@ -95,16 +95,16 @@ def run_ref_simulation_with_input_file():
 
     # We launch the main simulation program:
     print("Simulation starts ...")
-    simulation.main_simulation(g, simulation_period_in_days=20., time_step_in_days=1./24.,
+    simulation.main_simulation(g, simulation_period_in_days=6., time_step_in_days=1./24.,
                                radial_growth="Possible", ArchiSimple=False, ArchiSimple_C_fraction=0.10,
                                input_file=os.path.join("inputs", "sucrose_input_test.csv"),
                                outputs_directory=OUTPUTS_DIRPATH,
-                               forcing_constant_inputs=False, constant_sucrose_input_rate=1.e-6,
+                               forcing_constant_inputs=True, constant_sucrose_input_rate=1e-10,
                                constant_soil_temperature_in_Celsius=20,
                                nodules=False,
                                root_order_limitation=False,
                                root_order_treshold=2,
-                               specific_model_option=None,
+                               using_solver=False,
                                simulation_results_file=ACTUAL_RESULTS_FILENAME,
                                recording_interval_in_days=5,
                                recording_images=True,
@@ -123,8 +123,8 @@ def run_ref_simulation_with_input_file():
                                scenario_id=1,
                                displayed_property="C_hexose_root", displayed_vmin=1e-6, displayed_vmax=1e-0,
                                log_scale=True, cmap='jet',
-                               x_center=0, y_center=0, z_center=-1, z_cam=-2,
-                               camera_distance=4., step_back_coefficient=0., camera_rotation=False, n_rotation_points=24 * 5)
+                               x_center=0, y_center=0, z_center=-0.1, z_cam=-0.2,
+                               camera_distance=0.4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=24 * 5)
 
 def test_run(overwrite_desired_data=False):
     """

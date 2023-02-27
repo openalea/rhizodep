@@ -71,7 +71,7 @@ n_seminal_roots = 5
 
 # Maximal number of roots emerging from the base (including primary and seminal roots)(dimensionless):
 #-----------------------------------------------------------------------------------------------------
-n_adventitious_roots = 100
+n_adventitious_roots = 0
 # WATCH OUT: If the file 'adventitious_roots_inputs.csv' exist in the proper directory, information regarding
 # the emergence of adventitious roots will actually be read from this file.
 
@@ -236,24 +236,12 @@ expected_C_hexose_reserve = expected_C_hexose_root * 2.
 # => We expect the reserve pool to be two times higher than the mobile one.
 
 #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-# Parameters for estimation the surfaces of exchange between root symplasm, apoplasm and  phloem:
-#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-# Phloem surface as a fraction of the root external surface (in m2 of phloem surface per m2 of root external surface):
-#---------------------------------------------------------------------------------------------------------------------
-phloem_surfacic_fraction = 1.
-
-# Symplasm surface as a fraction of the root external surface (in m2 of symplasm surface per m2 of root external surface):
-#-------------------------------------------------------------------------------------------------------------------------
-symplasm_surfacic_fraction = 10.
-
-#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Parameters for phloem unloading/reloading:
 #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # Maximum unloading rate of sucrose through the surface of the phloem vessels (in mol of sucrose per m2 per second):
 # -------------------------------------------------------------------------------------------------------------------
-surfacic_unloading_rate_reference = 0.03 / 12 * 1e-6 / (0.5 * phloem_surfacic_fraction)
+surfacic_unloading_rate_reference = 0.03 / 12 * 1e-6 / (0.5 * 1)
 # => According to Barillot et al. (2016b), this value is 0.03 umol C g-1 s-1, and we assume that 1 gram of dry root mass
 # is equivalent to 0.5 m2 of surface. However, the unloading of sucrose is not done exactly the same in CN-Wheat as in
 # RhizoDep (for example, exudation is a fraction of the sucrose unloading, unlike in RhizoDep where it is a fraction
@@ -275,6 +263,8 @@ phloem_permeability = 5.76
 # density was 0.1 g cm-3. Calculating an exchange surface of the sieve tube of 4e-9 m2, we obtained a permeability
 # coefficient of 5.76 gDW m-2 s-1 using the values of the flow, of the gradient of sugar concentration (assuming hexose
 # concentration was 0) and of the exchange surface.
+# CHEATING:
+phloem_permeability = 2e-4
 
 # Temperature dependence for this parameter:
 #"""""""""""""""""""""""""""""""""""""""""""
@@ -412,7 +402,7 @@ gamma_exudation = 0.4
 
 # Maximum rate of influx of hexose from soil to roots (in mol of hexose per m2 per s):
 #-------------------------------------------------------------------------------------
-uptake_rate_max = 277 * 0.000000001 / (60 * 60 * 24) * 1000 * 1 / (0.5 * symplasm_surfacic_fraction)
+uptake_rate_max = 277 * 0.000000001 / (60 * 60 * 24) * 1000 * 1 / (0.5 * 1)
 # => According to Jones and Darrah (1996), the uptake rate measured for all sugars tested with an individual external
 # concentration of 100 uM is equivalent to 277 nmol hexose mg-1 day-1, and we assume that 1 gram of dry root mass is
 # equivalent to 0.5 m2 of external surface.
@@ -598,3 +588,33 @@ Km_nodule_thickening = Km_elongation * 100
 #-----------------------------------------------------------------------
 relative_nodule_thickening_rate_max = 20. / 100. / (24. * 60. * 60.)
 # => We consider that the radius can't increase by more than 20% every day
+
+#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# Parameters for calculating surfaces and barriers to transport
+#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Relative ratio between the exchange surface of a compartment in the root and its external surface (m2 per m2):
+#---------------------------------------------------------------------------------------------------------------
+phloem_surfacic_fraction = 1.
+stelar_parenchyma_surfacic_fraction  = 1.
+cortical_parenchyma_surfacic_fraction  = 1.
+epidermal_parenchyma_surfacic_fraction  = 1.
+
+# Ratio between the length of the meristem zone and root radius (m per m):
+#-------------------------------------------------------------------------
+meristem_limite_zone_factor = 1. # We assume that the length of the meristem zone is equal to the radius of the root
+
+# Relative conductance in the meristem zone (me per m2):
+#-------------------------------------------------------
+relative_conductance_at_meristem = 0.5 # We assume that the conductance of cells walls is reduced by 2 in the meristem zone.
+
+# Ratio between the length of the zone where barrier formation has not been initiated yet, and root radius (m per m):
+#--------------------------------------------------------------------------------------------------------------------
+endodermis_limite_zone_factor = growing_zone_factor # We assume that endodermis formation starts right after the end of the elongation zone
+exodermis_limite_zone_factor = growing_zone_factor * 3. # We assume that exodermis starts 3 times further.
+
+# Maximal thermal time above which no barrier disruption is considered anymore when a lateral root has emerged
+# (in second equivalent to temperature T_ref_growth):
+#-------------------------------------------------------------------------------------------------------------
+max_thermal_time_since_endodermis_disruption = 6 * 60. * 60. # We assume that after 6h, no disruption is observed anymore!
+max_thermal_time_since_exodermis_disruption = 6 * 60. * 60. # We assume that after 6h, no disruption is observed anymore!
