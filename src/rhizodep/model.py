@@ -14,6 +14,10 @@
 # TODO: Check how "Just_dead" might mess up with the duration of certain process (ex: hexose uptake)
 # TODO : Update ArchiSimple option (e.g. with the new way to represent Seminal/Adventitious roots?)
 # TODO: Add a general upper scale for the whole root system, in which the proprties about phloem sucrose could be stored?
+# TODO: Introduce explicit threshold concentration for limiting processes, rather than "0"
+# TODO: Consider giving priority to root maintenance, and trigger senescence when root maintenance is not ensured
+# TODO: Watch the calculation of surface and volume for the apices - if they correspond to cones, the mass balance for segmentation may not be correct!
+# TODO: Check actual_elongation_rate with thermal time...
 
 # TODO: POSSIBLE FUTURE DEVELOPMENT - Modify the way the apex and elongation zone are discretized:
 #  instead of using a tip that is elongated and segmented over time, define a meristem object and an elongation zone
@@ -4283,10 +4287,6 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
         # We use a numeric solver to calculate the best equilibrium between pools over time, so that the fluxes
         # still correspond to plausible values even when the time step is too large:
         if using_solver:
-
-            # # CHEATING: #TODO: WATCH OUT
-            # if n.type != "Base_of_the_root_system":
-            #     continue
 
             if printing_solver_outputs:
                 print("Considering for the solver the element", n.index(),"of length", n.length, "...")
