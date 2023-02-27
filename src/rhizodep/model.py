@@ -3919,7 +3919,9 @@ def calculating_amounts_from_fluxes(n, time_step_in_seconds):
     n.hexose_mobilization_from_reserve = n.hexose_mobilization_from_reserve_rate * time_step_in_seconds
     n.resp_maintenance = n.resp_maintenance_rate * time_step_in_seconds
     n.hexose_exudation = n.hexose_exudation_rate * time_step_in_seconds
+    n.phloem_hexose_exudation = n.phloem_hexose_exudation_rate * time_step_in_seconds
     n.hexose_uptake = n.hexose_uptake_rate * time_step_in_seconds
+    n.phloem_hexose_uptake = n.phloem_hexose_uptake_rate * time_step_in_seconds
     n.hexose_degradation = n.soil_hexose_degradation_rate * time_step_in_seconds
     n.mucilage_secretion = n.root_mucilage_secretion_rate * time_step_in_seconds
     n.mucilage_degradation = n.soil_mucilage_degradation_rate * time_step_in_seconds
@@ -3936,7 +3938,7 @@ def calculating_extra_variables(n, time_step_in_seconds):
     :return: the updated root element n
     """
     # We calculate the net exudation of hexose (in mol of hexose):
-    n.net_hexose_exudation = n.hexose_exudation - n.hexose_uptake
+    n.net_hexose_exudation = n.hexose_exudation + n.phloem_hexose_exudation - n.hexose_uptake - n.phloem_hexose_uptake
     # We calculate the total biomass of each element, including the structural mass and all sugars:
     n.biomass = n.struct_mass + (
             n.C_hexose_root * 6 * 12.01 + n.C_hexose_reserve * 6 * 12.01 + n.C_sucrose_root * 12 * 12.01) * n.struct_mass
@@ -3956,8 +3958,6 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
     :return: a dictionary "y_derivatives" containing the values of net evolution rates for each pool.
     """
 
-    #TODO: Is the notion of Deficit_rate really relevant?
-    
     # We initialize an empty dictionary which will contain the different fluxes:
     y_derivatives = {}
 
@@ -3966,7 +3966,9 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
     y_derivatives['sucrose_root'] = \
         - n.Deficit_sucrose_root_rate \
         - n.hexose_production_from_phloem_rate / 2. \
-        + n.sucrose_loading_in_phloem_rate
+        - n.phloem_hexose_exudation_rate / 2. \
+        + n.sucrose_loading_in_phloem_rate \
+        + n.phloem_hexose_uptake_rate / 2.
 
     # We calculate the derivative of the amount of hexose in the root reserve pool:
     y_derivatives['hexose_reserve'] = \
@@ -3989,7 +3991,9 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
         - n.Deficit_hexose_soil_rate \
         - n.soil_hexose_degradation_rate \
         + n.hexose_exudation_rate \
-        - n.hexose_uptake_rate
+        + n.phloem_hexose_exudation_rate \
+        - n.hexose_uptake_rate \
+        - n.phloem_hexose_uptake_rate
 
     # We calculate the derivative of the amount of mucilage in the soil pool:
     y_derivatives['mucilage_soil'] = \
