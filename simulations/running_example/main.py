@@ -73,10 +73,9 @@ if __name__ == "__main__":
                     input_file="None",
                     outputs_directory=outputs_dirpath,
                     forcing_constant_inputs=True,
-                    constant_sucrose_input_rate=1.e-6,
+                    constant_sucrose_input_rate=1.e-10,
                     constant_soil_temperature_in_Celsius=20,
                     nodules=False,
-                    specific_model_option=None,
                     simulation_results_file='simulation_results.csv',
                     recording_interval_in_days=5,
                     recording_images=False,
@@ -95,8 +94,8 @@ if __name__ == "__main__":
                     scenario_id=1,
                     displayed_property="C_hexose_root", displayed_vmin=1e-6, displayed_vmax=1e-0,
                     log_scale=True, cmap='brg',
-                    x_center=0, y_center=0, z_center=-1, z_cam=-1,
-                    camera_distance=10., step_back_coefficient=0., camera_rotation=False, n_rotation_points=24 * 5)
+                    x_center=0, y_center=0, z_center=-0.1, z_cam=-0.1,
+                    camera_distance=0.4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=24 * 5)
 
     print("")
     print("***************************************************************")
