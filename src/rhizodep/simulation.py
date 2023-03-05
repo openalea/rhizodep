@@ -811,7 +811,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                                            + sucrose_input_rate * time_step_in_seconds * 12.)
                     theoretical_cumulated_C_in_the_system += sucrose_input_rate * time_step_in_seconds * 12.
 
-                    if abs(current_C_in_the_system - theoretical_cumulated_C_in_the_system) / current_C_in_the_system > 1e-3:
+                    if abs(current_C_in_the_system - theoretical_cumulated_C_in_the_system) / current_C_in_the_system > 1e-6:
                         print("!!! ERROR ON CARBON BALANCE: the current amount of C in the system is",
                               "{:.2E}".format(Decimal(current_C_in_the_system)), "but it should be",
                               "{:.2E}".format(Decimal(theoretical_current_C_in_the_system)), "mol of C")

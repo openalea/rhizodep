@@ -595,10 +595,10 @@ relative_nodule_thickening_rate_max = 20. / 100. / (24. * 60. * 60.)
 
 # Relative ratio between the exchange surface of a compartment in the root and its external surface (m2 per m2):
 #---------------------------------------------------------------------------------------------------------------
-phloem_surfacic_fraction = 1.
-stelar_parenchyma_surfacic_fraction  = 1.
-cortical_parenchyma_surfacic_fraction  = 1.
-epidermal_parenchyma_surfacic_fraction  = 1.
+phloem_surfacic_fraction = 0.64 # According to Frederic Rees' first estimations
+stelar_parenchyma_surfacic_fraction  = 8 # According to Tristan Gerault's first estimation
+cortical_parenchyma_surfacic_fraction  = 10 # According to Tristan Gerault's first estimation
+epidermal_parenchyma_surfacic_fraction  = 8 # According to Tristan Gerault's first estimation
 
 # Ratio between the length of the meristem zone and root radius (m per m):
 #-------------------------------------------------------------------------

@@ -49,6 +49,9 @@ from openalea.mtg.traversal import pre_order, post_order
 
 import rhizodep.parameters as param
 
+# To display more than 5 columns when printing a Panda datframe:
+pd.set_option('display.max_columns',20)
+
 # FUNCTIONS FOR CALCULATING PROPERTIES ON THE MTG
 #################################################
 
@@ -2084,9 +2087,7 @@ class Simulate_segmentation_and_primordia_formation(object):
         apices_list = list(self._apices)
         # For each apex in the list of apices:
         for apex in apices_list:
-            i = 0
             if apex.type == "Normal_root_after_emergence" and apex.length > 0.:
-                i += 1
                 # We define the new list of apices with the function apex_development:
                 new_apex = segmentation_and_primordium_formation(self.g,
                                                                  apex,
@@ -3453,7 +3454,7 @@ def root_hexose_uptake_rate(n, soil_temperature_in_Celsius=20, printing_warnings
 
 # Mucilage secretion:
 # ------------------
-def root_mucilage_secretion_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
+def mucilage_secretion_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
     """
     This function computes the rate of mucilage secretion (in mol of equivalent hexose per second) for a given root element n.
     :param n: the root element to be considered
@@ -3541,13 +3542,13 @@ def root_mucilage_secretion_rate(n, soil_temperature_in_Celsius=20, printing_war
     # RECORDING THE RESULTS:
     # ----------------------
     # Eventually, we record all new values in the element n:
-    n.root_mucilage_secretion_rate = mucilage_secretion_rate
+    n.mucilage_secretion_rate = mucilage_secretion_rate
 
     return n
 
 # Release of root cells:
 # ----------------------
-def root_cells_release_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
+def cells_release_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
     """
     This function computes the rate of release of epidermal or cap root cells (in mol of equivalent hexose per second)
     into the soil for a given root element. The rate of release linearily decreases with increasing length from the tip,
@@ -3640,7 +3641,7 @@ def root_cells_release_rate(n, soil_temperature_in_Celsius=20, printing_warnings
     # RECORDING THE RESULTS:
     # ----------------------
     # Eventually, we record all new values in the element n:
-    n.root_cells_release_rate = cells_release_rate
+    n.cells_release_rate = cells_release_rate
 
     return n
 
@@ -3654,7 +3655,7 @@ def root_cells_release_rate(n, soil_temperature_in_Celsius=20, printing_warnings
 
 # Degradation of hexose in the soil (microbial consumption):
 # ----------------------------------------------------------
-def soil_hexose_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
+def hexose_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
     """
     This function computes the rate of hexose "consumption" (in mol of hexose per seconds) at the soil-root interface
     for a given root element. It mimics the uptake of hexose by rhizosphere microorganisms, and is therefore described
@@ -3688,7 +3689,7 @@ def soil_hexose_degradation_rate(n, soil_temperature_in_Celsius=20, printing_war
     # CONSIDERING CASES THAT SHOULD BE AVOIDED:
     # ------------------------------------------
     # We initialize the rate of the element n:
-    soil_hexose_degradation_rate = 0.
+    hexose_degradation_rate = 0.
 
     # We initialize the possibility of hexose degradation:
     possible_hexose_degradation = True
@@ -3708,31 +3709,31 @@ def soil_hexose_degradation_rate(n, soil_temperature_in_Celsius=20, printing_war
         # ------------------------------------------------------
 
         # We correct the maximal degradation rate according to soil temperature:
-        corrected_hexose_degradation_rate_max = param.soil_hexose_degradation_rate_max * temperature_modification(
+        corrected_hexose_degradation_rate_max = param.hexose_degradation_rate_max * temperature_modification(
             temperature_in_Celsius=soil_temperature_in_Celsius,
             process_at_T_ref=1,
-            T_ref=param.soil_hexose_degradation_rate_max_T_ref,
-            A=param.soil_hexose_degradation_rate_max_A,
-            B=param.soil_hexose_degradation_rate_max_B,
-            C=param.soil_hexose_degradation_rate_max_C)
+            T_ref=param.hexose_degradation_rate_max_T_ref,
+            A=param.hexose_degradation_rate_max_A,
+            B=param.hexose_degradation_rate_max_B,
+            C=param.hexose_degradation_rate_max_C)
 
         # CALCULATIONS OF SOIL HEXOSE DEGRADATION RATE:
         # ---------------------------------------------
         # The degradation rate is defined according to a Michaelis-Menten function of the concentration of hexose
         # in the soil:
-        soil_hexose_degradation_rate = corrected_hexose_degradation_rate_max * non_vascular_exchange_surface \
+        hexose_degradation_rate = corrected_hexose_degradation_rate_max * non_vascular_exchange_surface \
                                        * C_hexose_soil / (param.Km_hexose_degradation + C_hexose_soil)
 
     # RECORDING THE RESULTS:
     # ----------------------
     # Eventually, we record all new values in the element n:
-    n.soil_hexose_degradation_rate = soil_hexose_degradation_rate
+    n.hexose_degradation_rate = hexose_degradation_rate
 
     return n
 
 # Degradation of mucilage in the soil (microbial consumption):
 # ------------------------------------------------------------
-def soil_mucilage_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
+def mucilage_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
     """
     This function computes the rate of mucilage degradation outside the root (in mol of equivalent-hexose per second)
     for a given root element. Only the external surface of the root element is taken into account here, similarly to
@@ -3756,7 +3757,7 @@ def soil_mucilage_degradation_rate(n, soil_temperature_in_Celsius=20, printing_w
     # CONSIDERING CASES THAT SHOULD BE AVOIDED:
     # ------------------------------------------
     # We initialize the rate of the element n:
-    soil_mucilage_degradation_rate = 0.
+    mucilage_degradation_rate = 0.
 
     # We initialize the possibility of mucilage degradation:
     possible_mucilage_degradation = True
@@ -3776,31 +3777,31 @@ def soil_mucilage_degradation_rate(n, soil_temperature_in_Celsius=20, printing_w
         # -------------------------------------------------------
 
         # We correct the maximal degradation rate according to soil temperature:
-        corrected_mucilage_degradation_rate_max = param.soil_mucilage_degradation_rate_max * temperature_modification(
+        corrected_mucilage_degradation_rate_max = param.mucilage_degradation_rate_max * temperature_modification(
             temperature_in_Celsius=soil_temperature_in_Celsius,
             process_at_T_ref=1,
-            T_ref=param.soil_mucilage_degradation_rate_max_T_ref,
-            A=param.soil_mucilage_degradation_rate_max_A,
-            B=param.soil_mucilage_degradation_rate_max_B,
-            C=param.soil_mucilage_degradation_rate_max_C)
+            T_ref=param.mucilage_degradation_rate_max_T_ref,
+            A=param.mucilage_degradation_rate_max_A,
+            B=param.mucilage_degradation_rate_max_B,
+            C=param.mucilage_degradation_rate_max_C)
 
         # CALCULATIONS OF SOIL MUCILAGE DEGRADATION RATE:
         # ---------------------------------------------
         # The degradation rate is defined according to a Michaelis-Menten function of the concentration of mucilage
         # in the soil:
-        soil_mucilage_degradation_rate = corrected_mucilage_degradation_rate_max * exchange_surface \
+        mucilage_degradation_rate = corrected_mucilage_degradation_rate_max * exchange_surface \
                                        * Cs_mucilage_soil / (param.Km_mucilage_degradation + Cs_mucilage_soil)
 
     # RECORDING THE RESULTS:
     # ----------------------
     # Eventually, we record all new values in the element n:
-    n.soil_mucilage_degradation_rate = soil_mucilage_degradation_rate
+    n.mucilage_degradation_rate = mucilage_degradation_rate
 
     return n
 
 # Degradation of root cells released in the soil (microbial consumption):
 # -----------------------------------------------------------------------
-def soil_cells_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
+def cells_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
     """
     This function computes the rate of root cells degradation outside the root (in mol of equivalent-hexose per second)
     for a given root element. Only the external surface of the root element is taken into account as the exchange
@@ -3822,7 +3823,7 @@ def soil_cells_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warn
     # CONSIDERING CASES THAT SHOULD BE AVOIDED:
     # ------------------------------------------
     # We initialize the rate of the element n:
-    soil_cells_degradation_rate = 0.
+    cells_degradation_rate = 0.
 
     # We initialize the possibility of cells degradation:
     possible_cells_degradation = True
@@ -3841,25 +3842,25 @@ def soil_cells_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warn
         # CALCULATION OF THE MAXIMAL RATE OF CELLS DEGRADATION:
         # -----------------------------------------------------
         # We correct the maximal degradation rate according to soil temperature:
-        corrected_cells_degradation_rate_max = param.soil_cells_degradation_rate_max * temperature_modification(
+        corrected_cells_degradation_rate_max = param.cells_degradation_rate_max * temperature_modification(
             temperature_in_Celsius=soil_temperature_in_Celsius,
             process_at_T_ref=1,
-            T_ref=param.soil_cells_degradation_rate_max_T_ref,
-            A=param.soil_cells_degradation_rate_max_A,
-            B=param.soil_cells_degradation_rate_max_B,
-            C=param.soil_cells_degradation_rate_max_C)
+            T_ref=param.cells_degradation_rate_max_T_ref,
+            A=param.cells_degradation_rate_max_A,
+            B=param.cells_degradation_rate_max_B,
+            C=param.cells_degradation_rate_max_C)
 
         # CALCULATIONS OF SOIL CELLS DEGRADATION RATE:
         # --------------------------------------------
         # The degradation rate is defined according to a Michaelis-Menten function of the concentration of root cells
         # in the soil:
-        soil_cells_degradation_rate = corrected_cells_degradation_rate_max * exchange_surface \
+        cells_degradation_rate = corrected_cells_degradation_rate_max * exchange_surface \
                                        * Cs_cells_soil / (param.Km_cells_degradation + Cs_cells_soil)
 
     # RECORDING THE RESULTS:
     # ----------------------
     # Eventually, we record all new values in the element n:
-    n.soil_cells_degradation_rate = soil_cells_degradation_rate
+    n.cells_degradation_rate = cells_degradation_rate
 
     return n
 
@@ -3893,15 +3894,15 @@ def calculating_all_growth_independent_fluxes(n, soil_temperature_in_Celsius, pr
     # Transfer of hexose from the soil to the root:
     root_hexose_uptake_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Consumption of hexose in the soil:
-    soil_hexose_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
+    hexose_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Secretion of mucilage into the soil:
-    root_mucilage_secretion_rate(n, soil_temperature_in_Celsius, printing_warnings)
+    mucilage_secretion_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Consumption of mucilage in the soil:
-    soil_mucilage_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
+    mucilage_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Release of root cells into the soil:
-    root_cells_release_rate(n, soil_temperature_in_Celsius, printing_warnings)
+    cells_release_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Consumption of root cells in the soil:
-    soil_cells_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
+    cells_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
 
     return n
 
@@ -3922,11 +3923,11 @@ def calculating_amounts_from_fluxes(n, time_step_in_seconds):
     n.phloem_hexose_exudation = n.phloem_hexose_exudation_rate * time_step_in_seconds
     n.hexose_uptake = n.hexose_uptake_rate * time_step_in_seconds
     n.phloem_hexose_uptake = n.phloem_hexose_uptake_rate * time_step_in_seconds
-    n.hexose_degradation = n.soil_hexose_degradation_rate * time_step_in_seconds
-    n.mucilage_secretion = n.root_mucilage_secretion_rate * time_step_in_seconds
-    n.mucilage_degradation = n.soil_mucilage_degradation_rate * time_step_in_seconds
-    n.cells_release = n.root_cells_release_rate * time_step_in_seconds
-    n.cells_degradation = n.soil_cells_degradation_rate * time_step_in_seconds
+    n.hexose_degradation = n.hexose_degradation_rate * time_step_in_seconds
+    n.mucilage_secretion = n.mucilage_secretion_rate * time_step_in_seconds
+    n.mucilage_degradation = n.mucilage_degradation_rate * time_step_in_seconds
+    n.cells_release = n.cells_release_rate * time_step_in_seconds
+    n.cells_degradation = n.cells_degradation_rate * time_step_in_seconds
 
     return n
 
@@ -3940,8 +3941,8 @@ def calculating_extra_variables(n, time_step_in_seconds):
     # We calculate the net exudation of hexose (in mol of hexose):
     n.net_hexose_exudation = n.hexose_exudation + n.phloem_hexose_exudation - n.hexose_uptake - n.phloem_hexose_uptake
     # We calculate the total biomass of each element, including the structural mass and all sugars:
-    n.biomass = n.struct_mass + (
-            n.C_hexose_root * 6 * 12.01 + n.C_hexose_reserve * 6 * 12.01 + n.C_sucrose_root * 12 * 12.01) * n.struct_mass
+    n.biomass = n.struct_mass + (n.C_hexose_root * 6 * 12.01 \
+                                 + n.C_hexose_reserve * 6 * 12.01 + n.C_sucrose_root * 12 * 12.01) * n.struct_mass
     # We calculate a net rate of exudation, in gram of C per gram of dry structural mass per day:
     n.net_hexose_exudation_rate_per_day_per_gram \
         = (n.net_hexose_exudation / time_step_in_seconds) * 24. * 60. * 60. * 6. * 12.01 / n.struct_mass
@@ -3979,8 +3980,8 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
     y_derivatives['hexose_root'] = \
         - n.Deficit_hexose_root_rate \
         - n.hexose_exudation_rate + n.hexose_uptake_rate \
-        - n.root_mucilage_secretion_rate \
-        - n.root_cells_release_rate \
+        - n.mucilage_secretion_rate \
+        - n.cells_release_rate \
         - n.resp_maintenance_rate / 6. \
         - n.hexose_consumption_by_growth_rate \
         + n.hexose_production_from_phloem_rate - 2. * n.sucrose_loading_in_phloem_rate \
@@ -3989,23 +3990,21 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
     # We calculate the derivative of the amount of hexose in the soil pool:
     y_derivatives['hexose_soil'] = \
         - n.Deficit_hexose_soil_rate \
-        - n.soil_hexose_degradation_rate \
-        + n.hexose_exudation_rate \
-        + n.phloem_hexose_exudation_rate \
-        - n.hexose_uptake_rate \
-        - n.phloem_hexose_uptake_rate
+        - n.hexose_degradation_rate \
+        + n.hexose_exudation_rate - n.hexose_uptake_rate \
+        + n.phloem_hexose_exudation_rate - n.phloem_hexose_uptake_rate
 
     # We calculate the derivative of the amount of mucilage in the soil pool:
     y_derivatives['mucilage_soil'] = \
         - n.Deficit_mucilage_soil_rate \
-        + n.root_mucilage_secretion_rate \
-        - n.soil_mucilage_degradation_rate
+        + n.mucilage_secretion_rate \
+        - n.mucilage_degradation_rate
 
     # We calculate the derivative of the amount of root cells in the soil pool:
     y_derivatives['cells_soil'] = \
         - n.Deficit_cells_soil_rate \
-        + n.root_cells_release_rate \
-        - n.soil_cells_degradation_rate
+        + n.cells_release_rate \
+        - n.cells_degradation_rate
 
     return y_derivatives
 
@@ -4021,21 +4020,51 @@ class Differential_Equation_System(object):
         self.printing_warnings = printing_warnings
         self.printing_solver_outputs = printing_solver_outputs
 
+        # We initialize an empty list for the initial conditions of each variable:
         self.initial_conditions = []  #: the initial conditions of the compartments
 
         # We define the list of variables for which derivatives will be integrated, which correspond here to
-        # the quantities of sugars  in different pools - we voluntarily exclude the sucrose pool in the phloem:
-        y_variables = ['hexose_root', 'hexose_reserve', 'hexose_soil', 'mucilage_soil', 'cells_soil']
+        # the quantities  in each pool (NOTE: we voluntarily exclude the sucrose pool in the phloem):
+        self.variables_in_the_system = ['hexose_root',
+                                        'hexose_reserve',
+                                        'hexose_soil',
+                                        'mucilage_soil',
+                                        'cells_soil']
+
+        # We define a second list of variables for which derivatives will not be be integrated, but for which we want to
+        # record the evolution and the final state considering the successive variations of concentrations within a time
+        # step:
+        self.variables_not_in_the_system = ['hexose_production_from_phloem',
+                                            'sucrose_loading_in_phloem',
+                                            'resp_maintenance',
+                                            'hexose_immobilization_as_reserve',
+                                            'hexose_mobilization_from_reserve',
+                                            'hexose_exudation',
+                                            'hexose_uptake',
+                                            'mucilage_secretion',
+                                            'cells_release',
+                                            'hexose_degradation',
+                                            'mucilage_degradation',
+                                            'cells_degradation']
 
         # We initialize an index and a dictionary:
-        index = 0
-        y_mapping = {}
+        index = 0 # The index will be used to attribute the right property in the list corresponding to y
+        y_mapping = {} # y_mapping is a dictionnary associating a unique index for each variable in y
         # We create a mapping, so that there is a dictionary containing the link between the variable name and the index in the list:
-        for var in y_variables:
+        for var in self.variables_in_the_system:
+            # For the new key [var] in the dictionary, we add the corresponding index:
+            y_mapping[var] = index
+            # We also add a 0 in the list corresponding to the initial conditions of y:
+            self.initial_conditions.append(0)
+            index += 1
+        # We also add the amounts exchanged between pools that we want to keep in memory:
+        for var in self.variables_not_in_the_system:
             y_mapping[var] = index
             self.initial_conditions.append(0)
             index += 1
-        self.initial_conditions_mapping = y_mapping
+
+        # We keep this information in the "self":
+        self.y_variables_mapping = y_mapping
 
         # We create a time grid of the simulation:
         self.time_grid_in_seconds = np.array([0.0, self.time_step_in_seconds])
@@ -4050,16 +4079,19 @@ class Differential_Equation_System(object):
         # We initialize a vector of 0 for each variable in y:
         y_derivatives = np.zeros_like(y)
 
-        # We read the current values of the amounts:
-        self.n.hexose_root = y[self.initial_conditions_mapping['hexose_root']]
-        self.n.hexose_reserve = y[self.initial_conditions_mapping['hexose_reserve']]
-        self.n.hexose_soil = y[self.initial_conditions_mapping['hexose_soil']]
-        self.n.mucilage_soil = y[self.initial_conditions_mapping['mucilage_soil']]
-        self.n.cells_soil = y[self.initial_conditions_mapping['cells_soil']]
+        # We assign to the pool amounts in n the values in y:
+        #----------------------------------------------------
+
+        # We cover all the variables that need to be computed over the time step:
+        for variable_name in self.y_variables_mapping.keys():
+            # And we attribute the corresponding value in y to the corresppnding property in the root element n:
+            setattr(self.n, variable_name, y[self.y_variables_mapping[variable_name]])
+            # Now n has new amounts corresponding to the values calculated in y!
     
-        # Then we update the concentrations in each pool!
+        # We update the concentrations in each pool:
+        #-------------------------------------------
+
         # 1) Hexose concentrations are expressed relative to the structural mass of the root element:
-        #--------------------------------------------------------------------------------------------
         mass = (self.n.initial_struct_mass + self.n.initial_living_root_hairs_struct_mass)
         # We make sure that the mass is positive:
         if isnan(mass) or mass <=0.:
@@ -4079,6 +4111,7 @@ class Differential_Equation_System(object):
             self.n.C_hexose_root = self.n.hexose_root / mass
             self.n.C_hexose_reserve = self.n.hexose_reserve / mass
             self.n.C_hexose_soil = self.n.hexose_soil / mass
+
         # 2) Mucilage concentration and root cells concentration in the soil are expressed relative to the external
         # surface of roots:
         surface = (self.n.initial_external_surface + self.n.initial_living_root_hairs_external_surface)
@@ -4099,21 +4132,27 @@ class Differential_Equation_System(object):
 
         #  Calculation of all C-related fluxes:
         # -------------------------------------
-        # We call an external function that computes all the fluxes for given element n, based on the updated concentrations:
+        # We call an external function that computes all the fluxes for given element n, based on the new concentrations:
         calculating_all_growth_independent_fluxes(self.n, self.soil_temperature_in_Celsius, self.printing_warnings)
 
         # Calculation of time derivatives:
         # ---------------------------------
         # We get a list of all derivatives of the amount in each pool, i.e. their rate of evolution over time (dQ/dt):
         time_derivatives = calculating_time_derivatives_of_the_amount_in_each_pool(self.n)
-        # Then we record these time derivatives:
-        y_derivatives[self.initial_conditions_mapping['hexose_root']] = time_derivatives['hexose_root']
-        y_derivatives[self.initial_conditions_mapping['hexose_reserve']] = time_derivatives['hexose_reserve']
-        y_derivatives[self.initial_conditions_mapping['hexose_soil']] = time_derivatives['hexose_soil']
-        y_derivatives[self.initial_conditions_mapping['mucilage_soil']] = time_derivatives['mucilage_soil']
-        y_derivatives[self.initial_conditions_mapping['cells_soil']] = time_derivatives['cells_soil']
+        # # And we record the new time derivatives. We cover all the variables in the differential equations system,
+        # and assign the corresponding derivative over time:
+        for variable_name in self.variables_in_the_system:
+            y_derivatives[self.y_variables_mapping[variable_name]] = time_derivatives[variable_name]
 
-        # The function returns this system of differential equations:
+        # # We also record specific fluxes over time. We cover all the variables NOT in the differential equations system,
+        # which need to be computed over the time step:
+        for variable_name in self.variables_not_in_the_system:
+            # We assign to 'y_derivatives' the actual rate that has been calculated above by the function
+            # 'calculating_all_growth_independent_fluxes':
+            variable_name_rate = variable_name + '_rate'
+            y_derivatives[self.y_variables_mapping[variable_name]] = getattr(self.n, variable_name_rate)
+
+        # The function returns the actual list of derivatives over time, for both pools and specific exchanged amounts:
         return y_derivatives
 
     def _update_initial_conditions(self):
@@ -4123,26 +4162,55 @@ class Differential_Equation_System(object):
         :return:
         """
 
+        # We calculate the structural mass to which concentrations are related:
         mass = (self.n.initial_struct_mass + self.n.initial_living_root_hairs_struct_mass)
         if isnan(mass):
             print("!!! For element", self.n.index(), "the initial mass before updating the initial conditions in the solver was NA!")
             mass=0.
+
+        # We calculate the external surface to which some concentrations are related:
         surface = (self.n.initial_external_surface + self.n.initial_living_root_hairs_external_surface)
         if isnan(surface):
             print("!!! For element", self.n.index(),
                   "the initial external surface before updating the initial conditions in the solver was NA!")
             surface=0.
 
-        self.initial_conditions[self.initial_conditions_mapping['hexose_root']] \
-            = self.n.C_hexose_root * mass
-        self.initial_conditions[self.initial_conditions_mapping['hexose_reserve']] \
-            = self.n.C_hexose_reserve * mass
-        self.initial_conditions[self.initial_conditions_mapping['hexose_soil']] \
-            = self.n.C_hexose_soil * mass
-        self.initial_conditions[self.initial_conditions_mapping['mucilage_soil']] \
-            = self.n.Cs_mucilage_soil * surface
-        self.initial_conditions[self.initial_conditions_mapping['cells_soil']] \
-            = self.n.Cs_cells_soil * surface
+        # We define the list of variables for which concentrations is related to surface, not mass:
+        surface_related_concentrations = ['mucilage_soil', 'cells_soil']
+
+        # We cover all the variables in the differential equations system and calculate the new amount in the pool,
+        # based on the concentration in this pool:
+        for variable_name in self.variables_in_the_system:
+            # If the concentration is related to surface (and not mass):
+            if variable_name in surface_related_concentrations:
+                # We create the name corresponding to the concentration property in the root element:
+                concentration_name = "Cs_" + variable_name
+                # Then the amount in the pool is calculated from the concentration and the surface:
+                self.initial_conditions[self.y_variables_mapping[variable_name]] = getattr(self.n, concentration_name) \
+                                                                                   * surface
+            else:
+                # Otherwise the amount in the pool is calculated from the concentration and the mass:
+                concentration_name = "C_" + variable_name
+                self.initial_conditions[self.y_variables_mapping[variable_name]] = getattr(self.n, concentration_name) \
+                                                                                   * mass
+
+        # We cover all the variables NOT in the differential equations system:
+        for variable_name in self.variables_not_in_the_system:
+            # The initial amounts corresponding to the exchange is necessarily 0 at the beginning of the time step:
+            self.initial_conditions[self.y_variables_mapping[variable_name]] = 0.
+
+        return
+
+    def _update_final_conditions(self, sol):
+        """
+        Update the compartments values in n from the compartments values in sol at self.time_step_in_seconds
+        """
+
+        # We cover all the variables to be computed (i.e. both the amounts in each pool and the exchanged amounts):
+        for compartment_name, compartment_index in self.y_variables_mapping.items():
+            # We assign to the property in n the new value of the amount after running the solver, which is the last
+            # value of the time series of the corresponging variable in the new y given by the outputs of the solver:
+            setattr(self.n, compartment_name, sol.y[compartment_index][-1])
 
         return
 
@@ -4153,25 +4221,21 @@ class Differential_Equation_System(object):
         then the new concentrations because of the function '_C_fluxes_within_each_segment_derivatives'.
         """
 
-        # print("Here are the initial conditions before update:")
-        # print(self.initial_conditions)
-
+        # We first initialize y before running the solver:
         self._update_initial_conditions()
 
-        # print("Here are the initial conditions after update:")
-        # print(self.initial_conditions)
-
+        # We call the solver, which will repeat calculations at different times within the time step and progressively
+        # transform all the variables stored in y:
         sol = solve_ivp(fun=self._C_fluxes_within_each_segment_derivatives,
                         t_span=self.time_grid_in_seconds,
                         y0=self.initial_conditions,
                         # method='BDF',
                         method='LSODA',
                         # t_eval=np.array([self.time_step_in_seconds]), # Select this to get only the final quantities at the end of the time step
-                        # t_eval=np.linspace(0, self.time_step_in_seconds, 4), # Select this to get time points regularly distributed within the time step
+                        # t_eval=np.linspace(0, self.time_step_in_seconds, # Select this to get time points regularly distributed within the time step
                         t_eval=None, # Select t_eval=None to get automatical time points within the current macro time step
                         # min_step=1 / (24. * 60. * 60.), # OPTIONAL: defines the minimal micro time step (0 by default)
-                        dense_output=False
-                        # OPTIONAL: defines whether the solution should be continuous or not (False by default)
+                        dense_output=False # OPTIONAL: defines whether the solution should be continuous or not (False by default)
                         )
 
         # OPTIONAL: We can print the results of the different iterations at some of the micro time steps!
@@ -4182,7 +4246,7 @@ class Differential_Equation_System(object):
                 solver_times.columns=['Time']
                 solver_y = pd.DataFrame(sol.y)
                 solver_y = solver_y.transpose()
-                solver_y.columns = self.initial_conditions_mapping.keys()
+                solver_y.columns = self.y_variables_mapping.keys()
                 solver_results = pd.concat([solver_times, solver_y], axis=1)
                 print(solver_results)
                 print("")
@@ -4190,6 +4254,9 @@ class Differential_Equation_System(object):
                 print("   > PROBLEM: Not able to interpret the solver results! Here was the message given by the solver:")
                 print(sol.message)
                 print("")
+
+        # We make sure that only the last value at the end of the time step is kept in memory to update each amount:
+        self._update_final_conditions(sol)
 
         return
 
@@ -4509,13 +4576,16 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
         # (but note that root hairs have already been included in the total structural mass calculated above):
         total_root_hairs_mass += n.root_hairs_struct_mass
 
+        # We increase the total amounts in each pool, based on the concentrations of the pool and its mass or surface
+        # (NOTE: we don't include Deficits here, as they are considered further below):
         total_sucrose_root += n.C_sucrose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
         total_hexose_root += n.C_hexose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
         total_hexose_reserve += n.C_hexose_reserve * (n.struct_mass + n.living_root_hairs_struct_mass)
         total_hexose_soil += n.C_hexose_soil * (n.struct_mass + n.living_root_hairs_struct_mass)
-        total_mucilage_soil += n.Cs_mucilage_soil * (n.struct_mass + n.living_root_hairs_struct_mass)
-        total_cells_soil += n.Cs_cells_soil * (n.struct_mass + n.living_root_hairs_struct_mass)
+        total_mucilage_soil += n.Cs_mucilage_soil * (n.external_surface + n.living_root_hairs_external_surface)
+        total_cells_soil += n.Cs_cells_soil * (n.external_surface + n.living_root_hairs_external_surface)
 
+        # We increase the possible deficit of each pool:
         total_sucrose_root_deficit += n.Deficit_sucrose_root
         total_hexose_root_deficit += n.Deficit_hexose_root
         total_hexose_reserve_deficit += n.Deficit_hexose_reserve
@@ -4523,6 +4593,7 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
         total_mucilage_soil_deficit += n.Deficit_mucilage_soil
         total_cells_soil_deficit += n.Deficit_cells_soil
 
+        # We also increase the quantities exchanged between pools because of specific processes:
         total_respiration += n.resp_maintenance + n.resp_growth
         total_respiration_root_growth += n.resp_growth
         total_respiration_root_maintenance += n.resp_maintenance
