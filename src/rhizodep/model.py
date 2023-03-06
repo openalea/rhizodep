@@ -3965,7 +3965,6 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
     # We calculate the derivative of the amount of sucrose for this element
     # (NOTE: we don't consider here the transfer of sucrose from other elements through the phloem):
     y_derivatives['sucrose_root'] = \
-        - n.Deficit_sucrose_root_rate \
         - n.hexose_production_from_phloem_rate / 2. \
         - n.phloem_hexose_exudation_rate / 2. \
         + n.sucrose_loading_in_phloem_rate \
@@ -3973,12 +3972,10 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
 
     # We calculate the derivative of the amount of hexose in the root reserve pool:
     y_derivatives['hexose_reserve'] = \
-        - n.Deficit_hexose_reserve_rate \
         + n.hexose_immobilization_as_reserve_rate - n.hexose_mobilization_from_reserve_rate
 
     # # We calculate the derivative of the amount of hexose in the mobile pool of the root:
     y_derivatives['hexose_root'] = \
-        - n.Deficit_hexose_root_rate \
         - n.hexose_exudation_rate + n.hexose_uptake_rate \
         - n.mucilage_secretion_rate \
         - n.cells_release_rate \
@@ -3989,24 +3986,129 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
     
     # We calculate the derivative of the amount of hexose in the soil pool:
     y_derivatives['hexose_soil'] = \
-        - n.Deficit_hexose_soil_rate \
         - n.hexose_degradation_rate \
         + n.hexose_exudation_rate - n.hexose_uptake_rate \
         + n.phloem_hexose_exudation_rate - n.phloem_hexose_uptake_rate
 
     # We calculate the derivative of the amount of mucilage in the soil pool:
     y_derivatives['mucilage_soil'] = \
-        - n.Deficit_mucilage_soil_rate \
         + n.mucilage_secretion_rate \
         - n.mucilage_degradation_rate
 
     # We calculate the derivative of the amount of root cells in the soil pool:
     y_derivatives['cells_soil'] = \
-        - n.Deficit_cells_soil_rate \
         + n.cells_release_rate \
         - n.cells_degradation_rate
 
     return y_derivatives
+
+def adjusting_pools_and_deficits(n, printing_warnings=False):
+    """
+    This function adjusts possibly negative concentrations by setting them to 0 and by recording the corresponding deficit.
+    WATCH OUT: This function must be called once the concentrations have already been calculated with the previous deficits!
+    :param n: the root element where calculations are made
+    :param printing_warnings: if True, warning messages will be printed
+    :return: the updated element n
+    """
+
+    # We calculate possible deficits to be included in the next time step:
+    # ---------------------------------------------------------------------
+
+    # We reset the local deficits to 0:
+    n.Deficit_sucrose_root = 0.
+    n.Deficit_hexose_root = 0.
+    n.Deficit_hexose_reserve = 0.
+    n.Deficit_hexose_soil = 0.
+    n.Deficit_mucilage_soil = 0.
+    n.Deficit_cells_soil = 0.
+
+    # Looking at sucrose:
+    if n.C_sucrose_root < 0:
+        # We define a positive deficit (mol of sucrose) based on the negative concentration:
+        n.Deficit_sucrose_root = -n.C_sucrose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
+        # And we set the concentration to 0:
+        if printing_warnings:
+            print("WARNING: After balance, there is a deficit in root sucrose for element", n.index(),
+                  "that corresponds to", n.Deficit_sucrose_root,
+                  "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        # # CHEATING:
+        # n.Deficit_sucrose_root = 0.
+        # And we set the concentration to zero:
+        n.C_sucrose_root = 0.
+
+    # TODO: WATCH OUT HERE!!!!
+    # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
+    # n.Deficit_sucrose_root_rate = n.Deficit_sucrose_root / time_step_in_seconds
+    # # PLEASE NOTE: The global (if any) deficit in sucrose is only used by the function "shoot_sucrose_and_spreading"
+    # # when defining the new homogeneous concentration of sucrose within the root system, and when performing a true
+    # # carbon balance of the root system in "summing".
+
+    # Looking at hexose in the mobile pool of the root:
+    if n.C_hexose_root < 0:
+        if printing_warnings:
+            print("WARNING: After balance, there is a deficit of root hexose for element", n.index(),
+                  "that corresponds to", n.Deficit_hexose_root,
+                  "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        # We define a positive deficit (mol of hexose) based on the negative concentration:
+        n.Deficit_hexose_root = - n.C_hexose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
+        # And we set the concentration to 0:
+        n.C_hexose_root = 0.
+    # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
+    # n.Deficit_hexose_root_rate = n.Deficit_hexose_root / time_step_in_seconds
+
+    # Looking at hexose in the reserve pool:
+    if n.C_hexose_reserve < 0:
+        if printing_warnings:
+            print("WARNING: After balance, there is a deficit of reserve hexose for element", n.index(),
+                  "that corresponds to", n.Deficit_hexose_reserve,
+                  "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        # We define a positive deficit (mol of hexose) based on the negative concentration:
+        n.Deficit_hexose_reserve = - n.C_hexose_reserve * (n.struct_mass + n.living_root_hairs_struct_mass)
+        # And we set the concentration to 0:
+        n.C_hexose_reserve = 0.
+    # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
+    # n.Deficit_hexose_reserve_rate = n.Deficit_hexose_reserve / time_step_in_seconds
+
+    # Looking at hexose in the soil:
+    if n.C_hexose_soil < 0:
+        if printing_warnings:
+            print("WARNING: After balance, there is a deficit of soil hexose for element", n.index(),
+                  "that corresponds to", n.Deficit_hexose_soil,
+                  "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        # We define a positive deficit (mol of hexose) based on the negative concentration:
+        n.Deficit_hexose_soil = -n.C_hexose_soil * (n.struct_mass + n.living_root_hairs_struct_mass)
+        # And we set the concentration to 0:
+        n.C_hexose_soil = 0.
+    # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
+    # n.Deficit_hexose_soil_rate = n.Deficit_hexose_soil / time_step_in_seconds
+
+    # Looking at mucilage in the soil:
+    if n.Cs_mucilage_soil < 0:
+        if printing_warnings:
+            print("WARNING: After balance, there is a deficit of soil mucilage for element", n.index(),
+                  "that corresponds to", n.Deficit_mucilage_soil,
+                  "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        # We define a positive deficit (mol of equivalent-hexose) based on the negative concentration:
+        n.Deficit_mucilage_soil = -n.Cs_mucilage_soil * (n.external_surface + n.living_root_hairs_external_surface)
+        # And we set the concentration to 0:
+        n.Cs_mucilage_soil = 0.
+    # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
+    # n.Deficit_mucilage_soil_rate = n.Deficit_mucilage_soil / time_step_in_seconds
+
+    # Looking at the root cells in the soil:
+    if n.Cs_cells_soil < 0:
+        if printing_warnings:
+            print("WARNING: After balance, there is a deficit of root cells in the soil for element", n.index(),
+                  "that corresponds to", n.Deficit_cells_soil,
+                  "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        # We define a positive deficit (mol of hexose-equivalent) based on the negative concentration:
+        n.Deficit_cells_soil = -n.Cs_cells_soil * (n.external_surface + n.living_root_hairs_external_surface)
+        # And we set the concentration to 0:
+        n.Cs_cells_soil = 0.
+    # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
+    # n.Deficit_cells_soil_rate = n.Deficit_cells_soil / time_step_in_seconds
+
+    return n
 
 # We create a class containing the system of differential equations to be solved with a solver:
 #----------------------------------------------------------------------------------------------
@@ -4086,8 +4188,8 @@ class Differential_Equation_System(object):
         for variable_name in self.y_variables_mapping.keys():
             # And we attribute the corresponding value in y to the corresppnding property in the root element n:
             setattr(self.n, variable_name, y[self.y_variables_mapping[variable_name]])
-            # Now n has new amounts corresponding to the values calculated in y!
-    
+            # Now n has new amounts corresponding to the values calculated in y! But these amounts could be negative.
+
         # We update the concentrations in each pool:
         #-------------------------------------------
 
@@ -4108,9 +4210,9 @@ class Differential_Equation_System(object):
                           "the initial mass before updating concentrations in the solver was 0 or NA!")
         else:
             # Otherwise, new concentrations are calculated considering the new amounts in each pool and the initial mass of the element:
-            self.n.C_hexose_root = self.n.hexose_root / mass
-            self.n.C_hexose_reserve = self.n.hexose_reserve / mass
-            self.n.C_hexose_soil = self.n.hexose_soil / mass
+            self.n.C_hexose_root = (self.n.hexose_root - self.n.Deficit_hexose_root) / mass
+            self.n.C_hexose_reserve = (self.n.hexose_reserve - self.n.Deficit_hexose_reserve) / mass
+            self.n.C_hexose_soil = (self.n.hexose_soil - self.n.Deficit_hexose_soil) / mass
 
         # 2) Mucilage concentration and root cells concentration in the soil are expressed relative to the external
         # surface of roots:
@@ -4127,8 +4229,15 @@ class Differential_Equation_System(object):
                 print("!!! For element", self.n.index(),
                       "the initial surface before updating concentrations in the solver was 0 or NA!")
         else:
-            self.n.Cs_mucilage_soil = self.n.mucilage_soil / surface
-            self.n.Cs_cells_soil = self.n.cells_soil / surface
+            self.n.Cs_mucilage_soil = (self.n.mucilage_soil - self.n.Deficit_mucilage_soil) / surface
+            self.n.Cs_cells_soil = (self.n.cells_soil - self.n.Deficit_cells_soil) / surface
+
+        # Adjusting pools and deficits:
+        #------------------------------
+        # We make sure that new concentration in each pool is not negative - otherwise we set it to 0 and record the
+        # corresponding deficit for the next calculation of the concentration:
+        adjusting_pools_and_deficits(self.n, self.printing_warnings)
+        # At this point, all new concentrations are either positive or nil.
 
         #  Calculation of all C-related fluxes:
         # -------------------------------------
@@ -4353,6 +4462,10 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
                                   + cells_soil_derivative) / (n.external_surface
                                                                  + n.living_root_hairs_external_surface)
 
+            # We make sure that new concentration in each pool is not negative - and takes into account possible
+            # previous deficits:
+            adjusting_pools_and_deficits(n, printing_warnings=printing_warnings)
+
         # OPTION 2: WITH SOLVER
         #######################
         # We use a numeric solver to calculate the best equilibrium between pools over time, so that the fluxes
@@ -4394,88 +4507,88 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
             n.C_sucrose_root = (initial_sucrose_root_amount + estimated_sucrose_root_derivative) \
               / (n.struct_mass + n.living_root_hairs_struct_mass)
 
-        # We calculate possible deficits to be included in the next time step:
-        #---------------------------------------------------------------------
-
-        # We reset the local deficits to 0:
-        n.Deficit_sucrose_root = 0.
-        n.Deficit_hexose_root = 0.
-        n.Deficit_hexose_reserve = 0.
-        n.Deficit_hexose_soil = 0.
-        n.Deficit_mucilage_soil = 0.
-        n.Deficit_cells_soil = 0.
-
-        # Looking at sucrose:
-        if n.C_sucrose_root < 0:
-            # We define a positive deficit (mol of sucrose) based on the negative concentration:
-            n.Deficit_sucrose_root = -n.C_sucrose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
-            # And we set the concentration to 0:
-            if printing_warnings:
-                print("WARNING: After balance, there is a deficit in root sucrose for element", n.index(), "that corresponds to", n.Deficit_sucrose_root, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-            # # CHEATING:
-            # n.Deficit_sucrose_root = 0.
-            # And we set the concentration to zero:
-            n.C_sucrose_root = 0.
-        # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-        n.Deficit_sucrose_root_rate = n.Deficit_sucrose_root / time_step_in_seconds
-        # PLEASE NOTE: The global (if any) deficit in sucrose is only used by the function "shoot_sucrose_and_spreading"
-        # when defining the new homogeneous concentration of sucrose within the root system, and when performing a true
-        # carbon balance of the root system in "summing".
-
-        # Looking at hexose in the mobile pool of the root:
-        if n.C_hexose_root < 0:
-            if printing_warnings:
-                print("WARNING: After balance, there is a deficit of root hexose for element", n.index(), "that corresponds to", n.Deficit_hexose_root, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-            # We define a positive deficit (mol of hexose) based on the negative concentration:
-            n.Deficit_hexose_root = - n.C_hexose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
-            # And we set the concentration to 0:
-            n.C_hexose_root = 0.
-        # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-        n.Deficit_hexose_root_rate = n.Deficit_hexose_root / time_step_in_seconds
-
-        # Looking at hexose in the reserve pool:
-        if n.C_hexose_reserve < 0:
-            if printing_warnings:
-                print("WARNING: After balance, there is a deficit of reserve hexose for element", n.index(),"that corresponds to", n.Deficit_hexose_reserve, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-            # We define a positive deficit (mol of hexose) based on the negative concentration:
-            n.Deficit_hexose_reserve = - n.C_hexose_reserve * (n.struct_mass + n.living_root_hairs_struct_mass)
-            # And we set the concentration to 0:
-            n.C_hexose_reserve = 0.
-        # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-        n.Deficit_hexose_reserve_rate = n.Deficit_hexose_reserve / time_step_in_seconds
-
-        # Looking at hexose in the soil:
-        if n.C_hexose_soil < 0:
-            if printing_warnings:
-                print("WARNING: After balance, there is a deficit of soil hexose for element", n.index(), "that corresponds to", n.Deficit_hexose_soil, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-            # We define a positive deficit (mol of hexose) based on the negative concentration:
-            n.Deficit_hexose_soil = -n.C_hexose_soil * (n.struct_mass + n.living_root_hairs_struct_mass)
-            # And we set the concentration to 0:
-            n.C_hexose_soil = 0.
-        # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-        n.Deficit_hexose_soil_rate = n.Deficit_hexose_soil / time_step_in_seconds
-
-        # Looking at mucilage in the soil:
-        if n.Cs_mucilage_soil < 0:
-            if printing_warnings:
-                print("WARNING: After balance, there is a deficit of soil mucilage for element", n.index(), "that corresponds to", n.Deficit_mucilage_soil, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-            # We define a positive deficit (mol of equivalent-hexose) based on the negative concentration:
-            n.Deficit_mucilage_soil = -n.Cs_mucilage_soil * (n.external_surface + n.living_root_hairs_external_surface)
-            # And we set the concentration to 0:
-            n.Cs_mucilage_soil = 0.
-        # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-        n.Deficit_mucilage_soil_rate = n.Deficit_mucilage_soil / time_step_in_seconds
-
-        # Looking at the root cells in the soil:
-        if n.Cs_cells_soil < 0:
-            if printing_warnings:
-                print("WARNING: After balance, there is a deficit of root cells in the soil for element", n.index(),"that corresponds to", n.Deficit_cells_soil, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-            # We define a positive deficit (mol of hexose-equivalent) based on the negative concentration:
-            n.Deficit_cells_soil = -n.Cs_cells_soil * (n.external_surface + n.living_root_hairs_external_surface)
-            # And we set the concentration to 0:
-            n.Cs_cells_soil = 0.
-        # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-        n.Deficit_cells_soil_rate = n.Deficit_cells_soil / time_step_in_seconds
+        # # We calculate possible deficits to be included in the next time step:
+        # #---------------------------------------------------------------------
+        #
+        # # We reset the local deficits to 0:
+        # n.Deficit_sucrose_root = 0.
+        # n.Deficit_hexose_root = 0.
+        # n.Deficit_hexose_reserve = 0.
+        # n.Deficit_hexose_soil = 0.
+        # n.Deficit_mucilage_soil = 0.
+        # n.Deficit_cells_soil = 0.
+        #
+        # # Looking at sucrose:
+        # if n.C_sucrose_root < 0:
+        #     # We define a positive deficit (mol of sucrose) based on the negative concentration:
+        #     n.Deficit_sucrose_root = -n.C_sucrose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
+        #     # And we set the concentration to 0:
+        #     if printing_warnings:
+        #         print("WARNING: After balance, there is a deficit in root sucrose for element", n.index(), "that corresponds to", n.Deficit_sucrose_root, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        #     # # CHEATING:
+        #     # n.Deficit_sucrose_root = 0.
+        #     # And we set the concentration to zero:
+        #     n.C_sucrose_root = 0.
+        # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
+        # n.Deficit_sucrose_root_rate = n.Deficit_sucrose_root / time_step_in_seconds
+        # # PLEASE NOTE: The global (if any) deficit in sucrose is only used by the function "shoot_sucrose_and_spreading"
+        # # when defining the new homogeneous concentration of sucrose within the root system, and when performing a true
+        # # carbon balance of the root system in "summing".
+        #
+        # # Looking at hexose in the mobile pool of the root:
+        # if n.C_hexose_root < 0:
+        #     if printing_warnings:
+        #         print("WARNING: After balance, there is a deficit of root hexose for element", n.index(), "that corresponds to", n.Deficit_hexose_root, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        #     # We define a positive deficit (mol of hexose) based on the negative concentration:
+        #     n.Deficit_hexose_root = - n.C_hexose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
+        #     # And we set the concentration to 0:
+        #     n.C_hexose_root = 0.
+        # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
+        # n.Deficit_hexose_root_rate = n.Deficit_hexose_root / time_step_in_seconds
+        #
+        # # Looking at hexose in the reserve pool:
+        # if n.C_hexose_reserve < 0:
+        #     if printing_warnings:
+        #         print("WARNING: After balance, there is a deficit of reserve hexose for element", n.index(),"that corresponds to", n.Deficit_hexose_reserve, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        #     # We define a positive deficit (mol of hexose) based on the negative concentration:
+        #     n.Deficit_hexose_reserve = - n.C_hexose_reserve * (n.struct_mass + n.living_root_hairs_struct_mass)
+        #     # And we set the concentration to 0:
+        #     n.C_hexose_reserve = 0.
+        # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
+        # n.Deficit_hexose_reserve_rate = n.Deficit_hexose_reserve / time_step_in_seconds
+        #
+        # # Looking at hexose in the soil:
+        # if n.C_hexose_soil < 0:
+        #     if printing_warnings:
+        #         print("WARNING: After balance, there is a deficit of soil hexose for element", n.index(), "that corresponds to", n.Deficit_hexose_soil, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        #     # We define a positive deficit (mol of hexose) based on the negative concentration:
+        #     n.Deficit_hexose_soil = -n.C_hexose_soil * (n.struct_mass + n.living_root_hairs_struct_mass)
+        #     # And we set the concentration to 0:
+        #     n.C_hexose_soil = 0.
+        # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
+        # n.Deficit_hexose_soil_rate = n.Deficit_hexose_soil / time_step_in_seconds
+        #
+        # # Looking at mucilage in the soil:
+        # if n.Cs_mucilage_soil < 0:
+        #     if printing_warnings:
+        #         print("WARNING: After balance, there is a deficit of soil mucilage for element", n.index(), "that corresponds to", n.Deficit_mucilage_soil, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        #     # We define a positive deficit (mol of equivalent-hexose) based on the negative concentration:
+        #     n.Deficit_mucilage_soil = -n.Cs_mucilage_soil * (n.external_surface + n.living_root_hairs_external_surface)
+        #     # And we set the concentration to 0:
+        #     n.Cs_mucilage_soil = 0.
+        # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
+        # n.Deficit_mucilage_soil_rate = n.Deficit_mucilage_soil / time_step_in_seconds
+        #
+        # # Looking at the root cells in the soil:
+        # if n.Cs_cells_soil < 0:
+        #     if printing_warnings:
+        #         print("WARNING: After balance, there is a deficit of root cells in the soil for element", n.index(),"that corresponds to", n.Deficit_cells_soil, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        #     # We define a positive deficit (mol of hexose-equivalent) based on the negative concentration:
+        #     n.Deficit_cells_soil = -n.Cs_cells_soil * (n.external_surface + n.living_root_hairs_external_surface)
+        #     # And we set the concentration to 0:
+        #     n.Cs_cells_soil = 0.
+        # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
+        # n.Deficit_cells_soil_rate = n.Deficit_cells_soil / time_step_in_seconds
 
         #  Calculation of additional variables:
         # -------------------------------------
