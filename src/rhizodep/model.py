@@ -12,11 +12,12 @@
 
 # TODO: Check the calculation of "Structural mass produced (g)"
 # TODO: Check how "Just_dead" might mess up with the duration of certain process (ex: hexose uptake)
-# TODO : Update ArchiSimple option (e.g. with the new way to represent Seminal/Adventitious roots?)
-# TODO: Add a general upper scale for the whole root system, in which the proprties about phloem sucrose could be stored?
+# TODO: Update ArchiSimple option (e.g. with the new way to represent Seminal/Adventitious roots?)
+# TODO: Add a general upper scale for the whole root system, in which the properties about phloem sucrose could be stored?
 # TODO: Introduce explicit threshold concentration for limiting processes, rather than "0"
 # TODO: Consider giving priority to root maintenance, and trigger senescence when root maintenance is not ensured
-# TODO: Watch the calculation of surface and volume for the apices - if they correspond to cones, the mass balance for segmentation may not be correct!
+# TODO: Watch the calculation of surface and volume for the apices - if they correspond to cones, the mass balance for
+#  segmentation may not be correct! A "reverse" function for calculating length/radius from the volume should be used.
 # TODO: Check actual_elongation_rate with thermal time...
 
 # TODO: POSSIBLE FUTURE DEVELOPMENT - Modify the way the apex and elongation zone are discretized:
@@ -36,6 +37,20 @@
 #  the root system into a soil grid. New concentrations at the interface of the roots would then be calculated, and the 
 #  converter would be used in a reverse way to switch back to the first, metabolic structure at the next time step. This 
 #  new development would be useful only if the metabolic structure has less elements in total than the geometric one.
+
+# TODO: POSSIBLE FUTURE DEVELOPMENT - Create a new ID of each root element, so that the ID does not change over time
+#  (unlike the index of elements in the MTG, which cannot be easily predicted or interpreted):
+#  We could label the elongating apex as a special case (A) for a given axis, while segments' numerotation
+#  would start close to the mother root and increase towards the apex. In this way the apex keeps the same ID regardless
+#  of the elongation of the axis and the segmentation, while a given segment also keeps its own ID regardless of
+#  segmentation. Each lateral axis would be identified based on the supporting element (if two laterals emerge from the
+#  same segment, they are numbered successively depending on their orientation in space ?).
+#  Example:
+#  - R(0)-A always designates the apex of the primary root.
+#  - R(0-S3-1)-S2 represents the second segment of the axis R(0-S3-1), which corresponds to the first lateral emerging
+#  from the third segment of axis R0.
+#  - R((0-S3-1)-S2-1)-A represents the apex of the first lateral root emerging from the segment described above.
+#  Check what is used in L-system and whether we are not reinventing the wheel!
 
 import os
 import numpy as np
@@ -4035,13 +4050,9 @@ def adjusting_pools_and_deficits(n, printing_warnings=False):
         # n.Deficit_sucrose_root = 0.
         # And we set the concentration to zero:
         n.C_sucrose_root = 0.
-
-    # TODO: WATCH OUT HERE!!!!
-    # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-    # n.Deficit_sucrose_root_rate = n.Deficit_sucrose_root / time_step_in_seconds
-    # # PLEASE NOTE: The global (if any) deficit in sucrose is only used by the function "shoot_sucrose_and_spreading"
-    # # when defining the new homogeneous concentration of sucrose within the root system, and when performing a true
-    # # carbon balance of the root system in "summing".
+    # PLEASE NOTE: The global (if any) deficit in sucrose is only used by the function "shoot_sucrose_and_spreading"
+    # when defining the new homogeneous concentration of sucrose within the root system, and when performing a true
+    # carbon balance of the root system in "summing".
 
     # Looking at hexose in the mobile pool of the root:
     if n.C_hexose_root < 0:
@@ -4053,8 +4064,6 @@ def adjusting_pools_and_deficits(n, printing_warnings=False):
         n.Deficit_hexose_root = - n.C_hexose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
         # And we set the concentration to 0:
         n.C_hexose_root = 0.
-    # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-    # n.Deficit_hexose_root_rate = n.Deficit_hexose_root / time_step_in_seconds
 
     # Looking at hexose in the reserve pool:
     if n.C_hexose_reserve < 0:
@@ -4066,8 +4075,6 @@ def adjusting_pools_and_deficits(n, printing_warnings=False):
         n.Deficit_hexose_reserve = - n.C_hexose_reserve * (n.struct_mass + n.living_root_hairs_struct_mass)
         # And we set the concentration to 0:
         n.C_hexose_reserve = 0.
-    # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-    # n.Deficit_hexose_reserve_rate = n.Deficit_hexose_reserve / time_step_in_seconds
 
     # Looking at hexose in the soil:
     if n.C_hexose_soil < 0:
@@ -4079,8 +4086,6 @@ def adjusting_pools_and_deficits(n, printing_warnings=False):
         n.Deficit_hexose_soil = -n.C_hexose_soil * (n.struct_mass + n.living_root_hairs_struct_mass)
         # And we set the concentration to 0:
         n.C_hexose_soil = 0.
-    # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-    # n.Deficit_hexose_soil_rate = n.Deficit_hexose_soil / time_step_in_seconds
 
     # Looking at mucilage in the soil:
     if n.Cs_mucilage_soil < 0:
@@ -4092,8 +4097,6 @@ def adjusting_pools_and_deficits(n, printing_warnings=False):
         n.Deficit_mucilage_soil = -n.Cs_mucilage_soil * (n.external_surface + n.living_root_hairs_external_surface)
         # And we set the concentration to 0:
         n.Cs_mucilage_soil = 0.
-    # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-    # n.Deficit_mucilage_soil_rate = n.Deficit_mucilage_soil / time_step_in_seconds
 
     # Looking at the root cells in the soil:
     if n.Cs_cells_soil < 0:
@@ -4105,8 +4108,6 @@ def adjusting_pools_and_deficits(n, printing_warnings=False):
         n.Deficit_cells_soil = -n.Cs_cells_soil * (n.external_surface + n.living_root_hairs_external_surface)
         # And we set the concentration to 0:
         n.Cs_cells_soil = 0.
-    # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-    # n.Deficit_cells_soil_rate = n.Deficit_cells_soil / time_step_in_seconds
 
     return n
 
@@ -4116,6 +4117,15 @@ class Differential_Equation_System(object):
 
     def __init__(self, n, time_step_in_seconds=1. * (60. * 60. * 24.), soil_temperature_in_Celsius=20,
                  printing_warnings=False, printing_solver_outputs=False):
+        """
+        This class is used to solve a system of differential equations corresponding to the evolution of the amounts
+        in each pool for a given root element n.
+        :param n: the root element n
+        :param time_step_in_seconds: the time step over which new amounts/concentrations will be updated
+        :param soil_temperature_in_Celsius: the temperature sensed by the root element n
+        :param printing_warnings: if True, warning messages related to processes will be printed
+        :param printing_solver_outputs: if True, the successive steps of the solver will be printed
+        """
         self.n = n
         self.time_step_in_seconds = time_step_in_seconds
         self.soil_temperature_in_Celsius = soil_temperature_in_Celsius
@@ -4125,24 +4135,30 @@ class Differential_Equation_System(object):
         # We initialize an empty list for the initial conditions of each variable:
         self.initial_conditions = []  #: the initial conditions of the compartments
 
+        # # We initialize a timer that will be used to calculate the period elapsed over each micro time step of the solver:
+        # self.initial_time_solver = 0.
+
         # We define the list of variables for which derivatives will be integrated, which correspond here to
-        # the quantities  in each pool (NOTE: we voluntarily exclude the sucrose pool in the phloem):
+        # the quantities in each pool (NOTE: we voluntarily exclude the sucrose pool in the phloem):
         self.variables_in_the_system = ['hexose_root',
                                         'hexose_reserve',
                                         'hexose_soil',
                                         'mucilage_soil',
-                                        'cells_soil']
+                                        'cells_soil'
+                                        ]
 
         # We define a second list of variables for which derivatives will not be be integrated, but for which we want to
-        # record the evolution and the final state considering the successive variations of concentrations within a time
-        # step:
+        # record the evolution and the final state considering the successive variations of concentrations at each micro
+        # time step within a time step:
         self.variables_not_in_the_system = ['hexose_production_from_phloem',
                                             'sucrose_loading_in_phloem',
                                             'resp_maintenance',
                                             'hexose_immobilization_as_reserve',
                                             'hexose_mobilization_from_reserve',
                                             'hexose_exudation',
+                                            'phloem_hexose_exudation',
                                             'hexose_uptake',
+                                            'phloem_hexose_uptake',
                                             'mucilage_secretion',
                                             'cells_release',
                                             'hexose_degradation',
@@ -4168,7 +4184,8 @@ class Differential_Equation_System(object):
         # We keep this information in the "self":
         self.y_variables_mapping = y_mapping
 
-        # We create a time grid of the simulation:
+        # We create a time grid of the simulation that will be used by the solver (NOTE: here it only contains 0 and the
+        # final time at the end of the time step, but we could add more intermediate values):
         self.time_grid_in_seconds = np.array([0.0, self.time_step_in_seconds])
 
     def _C_fluxes_within_each_segment_derivatives(self, t, y):
@@ -4178,7 +4195,7 @@ class Differential_Equation_System(object):
         :rtype: list [float]
         """
 
-        # We initialize a vector of 0 for each variable in y:
+        # We create a vector of 0 for each variable in y, for initializing the vector 'y_derivatives':
         y_derivatives = np.zeros_like(y)
 
         # We assign to the pool amounts in n the values in y:
@@ -4189,6 +4206,16 @@ class Differential_Equation_System(object):
             # And we attribute the corresponding value in y to the corresppnding property in the root element n:
             setattr(self.n, variable_name, y[self.y_variables_mapping[variable_name]])
             # Now n has new amounts corresponding to the values calculated in y! But these amounts could be negative.
+
+        # AVOIDING NEGATIVE AMOUNTS: We check that no pool has a negative amount, otherwise, we set it to zero!
+        for variable_name in self.variables_in_the_system:
+            pool_amount = getattr(self.n, variable_name)
+            if pool_amount < 0.:
+                # We forbids the amount to be negative and reset it to 0:
+                setattr(self.n, variable_name, 0)
+                # NOTE: As the corresponding exchanges between pools that led to this negative value have been recorded,
+                # this reset to 0 does not eventually affect the C balance, as deficits will be defined and recorded
+                # at the end of the time step!
 
         # We update the concentrations in each pool:
         #-------------------------------------------
@@ -4210,9 +4237,10 @@ class Differential_Equation_System(object):
                           "the initial mass before updating concentrations in the solver was 0 or NA!")
         else:
             # Otherwise, new concentrations are calculated considering the new amounts in each pool and the initial mass of the element:
-            self.n.C_hexose_root = (self.n.hexose_root - self.n.Deficit_hexose_root) / mass
-            self.n.C_hexose_reserve = (self.n.hexose_reserve - self.n.Deficit_hexose_reserve) / mass
-            self.n.C_hexose_soil = (self.n.hexose_soil - self.n.Deficit_hexose_soil) / mass
+            self.n.C_hexose_root = (self.n.hexose_root) / mass
+            self.n.C_hexose_reserve = (self.n.hexose_reserve) / mass
+            self.n.C_hexose_soil = (self.n.hexose_soil) / mass
+            # At this point, concentrations could be negative!
 
         # 2) Mucilage concentration and root cells concentration in the soil are expressed relative to the external
         # surface of roots:
@@ -4229,15 +4257,9 @@ class Differential_Equation_System(object):
                 print("!!! For element", self.n.index(),
                       "the initial surface before updating concentrations in the solver was 0 or NA!")
         else:
-            self.n.Cs_mucilage_soil = (self.n.mucilage_soil - self.n.Deficit_mucilage_soil) / surface
-            self.n.Cs_cells_soil = (self.n.cells_soil - self.n.Deficit_cells_soil) / surface
-
-        # Adjusting pools and deficits:
-        #------------------------------
-        # We make sure that new concentration in each pool is not negative - otherwise we set it to 0 and record the
-        # corresponding deficit for the next calculation of the concentration:
-        adjusting_pools_and_deficits(self.n, self.printing_warnings)
-        # At this point, all new concentrations are either positive or nil.
+            self.n.Cs_mucilage_soil = (self.n.mucilage_soil) / surface
+            self.n.Cs_cells_soil = (self.n.cells_soil) / surface
+            # At this point, concentrations could be negative!
 
         #  Calculation of all C-related fluxes:
         # -------------------------------------
@@ -4266,8 +4288,8 @@ class Differential_Equation_System(object):
 
     def _update_initial_conditions(self):
         """
-        This internal function simply updates the initial conditions in y, calculating the amount in each pool from its
-        concentration.
+        This internal function simply computes the initial conditions in y, calculating the amount in each pool from its
+        initial concentration.
         :return:
         """
 
@@ -4276,7 +4298,6 @@ class Differential_Equation_System(object):
         if isnan(mass):
             print("!!! For element", self.n.index(), "the initial mass before updating the initial conditions in the solver was NA!")
             mass=0.
-
         # We calculate the external surface to which some concentrations are related:
         surface = (self.n.initial_external_surface + self.n.initial_living_root_hairs_external_surface)
         if isnan(surface):
@@ -4312,7 +4333,10 @@ class Differential_Equation_System(object):
 
     def _update_final_conditions(self, sol):
         """
-        Update the compartments values in n from the compartments values in sol at self.time_step_in_seconds
+        This function updates the root element n with all the quantities computed by the solver, using the last values
+        in the time list of y and assigning them to the corresponding variables in the root element n.
+        :param sol: the solution returned by the function 'solve_ivp'
+        :return:
         """
 
         # We cover all the variables to be computed (i.e. both the amounts in each pool and the exchanged amounts):
@@ -4321,13 +4345,28 @@ class Differential_Equation_System(object):
             # value of the time series of the corresponging variable in the new y given by the outputs of the solver:
             setattr(self.n, compartment_name, sol.y[compartment_index][-1])
 
+        # We also update accordingly the rates of exchange between each pool.
+        # We cover all the variables NOT in the differential equations system but transformed by the solver:
+        for variable_name in self.variables_not_in_the_system:
+            # We create the corresponding name of the rate variable:
+            variable_name_rate = variable_name + '_rate'
+            # We get the value of the exchanged amount that has been updated:
+            exchanged_amount = getattr(self.n, variable_name)
+            # We calculate the overall mean rate of exchange between the whole time step:
+            new_mean_rate = exchanged_amount / self.time_step_in_seconds
+            # We assign this value of rate to the corresponding variable in n:
+            setattr(self.n, variable_name_rate, new_mean_rate)
+
         return
 
     def run(self):
         """
         This internal function actually solves the system of differential equations for a given root element.
         Within a given run, it first updates the new amounts because of the function '_update_initial_conditions',
-        then the new concentrations because of the function '_C_fluxes_within_each_segment_derivatives'.
+        then the new concentrations and fluxes because of the function '_C_fluxes_within_each_segment_derivatives'
+        computed by the solver 'solve_ivp', an external function from SciPy, which generates new amounts in each pool.
+        'solve_ivp' determines the temporal resolution by itself, depending on the integration method and the desired
+        accuracy of the solution.
         """
 
         # We first initialize y before running the solver:
@@ -4336,14 +4375,14 @@ class Differential_Equation_System(object):
         # We call the solver, which will repeat calculations at different times within the time step and progressively
         # transform all the variables stored in y:
         sol = solve_ivp(fun=self._C_fluxes_within_each_segment_derivatives,
-                        t_span=self.time_grid_in_seconds,
+                        t_span=self.time_grid_in_seconds, # Note that you could impose to the solver a number of different time points to be solved here!
                         y0=self.initial_conditions,
                         # method='BDF',
                         method='LSODA',
                         # t_eval=np.array([self.time_step_in_seconds]), # Select this to get only the final quantities at the end of the time step
-                        # t_eval=np.linspace(0, self.time_step_in_seconds, # Select this to get time points regularly distributed within the time step
+                        # t_eval=np.linspace(0, self.time_step_in_seconds, 10), # Select this to get time points regularly distributed within the time step
                         t_eval=None, # Select t_eval=None to get automatical time points within the current macro time step
-                        # min_step=1 / (24. * 60. * 60.), # OPTIONAL: defines the minimal micro time step (0 by default)
+                        min_step=60, # OPTIONAL: defines the minimal micro time step (0 by default)
                         dense_output=False # OPTIONAL: defines whether the solution should be continuous or not (False by default)
                         )
 
@@ -4366,6 +4405,14 @@ class Differential_Equation_System(object):
 
         # We make sure that only the last value at the end of the time step is kept in memory to update each amount:
         self._update_final_conditions(sol)
+        # # NOTE: To better understand the purpose of _update_final_conditions, we can compare what sol.y gives and what
+        # # has been eventually recorded in n, using as an example the amount of root hexose at the apex of the primary root:
+        # if self.n.label=="Apex" and self.n.radius==param.D_ini/2.:
+        #     y_value = sol.y[0,-1]
+        #     n_value = self.n.hexose_root
+        #     print(">>>> For the first apex, here is the final pool of root hexose in y after solving:", y_value)
+        #     print(">>>> For the first apex, here is the pool of root hexose in n after solving:", n_value)
+        #     print(">>>> The difference between the first and the second is:", y_value - n_value)
 
         return
 
@@ -4462,10 +4509,6 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
                                   + cells_soil_derivative) / (n.external_surface
                                                                  + n.living_root_hairs_external_surface)
 
-            # We make sure that new concentration in each pool is not negative - and takes into account possible
-            # previous deficits:
-            adjusting_pools_and_deficits(n, printing_warnings=printing_warnings)
-
         # OPTION 2: WITH SOLVER
         #######################
         # We use a numeric solver to calculate the best equilibrium between pools over time, so that the fluxes
@@ -4474,6 +4517,7 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
 
             if printing_solver_outputs:
                 print("Considering for the solver the element", n.index(),"of length", n.length, "...")
+
             # We use the class corresponding to the system of differential equations and its resolution:
             System = Differential_Equation_System(n,
                                                   time_step_in_seconds,
@@ -4481,11 +4525,8 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
                                                   printing_warnings=printing_warnings,
                                                   printing_solver_outputs=printing_solver_outputs)
             System.run()
-            # We then calculate the quantities that correspond to the fluxes (dependent of the time step):
-            calculating_amounts_from_fluxes(n, time_step_in_seconds)
-            # TODO: Is there the same problem as before, i.e. the fluxes given by the solver correspond to the last
-            #  fluxes computed at the end of the time step, so the exchanged amounts calculated from these fluxes are
-            #  not exactly correct?
+            # At this stage, the amounts in each pool pool have been updated by the solver, as well as the amount
+            # exchanged between pools corresponding to specific processes.
 
             # We recalculate the new final concentrations based on (i) quantities at the end of the solver,
             # and (ii) struct_mass (instead of initial_struct_mass as used in the solver):
@@ -4495,100 +4536,29 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
             n.Cs_mucilage_soil = n.mucilage_soil / (n.external_surface + n.living_root_hairs_external_surface)
             n.Cs_cells_soil = n.cells_soil / (n.external_surface + n.living_root_hairs_external_surface)
 
-            # SPECIAL CASE FOR SUCROSE: As sucrose was not included in the solver, we update C_sucrose_root based on
-            # 'last' exchange rates during the time_step.
-            # We call again a dictionary containing the time derivative (dQ/dt) of the amount
-            # present in each pool, e.g. sucrose, based on the C balance (NOTE: the transfer of sucrose between elements
-            # through the phloem is not considered at this stage):
-            y_time_derivatives = calculating_time_derivatives_of_the_amount_in_each_pool(n)
+            # SPECIAL CASE FOR SUCROSE:
+            # As sucrose pool was not included in the solver, we update C_sucrose_root based on the mean exchange rates
+            # calculated over the time_step.
+            # We calculate the initial amount of sucrose in the root element:
             initial_sucrose_root_amount = n.C_sucrose_root \
                                           * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
+            # We call again a dictionary containing the time derivative (dQ/dt) of the amount present in each pool, and
+            # in particular sucrose, based on the balance between different rates (NOTE: the transfer of sucrose
+            # between elements through the phloem is not considered at this stage!):
+            y_time_derivatives = calculating_time_derivatives_of_the_amount_in_each_pool(n)
             estimated_sucrose_root_derivative = y_time_derivatives['sucrose_root'] * time_step_in_seconds
+            # Eventually, the new concentration of sucrose in the root element is calculated:
             n.C_sucrose_root = (initial_sucrose_root_amount + estimated_sucrose_root_derivative) \
               / (n.struct_mass + n.living_root_hairs_struct_mass)
 
-        # # We calculate possible deficits to be included in the next time step:
-        # #---------------------------------------------------------------------
-        #
-        # # We reset the local deficits to 0:
-        # n.Deficit_sucrose_root = 0.
-        # n.Deficit_hexose_root = 0.
-        # n.Deficit_hexose_reserve = 0.
-        # n.Deficit_hexose_soil = 0.
-        # n.Deficit_mucilage_soil = 0.
-        # n.Deficit_cells_soil = 0.
-        #
-        # # Looking at sucrose:
-        # if n.C_sucrose_root < 0:
-        #     # We define a positive deficit (mol of sucrose) based on the negative concentration:
-        #     n.Deficit_sucrose_root = -n.C_sucrose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
-        #     # And we set the concentration to 0:
-        #     if printing_warnings:
-        #         print("WARNING: After balance, there is a deficit in root sucrose for element", n.index(), "that corresponds to", n.Deficit_sucrose_root, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-        #     # # CHEATING:
-        #     # n.Deficit_sucrose_root = 0.
-        #     # And we set the concentration to zero:
-        #     n.C_sucrose_root = 0.
-        # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-        # n.Deficit_sucrose_root_rate = n.Deficit_sucrose_root / time_step_in_seconds
-        # # PLEASE NOTE: The global (if any) deficit in sucrose is only used by the function "shoot_sucrose_and_spreading"
-        # # when defining the new homogeneous concentration of sucrose within the root system, and when performing a true
-        # # carbon balance of the root system in "summing".
-        #
-        # # Looking at hexose in the mobile pool of the root:
-        # if n.C_hexose_root < 0:
-        #     if printing_warnings:
-        #         print("WARNING: After balance, there is a deficit of root hexose for element", n.index(), "that corresponds to", n.Deficit_hexose_root, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-        #     # We define a positive deficit (mol of hexose) based on the negative concentration:
-        #     n.Deficit_hexose_root = - n.C_hexose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
-        #     # And we set the concentration to 0:
-        #     n.C_hexose_root = 0.
-        # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-        # n.Deficit_hexose_root_rate = n.Deficit_hexose_root / time_step_in_seconds
-        #
-        # # Looking at hexose in the reserve pool:
-        # if n.C_hexose_reserve < 0:
-        #     if printing_warnings:
-        #         print("WARNING: After balance, there is a deficit of reserve hexose for element", n.index(),"that corresponds to", n.Deficit_hexose_reserve, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-        #     # We define a positive deficit (mol of hexose) based on the negative concentration:
-        #     n.Deficit_hexose_reserve = - n.C_hexose_reserve * (n.struct_mass + n.living_root_hairs_struct_mass)
-        #     # And we set the concentration to 0:
-        #     n.C_hexose_reserve = 0.
-        # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-        # n.Deficit_hexose_reserve_rate = n.Deficit_hexose_reserve / time_step_in_seconds
-        #
-        # # Looking at hexose in the soil:
-        # if n.C_hexose_soil < 0:
-        #     if printing_warnings:
-        #         print("WARNING: After balance, there is a deficit of soil hexose for element", n.index(), "that corresponds to", n.Deficit_hexose_soil, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-        #     # We define a positive deficit (mol of hexose) based on the negative concentration:
-        #     n.Deficit_hexose_soil = -n.C_hexose_soil * (n.struct_mass + n.living_root_hairs_struct_mass)
-        #     # And we set the concentration to 0:
-        #     n.C_hexose_soil = 0.
-        # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-        # n.Deficit_hexose_soil_rate = n.Deficit_hexose_soil / time_step_in_seconds
-        #
-        # # Looking at mucilage in the soil:
-        # if n.Cs_mucilage_soil < 0:
-        #     if printing_warnings:
-        #         print("WARNING: After balance, there is a deficit of soil mucilage for element", n.index(), "that corresponds to", n.Deficit_mucilage_soil, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-        #     # We define a positive deficit (mol of equivalent-hexose) based on the negative concentration:
-        #     n.Deficit_mucilage_soil = -n.Cs_mucilage_soil * (n.external_surface + n.living_root_hairs_external_surface)
-        #     # And we set the concentration to 0:
-        #     n.Cs_mucilage_soil = 0.
-        # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-        # n.Deficit_mucilage_soil_rate = n.Deficit_mucilage_soil / time_step_in_seconds
-        #
-        # # Looking at the root cells in the soil:
-        # if n.Cs_cells_soil < 0:
-        #     if printing_warnings:
-        #         print("WARNING: After balance, there is a deficit of root cells in the soil for element", n.index(),"that corresponds to", n.Deficit_cells_soil, "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-        #     # We define a positive deficit (mol of hexose-equivalent) based on the negative concentration:
-        #     n.Deficit_cells_soil = -n.Cs_cells_soil * (n.external_surface + n.living_root_hairs_external_surface)
-        #     # And we set the concentration to 0:
-        #     n.Cs_cells_soil = 0.
-        # # We keep in memory the theoretical "deficit rate" to be used at the next time step:
-        # n.Deficit_cells_soil_rate = n.Deficit_cells_soil / time_step_in_seconds
+        # WITH BOTH OPTIONS, AFTER ALL PROCESSES HAVE BEEN COMPUTED:
+        ############################################################
+
+        # Updating concentrations and deficits:
+        #--------------------------------------
+        # We make sure that new concentration in each pool is not negative - otherwise we set it to 0 and record the
+        # corresponding deficit to balance the next calculation of the concentration:
+        adjusting_pools_and_deficits(n, printing_warnings)
 
         #  Calculation of additional variables:
         # -------------------------------------
