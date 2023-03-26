@@ -22,7 +22,7 @@ import rhizodep.parameters as param
 import rhizodep.tools as tools
 
 def run_one_scenario(scenario_id=1,
-                     inputs_dir_path=None,
+                     inputs_dir_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
                      outputs_dir_path='outputs',
                      scenarios_list="scenarios_list.xlsx"):
     """
@@ -61,7 +61,7 @@ def run_one_scenario(scenario_id=1,
         # We read the scenario to be run:
         scenarios_df = pd.read_excel(os.path.join(INPUTS_DIRPATH, scenarios_list), header=0, sheet_name="scenarios_as_columns")
         # We remove the columns containing unnecessary details about parameters:
-        useless_columns = ["Explanation", "Type/ Unit"]
+        useless_columns = ["Explanation", "Type/ Unit", "Reference_value"]
         scenarios_df.drop(useless_columns, axis=1, inplace=True)
         # Before transposing the dataframe, we rename the first column as 'Scenario':
         scenarios_df.rename(columns={'Parameter':'Scenario'}, inplace= True)
@@ -141,6 +141,7 @@ def run_one_scenario(scenario_id=1,
     SOIL_TEMPERATURE = scenario_parameters.get('constant_soil_temperature_in_Celsius', 20)
 
     INITIAL_SEGMENT_LENGTH = scenario_parameters.get('initial_segment_length', 1e-3)
+    INITIAL_APEX_LENGTH = scenario_parameters.get('initial_apex_length', 0)
     INITIAL_C_SUCROSE_ROOT = scenario_parameters.get('initial_C_sucrose_root', 1e-4)
     INITIAL_C_HEXOSE_ROOT = scenario_parameters.get('initial_C_hexose_root', 1e-4)
 
@@ -177,13 +178,19 @@ def run_one_scenario(scenario_id=1,
     if USING_SOLVER:
         print("NOTE: a solver will be used to compute the balance between C pools within each time step!")
         print("")
+    else:
+        print("No solver will be used to compute the balance between C pools.")
+        print("")
 
     # We initiate the properties of the MTG "g":
     g = model.initiate_mtg(random=True,
                            initial_segment_length=INITIAL_SEGMENT_LENGTH,
+                           initial_apex_length=INITIAL_APEX_LENGTH,
                            initial_C_sucrose_root=INITIAL_C_SUCROSE_ROOT,
-                           initial_C_hexose_root=INITIAL_C_HEXOSE_ROOT
-                           )
+                           initial_C_hexose_root=INITIAL_C_HEXOSE_ROOT,
+                           input_file_path=inputs_dir_path,
+                           seminal_roots_events_file="seminal_roots_inputs.csv",
+                           adventitious_roots_events_file="adventitious_roots_inputs.csv")
 
     # We launch the main simulation program:
     simulation.main_simulation(g, simulation_period_in_days=SIMULATION_PERIOD, time_step_in_days=TIME_STEP,
@@ -267,8 +274,8 @@ def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx"):
         scenarios_df = pd.read_excel(os.path.join('inputs', scenarios_list), sheet_name="scenarios_as_columns")
         # We get a list of the names of the columns, which correspond to the scenarios' numbers:
         scenarios = list(scenarios_df.columns)
-        # We remove the unnecessary names of the first 3 columns, so that scenarios only contains the scenario numbers:
-        del scenarios[0:3]
+        # We remove the unnecessary names of the first 4 columns, so that scenarios only contains the scenario numbers:
+        del scenarios[0:4]
 
     # We record the starting time of the simulation:
     t_start = time.time()

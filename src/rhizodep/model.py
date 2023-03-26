@@ -527,7 +527,7 @@ def classifying_on_z(g, z_min=0., z_max=1., z_interval=0.1):
     dictionary_root_necromass = {}
     dictionary_surface = {}
     dictionary_net_hexose_exudation = {}
-    dictionary_total_rhizodeposition = {}
+    dictionary_total_net_rhizodeposition = {}
     dictionary_hexose_degradation = {}
     final_dictionary = {}
 
@@ -542,7 +542,7 @@ def classifying_on_z(g, z_min=0., z_max=1., z_interval=0.1):
         name_surface_z = "surface_" + str(round(z_start, 3)) + "-" + str(round(z_start + z_interval, 3)) + "_m"
         name_net_hexose_exudation_z = "net_hexose_exudation_" + str(round(z_start, 3)) + "-" + str(
             round(z_start + z_interval, 3)) + "_m"
-        name_total_rhizodeposition_z = "total_rhizodeposition_" + str(round(z_start, 3)) + "-" + str(
+        name_total_net_rhizodeposition_z = "total_net_rhizodeposition_" + str(round(z_start, 3)) + "-" + str(
             round(z_start + z_interval, 3)) + "_m"
         name_hexose_degradation_z = "hexose_degradation_" + str(round(z_start, 3)) + "-" + str(
             round(z_start + z_interval, 3)) + "_m"
@@ -590,7 +590,7 @@ def classifying_on_z(g, z_min=0., z_max=1., z_interval=0.1):
         dictionary_root_necromass[name_root_necromass_z] = total_included_root_necromass
         dictionary_surface[name_surface_z] = total_included_surface
         dictionary_net_hexose_exudation[name_net_hexose_exudation_z] = total_included_net_hexose_exudation
-        dictionary_total_rhizodeposition[name_total_rhizodeposition_z] = total_included_rhizodeposition
+        dictionary_total_net_rhizodeposition[name_total_net_rhizodeposition_z] = total_included_rhizodeposition
         dictionary_hexose_degradation[name_hexose_degradation_z] = total_included_hexose_degradation
 
         # We also create a new property of the MTG that corresponds to the fraction of length of each node in the z interval:
@@ -600,7 +600,7 @@ def classifying_on_z(g, z_min=0., z_max=1., z_interval=0.1):
     final_dictionary = {}
     for d in [dictionary_length, dictionary_struct_mass, dictionary_root_necromass, dictionary_surface,
               dictionary_net_hexose_exudation,
-              dictionary_total_rhizodeposition,
+              dictionary_total_net_rhizodeposition,
               dictionary_hexose_degradation]:
         final_dictionary.update(d)
 
@@ -811,9 +811,11 @@ def ADDING_A_CHILD(mother_element, edge_type='+', label='Apex', type='Normal_roo
                                              hexose_immobilization_as_reserve=0.,
                                              hexose_exudation=0.,
                                              hexose_uptake=0.,
+                                             phloem_hexose_exudation=0.,
+                                             phloem_hexose_uptake=0.,
                                              mucilage_secretion=0.,
                                              cells_release=0.,
-                                             total_rhizodeposition=0.,
+                                             total_net_rhizodeposition=0.,
                                              hexose_degradation=0.,
                                              mucilage_degradation=0.,
                                              cells_degradation=0.,
@@ -924,9 +926,11 @@ def ADDING_A_CHILD(mother_element, edge_type='+', label='Apex', type='Normal_roo
                                              hexose_immobilization_as_reserve=mother_element.hexose_immobilization_as_reserve,
                                              hexose_exudation=mother_element.hexose_exudation,
                                              hexose_uptake=mother_element.hexose_uptake,
+                                             phloem_hexose_exudation=mother_element.phloem_hexose_exudation,
+                                             phloem_hexose_uptake=mother_element.phloem_hexose_uptake,
                                              mucilage_secretion=mother_element.mucilage_secretion,
                                              cells_release=mother_element.cells_release,
-                                             total_rhizodeposition=mother_element.total_rhizodeposition,
+                                             total_net_rhizodeposition=mother_element.total_net_rhizodeposition,
                                              hexose_degradation=mother_element.hexose_degradation,
                                              mucilage_degradation=mother_element.mucilage_degradation,
                                              cells_degradation=mother_element.cells_degradation,
@@ -1345,9 +1349,9 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
                 vid = apex.index()
                 index_parent = g.Father(vid, EdgeType='+')
                 parent = g.node(index_parent)
-                # # The possibility of emergence of a lateral root from the parent is recorded inside the parent:
-                # parent.lateral_root_emergence_possibility = "Possible"
-                # parent.lateral_primordium_index = apex.index()
+                # The possibility of emergence of a lateral root from the parent is recorded inside the parent:
+                parent.lateral_root_emergence_possibility = "Possible"
+                parent.lateral_primordium_index = apex.index()
                 # And the new element returned by the function corresponds to the potentially emerging apex:
                 new_apex.append(apex)
                 # And the function returns this new apex and stops here:
@@ -1814,9 +1818,11 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
 
     initial_hexose_exudation = apex.hexose_exudation
     initial_hexose_uptake = apex.hexose_uptake
+    initial_phloem_hexose_exudation = apex.phloem_hexose_exudation
+    initial_phloem_hexose_uptake = apex.phloem_hexose_uptake
     initial_mucilage_secretion = apex.mucilage_secretion
     initial_cells_release = apex.cells_release
-    initial_total_rhizodeposition = apex.total_rhizodeposition
+    initial_total_net_rhizodeposition = apex.total_net_rhizodeposition
     initial_hexose_degradation = apex.hexose_degradation
     initial_mucilage_degradation = apex.mucilage_degradation
     initial_cells_degradation = apex.cells_degradation
@@ -1902,9 +1908,11 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
 
             apex.hexose_exudation = initial_hexose_exudation * mass_fraction
             apex.hexose_uptake = initial_hexose_uptake * mass_fraction
+            apex.phloem_hexose_exudation = initial_phloem_hexose_exudation * mass_fraction
+            apex.phloem_hexose_uptake = initial_phloem_hexose_uptake * mass_fraction
             apex.mucilage_secretion = initial_mucilage_secretion * mass_fraction
             apex.cells_release = initial_cells_release * mass_fraction
-            apex.total_rhizodeposition = initial_total_rhizodeposition * mass_fraction
+            apex.total_net_rhizodeposition = initial_total_net_rhizodeposition * mass_fraction
             apex.hexose_degradation = initial_hexose_degradation * mass_fraction
             apex.mucilage_degradation = initial_mucilage_degradation * mass_fraction
             apex.cells_degradation = initial_cells_degradation * mass_fraction
@@ -1973,9 +1981,11 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
         apex.initial_living_root_hairs_external_surface = initial_initial_living_root_hairs_external_surface * mass_fraction
         apex.hexose_exudation = initial_hexose_exudation * mass_fraction
         apex.hexose_uptake = initial_hexose_uptake * mass_fraction
+        apex.phloem_hexose_exudation = initial_phloem_hexose_exudation * mass_fraction
+        apex.phloem_hexose_uptake = initial_phloem_hexose_uptake * mass_fraction
         apex.mucilage_secretion = initial_mucilage_secretion * mass_fraction
         apex.cells_release = initial_cells_release * mass_fraction
-        apex.total_rhizodeposition = initial_total_rhizodeposition * mass_fraction
+        apex.total_net_rhizodeposition = initial_total_net_rhizodeposition * mass_fraction
         apex.hexose_degradation = initial_hexose_degradation * mass_fraction
         apex.mucilage_degradation = initial_mucilage_degradation * mass_fraction
         apex.cells_degradation = initial_cells_degradation * mass_fraction
@@ -2044,9 +2054,11 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
         apex.struct_mass_produced = initial_struct_mass_produced * mass_fraction
         apex.hexose_exudation = initial_hexose_exudation * mass_fraction
         apex.hexose_uptake = initial_hexose_uptake * mass_fraction
+        apex.phloem_hexose_exudation = initial_phloem_hexose_exudation * mass_fraction
+        apex.phloem_hexose_uptake = initial_phloem_hexose_uptake * mass_fraction
         apex.mucilage_secretion = initial_mucilage_secretion * mass_fraction
         apex.cells_release = initial_cells_release * mass_fraction
-        apex.total_rhizodeposition = initial_total_rhizodeposition * mass_fraction
+        apex.total_net_rhizodeposition = initial_total_net_rhizodeposition * mass_fraction
         apex.hexose_degradation = initial_hexose_degradation * mass_fraction
         apex.mucilage_degradation = initial_mucilage_degradation * mass_fraction
         apex.cells_degradation = initial_cells_degradation * mass_fraction
@@ -2986,7 +2998,7 @@ def exchange_with_phloem_rate(n, soil_temperature_in_Celsius=20, printing_warnin
             # If the element has stopped its growth, we decrease its unloading coefficient:
             phloem_permeability = phloem_permeability / 50.
         # If the node corresponds to the base of the root system and if an adventious root can emerge:
-        if type=="Base_of_the_root_system": #and lateral_root_emergence_possibility == "Possible":
+        if type=="Base_of_the_root_system" and hexose_growth_demand >0.:
             # TODO: Check how unloading should be reduced when considering the base of the root system!
             phloem_permeability = phloem_permeability * 10.
 
@@ -3043,8 +3055,7 @@ def exchange_with_phloem_rate(n, soil_temperature_in_Celsius=20, printing_warnin
         if hexose_growth_demand > 0.:
             max_loading_rate  = 0.
 
-        # We calculate the potential production of sucrose from hexose (in mol) according to the Michaelis-Menten function:
-        # TODO: Consider the new calculations with all surfaces and conductances, and the uptake directly from soil solution!
+        # We calculate the potential production of sucrose from root hexose (in mol) according to the Michaelis-Menten function:
         sucrose_loading_in_phloem_rate = 0.5 * max_loading_rate * exchange_surface * C_hexose_root \
                                       / (param.Km_loading + C_hexose_root)
         # AVOIDING PROBLEMS - We make sure that hexose production can't become negative:
@@ -3151,10 +3162,10 @@ def exchange_with_reserve_rate(n, soil_temperature_in_Celsius=20, printing_warni
         # CALCULATIONS OF THEORETICAL MOBILIZATION RATE:
         #-----------------------------------------------
         if C_hexose_reserve <= param.C_hexose_reserve_min:
-            hexose_mobilization_from_reserve = 0.
+            hexose_mobilization_from_reserve_rate = 0.
         else:
             # We calculate the potential mobilization of hexose from reserve (in mol) according to the Michaelis-Menten function:
-            hexose_mobilization_from_reserve = corrected_max_mobilization_rate * C_hexose_reserve \
+            hexose_mobilization_from_reserve_rate = corrected_max_mobilization_rate * C_hexose_reserve \
                                                / (param.Km_mobilization + C_hexose_reserve) \
                                                * (struct_mass + living_root_hairs_struct_mass)
 
@@ -3164,9 +3175,9 @@ def exchange_with_reserve_rate(n, soil_temperature_in_Celsius=20, printing_warni
         if C_hexose_root <= param.C_hexose_root_min_for_reserve or C_hexose_reserve >= param.C_hexose_reserve_max:
             # If the concentration of mobile hexose is already too low or the concentration if the reserve pool too high,
             # there is no immobilization:
-            hexose_immobilization_as_reserve = 0.
+            hexose_immobilization_as_reserve_rate = 0.
         else:
-            hexose_immobilization_as_reserve = corrected_max_immobilization_rate * C_hexose_root \
+            hexose_immobilization_as_reserve_rate = corrected_max_immobilization_rate * C_hexose_root \
                                                  / (param.Km_immobilization + C_hexose_root) \
                                                  * (struct_mass + living_root_hairs_struct_mass)
         # TODO: Check that the C balance for reserve has been introduced elsewhere!
@@ -3547,6 +3558,10 @@ def mucilage_secretion_rate(n, soil_temperature_in_Celsius=20, printing_warnings
                                            * (param.Cs_mucilage_soil_max - Cs_mucilage_soil) / param.Cs_mucilage_soil_max
         # TODO: Validate this linear decrease until reaching the max surfacic density.
 
+        # We verify that the rate is not negative:
+        if corrected_secretion_rate_max < 0.:
+            corrected_secretion_rate_max = 0.
+
         # CALCULATIONS OF SECRETION RATE:
         #--------------------------------
         # We calculate the rate of secretion according to a Michaelis-Menten formalis:
@@ -3850,7 +3865,7 @@ def cells_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=
         possible_cells_degradation = False
         if printing_warnings:
             print("WARNING: No cells degradation occurred for node", n.index(),
-                  "because soil cells concentration was", Cs_mucilage_soil, "mol/g.")
+                  "because soil cells concentration was", Cs_cells_soil, "mol/g.")
 
     if possible_cells_degradation:
 
@@ -3955,6 +3970,10 @@ def calculating_extra_variables(n, time_step_in_seconds):
     """
     # We calculate the net exudation of hexose (in mol of hexose):
     n.net_hexose_exudation = n.hexose_exudation + n.phloem_hexose_exudation - n.hexose_uptake - n.phloem_hexose_uptake
+    # We calculate the total net rhizodeposition (i.e. subtracting the uptake of hexose from soil by roots),
+    # expressed in mol of hexose:
+    n.total_net_rhizodeposition \
+        = n.net_hexose_exudation + n.mucilage_secretion + n.cells_release
     # We calculate the total biomass of each element, including the structural mass and all sugars:
     n.biomass = n.struct_mass + (n.C_hexose_root * 6 * 12.01 \
                                  + n.C_hexose_reserve * 6 * 12.01 + n.C_sucrose_root * 12 * 12.01) * n.struct_mass
@@ -3964,6 +3983,16 @@ def calculating_extra_variables(n, time_step_in_seconds):
     # We calculate a net rate of exudation, in gram of C per cm of root per day:
     n.net_hexose_exudation_rate_per_day_per_cm \
         = (n.net_hexose_exudation / time_step_in_seconds) * 24. * 60. * 60. * 6. * 12.01 / n.length / 100
+    # We calculate the net rhizodeposition rates expressed in gC per cm per day:
+    n.net_rhizodeposition_rate_per_day_per_cm = \
+        (n.total_net_rhizodeposition / time_step_in_seconds) * 24. * 60. * 60. * 6. * 12.01 / n.length / 100
+    # We calculate the secretion rate expressed in gC per cm per day:
+    n.mucilage_secretion_rate_per_day_per_cm = \
+        (n.mucilage_secretion / time_step_in_seconds) * 24. * 60. * 60. * 6. * 12.01 / n.length / 100
+    # We calculate the cells release rate expressed in gC per cm per day:
+    n.cells_release_rate_per_day_per_cm = \
+        (n.cells_release / time_step_in_seconds) * 24. * 60. * 60. * 6. * 12.01 / n.length / 100
+
     return n
 
 def calculating_time_derivatives_of_the_amount_in_each_pool(n):
@@ -3989,7 +4018,7 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
     y_derivatives['hexose_reserve'] = \
         + n.hexose_immobilization_as_reserve_rate - n.hexose_mobilization_from_reserve_rate
 
-    # # We calculate the derivative of the amount of hexose in the mobile pool of the root:
+    # We calculate the derivative of the amount of hexose in the mobile pool of the root:
     y_derivatives['hexose_root'] = \
         - n.hexose_exudation_rate + n.hexose_uptake_rate \
         - n.mucilage_secretion_rate \
@@ -3998,7 +4027,7 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
         - n.hexose_consumption_by_growth_rate \
         + n.hexose_production_from_phloem_rate - 2. * n.sucrose_loading_in_phloem_rate \
         + n.hexose_mobilization_from_reserve_rate - n.hexose_immobilization_as_reserve_rate
-    
+
     # We calculate the derivative of the amount of hexose in the soil pool:
     y_derivatives['hexose_soil'] = \
         - n.hexose_degradation_rate \
@@ -4437,6 +4466,9 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
     :return:
     """
 
+    # We initialize a tip concentration:
+    tip_C_hexose_root = -1
+
     # We cover all the vertices in the MTG:
     for vid in g.vertices_iter(scale=1):
 
@@ -4452,9 +4484,11 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
 
         # OPTION 1: WITHOUT SOLVER
         ##########################
-        # We simply calculate all related fluxes and the new concentrations based on the initial conditions
-        # at the beginning of the time step:
+
         if not using_solver:
+
+            # We simply calculate all related fluxes and the new concentrations based on the initial conditions
+            # at the beginning of the time step.
 
             # Calculating all new fluxes and related quantities:
             #---------------------------------------------------
@@ -4478,35 +4512,35 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
             # (NOTE: The deficit in sucrose is not included in this balance, since it has been considered in the function shoot_supply before)
             sucrose_root_derivative = y_time_derivatives["sucrose_root"] * time_step_in_seconds
             n.C_sucrose_root = (n.C_sucrose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                                + sucrose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+                                + sucrose_root_derivative - n.Deficit_sucrose_root) / (n.struct_mass + n.living_root_hairs_struct_mass)
 
             # We calculate the new concentration of hexose in the root cytoplasm:
             hexose_root_derivative = y_time_derivatives["hexose_root"] * time_step_in_seconds
             n.C_hexose_root = (n.C_hexose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                                + hexose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+                                + hexose_root_derivative - n.Deficit_hexose_root) / (n.struct_mass + n.living_root_hairs_struct_mass)
 
             # We calculate the new concentration of hexose in the reserve:
             hexose_reserve_derivative = y_time_derivatives["hexose_reserve"] * time_step_in_seconds
-            C_hexose_reserve = (n.C_hexose_reserve * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                                + hexose_reserve_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+            n.C_hexose_reserve = (n.C_hexose_reserve * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
+                                + hexose_reserve_derivative - n.Deficit_hexose_reserve) / (n.struct_mass + n.living_root_hairs_struct_mass)
 
             # We calculate the new concentration of hexose in the soil:
             hexose_soil_derivative = y_time_derivatives["hexose_soil"] * time_step_in_seconds
             n.C_hexose_soil = (n.C_hexose_soil * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                                + hexose_soil_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+                                + hexose_soil_derivative - n.Deficit_hexose_soil) / (n.struct_mass + n.living_root_hairs_struct_mass)
 
             # We calculate the new concentration of hexose in the soil:
             mucilage_soil_derivative = y_time_derivatives["mucilage_soil"] * time_step_in_seconds
             n.Cs_mucilage_soil = (n.Cs_mucilage_soil * (n.initial_external_surface
                                                         + n.initial_living_root_hairs_external_surface)
-                                  + mucilage_soil_derivative) / (n.external_surface
+                                  + mucilage_soil_derivative - n.Deficit_mucilage_soil) / (n.external_surface
                                                                  + n.living_root_hairs_external_surface)
 
             # We calculate the new concentration of cells in the soil:
             cells_soil_derivative = y_time_derivatives["cells_soil"] * time_step_in_seconds
             n.Cs_cells_soil = (n.Cs_cells_soil * (n.initial_external_surface
                                                         + n.initial_living_root_hairs_external_surface)
-                                  + cells_soil_derivative) / (n.external_surface
+                                  + cells_soil_derivative - n.Deficit_cells_soil) / (n.external_surface
                                                                  + n.living_root_hairs_external_surface)
 
         # OPTION 2: WITH SOLVER
@@ -4566,8 +4600,6 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
         
         # SPECIAL CASE: we record the property of the apex of the primary root
         #---------------------------------------------------------------------
-        # We initialize a tip concentration:
-        tip_C_hexose_root = -1
         # If the element corresponds to the apex of the primary root:
         if n.radius == param.D_ini / 2. and n.label == "Apex":
             # Then the function will give its specific concentration of mobile hexose:
@@ -4619,10 +4651,12 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
     total_hexose_mobilization_from_reserve = 0.
     total_hexose_exudation = 0.
     total_hexose_uptake = 0.
+    total_phloem_hexose_exudation = 0.
+    total_phloem_hexose_uptake = 0.
     total_net_hexose_exudation = 0.
     total_mucilage_secretion = 0.
     total_cells_release = 0.
-    total_rhizodeposition = 0.
+    total_net_rhizodeposition = 0.
     total_hexose_degradation = 0.
     total_mucilage_degradation = 0.
     total_cells_degradation = 0.
@@ -4687,10 +4721,12 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
         total_hexose_mobilization_from_reserve += n.hexose_mobilization_from_reserve
         total_hexose_exudation += n.hexose_exudation
         total_hexose_uptake += n.hexose_uptake
+        total_phloem_hexose_exudation += n.phloem_hexose_exudation
+        total_phloem_hexose_uptake += n.phloem_hexose_uptake
         total_net_hexose_exudation += (n.hexose_exudation - n.hexose_uptake)
         total_mucilage_secretion += n.mucilage_secretion
         total_cells_release += n.cells_release
-        total_rhizodeposition += n.total_rhizodeposition
+        total_net_rhizodeposition += n.total_net_rhizodeposition
         total_hexose_degradation += n.hexose_degradation
         total_mucilage_degradation += n.mucilage_degradation
         total_cells_degradation += n.cells_degradation
@@ -4729,9 +4765,9 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
         print("      The current amount of mobile hexose in the roots (including possible deficit and dead roots) is",
               "{:.2E}".format(Decimal(total_hexose_root - total_hexose_root_deficit)), "mol of hexose, i.e.",
               "{:.2E}".format(Decimal((total_hexose_root - total_hexose_root_deficit) * 6)), "mol of C.")
-        print("      The current amount of hexose stored as reserve in the roots is",
-              "{:.2E}".format(Decimal(total_hexose_reserve)), "mol of hexose, i.e.",
-              "{:.2E}".format(Decimal(total_hexose_reserve * 6)), "mol of C.")
+        print("      The current amount of hexose stored as reserve in the roots (including possible deficit and dead roots) is",
+              "{:.2E}".format(Decimal(total_hexose_reserve  - total_hexose_reserve_deficit)), "mol of hexose, i.e.",
+              "{:.2E}".format(Decimal((total_hexose_reserve - total_hexose_reserve_deficit) * 6)), "mol of C.")
         print("      The current amount of hexose in the soil (including possible deficit and dead roots) is",
               "{:.2E}".format(Decimal(total_hexose_soil - total_hexose_soil_deficit)), "mol of hexose, i.e.",
               "{:.2E}".format(Decimal((total_hexose_soil - total_hexose_soil_deficit) * 6)), "mol of C.")
@@ -4743,8 +4779,8 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
               "{:.2E}".format(Decimal(total_net_hexose_exudation)), "mol of hexose, i.e.",
               "{:.2E}".format(Decimal(total_net_hexose_exudation * 6)), "mol of C.")
         print("      The total net rhizodeposition over this time step was",
-              "{:.2E}".format(Decimal(total_rhizodeposition)), "mol of hexose, i.e.",
-              "{:.2E}".format(Decimal(total_rhizodeposition * 6)), "mol of C.")
+              "{:.2E}".format(Decimal(total_net_rhizodeposition)), "mol of hexose, i.e.",
+              "{:.2E}".format(Decimal(total_net_rhizodeposition * 6)), "mol of C.")
         print("      The total amount of hexose degraded in the soil over this time step was",
               "{:.2E}".format(Decimal(total_hexose_degradation)), "mol of hexose, i.e.",
               "{:.2E}".format(Decimal(total_hexose_degradation * 6)), "mol of C.")
@@ -4765,6 +4801,7 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
                   "total_cells_soil": total_cells_soil,
                   "total_sucrose_root_deficit": total_sucrose_root_deficit,
                   "total_hexose_root_deficit": total_hexose_root_deficit,
+                  "total_hexose_reserve_deficit": total_hexose_reserve_deficit,
                   "total_hexose_soil_deficit": total_hexose_soil_deficit,
                   "total_mucilage_soil_deficit": total_mucilage_soil_deficit,
                   "total_cells_soil_deficit": total_cells_soil_deficit,
@@ -4777,15 +4814,16 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
                   "total_hexose_immobilization_as_reserve": total_hexose_immobilization_as_reserve,
                   "total_hexose_mobilization_from_reserve": total_hexose_mobilization_from_reserve,
                   "total_hexose_exudation": total_hexose_exudation,
+                  "total_phloem_hexose_exudation": total_phloem_hexose_exudation,
                   "total_hexose_uptake": total_hexose_uptake,
+                  "total_phloem_hexose_uptake": total_phloem_hexose_uptake,
                   "total_mucilage_secretion": total_mucilage_secretion,
-                  "total_total_rhizodeposition": total_rhizodeposition,
                   "total_cells_release": total_cells_release,
                   "total_hexose_degradation": total_hexose_degradation,
                   "total_mucilage_degradation": total_mucilage_degradation,
                   "total_cells_degradation": total_cells_degradation,
                   "total_net_hexose_exudation": total_net_hexose_exudation,
-                  "total_rhizodeposition": total_rhizodeposition,
+                  "total_net_rhizodeposition": total_net_rhizodeposition,
                   "C_in_the_root_soil_system": C_in_the_root_soil_system,
                   "C_degraded_in_the_soil": C_degraded,
                   "C_respired_by_roots": C_respired_by_roots
@@ -4825,9 +4863,12 @@ def control_of_anomalies(g):
 #-----------------------------------
 def initiate_mtg(random=True,
                  initial_segment_length=1e-3,
-                 initial_apex_length=1e-4,
-                 initial_C_sucrose_root=1e-4,
-                 initial_C_hexose_root=1e-4):
+                 initial_apex_length=0.,
+                 initial_C_sucrose_root=0.,
+                 initial_C_hexose_root=0.,
+                 input_file_path="C:/Users/frees/rhizodep/src/rhizodep/",
+                 seminal_roots_events_file="seminal_roots_inputs.csv",
+                 adventitious_roots_events_file="adventitious_roots_inputs.csv"):
 
     """
     This functions generates a root MTG from scratch, containing only one segment of a specific length,
@@ -4957,13 +4998,35 @@ def initiate_mtg(random=True,
     base_segment.hexose_immobilization_as_reserve = 0.
     base_segment.hexose_exudation = 0.
     base_segment.hexose_uptake = 0.
+    base_segment.phloem_hexose_exudation = 0.
+    base_segment.phloem_hexose_uptake = 0.
     base_segment.mucilage_secretion = 0.
     base_segment.cells_release = 0.
-    base_segment.total_rhizodeposition = 0.
+    base_segment.total_net_rhizodeposition = 0.
     base_segment.hexose_degradation = 0.
     base_segment.mucilage_degradation = 0.
     base_segment.cells_degradation = 0.
     base_segment.specific_net_exudation = 0.
+
+    # Rates:
+    #-------
+    base_segment.resp_maintenance_rate = 0.
+    base_segment.resp_growth_rate = 0.
+    base_segment.hexose_growth_demand_rate = 0.
+    base_segment.hexose_consumption_by_growth_rate = 0.
+    base_segment.hexose_production_from_phloem_rate = 0.
+    base_segment.sucrose_loading_in_phloem_rate = 0.
+    base_segment.hexose_mobilization_from_reserve_rate = 0.
+    base_segment.hexose_immobilization_as_reserve_rate = 0.
+    base_segment.hexose_exudation_rate = 0.
+    base_segment.hexose_uptake_rate = 0.
+    base_segment.phloem_hexose_exudation_rate = 0.
+    base_segment.phloem_hexose_uptake_rate = 0.
+    base_segment.mucilage_secretion_rate = 0.
+    base_segment.cells_release_rate = 0.
+    base_segment.hexose_degradation_rate = 0.
+    base_segment.mucilage_degradation_rate = 0.
+    base_segment.cells_degradation_rate = 0.
 
     # Time indications:
     # ------------------
@@ -4988,8 +5051,25 @@ def initiate_mtg(random=True,
 
         # We read additional parameters that are stored in a CSV file, with one column containing the delay for each
         # emergence event, and the second column containing the number of seminal roots that have to emerge at each event:
-        seminal_inputs_path = os.path.join("C:/Users/frees/rhizodep/src/rhizodep","seminal_roots_inputs.csv")
-        seminal_inputs_file = pd.read_csv(seminal_inputs_path)
+        # We try to access an already-existing CSV file:
+        seminal_inputs_path = os.path.join(input_file_path, seminal_roots_events_file)
+        # If the file doesn't exist, we construct a new table using the specified parameters:
+        if not os.path.exists(seminal_inputs_path):
+            print("NOTE: there was no CSV file describing the apparitions of seminal roots!")
+            print("We therefore built a table according to the parameters 'n_seminal_roots' and 'ER'")
+            # We initialize an empty data frame:
+            seminal_inputs_file = pd.DataFrame()
+            # We define a list that will contain the successive thermal times corresponding to root emergence:
+            list_time = [x * 1/param.ER for x in range(1, param.n_seminal_roots)]
+            # We define another list containing only "1" as the number of roots to be emerged for each event:
+            list_number = np.ones(param.n_seminal_roots)
+            # We assigned the two lists to the dataframe, and record it:
+            seminal_inputs_file['emergence_delay_in_thermal_time'] = list_time
+            seminal_inputs_file['number_of_seminal_roots_per_event'] = list_number
+            seminal_inputs_file.to_csv(os.path.join(input_file_path, seminal_roots_events_file),
+                                            na_rep='NA', index=False, header=True)
+        else:
+            seminal_inputs_file = pd.read_csv(seminal_inputs_path)
 
         # For each event of seminal roots emergence:
         for i in range(0, len(seminal_inputs_file.emergence_delay_in_thermal_time)):
@@ -5044,7 +5124,7 @@ def initiate_mtg(random=True,
         # We read additional parameters from a table, with one column containing the delay for each emergence event,
         # and the second column containing the number of adventitious roots that have to emerge at each event.
         # We try to access an already-existing CSV file:
-        adventitious_inputs_path = os.path.join("C:/Users/frees/rhizodep/src/rhizodep","adventitious_roots_inputs.csv")
+        adventitious_inputs_path = os.path.join(input_file_path, adventitious_roots_events_file)
         # If the file doesn't exist, we construct a new table using the specified parameters:
         if not os.path.exists(adventitious_inputs_path):
             print("NOTE: there was no CSV file describing the apparitions of adventitious roots!")
@@ -5059,7 +5139,7 @@ def initiate_mtg(random=True,
             # We assigned the two lists to the dataframe, and record it:
             adventitious_inputs_file['emergence_delay_in_thermal_time'] = list_time
             adventitious_inputs_file['number_of_adventitious_roots_per_event'] = list_number
-            adventitious_inputs_file.to_csv(os.path.join("C:/Users/frees/rhizodep/src/rhizodep", "adventitious_roots_inputs.csv"),
+            adventitious_inputs_file.to_csv(os.path.join(input_file_path, adventitious_roots_events_file),
                                             na_rep='NA', index=False, header=True)
         else:
             adventitious_inputs_file = pd.read_csv(adventitious_inputs_path)
@@ -5105,7 +5185,7 @@ def initiate_mtg(random=True,
                 apex_adventitious.growth_duration = param.GDs * (2. * radius_adventitious) ** 2 \
                                                     * param.main_roots_growth_extender
                 # TODO: Is the use of a parameter 'main_roots_growth_extender' for artificially increase the growth
-                #  duration of seminal and adevntitious roots really relevant?
+                #  duration of seminal and adventitious roots really relevant?
                 apex_adventitious.life_duration = param.LDs * (2. * radius_adventitious) * param.root_tissue_density
 
                 # We defined the delay of emergence for the new primordium:
@@ -5132,6 +5212,9 @@ def initiate_mtg(random=True,
 
     apex.C_sucrose_root=initial_C_sucrose_root
     apex.C_hexose_root=initial_C_hexose_root
+    apex.C_hexose_soil=0.
+    apex.Cs_mucilage_soil=0.
+    apex.Cs_cells_soil=0.
 
     apex.volume = volume_and_external_surface_from_radius_and_length(g, apex, apex.radius, apex.length)["volume"]
     apex.struct_mass = apex.volume * param.root_tissue_density
@@ -5149,6 +5232,9 @@ def initiate_mtg(random=True,
     apex.hexose_soil = apex.C_hexose_soil * mass
     apex.mucilage_soil = apex.Cs_mucilage_soil * external_surface
     apex.cells_soil = apex.Cs_cells_soil * external_surface
+
+    apex.hexose_consumption_by_growth = 0.
+    apex.hexose_consumption_by_growth_rate = 0.
 
     return g
 

@@ -153,6 +153,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     total_sucrose_root_deficit_series = []
     total_hexose_root_deficit_series = []
+    total_hexose_reserve_deficit_series = []
     total_hexose_soil_deficit_series = []
     total_mucilage_soil_deficit_series = []
     total_cells_soil_deficit_series = []
@@ -166,11 +167,13 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     total_hexose_mobilization_from_reserve_series = []
     total_hexose_immobilization_as_reserve_series = []
     total_hexose_exudation_series = []
+    total_phloem_hexose_exudation_series = []
     total_hexose_uptake_series = []
+    total_phloem_hexose_uptake_series = []
     total_mucilage_secretion_series = []
     total_cells_release_series = []
     total_net_hexose_exudation_series = []
-    total_rhizodeposition_series = []
+    total_net_rhizodeposition_series = []
     total_hexose_degradation_series = []
     total_mucilage_degradation_series = []
     total_cells_degradation_series = []
@@ -336,6 +339,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
         total_sucrose_root_deficit_series.append(dictionary["total_sucrose_root_deficit"])
         total_hexose_root_deficit_series.append(dictionary["total_hexose_root_deficit"])
+        total_hexose_reserve_deficit_series.append(dictionary["total_hexose_reserve_deficit"])
         total_hexose_soil_deficit_series.append(dictionary["total_hexose_soil_deficit"])
         total_mucilage_soil_deficit_series.append(dictionary["total_mucilage_soil_deficit"])
         total_cells_soil_deficit_series.append(dictionary["total_cells_soil_deficit"])
@@ -349,10 +353,12 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         total_hexose_mobilization_from_reserve_series.append(dictionary["total_hexose_mobilization_from_reserve"])
         total_hexose_immobilization_as_reserve_series.append(dictionary["total_hexose_immobilization_as_reserve"])
         total_hexose_exudation_series.append(dictionary["total_hexose_exudation"])
+        total_phloem_hexose_exudation_series.append(dictionary["total_phloem_hexose_exudation"])
         total_hexose_uptake_series.append(dictionary["total_hexose_uptake"])
+        total_phloem_hexose_uptake_series.append(dictionary["total_phloem_hexose_uptake"])
         total_mucilage_secretion_series.append(dictionary["total_mucilage_secretion"])
         total_cells_release_series.append(dictionary["total_cells_release"])
-        total_rhizodeposition_series.append(dictionary["total_rhizodeposition"])
+        total_net_rhizodeposition_series.append(dictionary["total_net_rhizodeposition"])
         total_net_hexose_exudation_series.append(dictionary["total_net_hexose_exudation"])
         total_hexose_degradation_series.append(dictionary["total_hexose_degradation"])
         total_mucilage_degradation_series.append(dictionary["total_mucilage_degradation"])
@@ -372,7 +378,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         soil_temperature_series.append("NA")
 
         # Initializing the amount of C in the root_soil_CO2 system:
-        previous_C_in_the_system = dictionary["C_in_the_root_soil_system"] + C_cumulated_in_the_gaz_phase
+        previous_C_in_the_system = dictionary["C_in_the_root_soil_system"]
         theoretical_cumulated_C_in_the_system = previous_C_in_the_system
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -406,6 +412,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
                                        "Deficit of sucrose in the root (mol of sucrose)": total_sucrose_root_deficit_series,
                                        "Deficit of hexose in the mobile pool of the roots (mol of hexose)": total_hexose_root_deficit_series,
+                                       "Deficit of hexose in the reserve pool of the roots (mol of hexose)": total_hexose_reserve_deficit_series,
                                        "Deficit of hexose in the soil (mol of hexose)": total_hexose_soil_deficit_series,
                                        "Deficit of mucilage in the soil (mol of hexose)": total_mucilage_soil_deficit_series,
                                        "Deficit of cells in the soil (mol of hexose)": total_cells_soil_deficit_series,
@@ -417,11 +424,13 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                        "Sucrose reloaded in the phloem (mol of hexose)": total_sucrose_loading_in_phloem_series,
                                        "Hexose mobilized from reserve (mol of hexose)": total_hexose_mobilization_from_reserve_series,
                                        "Hexose stored as reserve (mol of hexose)": total_hexose_immobilization_as_reserve_series,
-                                       "Hexose emitted in the soil (mol of hexose)": total_hexose_exudation_series,
-                                       "Hexose taken up from the soil (mol of hexose)": total_hexose_uptake_series,
+                                       "Hexose emitted in the soil from parenchyma (mol of hexose)": total_hexose_exudation_series,
+                                       "Hexose emitted in the soil from phloem (mol of hexose)": total_phloem_hexose_exudation_series,
+                                       "Hexose taken up from the soil by parenchyma (mol of hexose)": total_hexose_uptake_series,
+                                       "Hexose taken up from the soil by phloem (mol of hexose)": total_phloem_hexose_uptake_series,
                                        "Mucilage secreted in the soil (mol of hexose)": total_mucilage_secretion_series,
                                        "Cells release in the soil (mol of equivalent-hexose)": total_cells_release_series,
-                                       "Total rhizodeposition (mol of hexose)": total_rhizodeposition_series,
+                                       "Total net rhizodeposition (mol of hexose)": total_net_rhizodeposition_series,
                                        "Hexose degraded in the soil (mol of hexose)": total_hexose_degradation_series,
                                        "Mucilage degraded in the soil (mol of hexose)": total_mucilage_degradation_series,
                                        "Cells degraded in the soil (mol of equivalent-hexose)": total_cells_degradation_series,
@@ -456,6 +465,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                                "Cells in the soil (mol of equivalent-hexose)",
                                                "Deficit of sucrose in the root (mol of sucrose)",
                                                "Deficit of hexose in the mobile pool of the roots (mol of hexose)",
+                                               "Deficit of hexose in the reserve pool of the roots (mol of hexose)",
                                                "Deficit of hexose in the soil (mol of hexose)",
                                                "Deficit of mucilage in the soil (mol of hexose)",
                                                "Deficit of cells in the soil (mol of hexose)",
@@ -466,11 +476,13 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                                "Sucrose reloaded in the phloem (mol of hexose)",
                                                "Hexose mobilized from reserve (mol of hexose)",
                                                "Hexose stored as reserve (mol of hexose)",
-                                               "Hexose emitted in the soil (mol of hexose)",
-                                               "Hexose taken up from the soil (mol of hexose)",
+                                               "Hexose emitted in the soil from parenchyma (mol of hexose)",
+                                               "Hexose emitted in the soil from phloem (mol of hexose)",
+                                               "Hexose taken up from the soil by parenchyma (mol of hexose)",
+                                               "Hexose taken up from the soil by phloem (mol of hexose)",
                                                "Mucilage secreted in the soil (mol of hexose)",
                                                "Cells release in the soil (mol of equivalent-hexose)",
-                                               "Total rhizodeposition (mol of hexose)",
+                                               "Total net rhizodeposition (mol of hexose)",
                                                "Hexose degraded in the soil (mol of hexose)",
                                                "Mucilage degraded in the soil (mol of hexose)",
                                                "Cells degraded in the soil (mol of equivalent-hexose)",
@@ -517,7 +529,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
             # DEFINING THE INPUT OF CARBON TO THE ROOTS FOR THIS TIME STEP:
             # --------------------------------------------------------------
-            if constant_sucrose_input_rate > 0 and forcing_constant_inputs:  # or input_file == "None":
+            if forcing_constant_inputs:
                 sucrose_input_rate = constant_sucrose_input_rate
             else:
                 sucrose_input_rate = input_frame.loc[step, 'sucrose_input_rate']
@@ -764,6 +776,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
                 total_sucrose_root_deficit_series.append(dictionary["total_sucrose_root_deficit"])
                 total_hexose_root_deficit_series.append(dictionary["total_hexose_root_deficit"])
+                total_hexose_reserve_deficit_series.append(dictionary["total_hexose_reserve_deficit"])
                 total_hexose_soil_deficit_series.append(dictionary["total_hexose_soil_deficit"])
                 total_mucilage_soil_deficit_series.append(dictionary["total_mucilage_soil_deficit"])
                 total_cells_soil_deficit_series.append(dictionary["total_cells_soil_deficit"])
@@ -777,10 +790,12 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 total_hexose_mobilization_from_reserve_series.append(dictionary["total_hexose_mobilization_from_reserve"])
                 total_hexose_immobilization_as_reserve_series.append(dictionary["total_hexose_immobilization_as_reserve"])
                 total_hexose_exudation_series.append(dictionary["total_hexose_exudation"])
+                total_phloem_hexose_exudation_series.append(dictionary["total_phloem_hexose_exudation"])
                 total_hexose_uptake_series.append(dictionary["total_hexose_uptake"])
+                total_phloem_hexose_uptake_series.append(dictionary["total_phloem_hexose_uptake"])
                 total_mucilage_secretion_series.append(dictionary["total_mucilage_secretion"])
                 total_cells_release_series.append(dictionary["total_cells_release"])
-                total_rhizodeposition_series.append(dictionary["total_rhizodeposition"])
+                total_net_rhizodeposition_series.append(dictionary["total_net_rhizodeposition"])
                 total_net_hexose_exudation_series.append(dictionary["total_net_hexose_exudation"])
                 total_hexose_degradation_series.append(dictionary["total_hexose_degradation"])
                 total_mucilage_degradation_series.append(dictionary["total_mucilage_degradation"])
@@ -805,13 +820,15 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     tip_C_hexose_root_series.append(tip_C_hexose_root)
 
                     # CHECKING CARBON BALANCE:
+                    ##########################
+
                     current_C_in_the_system = dictionary["C_in_the_root_soil_system"] \
                                               + C_cumulated_in_the_gaz_phase + C_cumulated_in_the_degraded_pool
                     theoretical_current_C_in_the_system = (previous_C_in_the_system
                                                            + sucrose_input_rate * time_step_in_seconds * 12.)
                     theoretical_cumulated_C_in_the_system += sucrose_input_rate * time_step_in_seconds * 12.
 
-                    if abs(current_C_in_the_system - theoretical_cumulated_C_in_the_system) / current_C_in_the_system > 1e-6:
+                    if abs(current_C_in_the_system - theoretical_current_C_in_the_system) / current_C_in_the_system > 1e-9:
                         print("!!! ERROR ON CARBON BALANCE: the current amount of C in the system is",
                               "{:.2E}".format(Decimal(current_C_in_the_system)), "but it should be",
                               "{:.2E}".format(Decimal(theoretical_current_C_in_the_system)), "mol of C")

@@ -457,20 +457,21 @@ if __name__ == "__main__":
     # Creating a new movie from root systems for one given scenario:
     ################################################################
 
-    resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0001'),
-                             images_folder='root_images',
+    resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0005'),
+                             # images_folder='root_images',
+                             images_folder='root_new_images',
                              resized_images_folder='root_images_resized',
                              film_making=True,
-                             film_name="root_movie.gif",
+                             film_name="root_movie_mucilage.gif",
                              image_transforming=True,
                              resizing=False, dividing_size_by=1.,
                              colorbar_option=True, colorbar_position=1,
-                             colorbar_title="Total rhizodeposition rate (mol of C per cm per second)",
+                             colorbar_title="Mucilage secretion rate (gC per day per cm)",
                              colorbar_cmap='jet', colorbar_lognorm=True,
                              n_thicks_for_linear_scale=6,
-                             vmin=1e-8, vmax=1e-5,
+                             vmin=1e-9, vmax=1e-4,
                              time_printing=True, time_position=1,
-                             time_step_in_days=1./24., sampling_frequency=4, fps=24,
+                             time_step_in_days=1./24., sampling_frequency=12, fps=24,
                              title="")
 
     # # Creating a new movie from root systems for a set of scenarios:
