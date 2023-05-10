@@ -273,8 +273,8 @@ def recording_MTG_properties(g, file_name='g_properties.csv'):
 ########################################################################################################################
 
 def loading_MTG_files(my_path='',
-                      file_name='g_file.pckl',
                       opening_list=False,
+                      single_MTG_file_number=3600,
                       property="C_hexose_root", vmin=1e-5, vmax=1e-2, log_scale=True, cmap='jet',
                       x_center=0, y_center=0, z_center=-1, z_cam=-2,
                       camera_distance=4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
@@ -330,24 +330,26 @@ def loading_MTG_files(my_path='',
 
     # Defining the list of files:
     # ----------------------------
+    filenames = Path(g_dir).glob('*pckl')
+    filenames = sorted(filenames)
     if opening_list:
-        filenames = Path(g_dir).glob('*pckl')
-        filenames = sorted(filenames)
         n_steps = len(filenames)
+        step_initial = 0
+        step_final = n_steps+1
         filename = filenames[0]
     else:
-        n_steps = 1
+        step_initial = single_MTG_file_number - 1
+        step_final = single_MTG_file_number + 1
+        filename = filenames[single_MTG_file_number]
 
-    # We cover each of the MTG files in the list (or only the specified file when requested):
+        # We cover each of the MTG files in the list (or only the specified file when requested):
     # ----------------------------------------------------------------------------------------
-    for step in range(0, n_steps):
+    for step in range(step_initial, step_final):
 
         # Defining the name of the MTG file:
         if opening_list:
             filename = filenames[step]
-        else:
-            filename = file_name
-        print("Dealing with file number", step + 1, "out of", n_steps, "...")
+        print("Dealing with file number", step, "out of", step_final-1, "...")
 
         # Loading the MTG file:
         f = open(filename, 'rb')
@@ -479,13 +481,13 @@ def loading_MTG_files(my_path='',
 # im_resized.save('colorbar_new.png', quality=95)
 # # im_new.save('colorbar_new.png', quality=95)
 
-loading_MTG_files(my_path='C:\\Users\\frees\\rhizodep\\simulations\\running_scenarios\\outputs\\Scenario_0005',
-                  # file_name='root02400.pckl',
+loading_MTG_files(my_path='C:\\Users\\frees\\rhizodep\\simulations\\running_scenarios\\outputs\\Scenario_0008',
+                  # single_MTG_file_number=3598,
                   opening_list=True,
                   # property="C_hexose_reserve", vmin=1e-3, vmax=5e-3, log_scale=False,
                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
-                  property="cells_release_rate_per_day_per_cm", vmin=1e-9, vmax=1e-4, log_scale=True, cmap='jet',
+                  property="hexose_exudation_rate", vmin=1e-15, vmax=1e-10, log_scale=True, cmap='jet',
                   x_center=0, y_center=0, z_center=-0.1, z_cam=-0.2,
                   camera_distance=0.4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
                   adding_images_on_plot=False,
@@ -498,5 +500,5 @@ loading_MTG_files(my_path='C:\\Users\\frees\\rhizodep\\simulations\\running_scen
 
 print("Done!")
 
-# To avoid closing PlantGL as soon as the run is done:
-input()
+# # To avoid closing PlantGL as soon as the run is done:
+# input()

@@ -442,36 +442,36 @@ if __name__ == "__main__":
     # # Creating a colorbar:
     # ######################
 
-    # path_colorbar = os.path.join('outputs', 'colorbar.png')
+    # path_colorbar = os.path.join('outputs', os.path.join('Scenario_0008','colorbar.png'))
     # # We create the colorbar:
-    # vmin=0
-    # vmax=1e-6
-    # bar = colorbar(title="Concentration of root mobile hexose (mol of hexose per gram of root)",
+    # vmin=1e-15
+    # vmax=1e-10
+    # bar = colorbar(title="Exudation rate from the phloem vessels (gC per day per cm)",
     #                cmap='jet',
-    #                lognorm=False,
+    #                lognorm=True,
     #                n_thicks_for_linear_scale=6,
     #                vmin=vmin, vmax=vmax)
     # # We save it in the output directory:
     # bar.savefig(path_colorbar, facecolor="None", edgecolor="None")
 
-    # Creating a new movie from root systems for one given scenario:
-    ################################################################
+    # # Creating a new movie from root systems for one given scenario:
+    # ################################################################
 
-    resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0005'),
+    resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0008'),
                              # images_folder='root_images',
                              images_folder='root_new_images',
                              resized_images_folder='root_images_resized',
                              film_making=True,
-                             film_name="root_movie_mucilage.gif",
+                             film_name="root_movie.gif",
                              image_transforming=True,
                              resizing=False, dividing_size_by=1.,
                              colorbar_option=True, colorbar_position=1,
-                             colorbar_title="Mucilage secretion rate (gC per day per cm)",
+                             colorbar_title="Normal exudation rate (gC per day per cm)",
                              colorbar_cmap='jet', colorbar_lognorm=True,
                              n_thicks_for_linear_scale=6,
-                             vmin=1e-9, vmax=1e-4,
+                             vmin=1e-15, vmax=1e-10,
                              time_printing=True, time_position=1,
-                             time_step_in_days=1./24., sampling_frequency=12, fps=24,
+                             time_step_in_days=1./24., sampling_frequency=6, fps=24,
                              title="")
 
     # # Creating a new movie from root systems for a set of scenarios:

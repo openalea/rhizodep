@@ -9,6 +9,7 @@
     :copyright: see AUTHORS.
     :license: see LICENSE for details.
 """
+# TODO for Tristan: Move phloem exudation? Calculate the age of each segment.
 
 # TODO: Check the calculation of "Structural mass produced (g)"
 # TODO: Check how "Just_dead" might mess up with the duration of certain process (ex: hexose uptake)
@@ -3654,7 +3655,7 @@ def cells_release_rate(n, soil_temperature_in_Celsius=20, printing_warnings=Fals
         # the rate is maximal when no cells are around, and linearily decreases with the concentration of cells
         # in the soil, until reaching 0 when the concentration is equal or higher than the maximal concentration in the
         # soil (NOTE: Cs_cells_soil is expressed in mol of equivalent hexose per m2 of external surface):
-        corrected_cells_surfacic_release = corrected_cells_surfacic_release * exchange_surface \
+        corrected_cells_surfacic_release = corrected_cells_surfacic_release
                                            * (param.Cs_cells_soil_max - Cs_cells_soil) / param.Cs_cells_soil_max
         # TODO: Validate this linear decrease until reaching the max surfacic density.
 
