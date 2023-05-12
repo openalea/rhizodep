@@ -327,6 +327,12 @@ def my_colormap(g, property_name, cmap='jet', vmin=None, vmax=None, lognorm=True
     :return: the MTG with the corresponding color
     """
 
+    # We make sure that the user did not accidently switch between vmin and vmax:
+    if vmin >= vmax:
+        raise Exception("Sorry, the vmin and vmax values of the color scale of the graph are wrong!")
+    if lognorm and (vmin <=0 or vmax <=0):
+        raise Exception("Sorry, it is not possible to represent negative values in a log scale - check vmin and vmax!")
+
     prop = g.property(property_name)
     keys = prop.keys()
     values = list(prop.values())
