@@ -354,8 +354,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         total_hexose_immobilization_as_reserve_series.append(dictionary["total_hexose_immobilization_as_reserve"])
         total_hexose_exudation_series.append(dictionary["total_hexose_exudation"])
         total_phloem_hexose_exudation_series.append(dictionary["total_phloem_hexose_exudation"])
-        total_hexose_uptake_series.append(dictionary["total_hexose_uptake"])
-        total_phloem_hexose_uptake_series.append(dictionary["total_phloem_hexose_uptake"])
+        total_hexose_uptake_series.append(dictionary["total_hexose_uptake_from_soil"])
+        total_phloem_hexose_uptake_series.append(dictionary["total_phloem_hexose_uptake_from_soil"])
         total_mucilage_secretion_series.append(dictionary["total_mucilage_secretion"])
         total_cells_release_series.append(dictionary["total_cells_release"])
         total_net_rhizodeposition_series.append(dictionary["total_net_rhizodeposition"])
@@ -597,6 +597,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # (NOTE: segmentation should always occur AFTER actual growth):
                 model.segmentation_and_primordia_formation(g, time_step_in_seconds, printing_warnings=printing_warnings,
                                                            soil_temperature_in_Celsius=soil_temperature, random=random,
+                                                           ArchiSimple=ArchiSimple,
                                                            nodules=nodules,
                                                            root_order_limitation=root_order_limitation,
                                                            root_order_treshold=root_order_treshold)
@@ -791,8 +792,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 total_hexose_immobilization_as_reserve_series.append(dictionary["total_hexose_immobilization_as_reserve"])
                 total_hexose_exudation_series.append(dictionary["total_hexose_exudation"])
                 total_phloem_hexose_exudation_series.append(dictionary["total_phloem_hexose_exudation"])
-                total_hexose_uptake_series.append(dictionary["total_hexose_uptake"])
-                total_phloem_hexose_uptake_series.append(dictionary["total_phloem_hexose_uptake"])
+                total_hexose_uptake_series.append(dictionary["total_hexose_uptake_from_soil"])
+                total_phloem_hexose_uptake_series.append(dictionary["total_phloem_hexose_uptake_from_soil"])
                 total_mucilage_secretion_series.append(dictionary["total_mucilage_secretion"])
                 total_cells_release_series.append(dictionary["total_cells_release"])
                 total_net_rhizodeposition_series.append(dictionary["total_net_rhizodeposition"])

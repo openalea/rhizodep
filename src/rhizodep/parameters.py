@@ -92,6 +92,12 @@ ER = 0.2 / (60. * 60. * 24.)
 GDs = 800 * (60. * 60. * 24.) * 1000. ** 2.
 # => Reference: GDs=400. day mm-2
 
+# Selective growth durations (in second equivalent to temperature T_ref_growth):
+#-------------------------------------------------------------------------------
+GD_low = 0.338 * (60. * 60. * 24.) # Estimated from the shortest lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)
+GD_medium = 4.49 * (60. * 60. * 24.) # Estimated from the medium lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)
+GD_high = 60 * (60. * 60. * 24.) # Expected from the longest observed lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)
+
 # NEW: Coefficient of extension of growth duration for specific roots (in second per second):
 #--------------------------------------------------------------------------------------------
 main_roots_growth_extender=100
@@ -604,16 +610,38 @@ epidermal_parenchyma_surfacic_fraction  = 8 # According to Tristan Gerault's fir
 #-------------------------------------------------------------------------
 meristem_limite_zone_factor = 1. # We assume that the length of the meristem zone is equal to the radius of the root
 
-# Relative conductance in the meristem zone (me per m2):
+# Relative conductance in the meristem zone (m per m2):
 #-------------------------------------------------------
 relative_conductance_at_meristem = 0.5 # We assume that the conductance of cells walls is reduced by 2 in the meristem zone.
 
-# Ratio between the length of the zone where barrier formation has not been initiated yet, and root radius (m per m):
-#--------------------------------------------------------------------------------------------------------------------
-endodermis_limite_zone_factor = growing_zone_factor # We assume that endodermis formation starts right after the end of the elongation zone
-exodermis_limite_zone_factor = growing_zone_factor * 3. # We assume that exodermis starts 3 times further.
+# Ratio between the distance from tip where barriers formation starts/ends, and root radius (m per m):
+#-----------------------------------------------------------------------------------------------------
+start_distance_for_endodermis_factor = meristem_limite_zone_factor
+end_distance_for_endodermis_factor = growing_zone_factor * 3.
+start_distance_for_exodermis_factor = growing_zone_factor
+end_distance_for_exodermis_factor = growing_zone_factor * 10.
 
-# Maximal thermal time above which no barrier disruption is considered anymore when a lateral root has emerged
+# Thermal age of root cells for starting/ending the formation of endodermis and exodermis (second equivalent to T_ref_growth):
+#-----------------------------------------------------------------------------------------------------------------------------
+start_thermal_time_for_endodermis_formation = 60.*60.*24.*1. # We assume that the endodermis formation starts after 1 day at T_ref_growth.
+end_thermal_time_for_endodermis_formation = 60.*60.*24.*3. # We assume that the endodermis formation is completed after 3 days at T_ref_growth.
+start_thermal_time_for_exodermis_formation = 60.*60.*24.*10. # We assume that the exodermis formation starts after 10 days at T_ref_growth.
+end_thermal_time_for_exodermis_formation = 60.*60.*24.*30. # We assume that the exodermis formation is completed after 30 days at T_ref_growth.
+
+# Gompertz parameters for describing the evolution of apoplastic barriers with cell age:
+#---------------------------------------------------------------------------------------
+# The following parameters estimations are derived from the works of Enstone et al. (2005, PCE) and Dupuy et al. (2016,
+# Chemosphere) on the formation of apoplastic barriers in maize, fitting their data with a Gompertz curve.
+endodermis_a = 100. # This parameter corresponds to the asymptote of the process (adimensional, as cond_endodermis)
+exodermis_a = 100. # This parameter corresponds to the asymptote of the process (adimensional, as cond_exodermis)
+endodermis_b = 3.25 # This parameter corresponds to the time lag before the large increase (day equivalent to T_ref_growth)
+exodermis_b = 5.32 # This parameter corresponds to the time lag before the large increase (day equivalent to T_ref_growth)
+endodermis_c = 1.11 / (60.*60.*24.) # This parameter reflects the slope of the increase (per second equivalent to T_ref_growth)
+exodermis_c = 1.11 / (60.*60.*24.) # This parameter reflects the slope of the increase (per second equivalent to T_ref_growth)
+# Note: Interestingly, the mean value for parameter c from the two studies was identical for both endodermis and exodermis,
+# while within each study, c was distinct between endodermis and exodermis.
+
+# Maximal thermal time above which no barrier disruption is considered anymore after a lateral root has emerged
 # (in second equivalent to temperature T_ref_growth):
 #-------------------------------------------------------------------------------------------------------------
 max_thermal_time_since_endodermis_disruption = 6 * 60. * 60. # We assume that after 6h, no disruption is observed anymore!

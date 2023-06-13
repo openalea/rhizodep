@@ -9,7 +9,6 @@
     :copyright: see AUTHORS.
     :license: see LICENSE for details.
 """
-# TODO for Tristan: Move phloem exudation? Calculate the age of each segment.
 
 # TODO: Check the calculation of "Structural mass produced (g)"
 # TODO: Check how "Just_dead" might mess up with the duration of certain process (ex: hexose uptake)
@@ -171,32 +170,45 @@ def specific_surfaces(element):
 #------------------------------------------------------------------------------------------------------------------
 def endodermis_and_exodermis_conductances_as_a_function_of_x(distance_from_tip,
                                                              starting_distance_endodermis,
-                                                             starting_distance_exodermis):
+                                                             ending_distance_endodermis,
+                                                             starting_distance_exodermis,
+                                                             ending_distance_exodermis):
     """
     This simple function caclulates what should be the relative conductance of the endodermis and exodermis barriers,
     based on the distance from root tip.
     :param distance_from_tip: the distance from root tip (meter)
     :param starting_distance_endodermis: the distance at which the endodermis starts to mature (meter)
+    :param ending_distance_endodermis: the distance at which the endodermis stops to mature (meter)
     :param starting_distance_exodermis: the distance at which the exodermis starts to mature (meter)
+    :param ending_distance_exodermis: the distance at which the exodermis stops to mature (meter)
     :return: a dictionary containing conductance_endodermis and conductance_exodermis
     """
-    # TODO: Find a better way to describe how endodermis and exodermis barriers are formed along the root. In particular,
-    #  consider using root segment age instead of the distance from the tip!
 
     # ENDODERMIS:
     # Above the starting distance, we consider that the conductance rapidly decreases as the endodermis is formed:
     if distance_from_tip > starting_distance_endodermis:
-        conductance_endodermis = starting_distance_endodermis / distance_from_tip
+        # # OPTION 1: Conductance decreases as y = x0/x
+        # conductance_endodermis = starting_distance_endodermis / distance_from_tip
+        # OPTION 2: Conductance linearly decreases with x, up to reaching 0:
+        conductance_endodermis = 1 - (distance_from_tip - starting_distance_endodermis) \
+                                 / (ending_distance_endodermis - starting_distance_endodermis)
+        if conductance_endodermis < 0.:
+            conductance_endodermis = 0.
     # Below the starting distance, the conductance is necessarily maximal:
     else:
         conductance_endodermis = 1
 
     # EXODERMIS:
-    # Above the starting distance, we consider that the conductance rapidly decreases as the exodermis is
-    # formed:
+    # Above the starting distance, we consider that the conductance rapidly decreases as the exodermis is formed:
     if distance_from_tip > starting_distance_exodermis:
-        conductance_exodermis = starting_distance_exodermis / distance_from_tip
-    # Below the starting distance, the conductance is necessarily maximal:
+        # # OPTION 1: Conductance decreases as y = x0/x
+        # conductance_exodermis = starting_distance_exodermis / distance_from_tip
+        # OPTION 2: Conductance linearly decreases with x, up to reaching 0:
+        conductance_exodermis = 1 - (distance_from_tip - starting_distance_exodermis) \
+                                 / (ending_distance_exodermis - starting_distance_exodermis)
+        if conductance_exodermis < 0.:
+            conductance_exodermis = 0.
+        # Below the starting distance, the conductance is necessarily maximal:
     else:
         conductance_exodermis = 1
 
@@ -211,7 +223,9 @@ def root_barriers_length_integrator(length_start,
                                     length_stop,
                                     number_of_length_steps,
                                     starting_distance_endodermis,
-                                    starting_distance_exodermis):
+                                    ending_distance_endodermis,
+                                    starting_distance_exodermis,
+                                    ending_distance_exodermis):
     """
     This function calculates the mean conductance of endodermis and exodermis along a specified length, by sub-dividing
     this length into little subsegments, and by eventually summing their individual, weighted conductances.
@@ -219,7 +233,9 @@ def root_barriers_length_integrator(length_start,
     :param length_stop: the position along the root where calculations stop
     :param number_of_length_steps: the number of intermediate positions to compute along the path to get a good estimation of the mean conductances
     :param starting_distance_endodermis: the distance at which the endodermis starts to mature (meter)
+    :param ending_distance_endodermis: the distance at which the endodermis stops to mature (meter)
     :param starting_distance_exodermis: the distance at which the exodermis starts to mature (meter)
+    :param ending_distance_exodermis: the distance at which the exodermis stops to mature (meter)
     :return: a dictionary containing conductance_endodermis and conductance_exodermis
     """
 
@@ -236,9 +252,11 @@ def root_barriers_length_integrator(length_start,
     # For each new sublength:
     for i in range(0, number_of_length_steps):
         # The new conductances are calculated in the middle of the current sub-length:
-        dict_cond = endodermis_and_exodermis_conductances_as_a_function_of_x(distance_from_tip = progressive_length,
-                                                                             starting_distance_endodermis =  starting_distance_endodermis,
-                                                                             starting_distance_exodermis = starting_distance_exodermis)
+        dict_cond = endodermis_and_exodermis_conductances_as_a_function_of_x(progressive_length,
+                                                                             starting_distance_endodermis,
+                                                                             ending_distance_endodermis,
+                                                                             starting_distance_exodermis,
+                                                                             ending_distance_exodermis)
         # The integrated values for endodermis and exodermis conductances are increased:
         integrated_value_endodermis += dict_cond['conductance_endodermis'] / number_of_length_steps
         integrated_value_exodermis += dict_cond['conductance_exodermis'] / number_of_length_steps
@@ -251,9 +269,10 @@ def root_barriers_length_integrator(length_start,
 
     return dictionary
 
-def transport_barriers(g, n):
+def transport_barriers(g, n, computation_with_age=True, computation_with_distance_to_tip=False):
     """
-    This function computes the actual relative conductances of cell walls, endodermis and exodermis for a given root element.
+    This function computes the actual relative conductances of cell walls, endodermis and exodermis for a given root
+    element, based on either the distance to root tip or the age of the root segment.
     :param g: the root MTG to work on
     :param n: the root element where calculations will be made
     :return: the updated element n with the new relative conductances
@@ -266,14 +285,16 @@ def transport_barriers(g, n):
     length = n.length
     radius = n.radius
     distance_from_tip = n.distance_from_tip
+    age = n.thermal_time_since_cells_formation
 
     # CELL WALLS RESISTANCE INCREASED IN THE MERISTEMATIC ZONE:
     # ---------------------------------------------------------
 
     meristem_zone_length = param.meristem_limite_zone_factor * radius
     relative_conductance_at_meristem = param.relative_conductance_at_meristem
-    # We assume that the relative conductance of cell walls is homogeneously reduced over the length of the meristem
-    # zone, and then is maximal, i.e. equal to 1.
+    # We assume that the relative conductance of cell walls is either homogeneously reduced over the length of the
+    # meristem zone, or is maximal elsewhere, i.e. equal to 1.
+    # TODO: Consider a progressive reduction of the conductance of cell walls with high root cells age?
     # If the current element encompasses part of all of the meristem zone:
     if (distance_from_tip - length) < meristem_zone_length:
         # Then we calculate the fraction of the length of the current element where the meristem is present:
@@ -289,22 +310,56 @@ def transport_barriers(g, n):
     # BARRIERS OF ENDODERMIS & EXODERMIS:
     #------------------------------------
 
-    # We define the length over which the endodermis has not started to form:
-    zone_without_endodermis = param.endodermis_limite_zone_factor * radius
-    # We define the length over which the exodermis has not started to form:
-    zone_without_exodermis = param.exodermis_limite_zone_factor * radius
+    # OPTION 1 - The formation of transport barriers is dictated by root segment age:
+    if computation_with_age:
 
-    # We call a function that integrates the values of relative conductances between the beginning and the end of the
-    # root element, knowing the evolution of the conductances with x (the distance from root tip):
-    dict_cond = root_barriers_length_integrator(length_start = distance_from_tip - length,
-                                                length_stop = distance_from_tip,
-                                                number_of_length_steps = 10,
-                                                starting_distance_endodermis = zone_without_endodermis,
-                                                starting_distance_exodermis = zone_without_exodermis)
-    relative_conductance_endodermis = dict_cond['conductance_endodermis']
-    relative_conductance_exodermis = dict_cond['conductance_exodermis']
-    # We now consider a special case where the endodermis and/or exodermis barriers are temporarily opened because of
-    # the emergence of a lateral root!
+        # # WITH LINEAR EVOLUTION:
+        # start_endo = param.start_thermal_time_for_endodermis_formation
+        # end_endo = param.end_thermal_time_for_endodermis_formation
+        # if age <= start_endo:
+        #     relative_conductance_endodermis = 1.
+        # elif age < end_endo:
+        #     relative_conductance_endodermis = 1 - (age - start_endo) / (end_endo - start_endo)
+        # else:
+        #     relative_conductance_endodermis = 0.
+        # # And the conductance of exodermis is also either 1, 0 or inbetween:
+        # start_exo = param.start_thermal_time_for_exodermis_formation
+        # end_exo = param.end_thermal_time_for_exodermis_formation
+        # if age <= start_exo:
+        #     relative_conductance_exodermis = 1.
+        # elif age < end_endo:
+        #     relative_conductance_exodermis = 1 - (age - start_exo) / (end_exo - start_exo)
+        # else:
+        #     relative_conductance_exodermis = 0.
+
+        # WITH GOMPERTZ CONTINUOUS EVOLUTION:
+        relative_conductance_endodermis = (100 - param.endodermis_a * np.exp(-np.exp(param.endodermis_b - param.endodermis_c * age)))/100.
+        relative_conductance_exodermis = (100 - param.exodermis_a * np.exp(-np.exp(param.exodermis_b - param.exodermis_c * age)))/100.
+
+        # OPTION 2 - The formation of transport barriers is dictated by the distance to root tip:
+    if computation_with_distance_to_tip:
+
+        # We define the distances from apex where barriers start/end:
+        start_distance_endodermis = param.start_distance_for_endodermis_factor * radius
+        end_distance_endodermis = param.end_distance_for_endodermis_factor * radius
+        start_distance_exodermis = param.start_distance_for_exodermis_factor * radius
+        end_distance_exodermis = param.end_distance_for_exodermis_factor * radius
+
+        # We call a function that integrates the values of relative conductances between the beginning and the end of the
+        # root element, knowing the evolution of the conductances with x (the distance from root tip):
+        dict_cond = root_barriers_length_integrator(length_start = distance_from_tip - length,
+                                                    length_stop = distance_from_tip,
+                                                    number_of_length_steps = 10,
+                                                    starting_distance_endodermis = start_distance_endodermis,
+                                                    ending_distance_endodermis = end_distance_endodermis,
+                                                    starting_distance_exodermis = start_distance_exodermis,
+                                                    ending_distance_exodermis = end_distance_exodermis)
+        relative_conductance_endodermis = dict_cond['conductance_endodermis']
+        relative_conductance_exodermis = dict_cond['conductance_exodermis']
+
+    # SPECIAL CASE: # We now consider a special case where the endodermis and/or exodermis barriers are temporarily
+    # opened because of the emergence of a lateral root.
+
     # If there are more than one child, then it means there are lateral roots:
     if number_of_children > 1:
         # We define two maximal thermal durations, above which the barriers are not considered to be affected anymore:
@@ -353,6 +408,7 @@ def transport_barriers(g, n):
                     new_conductance = max(relative_conductance_exodermis,
                                           (t_max_exo - t_since_exodermis_was_disrupted) / t_max_exo)
                     possible_conductances_exo.append(new_conductance)
+
         # Now that we have covered all lateral roots, we limit the conductance of the barriers of the mother root
         # element by choosing the least limiting lateral root (only active if the lists did not remain empty):
         if possible_conductances_endo:
@@ -396,11 +452,32 @@ def update_surfaces_and_volumes(g):
         # We calculate the current external surface of the element:
         n.external_surface = surfaces_and_volumes_dict["external_surface"]
 
-        # We call the function that automatically updates the other surfaces of exchange:
+        # We call the function that automatically updates the other surfaces of within the cells (ex: cortical symplast):
         specific_surfaces(n)
 
-        # We call the function that automatically updates the transport barriers:
+        # We call the function that automatically updates the transport barriers (i.e. endodermis and exodermis):
         transport_barriers(g, n)
+
+        # We update the surfaces of exchange between the soil solution and the accessible root symplast.
+        # We first read the values from the current root element:
+        S_epid = n.epidermis_surface_without_hairs
+        S_hairs = n.living_root_hairs_external_surface
+        S_cortex = n.cortical_parenchyma_surface
+        S_stele = n.stelar_parenchyma_surface
+        S_vessels = n.phloem_surface
+        cond_walls = n.relative_conductance_walls
+        cond_exo = n.relative_conductance_exodermis
+        cond_endo = n.relative_conductance_endodermis
+        # We then calculate the total surface of exchange between symplasm and apoplasm in the root parenchyma,
+        # modulated by the conductance of cell walls (reduced in the meristematic zone) and the conductances of
+        # endodermis and exodermis barriers (when these barriers are mature, conductance is expected to be 0 in general,
+        # and part of the symplasm is not accessible anymore to the soil solution).
+        S_exch_without_phloem = (S_epid + S_hairs) + cond_walls * (cond_exo * S_cortex + cond_endo * S_stele)
+        S_exch_phloem = cond_walls * cond_exo * cond_endo * S_vessels
+        # We finally record these exchange surfaces within n:
+        n.non_vascular_exchange_surface_with_soil_solution = S_exch_without_phloem
+        n.phloem_exchange_surface_with_soil_solution = S_exch_phloem
+        n.total_exchange_surface_with_soil_solution = S_exch_without_phloem + S_exch_phloem
 
     return g
 
@@ -446,6 +523,47 @@ def update_distance_from_tip(g):
 
     # We return a modified version of the MTG "g" with the updated property "distance_from_tip":
     return g
+
+# Calculating the growth duration of a given root apex:
+# -----------------------------------------------------
+def calculate_growth_duration(radius, index, root_order, ArchiSimple=False):
+    """
+    This function computes the growth duration of a given apex, based on its radius and root order. If ArchiSimple
+    option is activated, the function will calculate the duration proportionally to the square radius of the apex.
+    Otherwise, the duration is set from a probability test, largely independent from the radius of the apex.
+    :param radius: the radius of the apex element from which we compute the growth duration
+    :param index: the index of the apex element, used for setting a new random seed for this element
+    :param ArchiSimple: if True, the original rule set by ArchiSimple will be applied to compute the growth duration
+    :return: the growth duration of the apex (s)
+    """
+
+    # If we only want to apply original ArchiSimple rules:
+    if ArchiSimple:
+        # Then the growth duration of the apex is proportional to the square diameter of the apex:
+        growth_duration = param.GDs * (2. * radius) ** 2
+    # Otherwise, we define the growth duration as a fixed value, randomly chosen between three possibilities:
+    else:
+        # We first define the seed of random, depending on the index of the apex:
+        np.random.seed(param.random_choice * index)
+        # We then generate a random float number between 0 and 1, which will determine whether growth duration is low, medium or high:
+        random_result= np.random.random_sample()
+        # CASE 1: The apex corresponds to a seminal or adventitious root
+        if root_order ==1:
+            growth_duration = param.GD_high
+        else:
+            # CASE 2: Most likely, the growth duration will be low for a lateral root
+            if random_result < 0.80:
+                growth_duration = param.GD_low
+            # CASE 3: Occasionally, the growth duration of the lateral root may be significantly higher
+            elif random_result < 0.99:
+                growth_duration = param.GD_medium
+            # CASE 4: Exceptionally, the growth duration of the lateral root is as high as that from a seminal root,
+            # as long as the radius of the lateral root is high enough (i.e. twice as high as the minimal possible radius)
+            elif radius > 2 * param.Dmin/2.:
+                growth_duration = param.GD_high
+
+    # We return a modified version of the MTG "g" with the updated property "distance_from_tip":
+    return growth_duration
 
 
 # Calculation of the length of a root element intercepted between two z coordinates:
@@ -580,8 +698,8 @@ def classifying_on_z(g, z_min=0., z_max=1., z_interval=0.1):
             if n.type == "Dead" or n.type == "Just_dead":
                 total_included_root_necromass += (n.struct_mass + n.root_hairs_struct_mass) * fraction_length
             total_included_surface += n.external_surface * fraction_length
-            total_included_net_hexose_exudation += (n.hexose_exudation - n.hexose_uptake) * fraction_length
-            total_included_rhizodeposition += (n.hexose_exudation - n.hexose_uptake
+            total_included_net_hexose_exudation += (n.hexose_exudation - n.hexose_uptake_from_soil) * fraction_length
+            total_included_rhizodeposition += (n.hexose_exudation - n.hexose_uptake_from_soil
                                                + n.mucilage_secretion + n.cells_release) * fraction_length
             total_included_hexose_degradation += n.hexose_degradation * fraction_length
 
@@ -702,8 +820,7 @@ def temperature_modification(temperature_in_Celsius, process_at_T_ref=1., T_ref=
 # Adding a new root element with pre-defined properties:
 # ------------------------------------------------------
 def ADDING_A_CHILD(mother_element, edge_type='+', label='Apex', type='Normal_root_before_emergence',
-                   root_order=1,
-                   angle_down=45., angle_roll=0., length=0., radius=0.,
+                   root_order=1, angle_down=45., angle_roll=0., length=0., radius=0.,
                    identical_properties=True, nil_properties=False):
     """
     This function creates a new child element on the mother element, based on the function add_child.
@@ -811,9 +928,9 @@ def ADDING_A_CHILD(mother_element, edge_type='+', label='Apex', type='Normal_roo
                                              hexose_mobilization_from_reserve=0.,
                                              hexose_immobilization_as_reserve=0.,
                                              hexose_exudation=0.,
-                                             hexose_uptake=0.,
+                                             hexose_uptake_from_soil=0.,
                                              phloem_hexose_exudation=0.,
-                                             phloem_hexose_uptake=0.,
+                                             phloem_hexose_uptake_from_soil=0.,
                                              mucilage_secretion=0.,
                                              cells_release=0.,
                                              total_net_rhizodeposition=0.,
@@ -928,9 +1045,9 @@ def ADDING_A_CHILD(mother_element, edge_type='+', label='Apex', type='Normal_roo
                                              hexose_mobilization_from_reserve=mother_element.hexose_mobilization_from_reserve,
                                              hexose_immobilization_as_reserve=mother_element.hexose_immobilization_as_reserve,
                                              hexose_exudation=mother_element.hexose_exudation,
-                                             hexose_uptake=mother_element.hexose_uptake,
+                                             hexose_uptake_from_soil=mother_element.hexose_uptake_from_soil,
                                              phloem_hexose_exudation=mother_element.phloem_hexose_exudation,
-                                             phloem_hexose_uptake=mother_element.phloem_hexose_uptake,
+                                             phloem_hexose_uptake_from_soil=mother_element.phloem_hexose_uptake_from_soil,
                                              mucilage_secretion=mother_element.mucilage_secretion,
                                              cells_release=mother_element.cells_release,
                                              total_net_rhizodeposition=mother_element.total_net_rhizodeposition,
@@ -1011,7 +1128,7 @@ def elongated_length(initial_length=0., radius=0., C_hexose_root=1,
 
 def primordium_formation(g, apex, elongation_rate=0., time_step_in_seconds=1. * 60. * 60. * 24.,
                          soil_temperature_in_Celsius=20, random=False,
-                         root_order_limitation=False, root_order_treshold=2):
+                         root_order_limitation=False, root_order_treshold=2, ArchiSimple=False):
     """
     This function considers the formation of a primordium on a root apex, and, if possible, creates this new element
     of length 0.
@@ -1119,6 +1236,9 @@ def primordium_formation(g, apex, elongation_rate=0., time_step_in_seconds=1. * 
                                radius=potential_radius,
                                identical_properties=False,
                                nil_properties=True)
+        # We specifically recomputes the growth duration:
+        ramif.growth_duration = calculate_growth_duration(radius=ramif.radius, index=ramif.index(),
+                                                          root_order=ramif.root_order, ArchiSimple=ArchiSimple)
         # We specify the exact time since formation:
         ramif.actual_time_since_primordium_formation = actual_time_since_formation
         ramif.thermal_time_since_primordium_formation = actual_time_since_formation * temperature_time_adjustment
@@ -1862,9 +1982,9 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
     initial_initial_living_root_hairs_external_surface = apex.initial_living_root_hairs_external_surface
 
     initial_hexose_exudation = apex.hexose_exudation
-    initial_hexose_uptake = apex.hexose_uptake
+    initial_hexose_uptake_from_soil = apex.hexose_uptake_from_soil
     initial_phloem_hexose_exudation = apex.phloem_hexose_exudation
-    initial_phloem_hexose_uptake = apex.phloem_hexose_uptake
+    initial_phloem_hexose_uptake_from_soil = apex.phloem_hexose_uptake_from_soil
     initial_mucilage_secretion = apex.mucilage_secretion
     initial_cells_release = apex.cells_release
     initial_total_net_rhizodeposition = apex.total_net_rhizodeposition
@@ -1908,7 +2028,8 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
                                              time_step_in_seconds=time_step_in_seconds,
                                              soil_temperature_in_Celsius=soil_temperature_in_Celsius, random=random,
                                              root_order_limitation=root_order_limitation,
-                                             root_order_treshold=root_order_treshold))
+                                             root_order_treshold=root_order_treshold,
+                                             ArchiSimple=ArchiSimple))
 
         # If there has been an actual elongation of the root apex:
         if apex.actual_elongation_rate > 0.:
@@ -1991,9 +2112,9 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
                                                               * mass_fraction
 
             apex.hexose_exudation = initial_hexose_exudation * mass_fraction
-            apex.hexose_uptake = initial_hexose_uptake * mass_fraction
+            apex.hexose_uptake_from_soil = initial_hexose_uptake_from_soil * mass_fraction
             apex.phloem_hexose_exudation = initial_phloem_hexose_exudation * mass_fraction
-            apex.phloem_hexose_uptake = initial_phloem_hexose_uptake * mass_fraction
+            apex.phloem_hexose_uptake_from_soil = initial_phloem_hexose_uptake_from_soil * mass_fraction
             apex.mucilage_secretion = initial_mucilage_secretion * mass_fraction
             apex.cells_release = initial_cells_release * mass_fraction
             apex.total_net_rhizodeposition = initial_total_net_rhizodeposition * mass_fraction
@@ -2066,7 +2187,8 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
                                                  soil_temperature_in_Celsius=soil_temperature_in_Celsius,
                                                  random=random,
                                                  root_order_limitation=root_order_limitation,
-                                                 root_order_treshold=root_order_treshold))
+                                                 root_order_treshold=root_order_treshold,
+                                                 ArchiSimple=ArchiSimple))
 
             # The current element that has been elongated up to segment_length is now considered as a segment:
             apex.label = 'Segment'
@@ -2123,9 +2245,9 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
         apex.initial_living_root_hairs_external_surface = initial_initial_living_root_hairs_external_surface * mass_fraction
         apex.struct_mass_produced = initial_struct_mass_produced * mass_fraction
         apex.hexose_exudation = initial_hexose_exudation * mass_fraction
-        apex.hexose_uptake = initial_hexose_uptake * mass_fraction
+        apex.hexose_uptake_from_soil = initial_hexose_uptake_from_soil * mass_fraction
         apex.phloem_hexose_exudation = initial_phloem_hexose_exudation * mass_fraction
-        apex.phloem_hexose_uptake = initial_phloem_hexose_uptake * mass_fraction
+        apex.phloem_hexose_uptake_from_soil = initial_phloem_hexose_uptake_from_soil * mass_fraction
         apex.mucilage_secretion = initial_mucilage_secretion * mass_fraction
         apex.cells_release = initial_cells_release * mass_fraction
         apex.total_net_rhizodeposition = initial_total_net_rhizodeposition * mass_fraction
@@ -2166,7 +2288,8 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
                                              time_step_in_seconds=time_step_in_seconds,
                                              soil_temperature_in_Celsius=soil_temperature_in_Celsius, random=random,
                                              root_order_limitation=root_order_limitation,
-                                             root_order_treshold=root_order_treshold))
+                                             root_order_treshold=root_order_treshold,
+                                             ArchiSimple=ArchiSimple))
 
         # Finally, we add the last apex present at the end of the elongated axis:
         new_apex.append(apex)
@@ -2186,7 +2309,7 @@ class Simulate_segmentation_and_primordia_formation(object):
         # We define the list of apices for all vertices labelled as "Apex":
         self._apices = [g.node(v) for v in g.vertices_iter(scale=1) if g.label(v) == 'Apex']
 
-    def step(self, time_step_in_seconds, soil_temperature_in_Celsius=20, random=True, nodules=False,
+    def step(self, time_step_in_seconds, soil_temperature_in_Celsius=20, ArchiSimple=False, random=True, nodules=False,
              root_order_limitation=False, root_order_treshold=2):
         # We define "apices_list" as the list of all apices in g:
         apices_list = list(self._apices)
@@ -2198,6 +2321,7 @@ class Simulate_segmentation_and_primordia_formation(object):
                                                                  apex,
                                                                  time_step_in_seconds=time_step_in_seconds,
                                                                  soil_temperature_in_Celsius=soil_temperature_in_Celsius,
+                                                                 ArchiSimple=ArchiSimple,
                                                                  random=random,
                                                                  nodules=nodules,
                                                                  root_order_limitation=root_order_limitation,
@@ -2210,6 +2334,7 @@ class Simulate_segmentation_and_primordia_formation(object):
 #----------------------------------------------------------
 def segmentation_and_primordia_formation(g, time_step_in_seconds=1. * 60. * 60. * 24.,
                                          soil_temperature_in_Celsius=20,
+                                         ArchiSimple=False,
                                          random=True, printing_warnings=False,
                                          nodules=False,
                                          root_order_limitation=False,
@@ -2228,8 +2353,8 @@ def segmentation_and_primordia_formation(g, time_step_in_seconds=1. * 60. * 60. 
     """
     # We simulate the segmentation of all apices:
     simulator = Simulate_segmentation_and_primordia_formation(g)
-    simulator.step(time_step_in_seconds, soil_temperature_in_Celsius=soil_temperature_in_Celsius, random=random,
-                   nodules=nodules,
+    simulator.step(time_step_in_seconds, soil_temperature_in_Celsius=soil_temperature_in_Celsius,
+                   ArchiSimple=ArchiSimple, random=random, nodules=nodules,
                    root_order_limitation=root_order_limitation, root_order_treshold=root_order_treshold)
     return
 
@@ -3028,7 +3153,7 @@ def shoot_sucrose_supply_and_spreading(g, sucrose_input_rate=1e-9, time_step_in_
 
 # Unloading of sucrose from the phloem and conversion of sucrose into hexose:
 # --------------------------------------------------------------------------
-def exchange_with_phloem_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
+def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_warnings=False):
     """
     This function simulates the rate of sucrose unloading from phloem and its immediate conversion into hexose.
     The hexose pool is assumed to correspond to the symplastic compartment of root cells from the stelar and cortical
@@ -3050,6 +3175,7 @@ def exchange_with_phloem_rate(n, soil_temperature_in_Celsius=20, printing_warnin
     C_sucrose_root = n.C_sucrose_root
     C_hexose_root = n.C_hexose_root
     hexose_growth_demand = n.hexose_growth_demand
+    hexose_consumption_by_growth = n.hexose_consumption_by_growth
 
     # We also calculate the relevant surface of the element:
     exchange_surface = n.phloem_surface
@@ -3072,6 +3198,14 @@ def exchange_with_phloem_rate(n, soil_temperature_in_Celsius=20, printing_warnin
         #-------------------
         # We initially assume that phloem's permeability per m2 of surface is identical everywhere along the root:
         phloem_permeability = param.phloem_permeability
+
+        # We forbid any sucrose unloading if there is already a global deficit of sucrose:
+        global_sucrose_deficit = g.property('global_sucrose_deficit')[g.root]
+        if global_sucrose_deficit > 0.:
+            phloem_permeability = 0.
+            if printing_warnings:
+                print("WARNING: No phloem unloading occured for node", n.index(),
+                      "because there was a global deficit of sucrose!")
 
         # We verify that the concentration of sucrose is not negative:
         if C_sucrose_root <= C_hexose_root:
@@ -3118,9 +3252,9 @@ def exchange_with_phloem_rate(n, soil_temperature_in_Celsius=20, printing_warnin
             print("!!!ERROR!!! The distance to tip is lower than the length of the root element", vid)
         else:
             # TODO: Reconsider the way the variation of the max loading rate along the root axis has been described!
-            max_loading_rate = \
-                param.surfacic_loading_rate_reference \
-                * (1. - 1. / (1. + (distance_from_tip-length/2.) / original_radius) ** param.gamma_loading)
+            max_loading_rate = param.surfacic_loading_rate_reference \
+                * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
+            # max_loading_rate = param.surfacic_loading_rate_reference
 
         # We correct loading according to soil temperature:
         max_loading_rate = max_loading_rate \
@@ -3141,7 +3275,7 @@ def exchange_with_phloem_rate(n, soil_temperature_in_Celsius=20, printing_warnin
 
         # If there is a demand for growth, we set the loading rate to 0:
         # TODO: Here we restrict the loading of sucrose if there is a growth demand in the current element - should it be so?
-        if hexose_growth_demand > 0.:
+        if hexose_growth_demand > 0. or hexose_consumption_by_growth >0.:
             max_loading_rate  = 0.
 
         # We calculate the potential production of sucrose from root hexose (in mol) according to the Michaelis-Menten function:
@@ -3152,6 +3286,8 @@ def exchange_with_phloem_rate(n, soil_temperature_in_Celsius=20, printing_warnin
             print("!!!ERROR!!!  A negative sucrose loading rate was computed for element", n.index(),
                   "; we therefore set the loading rate to 0!")
             sucrose_loading_in_phloem_rate = 0.
+
+    # print("Sucrose loading is", sucrose_loading_in_phloem_rate, "while sucrose unloading is", hexose_production_from_phloem_rate*2.)
 
     # RECORDING THE RESULTS:
     #-----------------------
@@ -3367,7 +3503,7 @@ def maintenance_respiration_rate(n, soil_temperature_in_Celsius=20, printing_war
 
 # Exudation of hexose from the root into the soil:
 # ------------------------------------------------
-def root_hexose_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
+def root_sugars_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
     """
     This function computes the rate of hexose exudation (mol of hexose per seconds) for a given root element.
     Exudation corresponds to an efflux of hexose from the root to the soil by a passive diffusion. This efflux
@@ -3470,13 +3606,14 @@ def root_hexose_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warni
     # Eventually, we record all new values in the element n:
     n.hexose_exudation_rate = hexose_exudation_rate
     n.phloem_hexose_exudation_rate = phloem_hexose_exudation_rate
+    n.total_exudation_rate = hexose_exudation_rate + phloem_hexose_exudation_rate
     n.permeability_coeff = corrected_permeability_coeff
 
     return n
 
 # Uptake of hexose from the soil by the root:
 # -------------------------------------------
-def root_hexose_uptake_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
+def root_hexose_uptake_from_soil_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
     """
     This function computes the rate of hexose uptake by roots from the soil. This influx of hexose is represented
     as an active process with a substrate-limited relationship (Michaelis-Menten function) depending on the hexose
@@ -3512,10 +3649,10 @@ def root_hexose_uptake_rate(n, soil_temperature_in_Celsius=20, printing_warnings
     vascular_exchange_surface = cond_walls * cond_exo * cond_endo * S_vessels
 
     # CONSIDERING CASES THAT SHOULD BE AVOIDED:
-    # ------------------------------------------
+    # -----------------------------------------
     # We initialize the rate of the element n:
-    hexose_uptake_rate = 0.
-    phloem_hexose_uptake_rate = 0.
+    hexose_uptake_from_soil_rate = 0.
+    phloem_hexose_uptake_from_soil_rate = 0.
 
     # We initialize the possibility of uptake:
     possible_uptake = True
@@ -3549,12 +3686,12 @@ def root_hexose_uptake_rate(n, soil_temperature_in_Celsius=20, printing_warnings
         # CALCULATIONS OF UPTAKE RATE:
         # ----------------------------
         # We calculate the rate of hexose uptake:
-        hexose_uptake_rate = corrected_uptake_rate_max * non_vascular_exchange_surface \
+        hexose_uptake_from_soil_rate = corrected_uptake_rate_max * non_vascular_exchange_surface \
                              * C_hexose_soil / (param.Km_uptake + C_hexose_soil)
 
         # NEW: we also include the direct exchange between soil solution and phloem vessels, when these are in direct
         # contact with the soil solution (e.g. in the meristem, or if a lateral roots disturbs all the barriers):
-        phloem_hexose_uptake_rate = corrected_uptake_rate_max * vascular_exchange_surface \
+        phloem_hexose_uptake_from_soil_rate = corrected_uptake_rate_max * vascular_exchange_surface \
                              * C_hexose_soil / (param.Km_uptake + C_hexose_soil)
         # NOTE: We consider that the uptake rate though the surface of the phloem vessels in contact with
         # the solution is the same as through the surface of the parenchyma cells where the mobile pool is kept!
@@ -3562,8 +3699,9 @@ def root_hexose_uptake_rate(n, soil_temperature_in_Celsius=20, printing_warnings
     # RECORDING THE RESULTS:
     # ----------------------
     # Eventually, we record the new rate:
-    n.hexose_uptake_rate = hexose_uptake_rate
-    n.phloem_hexose_uptake_rate = phloem_hexose_uptake_rate
+    n.hexose_uptake_from_soil_rate = hexose_uptake_from_soil_rate
+    n.phloem_hexose_uptake_from_soil_rate = phloem_hexose_uptake_from_soil_rate
+    n.total_hexose_uptake_from_soil_rate = hexose_uptake_from_soil_rate + phloem_hexose_uptake_from_soil_rate
 
     return n
 
@@ -3701,9 +3839,13 @@ def cells_release_rate(n, soil_temperature_in_Celsius=20, printing_warnings=Fals
     # First, we ensure that the element has a positive length and surface of exchange:
     if length <= 0 or exchange_surface <=0.:
         possible_cells_release = False
-    # TODO: Are we sure that cells release is not dependent on C availability?
-    # We consider that dead elements cannot secrete any mucilage:
+
+    # We consider that dead root elements can't release cells anymore:
     if n.type == "Just_dead" or n.type == "Dead":
+        possible_cells_release = False
+
+    # We also consider that if the root axis has stopped elongating, no cells are released anymore:
+    if n.type == "Just_stopped" or n.type == "Stopped":
         possible_cells_release = False
 
     if possible_cells_release:
@@ -3756,6 +3898,7 @@ def cells_release_rate(n, soil_temperature_in_Celsius=20, printing_warnings=Fals
 
         # The release of cells by the root is then calculated according to this surface:
         cells_release_rate = exchange_surface * corrected_cells_surfacic_release
+        # TODO: Are we sure that cells release is not dependent on C availability?
 
     # RECORDING THE RESULTS:
     # ----------------------
@@ -3992,7 +4135,7 @@ def cells_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=
 ########################################################################################################################
 
 
-def calculating_all_growth_independent_fluxes(n, soil_temperature_in_Celsius, printing_warnings):
+def calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius, printing_warnings):
     """
     This function simply calls all the fluxes-related (not growth-dependent) functions of the model and runs them on a 
     given element n.
@@ -4003,15 +4146,15 @@ def calculating_all_growth_independent_fluxes(n, soil_temperature_in_Celsius, pr
     :return: the updated root element n
     """
     # Unloading of sucrose from phloem and conversion of sucrose into hexose, or reloading of sucrose:
-    exchange_with_phloem_rate(n, soil_temperature_in_Celsius, printing_warnings)
+    exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius, printing_warnings)
     # Net immobilization of hexose into the reserve pool:
     exchange_with_reserve_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Maintenance respiration:
     maintenance_respiration_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Transfer of hexose from the root to the soil:
-    root_hexose_exudation_rate(n, soil_temperature_in_Celsius, printing_warnings)
+    root_sugars_exudation_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Transfer of hexose from the soil to the root:
-    root_hexose_uptake_rate(n, soil_temperature_in_Celsius, printing_warnings)
+    root_hexose_uptake_from_soil_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Consumption of hexose in the soil:
     hexose_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Secretion of mucilage into the soil:
@@ -4040,8 +4183,8 @@ def calculating_amounts_from_fluxes(n, time_step_in_seconds):
     n.resp_maintenance = n.resp_maintenance_rate * time_step_in_seconds
     n.hexose_exudation = n.hexose_exudation_rate * time_step_in_seconds
     n.phloem_hexose_exudation = n.phloem_hexose_exudation_rate * time_step_in_seconds
-    n.hexose_uptake = n.hexose_uptake_rate * time_step_in_seconds
-    n.phloem_hexose_uptake = n.phloem_hexose_uptake_rate * time_step_in_seconds
+    n.hexose_uptake_from_soil = n.hexose_uptake_from_soil_rate * time_step_in_seconds
+    n.phloem_hexose_uptake_from_soil = n.phloem_hexose_uptake_from_soil_rate * time_step_in_seconds
     n.hexose_degradation = n.hexose_degradation_rate * time_step_in_seconds
     n.mucilage_secretion = n.mucilage_secretion_rate * time_step_in_seconds
     n.mucilage_degradation = n.mucilage_degradation_rate * time_step_in_seconds
@@ -4058,7 +4201,7 @@ def calculating_extra_variables(n, time_step_in_seconds):
     :return: the updated root element n
     """
     # We calculate the net exudation of hexose (in mol of hexose):
-    n.net_hexose_exudation = n.hexose_exudation + n.phloem_hexose_exudation - n.hexose_uptake - n.phloem_hexose_uptake
+    n.net_hexose_exudation = n.hexose_exudation + n.phloem_hexose_exudation - n.hexose_uptake_from_soil - n.phloem_hexose_uptake_from_soil
     # We calculate the total net rhizodeposition (i.e. subtracting the uptake of hexose from soil by roots),
     # expressed in mol of hexose:
     n.total_net_rhizodeposition \
@@ -4101,7 +4244,7 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
         - n.hexose_production_from_phloem_rate / 2. \
         - n.phloem_hexose_exudation_rate / 2. \
         + n.sucrose_loading_in_phloem_rate \
-        + n.phloem_hexose_uptake_rate / 2.
+        + n.phloem_hexose_uptake_from_soil_rate / 2.
 
     # We calculate the derivative of the amount of hexose in the root reserve pool:
     y_derivatives['hexose_reserve'] = \
@@ -4109,7 +4252,7 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
 
     # We calculate the derivative of the amount of hexose in the mobile pool of the root:
     y_derivatives['hexose_root'] = \
-        - n.hexose_exudation_rate + n.hexose_uptake_rate \
+        - n.hexose_exudation_rate + n.hexose_uptake_from_soil_rate \
         - n.mucilage_secretion_rate \
         - n.cells_release_rate \
         - n.resp_maintenance_rate / 6. \
@@ -4120,8 +4263,8 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
     # We calculate the derivative of the amount of hexose in the soil pool:
     y_derivatives['hexose_soil'] = \
         - n.hexose_degradation_rate \
-        + n.hexose_exudation_rate - n.hexose_uptake_rate \
-        + n.phloem_hexose_exudation_rate - n.phloem_hexose_uptake_rate
+        + n.hexose_exudation_rate - n.hexose_uptake_from_soil_rate \
+        + n.phloem_hexose_exudation_rate - n.phloem_hexose_uptake_from_soil_rate
 
     # We calculate the derivative of the amount of mucilage in the soil pool:
     y_derivatives['mucilage_soil'] = \
@@ -4233,7 +4376,7 @@ def adjusting_pools_and_deficits(n, printing_warnings=False):
 #----------------------------------------------------------------------------------------------
 class Differential_Equation_System(object):
 
-    def __init__(self, n, time_step_in_seconds=1. * (60. * 60. * 24.), soil_temperature_in_Celsius=20,
+    def __init__(self, g, n, time_step_in_seconds=1. * (60. * 60. * 24.), soil_temperature_in_Celsius=20,
                  printing_warnings=False, printing_solver_outputs=False):
         """
         This class is used to solve a system of differential equations corresponding to the evolution of the amounts
@@ -4244,6 +4387,7 @@ class Differential_Equation_System(object):
         :param printing_warnings: if True, warning messages related to processes will be printed
         :param printing_solver_outputs: if True, the successive steps of the solver will be printed
         """
+        self.g = g
         self.n = n
         self.time_step_in_seconds = time_step_in_seconds
         self.soil_temperature_in_Celsius = soil_temperature_in_Celsius
@@ -4275,8 +4419,8 @@ class Differential_Equation_System(object):
                                             'hexose_mobilization_from_reserve',
                                             'hexose_exudation',
                                             'phloem_hexose_exudation',
-                                            'hexose_uptake',
-                                            'phloem_hexose_uptake',
+                                            'hexose_uptake_from_soil',
+                                            'phloem_hexose_uptake_from_soil',
                                             'mucilage_secretion',
                                             'cells_release',
                                             'hexose_degradation',
@@ -4382,7 +4526,7 @@ class Differential_Equation_System(object):
         #  Calculation of all C-related fluxes:
         # -------------------------------------
         # We call an external function that computes all the fluxes for given element n, based on the new concentrations:
-        calculating_all_growth_independent_fluxes(self.n, self.soil_temperature_in_Celsius, self.printing_warnings)
+        calculating_all_growth_independent_fluxes(self.g, self.n, self.soil_temperature_in_Celsius, self.printing_warnings)
 
         # Calculation of time derivatives:
         # ---------------------------------
@@ -4583,7 +4727,7 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
             #---------------------------------------------------
 
             # We calculate all C-related fluxes (independent of the time step):
-            calculating_all_growth_independent_fluxes(n, soil_temperature_in_Celsius, printing_warnings)
+            calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius, printing_warnings)
 
             # We then calculate the quantities that correspond to these fluxes (dependent of the time step):
             calculating_amounts_from_fluxes(n, time_step_in_seconds)
@@ -4642,7 +4786,7 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
                 print("Considering for the solver the element", n.index(),"of length", n.length, "...")
 
             # We use the class corresponding to the system of differential equations and its resolution:
-            System = Differential_Equation_System(n,
+            System = Differential_Equation_System(g, n,
                                                   time_step_in_seconds,
                                                   soil_temperature_in_Celsius,
                                                   printing_warnings=printing_warnings,
@@ -4693,6 +4837,12 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
         if n.radius == param.D_ini / 2. and n.label == "Apex":
             # Then the function will give its specific concentration of mobile hexose:
             tip_C_hexose_root = n.C_hexose_root
+            # print("Root order for the main apex of index", n.index(), "is", n.root_order)
+            # if n.root_order > 1:
+            #     print("ACH!")
+            # if n.type=="Stopped":
+            #     print("This apex", n.index(), "is stopped!")
+            #     print(n.properties())
 
     # We return the concentration of hexose in the apex of the primary root:
     return tip_C_hexose_root
@@ -4739,9 +4889,9 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
     total_hexose_immobilization_as_reserve = 0.
     total_hexose_mobilization_from_reserve = 0.
     total_hexose_exudation = 0.
-    total_hexose_uptake = 0.
+    total_hexose_uptake_from_soil = 0.
     total_phloem_hexose_exudation = 0.
-    total_phloem_hexose_uptake = 0.
+    total_phloem_hexose_uptake_from_soil = 0.
     total_net_hexose_exudation = 0.
     total_mucilage_secretion = 0.
     total_cells_release = 0.
@@ -4809,10 +4959,10 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
         total_hexose_immobilization_as_reserve += n.hexose_immobilization_as_reserve
         total_hexose_mobilization_from_reserve += n.hexose_mobilization_from_reserve
         total_hexose_exudation += n.hexose_exudation
-        total_hexose_uptake += n.hexose_uptake
+        total_hexose_uptake_from_soil += n.hexose_uptake_from_soil
         total_phloem_hexose_exudation += n.phloem_hexose_exudation
-        total_phloem_hexose_uptake += n.phloem_hexose_uptake
-        total_net_hexose_exudation += (n.hexose_exudation - n.hexose_uptake)
+        total_phloem_hexose_uptake_from_soil += n.phloem_hexose_uptake_from_soil
+        total_net_hexose_exudation += (n.hexose_exudation - n.hexose_uptake_from_soil)
         total_mucilage_secretion += n.mucilage_secretion
         total_cells_release += n.cells_release
         total_net_rhizodeposition += n.total_net_rhizodeposition
@@ -4904,8 +5054,8 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
                   "total_hexose_mobilization_from_reserve": total_hexose_mobilization_from_reserve,
                   "total_hexose_exudation": total_hexose_exudation,
                   "total_phloem_hexose_exudation": total_phloem_hexose_exudation,
-                  "total_hexose_uptake": total_hexose_uptake,
-                  "total_phloem_hexose_uptake": total_phloem_hexose_uptake,
+                  "total_hexose_uptake_from_soil": total_hexose_uptake_from_soil,
+                  "total_phloem_hexose_uptake_from_soil": total_phloem_hexose_uptake_from_soil,
                   "total_mucilage_secretion": total_mucilage_secretion,
                   "total_cells_release": total_cells_release,
                   "total_hexose_degradation": total_hexose_degradation,
@@ -4951,6 +5101,7 @@ def control_of_anomalies(g):
 # Initialization of the root system:
 #-----------------------------------
 def initiate_mtg(random=True,
+                 ArchiSimple=False,
                  initial_segment_length=1e-3,
                  initial_apex_length=0.,
                  initial_C_sucrose_root=0.,
@@ -5086,9 +5237,9 @@ def initiate_mtg(random=True,
     base_segment.hexose_mobilization_from_reserve = 0.
     base_segment.hexose_immobilization_as_reserve = 0.
     base_segment.hexose_exudation = 0.
-    base_segment.hexose_uptake = 0.
+    base_segment.hexose_uptake_from_soil = 0.
     base_segment.phloem_hexose_exudation = 0.
-    base_segment.phloem_hexose_uptake = 0.
+    base_segment.phloem_hexose_uptake_from_soil = 0.
     base_segment.mucilage_secretion = 0.
     base_segment.cells_release = 0.
     base_segment.total_net_rhizodeposition = 0.
@@ -5108,9 +5259,9 @@ def initiate_mtg(random=True,
     base_segment.hexose_mobilization_from_reserve_rate = 0.
     base_segment.hexose_immobilization_as_reserve_rate = 0.
     base_segment.hexose_exudation_rate = 0.
-    base_segment.hexose_uptake_rate = 0.
+    base_segment.hexose_uptake_from_soil_rate = 0.
     base_segment.phloem_hexose_exudation_rate = 0.
-    base_segment.phloem_hexose_uptake_rate = 0.
+    base_segment.phloem_hexose_uptake_from_soil_rate = 0.
     base_segment.mucilage_secretion_rate = 0.
     base_segment.cells_release_rate = 0.
     base_segment.hexose_degradation_rate = 0.
@@ -5119,7 +5270,9 @@ def initiate_mtg(random=True,
 
     # Time indications:
     # ------------------
-    base_segment.growth_duration = param.GDs * (2. * base_radius) ** 2 * param.main_roots_growth_extender #WATCH OUT!!! we artificially multiply growth duration for seminal and adventious roots!!!!!!!!!!!!!!!!!!!!!!
+    # base_segment.growth_duration = param.GDs * (2. * base_radius) ** 2 * param.main_roots_growth_extender #WATCH OUT!!! we artificially multiply growth duration for seminal and adventious roots!!!!!!!!!!!!!!!!!!!!!!
+    base_segment.growth_duration = calculate_growth_duration(radius=base_radius, index=id_segment, root_order=1,
+                                                             ArchiSimple=ArchiSimple)
     base_segment.life_duration = param.LDs * (2. * base_radius) * param.root_tissue_density
     base_segment.actual_time_since_primordium_formation = 0.
     base_segment.actual_time_since_emergence = 0.
@@ -5199,9 +5352,11 @@ def initiate_mtg(random=True,
                                                    nil_properties=True)
                 apex_seminal.original_radius = radius_seminal
                 apex_seminal.initial_radius = radius_seminal
-                apex_seminal.growth_duration = param.GDs * (2. * radius_seminal) ** 2 * param.main_roots_growth_extender
-                # TODO: Is the use of a parameter 'main_roots_growth_extender' for artificially increase the growth
-                #  duration of seminal and adevntitious roots really relevant?
+                # apex_seminal.growth_duration = param.GDs * (2. * radius_seminal) ** 2 * param.main_roots_growth_extender
+                apex_seminal.growth_duration = calculate_growth_duration(radius=radius_seminal,
+                                                                         index=apex_seminal.index(),
+                                                                         root_order=1,
+                                                                         ArchiSimple=ArchiSimple)
                 apex_seminal.life_duration = param.LDs * (2. * radius_seminal) * param.root_tissue_density
 
                 # We defined the delay of emergence for the new primordium:
@@ -5273,10 +5428,11 @@ def initiate_mtg(random=True,
                                               nil_properties=True)
                 apex_adventitious.original_radius = radius_adventitious
                 apex_adventitious.initial_radius = radius_adventitious
-                apex_adventitious.growth_duration = param.GDs * (2. * radius_adventitious) ** 2 \
-                                                    * param.main_roots_growth_extender
-                # TODO: Is the use of a parameter 'main_roots_growth_extender' for artificially increase the growth
-                #  duration of seminal and adventitious roots really relevant?
+                # apex_adventitious.growth_duration = param.GDs * (2. * radius_adventitious) ** 2 * param.main_roots_growth_extender
+                apex_adventitious.growth_duration = calculate_growth_duration(radius=radius_adventitious,
+                                                                              index=apex_adventitious.index(),
+                                                                              root_order=1,
+                                                                              ArchiSimple=ArchiSimple)
                 apex_adventitious.life_duration = param.LDs * (2. * radius_adventitious) * param.root_tissue_density
 
                 # We defined the delay of emergence for the new primordium:
@@ -5296,9 +5452,11 @@ def initiate_mtg(random=True,
                           nil_properties=True)
     apex.original_radius = apex.radius
     apex.initial_radius = apex.radius
-    apex.growth_duration = param.GDs * (2. * base_radius) ** 2 * param.main_roots_growth_extender
-    # TODO: Is the use of a parameter 'main_roots_growth_extender' for artificially increase the growth
-    #  duration of seminal and adevntitious roots really relevant?
+    # apex.growth_duration = param.GDs * (2. * base_radius) ** 2 * param.main_roots_growth_extender
+    apex.growth_duration = calculate_growth_duration(radius=base_radius,
+                                                     index=apex.index(),
+                                                     root_order=1,
+                                                     ArchiSimple=ArchiSimple)
     apex.life_duration = param.LDs * (2. * base_radius) * param.root_tissue_density
 
     apex.C_sucrose_root=initial_C_sucrose_root

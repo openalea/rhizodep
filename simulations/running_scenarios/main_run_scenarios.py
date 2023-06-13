@@ -184,6 +184,7 @@ def run_one_scenario(scenario_id=1,
 
     # We initiate the properties of the MTG "g":
     g = model.initiate_mtg(random=True,
+                           ArchiSimple=ARCHISIMPLE_OPTION,
                            initial_segment_length=INITIAL_SEGMENT_LENGTH,
                            initial_apex_length=INITIAL_APEX_LENGTH,
                            initial_C_sucrose_root=INITIAL_C_SUCROSE_ROOT,
