@@ -847,7 +847,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             print("(SCENARIO {})".format(scenario_id))
 
             # If we want to save all results at specified time intervals:
-            recording_steps_list = list(range(0, n_steps, trunc(recording_interval_in_days / time_step_in_days)))
+            recording_steps_list = list(range(0, n_steps, trunc(recording_interval_in_days / time_step_in_days)+1))
             # We remove the first element of the list, as it makes no sense to record the properties at the beginning:
             recording_steps_list.pop(0)
             # If the current iteration correspond to the time where one full time interval for recording has been reached:

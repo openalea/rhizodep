@@ -139,6 +139,8 @@ def run_one_scenario(scenario_id=1,
     FORCING_INPUTS = scenario_parameters.get('forcing_constant_inputs', False)
     SUCROSE_INPUT_RATE = scenario_parameters.get('constant_sucrose_input_rate', 5e-9)
     SOIL_TEMPERATURE = scenario_parameters.get('constant_soil_temperature_in_Celsius', 20)
+    FORCING_SEMINAL_ROOTS_EVENTS = scenario_parameters.get('forcing_seminal_roots_events', False)
+    FORCING_ADVENTITIOUS_ROOTS_EVENTS = scenario_parameters.get('forcing_seminal_roots_events', False)
 
     INITIAL_SEGMENT_LENGTH = scenario_parameters.get('initial_segment_length', 1e-3)
     INITIAL_APEX_LENGTH = scenario_parameters.get('initial_apex_length', 0)
@@ -189,9 +191,12 @@ def run_one_scenario(scenario_id=1,
                            initial_apex_length=INITIAL_APEX_LENGTH,
                            initial_C_sucrose_root=INITIAL_C_SUCROSE_ROOT,
                            initial_C_hexose_root=INITIAL_C_HEXOSE_ROOT,
-                           input_file_path=inputs_dir_path,
+                           input_file_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
+                           forcing_seminal_roots_events=FORCING_SEMINAL_ROOTS_EVENTS,
+                           forcing_adventitious_roots_events=FORCING_ADVENTITIOUS_ROOTS_EVENTS,
                            seminal_roots_events_file="seminal_roots_inputs.csv",
                            adventitious_roots_events_file="adventitious_roots_inputs.csv")
+    print("The MTG has been initialized!")
 
     # We launch the main simulation program:
     simulation.main_simulation(g, simulation_period_in_days=SIMULATION_PERIOD, time_step_in_days=TIME_STEP,

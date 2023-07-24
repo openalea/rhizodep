@@ -28,8 +28,6 @@ import rhizodep.parameters as param
 # FUNCTIONS FOR DATA PREPROCESSING :
 ####################################
 
-# TODO: see if this function should stay in tools, or move to simulations/run_rhizodep.py
-
 def formatted_inputs(original_input_file="None", final_input_file='updated_input_file.csv', original_time_step_in_days=1 / 24., final_time_step_in_days=1.,
                      simulation_period_in_days=60., do_not_execute_if_file_with_suitable_size_exists=False):
     """
@@ -563,3 +561,62 @@ def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-
             new_scene += shapes_for_hair[vid]
 
     return new_scene
+
+# FUNCTIONS FOR FITTING DATA:
+#############################
+
+# import numpy as np
+# import pandas as pd
+# import matplotlib.pyplot as plt
+# import scipy
+# import scipy.stats
+# import time
+#
+# # We get the data showing the distribution of observations.
+# # Here, the example is the distribution of growth durations of lateral root elongation along a mother root:
+# data_path="D:/Documents/PHOTOS/2022 Essais Pots et Rhizotrons - Projet MezAgri/Scan racines - Projet CarboStockTMM/GDs_data_brut.csv"
+# data = pd.read_csv(data_path)
+# # We create a proper histogram from this data file:
+# bins=121
+# y, x = np.histogram(data, bins=bins, density=True)
+# # We define x as the middle of each class:
+# x = (x + np.roll(x, -1))[:-1] / 2.0
+#
+# # We test different possibilities of known probability distributions:
+# dist_names = ['norm', 'beta','gamma', 'pareto', 't', 'lognorm', 'invgamma', 'invgauss',  'loggamma', 'alpha', 'chi', 'chi2']
+#
+# # For each possible distribution suggeted in "dist_names":
+# for name in dist_names:
+#     print("")
+#     print("Considering the method", name, "...")
+#     try:
+#         # We try to fit the corresponding distribution curve on the data:
+#         dist = getattr(scipy.stats, name)
+#         # We record the parameters from this fitted distribution:
+#         param = dist.fit(data)
+#         loc = param[-2]
+#         scale = param[-1]
+#         arg = param[:-2]
+#         pdf = dist.pdf(x, *arg, loc=loc, scale=scale)
+#
+#         # We check whether the sum of square differences is low enough:
+#         model_sse = np.sum((y - pdf) ** 2)
+#         print("This method corresponded to a fit with square difference of", model_sse, "with following parameters:")
+#         print("> Param:", param)
+#         print("> Arg:", arg)
+#         print("> Loc:", loc)
+#         print("> Scale:", scale)
+#
+#         # We create a plot:
+#         plt.figure(figsize=(12,8))
+#         plt.plot(x,pdf,label=name, linewidth=3)
+#         plt.plot(x,y,alpha=0.6)
+#         plt.legend()
+#         plt.show()
+#     except:
+#         print("Method failed!")
+
+# # Checking if random data can reproduce the original distribution:
+# for i in range(1, 50):
+#     new_GD = np.random.standard_t(0.6829556179151338, size=10)
+#     print(new_GD)

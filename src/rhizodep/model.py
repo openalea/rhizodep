@@ -549,18 +549,35 @@ def calculate_growth_duration(radius, index, root_order, ArchiSimple=False):
         random_result= np.random.random_sample()
         # CASE 1: The apex corresponds to a seminal or adventitious root
         if root_order ==1:
-            growth_duration = param.GD_high
+            growth_duration = param.GD_highest
         else:
-            # CASE 2: Most likely, the growth duration will be low for a lateral root
-            if random_result < 0.80:
-                growth_duration = param.GD_low
-            # CASE 3: Occasionally, the growth duration of the lateral root may be significantly higher
-            elif random_result < 0.99:
-                growth_duration = param.GD_medium
-            # CASE 4: Exceptionally, the growth duration of the lateral root is as high as that from a seminal root,
-            # as long as the radius of the lateral root is high enough (i.e. twice as high as the minimal possible radius)
-            elif radius > 2 * param.Dmin/2.:
-                growth_duration = param.GD_high
+            # If we select random zoning, then the growth duration will be drawn from a range, for three different cases
+            # (from most likely to less likely):
+            if param.GD_by_frequency:
+                # CASE 2: Most likely, the growth duration will be low for a lateral root
+                if random_result < param.GD_prob_low:
+                    # We draw a random growth-duration in the lower range:
+                    growth_duration = random.uniform(0., param.GD_low)
+                # CASE 3: Occasionnaly, the growth duration may be a bit higher for a lateral root
+                if random_result < param.GD_prob_medium:
+                    # We draw a random growth-duration in the lower range:
+                    growth_duration = random.uniform(param.GD_low, param.GD_medium)
+                # CASE 3: Occasionnaly, the growth duration may be a bit higher for a lateral root
+                else:
+                    # We draw a random growth-duration in the lower range:
+                    growth_duration = random.uniform(param.GD_medium, param.GD_high)
+            # If random zoning has not been selected, a constant duration is selected for each probabibility range:
+            else:
+                # CASE 2: Most likely, the growth duration will be low for a lateral root
+                if random_result < param.GD_prob_low:
+                    growth_duration = param.GD_low
+                # CASE 3: Occasionally, the growth duration of the lateral root may be significantly higher
+                elif random_result < param.GD_prob_medium:
+                    growth_duration = param.GD_medium
+                # CASE 4: Exceptionally, the growth duration of the lateral root is as high as that from a seminal root,
+                # as long as the radius of the lateral root is high enough (i.e. twice as high as the minimal possible radius)
+                elif radius > 2 * param.Dmin/2.:
+                    growth_duration = param.GD_highest
 
     # We return a modified version of the MTG "g" with the updated property "distance_from_tip":
     return growth_duration
@@ -1102,6 +1119,8 @@ def elongated_length(initial_length=0., radius=0., C_hexose_root=1,
     :return: the new elongated length
     """
 
+    # TODO FOR TRISTAN: Consider including a control of potential elongation by N availability (only the regulation by hexose concentration has been considered so far).
+
     # If we keep the classical ArchiSimple rule:
     if ArchiSimple:
         # Then the elongation is calculated following the rules of Pages et al. (2014):
@@ -1205,7 +1224,6 @@ def primordium_formation(g, apex, elongation_rate=0., time_step_in_seconds=1. * 
     # We add a condition, i.e. potential_radius should not be larger than the one from the mother root:
     if potential_radius > apex.radius:
         potential_radius = apex.radius
-    # TODO: Is this condition really relevant?
 
     # If the distance between the apex and the last emerged root is higher than the inter-primordia distance
     # AND if the potential radius is higher than the minimum diameter:
@@ -1259,12 +1277,12 @@ def primordium_formation(g, apex, elongation_rate=0., time_step_in_seconds=1. * 
 def calculating_C_supply_for_elongation(g, element):
     """
     This function computes the list of root elements that can supply C as hexose for sustaining the elongation
-    of a given element, as long as their structural mass and their amount of available hexose.
+    of a given element, as well as their structural mass and their amount of available hexose.
     :param g: the MTG corresponding to the root system
     :param element: the element for which we calculate the possible supply of C for its elongation
     :return: three lists containing the indices of elements, their hexose amount (mol of hexose) and their structural mass (g).
     """
-
+    # TODO FOR TRISTAN: Consider using a similar approach for sustaining the need for N when a root apex should elongate.
     n = element
 
     # We initialize each amount of hexose available for growth:
@@ -1639,6 +1657,8 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
     :param soil_temperature_in_Celsius: the actual temperature experienced by the root segment
     :return: the updated segment
     """
+
+    # TODO FOR TRISTAN: Consider adding a regulation of root thickening with the availability of N in the root segment (only the limitation by hexose has been considered so far).
 
     # We initialize an empty list that will contain the new segment to be returned:
     new_segment = []
@@ -2206,7 +2226,6 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
                                       radius=apex.radius,
                                       identical_properties=True,
                                       nil_properties=False)
-                # TODO: Check how useful it is to update the elongation of a segment with the following relationship!
                 apex.actual_elongation = param.segment_length * i
             else:
                 # Otherwise, the loop will stop now, and we will add the terminal apex hereafter.
@@ -2384,6 +2403,10 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
     :return: g, the updated MTG
     """
 
+    # TODO FOR TRISTAN: Here you would need to explicit at least a cost of N associated to the actual growth,
+    #  and consider how to limit the actual growth when not enough N is available.
+    #  In a second step, you may consider how the emergence of primordia may depend on N availability in the root or in the soil.
+
     # CALCULATING AN EQUIVALENT OF THERMAL TIME:
     # -------------------------------------------
 
@@ -2443,6 +2466,8 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
             print("The initial radius was", n.initial_radius, "and the potential radius was", n.potential_radius)
             n.hexose_growth_demand = 0.
             # In such case, we just pass to the next element in the iteration:
+            continue
+        elif n.hexose_growth_demand == 0.:
             continue
 
         # CALCULATIONS OF THE AMOUNT OF HEXOSE AVAILABLE FOR GROWTH:
@@ -2626,6 +2651,8 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
                 n.actual_elongation = n.length - n.initial_length
                 n.actual_elongation_rate = n.actual_elongation / n.actual_time_since_emergence
                 # Note: at this stage, no sugar has been allocated to the emerging primordium itself!
+                if n.type == "Adventitious_root_before_emergence":
+                    print("> A new adventitious root has emerged, starting from element", n.index(), "!")
             elif n.type == "Normal_root_after_emergence":
                 # The actual elongation rate is calculated:
                 n.actual_elongation = n.length - n.initial_length
@@ -2710,6 +2737,8 @@ def ArchiSimple_growth(g, SC, time_step_in_seconds, soil_temperature_in_Celsius=
     :return: g, the updated root MTG
     """
 
+    # TODO FOR TRISTAN: If one day you have time to lose, you may see whether you want to add an equivalent limitation of the elongation of all apices with the amount of N available in the root - knowing that this does not exist in ArchiSimple anyway.
+
     # We have to cover each vertex from the apices up to the base one time:
     root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
     root = next(root_gen)
@@ -2792,6 +2821,9 @@ def reinitializing_growth_variables(g):
     :param g: the root MTG to be considered
     :return:
     """
+
+    # TODO FOR TRISTAN: Consider reinitializing the demand/cost for N in each element here.
+
     # We cover all the vertices in the MTG:
     for vid in g.vertices_iter(scale=1):
         # n represents the vertex:
@@ -2833,6 +2865,9 @@ def root_hairs_dynamics(g, time_step_in_seconds=1. * (60. * 60. * 24.),
     :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
     :return:
     """
+
+    # TODO FOR TRISTAN: Consider adding a limitation of growth for root hairs associated to the availability of N in the root.
+    #  In a second step, consider playing on the density / max. length of root hairs depending on the availability of N in the soil (if relevant)?
 
     # We cover all the vertices in the MTG:
     for vid in g.vertices_iter(scale=1):
@@ -3215,15 +3250,24 @@ def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_war
                 print("WARNING: No phloem unloading occured for node", n.index(),
                       "because root sucrose concentration was", n.C_sucrose_root, "mol/g.")
 
-        # If root elongation is not possible anymore:
-        if type == "Stopped" or type == "Just_stopped":
-            # TODO: Check how unloading should be reduced when no elongation is possible!
-            # If the element has stopped its growth, we decrease its unloading coefficient:
-            phloem_permeability = phloem_permeability / 50.
-        # If the node corresponds to the base of the root system and if an adventious root can emerge:
-        if type=="Base_of_the_root_system" and hexose_growth_demand >0.:
-            # TODO: Check how unloading should be reduced when considering the base of the root system!
-            phloem_permeability = phloem_permeability * 10.
+        # # OPTION 1: SPECIFYING SPECIFIC CASES FOR NON-GROWING ROOTS OR BASE ROOT ELEMENT
+        # # If root elongation is not possible anymore:
+        # if type == "Stopped" or type == "Just_stopped":
+        #     # If the element has stopped its growth, we decrease its unloading coefficient:
+        #     phloem_permeability = phloem_permeability / 50.
+        #
+        # # If the node corresponds to the base of the root system and if an adventious root can emerge:
+        # if type=="Base_of_the_root_system" and hexose_growth_demand >0.:
+        #     phloem_permeability = phloem_permeability * 10.
+
+        # OPTION 2:
+        # We correct the phloem permeability according to the amount of hexose that has been used for sustaining growth:
+        if hexose_consumption_by_growth >0. and phloem_permeability >0.:
+            # print("Before correction with growth, phloem permeability is", phloem_permeability,
+            #       "and hexose consumption is", hexose_consumption_by_growth)
+            phloem_permeability = phloem_permeability \
+                                  * (1 + hexose_consumption_by_growth / param.reference_hexose_consumption_by_growth)
+            # print("After correction, phloem permeability is", phloem_permeability)
 
         # We now correct the unloading rate according to soil temperature:
         phloem_permeability = phloem_permeability \
@@ -3235,7 +3279,6 @@ def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_war
                                                          C=param.phloem_permeability_C)
 
         # Eventually, we compute the unloading rate and the automatical conversion into hexose:
-        # TODO: Add the possible variation of surface and add the direct unloading into the soil solution in the case of the meristem zone!
         hexose_production_from_phloem_rate = 2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) \
                                           * exchange_surface
         # AVOIDING PROBLEMS - We make sure that hexose production can't become negative:
@@ -3252,9 +3295,9 @@ def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_war
             print("!!!ERROR!!! The distance to tip is lower than the length of the root element", vid)
         else:
             # TODO: Reconsider the way the variation of the max loading rate along the root axis has been described!
-            max_loading_rate = param.surfacic_loading_rate_reference \
-                * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
-            # max_loading_rate = param.surfacic_loading_rate_reference
+            # max_loading_rate = param.surfacic_loading_rate_reference \
+            #     * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
+            max_loading_rate = param.surfacic_loading_rate_reference
 
         # We correct loading according to soil temperature:
         max_loading_rate = max_loading_rate \
@@ -3275,19 +3318,18 @@ def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_war
 
         # If there is a demand for growth, we set the loading rate to 0:
         # TODO: Here we restrict the loading of sucrose if there is a growth demand in the current element - should it be so?
-        if hexose_growth_demand > 0. or hexose_consumption_by_growth >0.:
+        if hexose_growth_demand > 0. or hexose_consumption_by_growth > 0.:
             max_loading_rate  = 0.
 
         # We calculate the potential production of sucrose from root hexose (in mol) according to the Michaelis-Menten function:
         sucrose_loading_in_phloem_rate = 0.5 * max_loading_rate * exchange_surface * C_hexose_root \
                                       / (param.Km_loading + C_hexose_root)
+
         # AVOIDING PROBLEMS - We make sure that hexose production can't become negative:
         if sucrose_loading_in_phloem_rate < 0.:
             print("!!!ERROR!!!  A negative sucrose loading rate was computed for element", n.index(),
                   "; we therefore set the loading rate to 0!")
             sucrose_loading_in_phloem_rate = 0.
-
-    # print("Sucrose loading is", sucrose_loading_in_phloem_rate, "while sucrose unloading is", hexose_production_from_phloem_rate*2.)
 
     # RECORDING THE RESULTS:
     #-----------------------
@@ -3317,6 +3359,8 @@ def exchange_with_reserve_rate(n, soil_temperature_in_Celsius=20, printing_warni
     :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
     :return: the updated root element n
     """
+
+    # TODO FOR TRISTAN: Consider doing a similar function for N reserve pool (?)
 
     # READING THE VALUES:
     # --------------------
@@ -3405,7 +3449,6 @@ def exchange_with_reserve_rate(n, soil_temperature_in_Celsius=20, printing_warni
             hexose_immobilization_as_reserve_rate = corrected_max_immobilization_rate * C_hexose_root \
                                                  / (param.Km_immobilization + C_hexose_root) \
                                                  * (struct_mass + living_root_hairs_struct_mass)
-        # TODO: Check that the C balance for reserve has been introduced elsewhere!
 
     # RECORDING THE RESULTS:
     # -----------------------
@@ -3440,6 +3483,8 @@ def maintenance_respiration_rate(n, soil_temperature_in_Celsius=20, printing_war
     :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
     :return: the updated root element n
     """
+
+    # TODO FOR TRISTAN: Consider expliciting a respiration cost associated to the exchange of N in the root (e.g. cost for uptake, xylem loading)?
 
     # READING THE VALUES:
     # --------------------
@@ -3576,13 +3621,14 @@ def root_sugars_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warni
                                                                   B=param.permeability_coeff_B,
                                                                   C=param.permeability_coeff_C)
 
-        # The description of the evoltion of P along the root  is adapted from Personeni et al. (2007):
-        if distance_from_tip < length:
-            print("!!!ERROR!!! The distance to tip is lower than the length of the root element", vid)
-        else:
-            # TODO: Check whether this evolution of P along the root is still relevant when considering surfaces evolution!
-            corrected_permeability_coeff = corrected_P_max_apex \
-                                 / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
+        # # MODIFICATION OF THE PERMEABILITY WITH THE DISTANCE FROM ROOT TIP:
+        # # The description of the evolution of P along the root is adapted from Personeni et al. (2007):
+        # if distance_from_tip < length:
+        #     print("!!!ERROR!!! The distance to tip is lower than the length of the root element", vid)
+        # else:
+        #     corrected_permeability_coeff = corrected_P_max_apex \
+        #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
+        corrected_permeability_coeff = corrected_P_max_apex
 
         # CALCULATIONS OF EXUDATION RATE:
         #--------------------------------
@@ -3746,9 +3792,12 @@ def mucilage_secretion_rate(n, soil_temperature_in_Celsius=20, printing_warnings
             print("WARNING: No mucilage secretion occurred for node", n.index(),
                   "because root hexose concentration was", C_hexose_root, "mol/g.")
     # We consider that dead elements cannot secrete any mucilage:
-    if n.type == "Just_dead" or n.type == "Dead":
+    if n.type == "Dead":
         possible_secretion = False
-        # TODO: Is it really correct to consider that Just_dead elements did not secrete mucilage over a given time step?
+    # We consider that elements from an axis that has stopped growing (e.g. apices) do not secrete any mucilage anymore:
+    if n.type == "Stopped":
+        possible_secretion = False
+
     # TODO: Shouldn't we also introduce a limit with dist-to_tip, so that elements too far away from the tip are not even considered?
 
     if possible_secretion:
@@ -3845,7 +3894,7 @@ def cells_release_rate(n, soil_temperature_in_Celsius=20, printing_warnings=Fals
         possible_cells_release = False
 
     # We also consider that if the root axis has stopped elongating, no cells are released anymore:
-    if n.type == "Just_stopped" or n.type == "Stopped":
+    if n.type == "Stopped":
         possible_cells_release = False
 
     if possible_cells_release:
@@ -4126,6 +4175,8 @@ def cells_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=
 
     return n
 
+# TODO FOR TRISTAN: Consider adding similar functions for describing N mineralization/organization in the soil?
+
 ########################################################################################################################
 
 ########################################################################################################################
@@ -4145,6 +4196,9 @@ def calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius,
     console
     :return: the updated root element n
     """
+
+    # TODO FOR TRISTAN: Consider adding here N-related rates (or building a similar function to be possibly used in a solver).
+
     # Unloading of sucrose from phloem and conversion of sucrose into hexose, or reloading of sucrose:
     exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius, printing_warnings)
     # Net immobilization of hexose into the reserve pool:
@@ -4175,6 +4229,8 @@ def calculating_amounts_from_fluxes(n, time_step_in_seconds):
     :param soil_temperature_in_Celsius: the temperature experience by the root element n
     :return: the updated root element n
     """
+
+    # TODO FOR TRISTAN: Consider adding N-related amounts here (or building a similar function to be possibly used in a solver).
 
     n.hexose_production_from_phloem = n.hexose_production_from_phloem_rate * time_step_in_seconds
     n.sucrose_loading_in_phloem = n.sucrose_loading_in_phloem_rate * time_step_in_seconds
@@ -4235,6 +4291,8 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
     :return: a dictionary "y_derivatives" containing the values of net evolution rates for each pool.
     """
 
+    # TODO FOR TRISTAN: Consider adding N balance here (to be possibly used in the solver).
+
     # We initialize an empty dictionary which will contain the different fluxes:
     y_derivatives = {}
 
@@ -4286,6 +4344,8 @@ def adjusting_pools_and_deficits(n, printing_warnings=False):
     :param printing_warnings: if True, warning messages will be printed
     :return: the updated element n
     """
+
+    # TODO FOR TRISTAN: Consider doing similar balance with recorded deficits for N compounds?
 
     # We calculate possible deficits to be included in the next time step:
     # ---------------------------------------------------------------------
@@ -4375,6 +4435,8 @@ def adjusting_pools_and_deficits(n, printing_warnings=False):
 # We create a class containing the system of differential equations to be solved with a solver:
 #----------------------------------------------------------------------------------------------
 class Differential_Equation_System(object):
+
+    # TODO FOR TRISTAN: Consider adding N-related variables here to be computed together with C fluxes...
 
     def __init__(self, g, n, time_step_in_seconds=1. * (60. * 60. * 24.), soil_temperature_in_Celsius=20,
                  printing_warnings=False, printing_solver_outputs=False):
@@ -4699,6 +4761,8 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
     :return:
     """
 
+    # TODO FOR TRISTAN: Consider updating this function with N fluxes, or doing a similar function separated from here.
+
     # We initialize a tip concentration:
     tip_C_hexose_root = -1
 
@@ -4858,6 +4922,8 @@ def summing(g, printing_total_length=True, printing_total_struct_mass=True, prin
     :param printing_all: a Boolean defining whether all properties should be printed on the screen or not
     :return: a dictionary containing the numerical value of each property integrated over the whole MTG
     """
+
+    # TODO FOR TRISTAN: If no similar function is present in CINAPS, consider adding N balance here to compute variables on the whole root system.
 
     # We initialize the values to 0:
     total_length = 0.
@@ -5107,7 +5173,9 @@ def initiate_mtg(random=True,
                  initial_C_sucrose_root=0.,
                  initial_C_hexose_root=0.,
                  input_file_path="C:/Users/frees/rhizodep/src/rhizodep/",
+                 forcing_seminal_roots_events=True,
                  seminal_roots_events_file="seminal_roots_inputs.csv",
+                 forcing_adventitious_roots_events=True,
                  adventitious_roots_events_file="adventitious_roots_inputs.csv"):
 
     """
@@ -5119,6 +5187,8 @@ def initiate_mtg(random=True,
     :param initial_C_hexose_root:
     :return:
     """
+
+    # TODO FOR TRISTAN: Add all initial N-related variables that need to be explicited before N fluxes computation.
 
     # We create a new MTG called g:
     g = MTG()
@@ -5291,34 +5361,35 @@ def initiate_mtg(random=True,
     # ADDING THE PRIMORDIA OF ALL POSSIBLE SEMINAL ROOTS:
     #----------------------------------------------------
     # If there is more than one seminal root (i.e. roots already formed in the seed):
-    if param.n_seminal_roots > 1:
+    if param.n_seminal_roots > 1 or not forcing_seminal_roots_events:
 
         # We read additional parameters that are stored in a CSV file, with one column containing the delay for each
         # emergence event, and the second column containing the number of seminal roots that have to emerge at each event:
         # We try to access an already-existing CSV file:
         seminal_inputs_path = os.path.join(input_file_path, seminal_roots_events_file)
         # If the file doesn't exist, we construct a new table using the specified parameters:
-        if not os.path.exists(seminal_inputs_path):
-            print("NOTE: there was no CSV file describing the apparitions of seminal roots!")
-            print("We therefore built a table according to the parameters 'n_seminal_roots' and 'ER'")
+        if not os.path.exists(seminal_inputs_path) or forcing_seminal_roots_events:
+            print("NOTE: no CSV file describing the apparitions of seminal roots can be used!")
+            print("=> We therefore built a table according to the parameters 'n_seminal_roots' and 'ER'.")
+            print("")
             # We initialize an empty data frame:
             seminal_inputs_file = pd.DataFrame()
             # We define a list that will contain the successive thermal times corresponding to root emergence:
             list_time = [x * 1/param.ER for x in range(1, param.n_seminal_roots)]
             # We define another list containing only "1" as the number of roots to be emerged for each event:
-            list_number = np.ones(param.n_seminal_roots)
+            list_number = np.ones(param.n_seminal_roots-1, dtype='int8')
             # We assigned the two lists to the dataframe, and record it:
             seminal_inputs_file['emergence_delay_in_thermal_time'] = list_time
             seminal_inputs_file['number_of_seminal_roots_per_event'] = list_number
-            seminal_inputs_file.to_csv(os.path.join(input_file_path, seminal_roots_events_file),
-                                            na_rep='NA', index=False, header=True)
+            # seminal_inputs_file.to_csv(os.path.join(input_file_path, seminal_roots_events_file),
+            #                                 na_rep='NA', index=False, header=True)
         else:
             seminal_inputs_file = pd.read_csv(seminal_inputs_path)
 
         # For each event of seminal roots emergence:
         for i in range(0, len(seminal_inputs_file.emergence_delay_in_thermal_time)):
             # For each seminal root that can emerge at this emergence event:
-            for j in range(0,seminal_inputs_file.number_of_seminals_per_event[i]):
+            for j in range(0,seminal_inputs_file.number_of_seminal_roots_per_event[i]):
 
                 # We make sure that the seminal roots will have different random insertion angles:
                 np.random.seed(param.random_choice + i*j)
@@ -5365,28 +5436,29 @@ def initiate_mtg(random=True,
     # ADDING THE PRIMORDIA OF ALL POSSIBLE ADVENTIOUS ROOTS:
     # ------------------------------------------------------
     # If there should be more than one main root (i.e. adventitious roots formed at the basis):
-    if param.n_adventitious_roots > 0:
+    if param.n_adventitious_roots > 0 or not forcing_adventitious_roots_events:
 
         # We read additional parameters from a table, with one column containing the delay for each emergence event,
         # and the second column containing the number of adventitious roots that have to emerge at each event.
         # We try to access an already-existing CSV file:
         adventitious_inputs_path = os.path.join(input_file_path, adventitious_roots_events_file)
         # If the file doesn't exist, we construct a new table using the specified parameters:
-        if not os.path.exists(adventitious_inputs_path):
-            print("NOTE: there was no CSV file describing the apparitions of adventitious roots!")
-            print("We therefore built a table according to the parameters 'n_adventitious_roots' and 'ER'")
+        if not os.path.exists(adventitious_inputs_path) or forcing_adventitious_roots_events:
+            print("NOTE: no CSV file describing the apparitions of adventitious roots can be used!")
+            print("=> We therefore built a table according to the parameters 'n_adventitious_roots' and 'ER'.")
+            print("")
             # We initialize an empty data frame:
             adventitious_inputs_file = pd.DataFrame()
             # We define a list that will contain the successive thermal times corresponding to root emergence:
             list_time = [param.starting_time_for_adventitious_roots_emergence + x * 1/param.ER
                          for x in range(0, param.n_adventitious_roots)]
             # We define another list containing only "1" as the number of roots to be emerged for each event:
-            list_number = np.ones(param.n_adventitious_roots)
+            list_number = np.ones(param.n_adventitious_roots, dtype='int8')
             # We assigned the two lists to the dataframe, and record it:
             adventitious_inputs_file['emergence_delay_in_thermal_time'] = list_time
             adventitious_inputs_file['number_of_adventitious_roots_per_event'] = list_number
-            adventitious_inputs_file.to_csv(os.path.join(input_file_path, adventitious_roots_events_file),
-                                            na_rep='NA', index=False, header=True)
+            # adventitious_inputs_file.to_csv(os.path.join(input_file_path, adventitious_roots_events_file),
+            #                                 na_rep='NA', index=False, header=True)
         else:
             adventitious_inputs_file = pd.read_csv(adventitious_inputs_path)
 

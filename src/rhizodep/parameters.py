@@ -66,20 +66,14 @@ IPD = 5. / 1000.
 # Maximal number of roots emerging from the base (including primary and seminal roots)(dimensionless):
 #-----------------------------------------------------------------------------------------------------
 n_seminal_roots = 5
-# WATCH OUT: As long as n_seminal_roots is here higher than 0, the total number of seminal roots will actually
-# be calculated from the input file 'seminal_roots_inputs.csv'.
 
 # Maximal number of roots emerging from the base (including primary and seminal roots)(dimensionless):
 #-----------------------------------------------------------------------------------------------------
-n_adventitious_roots = 0
-# WATCH OUT: If the file 'adventitious_roots_inputs.csv' exist in the proper directory, information regarding
-# the emergence of adventitious roots will actually be read from this file.
+n_adventitious_roots = 10.
 
 # Time when adventitious roots start to successively emerge (in second equivalent to temperature T_ref_growth):
 #--------------------------------------------------------------------------------------------------------------
-starting_time_for_adventitious_roots_emergence = (60. * 60. * 24.) * 4
-# WATCH OUT: If the file 'adventitious_roots_inputs.csv' exist in the proper directory, information regarding
-# the emergence of adventitious roots will actually be read from this file.
+starting_time_for_adventitious_roots_emergence = (60. * 60. * 24.) * 9.
 
 # Emission rate of adventitious roots (per second equivalent to temperature T_ref_growth):
 #-----------------------------------------------------------------------------------------
@@ -91,18 +85,27 @@ ER = 0.2 / (60. * 60. * 24.)
 #-------------------------------------------------------------------------------------------------------------------
 GDs = 800 * (60. * 60. * 24.) * 1000. ** 2.
 # => Reference: GDs=400. day mm-2
+# NEW: Coefficient of extension of growth duration for specific roots (in second per second):
+main_roots_growth_extender = 100
+# => We assume that for some roots (e.g. seminal and adventious roots) there is an extender of growth compared to
+# what is predicted by their diameter.
 
 # Selective growth durations (in second equivalent to temperature T_ref_growth):
 #-------------------------------------------------------------------------------
-GD_low = 0.338 * (60. * 60. * 24.) # Estimated from the shortest lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)
-GD_medium = 4.49 * (60. * 60. * 24.) # Estimated from the medium lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)
-GD_high = 60 * (60. * 60. * 24.) # Expected from the longest observed lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)
-
-# NEW: Coefficient of extension of growth duration for specific roots (in second per second):
-#--------------------------------------------------------------------------------------------
-main_roots_growth_extender=100
-# => We assume that for some roots (e.g. seminal and adventious roots) there is an extender of growth compared to
-# what is predicted by their diameter.
+# As an alternative to using a single value of growth duration depending on diameter, we offer the possibility to rather
+# define the growth duration as a random choice between three values (low, medium and high), depending on their respective
+# probability (between 0 and 1):
+GD_by_frequency = False # If True, then four possible values of growth duration can be used!
+# The growth duration has a probability of [GD_prob_low] to equal GD_low:
+GD_low = 0.25 * (60. * 60. * 24.) # Estimated from the shortest lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)
+GD_prob_low = 0.50 # Estimated from the shortest lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)
+# The growth duration has a probability of [GD_prob_medium - GD_prob_low] to equal GD_medium:
+GD_medium = 0.70 * (60. * 60. * 24.) # Estimated from the medium lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)
+GD_prob_medium = 0.85 # Estimated from the medium lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)
+# The growth duration has a probability of [1-GD_prob_medium] to equal GD_high:
+GD_high = 6 * (60. * 60. * 24.) # Estimated the longest observed lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)
+# For seminal and adventitious roots, a longer growth duration is applied:
+GD_highest = 60 * (60. * 60. * 24.) # Expected growth duration of a seminal root
 
 # Coefficient of the life duration (in second equivalent to temperature T_ref_growth x meter-1 x cubic meter per gram):
 #--------------------------------------------------------------------------------------------------------------------
@@ -252,6 +255,10 @@ surfacic_unloading_rate_reference = 0.03 / 12 * 1e-6 / (0.5 * 1)
 # is equivalent to 0.5 m2 of surface. However, the unloading of sucrose is not done exactly the same in CN-Wheat as in
 # RhizoDep (for example, exudation is a fraction of the sucrose unloading, unlike in RhizoDep where it is a fraction
 # of hexose).
+
+# Reference consumption of hexose for a given root element (used to multiply the reference unloading rate when
+# growth has consumed hexose) (mol of hexose):
+reference_hexose_consumption_by_growth = 5e-10
 
 # Maximum unloading rate of sucrose from the phloem through the section of a primordium
 # (in mol of sucrose per m2 per second):
@@ -634,8 +641,8 @@ end_thermal_time_for_exodermis_formation = 60.*60.*24.*30. # We assume that the 
 # Chemosphere) on the formation of apoplastic barriers in maize, fitting their data with a Gompertz curve.
 endodermis_a = 100. # This parameter corresponds to the asymptote of the process (adimensional, as cond_endodermis)
 exodermis_a = 100. # This parameter corresponds to the asymptote of the process (adimensional, as cond_exodermis)
-endodermis_b = 3.25 # This parameter corresponds to the time lag before the large increase (day equivalent to T_ref_growth)
-exodermis_b = 5.32 # This parameter corresponds to the time lag before the large increase (day equivalent to T_ref_growth)
+endodermis_b = 3.25 * (60.*60.*24.) # This parameter corresponds to the time lag before the large increase (second equivalent to T_ref_growth)
+exodermis_b = 5.32 * (60.*60.*24.) # This parameter corresponds to the time lag before the large increase (second equivalent to T_ref_growth)
 endodermis_c = 1.11 / (60.*60.*24.) # This parameter reflects the slope of the increase (per second equivalent to T_ref_growth)
 exodermis_c = 1.11 / (60.*60.*24.) # This parameter reflects the slope of the increase (per second equivalent to T_ref_growth)
 # Note: Interestingly, the mean value for parameter c from the two studies was identical for both endodermis and exodermis,
@@ -645,4 +652,4 @@ exodermis_c = 1.11 / (60.*60.*24.) # This parameter reflects the slope of the in
 # (in second equivalent to temperature T_ref_growth):
 #-------------------------------------------------------------------------------------------------------------
 max_thermal_time_since_endodermis_disruption = 6 * 60. * 60. # We assume that after 6h, no disruption is observed anymore!
-max_thermal_time_since_exodermis_disruption = 6 * 60. * 60. # We assume that after 6h, no disruption is observed anymore!
+max_thermal_time_since_exodermis_disruption = 48 * 60. * 60. # We assume that after 48h, no disruption is observed anymore!

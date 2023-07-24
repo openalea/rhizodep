@@ -333,9 +333,9 @@ def loading_MTG_files(my_path='',
     filenames = Path(g_dir).glob('*pckl')
     filenames = sorted(filenames)
     if opening_list:
-        n_steps = len(filenames)
+        n_steps = len(filenames)-1
         step_initial = 0
-        step_final = n_steps+1
+        step_final = n_steps + 1
         filename = filenames[0]
     else:
         step_initial = single_MTG_file_number - 1
@@ -349,7 +349,7 @@ def loading_MTG_files(my_path='',
         # Defining the name of the MTG file:
         if opening_list:
             filename = filenames[step]
-        print("Dealing with file number", step, "out of", step_final-1, "...")
+        print("Dealing with file number", step+1, "out of", step_final, "...")
 
         # Loading the MTG file:
         f = open(filename, 'rb')
@@ -481,13 +481,14 @@ def loading_MTG_files(my_path='',
 # im_resized.save('colorbar_new.png', quality=95)
 # # im_new.save('colorbar_new.png', quality=95)
 
-loading_MTG_files(my_path='C:\\Users\\frees\\rhizodep\\simulations\\running_scenarios\\outputs\\Scenario_0008',
+loading_MTG_files(my_path='C:\\Users\\frees\\rhizodep\\simulations\\running_scenarios\\outputs\\Scenario_0016',
                   # single_MTG_file_number=3598,
                   opening_list=True,
-                  # property="C_hexose_reserve", vmin=1e-3, vmax=5e-3, log_scale=False,
+                  property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
-                  property="hexose_exudation_rate", vmin=1e-15, vmax=1e-10, log_scale=True, cmap='jet',
+                  # property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True, cmap='jet',
+                  # property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
                   x_center=0, y_center=0, z_center=-0.1, z_cam=-0.2,
                   camera_distance=0.4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
                   adding_images_on_plot=False,
@@ -496,7 +497,7 @@ loading_MTG_files(my_path='C:\\Users\\frees\\rhizodep\\simulations\\running_scen
                   recording_sum=False,
                   recording_g=False,
                   recording_g_properties=False,
-                  z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1 / 24.)
+                  z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
 
 print("Done!")
 
