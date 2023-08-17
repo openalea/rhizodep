@@ -457,7 +457,7 @@ if __name__ == "__main__":
     # # Creating a new movie from root systems for one given scenario:
     # ################################################################
 
-    resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0017'),
+    resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0054'),
                              images_folder='root_images',
                              # images_folder='root_new_images',
                              resized_images_folder='root_images_resized',

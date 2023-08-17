@@ -256,9 +256,9 @@ surfacic_unloading_rate_reference = 0.03 / 12 * 1e-6 / (0.5 * 1)
 # RhizoDep (for example, exudation is a fraction of the sucrose unloading, unlike in RhizoDep where it is a fraction
 # of hexose).
 
-# Reference consumption of hexose for a given root element (used to multiply the reference unloading rate when
-# growth has consumed hexose) (mol of hexose):
-reference_hexose_consumption_by_growth = 5e-10
+# Reference consumption rate of hexose for growth for a given root element (used to multiply the reference unloading rate
+# when growth has consumed hexose) (mol of hexose per second):
+reference_rate_of_hexose_consumption_by_growth = 5e-10
 
 # Maximum unloading rate of sucrose from the phloem through the section of a primordium
 # (in mol of sucrose per m2 per second):
@@ -266,7 +266,7 @@ surfacic_unloading_rate_primordium = surfacic_unloading_rate_reference * 3.
 # => We expect the maximum unloading rate through an emerging primordium to be xxx times higher
 # than the usual unloading rate
 
-# ALTERNATIVE: We use a permeability coefficient and unloading occurs through diffusion only !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# ALTERNATIVE: We use a permeability coefficient and unloading occurs through diffusion only !
 # Coefficient of permeability of unloading phloem (in gram per m2 per second):
 phloem_permeability = 5.76
 # => According to Ross-Eliott et al. (2017), an unloading flow of sucrose of 1.2e-13 mol of sucrose per second can be
@@ -653,3 +653,4 @@ exodermis_c = 1.11 / (60.*60.*24.) # This parameter reflects the slope of the in
 #-------------------------------------------------------------------------------------------------------------
 max_thermal_time_since_endodermis_disruption = 6 * 60. * 60. # We assume that after 6h, no disruption is observed anymore!
 max_thermal_time_since_exodermis_disruption = 48 * 60. * 60. # We assume that after 48h, no disruption is observed anymore!
+

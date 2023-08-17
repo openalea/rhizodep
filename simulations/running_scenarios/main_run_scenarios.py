@@ -156,6 +156,8 @@ def run_one_scenario(scenario_id=1,
     ROOT_HAIRS_DISPLAY = scenario_parameters.get('root_hairs_display', True)
     CAMERA_ROTATION_OPTION = scenario_parameters.get('camera_rotation', False)
     CAMERA_ROTATION_N_POINTS = scenario_parameters.get('camera_rotation_n_points', 120)
+    WIDTH = scenario_parameters.get('PlantGL_window_width', 1200)
+    HEIGHT = scenario_parameters.get('PlantGL_window_height', 1200)
     X_CENTER = scenario_parameters.get('x_center', 0)
     Y_CENTER = scenario_parameters.get('y_center', 0)
     Z_CENTER = scenario_parameters.get('z_center', -1)
@@ -185,7 +187,7 @@ def run_one_scenario(scenario_id=1,
         print("")
 
     # We initiate the properties of the MTG "g":
-    g = model.initiate_mtg(random=True,
+    g = model.initiate_mtg(random=RANDOM_OPTION,
                            ArchiSimple=ARCHISIMPLE_OPTION,
                            initial_segment_length=INITIAL_SEGMENT_LENGTH,
                            initial_apex_length=INITIAL_APEX_LENGTH,
@@ -235,6 +237,7 @@ def run_one_scenario(scenario_id=1,
                                displayed_vmin=DISPLAYED_MIN_VALUE, displayed_vmax=DISPLAYED_MAX_VALUE,
                                log_scale=LOG_SCALE, cmap=COLOR_MAP,
                                root_hairs_display=ROOT_HAIRS_DISPLAY,
+                               width=WIDTH, height=HEIGHT,
                                x_center=X_CENTER, y_center=Y_CENTER, z_center=Z_CENTER, z_cam=Z_CAMERA,
                                camera_distance=CAMERA_DISTANCE, step_back_coefficient=STEP_BACK_COEFFICIENT,
                                camera_rotation=CAMERA_ROTATION_OPTION, n_rotation_points=CAMERA_ROTATION_N_POINTS)

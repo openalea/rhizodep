@@ -56,6 +56,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     displayed_property="C_hexose_root", displayed_vmin=1e-6, displayed_vmax=1e-0,
                     log_scale=True, cmap='brg',
                     root_hairs_display=True,
+                    width=1200, height=1200,
                     x_center=0, y_center=0, z_center=-1, z_cam=-1,
                     camera_distance=10., step_back_coefficient=0., camera_rotation=False, n_rotation_points=24 * 5):
     """
@@ -253,6 +254,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                             vmax=displayed_vmax, cmap=cmap,
                             root_hairs_display=root_hairs_display,
+                            width=width,
+                            height=height,
                             x_center=x_center,
                             y_center=y_center,
                             z_center=z_center,
@@ -266,6 +269,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                             vmax=displayed_vmax, cmap=cmap,
                             root_hairs_display=root_hairs_display,
+                            width=width,
+                            height=height,
                             x_center=x_center,
                             y_center=y_center,
                             z_center=z_center,
@@ -280,6 +285,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     if plotting:
         pgl.Viewer.display(sc)
         if recording_images:
+            # pgl.Viewer.frameGL.setSize(width, height)
             image_name = os.path.join(root_images_directory, 'root%.5d.png')
             pgl.Viewer.saveSnapshot(image_name % step)
 
@@ -655,7 +661,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # ====================
 
                 # We now proceed to all the exchanges of C for each root element in each root axis
-                # (NOTE: the supply of the shoot is excluded in this calculation):
+                # (NOTE: the supply of sucrose from the shoot is excluded in this calculation):
                 tip_C_hexose_root = \
                     model.C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(
                         g,
@@ -689,6 +695,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                                     vmax=displayed_vmax, cmap=cmap,
                                     root_hairs_display=root_hairs_display,
+                                    width=width,
+                                    height=height,
                                     x_center=x_center,
                                     y_center=y_center,
                                     z_center=z_center,
@@ -707,6 +715,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                                     vmax=displayed_vmax, cmap=cmap,
                                     root_hairs_display=root_hairs_display,
+                                    width=width,
+                                    height=height,
                                     x_center=x_center,
                                     y_center=y_center,
                                     z_center=z_center,
@@ -865,5 +875,9 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         print("")
         print("The program has stopped at time t = {:.2f}".format(Decimal(step * time_step_in_days)), "days.")
         recording_attempt()
+
+        # # For preventing the interpreter to close all windows at the end of the program, we ask the user to press a key
+        # # before closing all the windows:
+        # ask_before_end = input()
 
     return

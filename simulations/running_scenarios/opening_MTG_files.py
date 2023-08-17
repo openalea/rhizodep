@@ -276,6 +276,7 @@ def loading_MTG_files(my_path='',
                       opening_list=False,
                       single_MTG_file_number=3600,
                       property="C_hexose_root", vmin=1e-5, vmax=1e-2, log_scale=True, cmap='jet',
+                      width=1200, height=1200,
                       x_center=0, y_center=0, z_center=-1, z_cam=-2,
                       camera_distance=4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
                       adding_images_on_plot=False,
@@ -372,6 +373,8 @@ def loading_MTG_files(my_path='',
             z_cam = z_coordinates[index_camera]
             # We plot the current file:
             sc = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
+                          width=width,
+                          height=height,
                           x_center=x_center,
                           y_center=y_center,
                           z_center=z_center,
@@ -384,6 +387,8 @@ def loading_MTG_files(my_path='',
             z_camera = z_cam
             # We plot the current file:
             sc = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
+                          width=width,
+                          height=height,
                           x_center=x_center,
                           y_center=y_center,
                           z_center=z_center,
@@ -481,16 +486,19 @@ def loading_MTG_files(my_path='',
 # im_resized.save('colorbar_new.png', quality=95)
 # # im_new.save('colorbar_new.png', quality=95)
 
-loading_MTG_files(my_path='C:\\Users\\frees\\rhizodep\\simulations\\running_scenarios\\outputs\\Scenario_0016',
-                  # single_MTG_file_number=3598,
+loading_MTG_files(my_path='C:\\Users\\frees\\rhizodep\\simulations\\running_scenarios\\outputs\\Scenario_0017',
+                  # single_MTG_file_number=96,
                   opening_list=True,
                   property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
                   # property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True, cmap='jet',
                   # property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
-                  x_center=0, y_center=0, z_center=-0.1, z_cam=-0.2,
-                  camera_distance=0.4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+                  width=900, height=900,
+                  x_center=0, y_center=0, z_center=-0.075, z_cam=-0.15,
+                  camera_distance=0.3, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+                  # x_center=0, y_center=0, z_center=-0, z_cam=-0,
+                  # camera_distance=1, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
                   adding_images_on_plot=False,
                   recording_images=True,
                   printing_sum=False,
@@ -501,5 +509,5 @@ loading_MTG_files(my_path='C:\\Users\\frees\\rhizodep\\simulations\\running_scen
 
 print("Done!")
 
-# # To avoid closing PlantGL as soon as the run is done:
-# input()
+# To avoid closing PlantGL as soon as the run is done:
+input()

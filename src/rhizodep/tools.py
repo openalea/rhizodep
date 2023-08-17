@@ -226,7 +226,7 @@ def _buildDic(keyList, val, dic):
 
 def buildDic(dict_scenario, dic=None):
     """
-    Function that build a nested dictionary (dict of dict), which is used in simulations/scenario_parameters/maine_one_scenario.py
+    Function that build a nested dictionary (dict of dict), which is used in simulations/scenario_parameters/main_one_scenario.py
     e.g. buildDic({'a:b:c': 1, 'a:b:d': 2}) returns {'a': {'b': {'c': 1, 'd': 2}}}
     """
     if not dic:
@@ -420,6 +420,7 @@ def circle_coordinates(x_center=0., y_center=0., z_center=0., radius=1., n_point
 
 def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-12, vmax=3e-7,
              root_hairs_display=True,
+             width=1200, height=1200,
              x_center=0., y_center=0., z_center=0.,
              x_cam=1., y_cam=0., z_cam=0.):
     """
@@ -451,7 +452,8 @@ def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-
     # We initialize the scene with the MTG g:
     scene = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
     # We update the scene with the specified position of the center of the graph and the camera:
-    prepareScene(scene, x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+    prepareScene(scene, width=width, height=height,
+                 x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
     # We compute the colors of the graph:
     my_colormap(g, prop_cmap, cmap=cmap, vmin=vmin, vmax=vmax, lognorm=lognorm)
     # We get a list of all shapes in the scene:
@@ -502,7 +504,8 @@ def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-
         # scene_for_hair = turt.TurtleFrame(g, visitor=visitor_for_hair, turtle=turtle_for_hair, gc=False)
         scene_for_hair = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_hair, gc=False)
         # We update the scene with the specified position of the center of the graph and the camera:
-        prepareScene(scene_for_hair, x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+        prepareScene(scene_for_hair, width=width, height=height,
+                     x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
         # We get a list of all shapes in the scene:
         shapes_for_hair = dict((sh.id, sh) for sh in scene_for_hair)
 
