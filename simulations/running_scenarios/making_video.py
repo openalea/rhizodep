@@ -46,13 +46,20 @@ def sci_notation(num, just_print_ten_power=True, decimal_digits=0, precision=Non
     if just_print_ten_power:
         return r"$10^{{{0:d}}}$".format(exponent)
     else:
-        return r"${0:.{2}f}\cdot10^{{{1:d}}}$".format(coeff, exponent, precision)
+        return r"${0:.{2}f}/cdot10^{{{1:d}}}$".format(coeff, exponent, precision)
 
 
 # Function that draws a colorbar:
 def colorbar(title="Radius (m)", cmap='jet', lognorm=True, n_thicks_for_linear_scale=6, vmin=1e-12, vmax=1e3):
-
     """
+    This function creates a colorbar for showing the legend of a plot.
+    :param title: the name of the property to be displayed on the bar
+    :param cmap: the name of the specific colormap in Python
+    :param lognorm: if True, the scale will be a log scale, otherwise, it will be a linear scale
+    :param n_thicks_for_linear_scale: the number of thicks to represent for a linear scale
+    :param vmin: the min value of the color scale
+    :param vmax: the max value of the color scale
+    :return: the new colorbar object
     """
 
     # CREATING THE COLORBAR
@@ -200,6 +207,7 @@ def colorbar(title="Radius (m)", cmap='jet', lognorm=True, n_thicks_for_linear_s
 
 
 # Definition of a function that can resize a list of images and make a movie from it:
+#------------------------------------------------------------------------------------
 def resizing_and_film_making(outputs_path='outputs',
                              images_folder='root_images',
                              resized_images_folder='root_images_resized',
@@ -216,6 +224,33 @@ def resizing_and_film_making(outputs_path='outputs',
                              time_step_in_days=1., sampling_frequency=1, fps=24,
                              title=""):
 
+    """
+    This function enables to resize some images, add a time indication and a colorbar on them, and create a movie from it.
+    :param outputs_path: the general path in which the folders containing images are located
+    :param images_folder: the name of the folder in which images have been stored
+    :param resized_images_folder: the name of the folder to create, in which transformed images will be saved
+    :param film_making: if True, a movie will be created from the original or transformed images
+    :param film_name: the name of the movie file to be created
+    :param image_transforming: if True, images will first be transformed
+    :param resizing: if True, images can be resized
+    :param dividing_size_by: the number by which the original dimensions will be divided to create the resized image
+    :param colorbar_option: if True, a colorbar will be added
+    :param colorbar_position: the position of the colorbar (1 = bottom right, 2 = bottom middle),
+    :param colorbar_title: the name of the property to be displayed on the bar
+    :param colorbar_cmap: the name of the specific colormap in Python
+    :param colorbar_lognorm: if True, the scale will be a log scale, otherwise, it will be a linear scale
+    :param n_thicks_for_linear_scale: the number of thicks to represent for a linear scale
+    :param vmin: the min value of the color scale
+    :param vmax: the max value of the color scale
+    :param time_printing: if True, a time indication will be calculated and displayed on the image
+    :param time_position: the position of the time indication (1 = top left for root graphs, 2 = bottom right for z-barplots)
+    :param time_step_in_days: the original time step at which MTG images were generated
+    :param sampling_frequency: the frequency at which images should be picked up and included in the transformation/movie (i.e. 1 image every X images)
+    :param fps: frames per second for the .gif movie to create
+    :param title: the name of the movie file
+    :return:
+    """
+
     images_directory=os.path.join(outputs_path, images_folder)
     resized_images_directory = os.path.join(outputs_path, resized_images_folder)
 
@@ -224,7 +259,7 @@ def resizing_and_film_making(outputs_path='outputs',
     filenames = sorted(filenames)
 
     # We define the final number of images that will be considered, based on the "sampling_frequency" variable:
-    number_of_images = floor(len(filenames) / float(sampling_frequency)) + 1
+    number_of_images = floor(len(filenames) / float(sampling_frequency))
 
     if colorbar_option:
         path_colorbar = os.path.join(outputs_path, 'colorbar.png')
@@ -331,9 +366,12 @@ def resizing_and_film_making(outputs_path='outputs',
                     im_to_print = im.resize(dimensions, resample=0)
                 else:
                     im_to_print = im
+
+                # We get the last characters of the path of the file, which correspond to the actual name 'rootXXXXX':
+                name = filename[-13:-4] + '.png'
                 # Saving the new image:
-                image_name = os.path.join(resized_images_directory, 'root%.4d.png')
-                im_to_print.save(image_name % number, quality=20, optimize=True)
+                image_name = os.path.join(resized_images_directory, name)
+                im_to_print.save(image_name, quality=20, optimize=True)
 
                 # We update the local counts:
                 number = number + 1
@@ -381,6 +419,8 @@ def resizing_and_film_making(outputs_path='outputs',
 
     return
 
+# Definition of a function that can create a similar movie for different scenarios' outputs
+#-------------------------------------------------------------------------------------------
 def resizing_and_film_making_for_scenarios(general_outputs_folder='outputs',
                                            images_folder="root_images",
                                            resized_images_folder="root_images_resided",
@@ -399,9 +439,12 @@ def resizing_and_film_making_for_scenarios(general_outputs_folder='outputs',
                                            ):
 
     """
-
-    :param outputs_path:
-    :param scenario_numbers:
+    This function creates the same type of movie in symetric outputs generated from different scenarios.
+    :param general_outputs_folder: the path of the general foleder, in which respective output folders from different scenarios have been recorded
+    :param images_folder: the name of the images folder in each scenario
+    :param resized_images_folder: the image of the transformed images folder in each scenario
+    :param scenario_numbers: a list of numbers corresponding to the different scenarios to consider
+    :[other parameters]: [cf the parameters from the function 'resizing_and_film_making']
     :return:
     """
 
@@ -433,11 +476,14 @@ def resizing_and_film_making_for_scenarios(general_outputs_folder='outputs',
     return
 
 ########################################################################################################################
+########################################################################################################################
 
 # MAIN PROGRAM:
 ###############
 
 if __name__ == "__main__":
+
+    print("Considering creating a video...")
 
     # # Creating a colorbar:
     # ######################
@@ -457,23 +503,63 @@ if __name__ == "__main__":
     # # Creating a new movie from root systems for one given scenario:
     # ################################################################
 
-    resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0054'),
-                             images_folder='root_images',
-                             # images_folder='root_new_images',
-                             resized_images_folder='root_images_resized',
-                             film_making=True,
-                             film_name="root_movie.gif",
-                             image_transforming=True,
-                             resizing=False, dividing_size_by=1.,
-                             colorbar_option=True, colorbar_position=1,
-                             # colorbar_title="Net rhizodeposition rate (mol of hexose per day per cm)",
-                             colorbar_title="Hexose concentration (mol of hexose per gram)",
-                             colorbar_cmap='jet', colorbar_lognorm=True,
-                             n_thicks_for_linear_scale=6,
-                             vmin=1e-6, vmax=1e-3,
-                             time_printing=True, time_position=1,
-                             time_step_in_days=1./24., sampling_frequency=6, fps=24,
-                             title="")
+    # # FROM ORIGINAL GRAPHS:
+    # resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0099'),
+    #                          # outputs_path='C:/Users/frees/rhizodep/simulations/saving_outputs/outputs_2023-08/Scenario_0069',
+    #                          images_folder='root_images',
+    #                          # images_folder='root_new_images',
+    #                          resized_images_folder='root_images_resized',
+    #                          film_making=True,
+    #                          film_name="root_movie_C_hexose.gif",
+    #                          image_transforming=True,
+    #                          resizing=False, dividing_size_by=1.,
+    #                          colorbar_option=True, colorbar_position=1,
+    #                          # colorbar_title="Net rhizodeposition rate (mol of hexose per day per cm)",
+    #                          colorbar_title="Hexose concentration (mol of hexose per gram)",
+    #                          colorbar_cmap='jet', colorbar_lognorm=True,
+    #                          n_thicks_for_linear_scale=6,
+    #                          vmin=1e-6, vmax=1e-3,
+    #                          time_printing=True, time_position=1,
+    #                          time_step_in_days=1./24., sampling_frequency=1, fps=6,
+    #                          title="")
+
+    # # FROM REDRAWN GRAPHS:
+    # resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0088'),
+    #                          # images_folder='root_images',
+    #                          images_folder='root_new_images',
+    #                          resized_images_folder='root_images_resized',
+    #                          film_making=True,
+    #                          film_name="root_movie_Rhizodeposition.gif",
+    #                          image_transforming=True,
+    #                          resizing=False, dividing_size_by=1.,
+    #                          colorbar_option=True, colorbar_position=1,
+    #                          colorbar_title="Net rhizodeposition rate (mol of hexose per day per cm)",
+    #                          # colorbar_title="Hexose concentration (mol of hexose per gram)",
+    #                          colorbar_cmap='jet', colorbar_lognorm=True,
+    #                          n_thicks_for_linear_scale=6,
+    #                          vmin=1e-8, vmax=1e-5,
+    #                          time_printing=True, time_position=1,
+    #                          time_step_in_days=1., sampling_frequency=1, fps=6,
+    #                          title="")
+
+    # # FROM AVERAGED GRAPHS:
+    # resizing_and_film_making(outputs_path='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0100/',
+    #                          images_folder='averaged_root_images',
+    #                          # images_folder='root_new_images',
+    #                          resized_images_folder='root_images_resized',
+    #                          film_making=True,
+    #                          film_name="root_movie_C_hexose_averaged.gif",
+    #                          image_transforming=True,
+    #                          resizing=False, dividing_size_by=1.,
+    #                          colorbar_option=True, colorbar_position=1,
+    #                          # colorbar_title="Net rhizodeposition rate (mol of hexose per day per cm)",
+    #                          colorbar_title="Hexose concentration (mol of hexose per gram)",
+    #                          colorbar_cmap='jet', colorbar_lognorm=True,
+    #                          n_thicks_for_linear_scale=6,
+    #                          vmin=1e-6, vmax=1e-3,
+    #                          time_printing=True, time_position=1,
+    #                          time_step_in_days=1. / 24., sampling_frequency=1, fps=6,
+    #                          title="")
 
     # # Creating a new movie from root systems for a set of scenarios:
     # ################################################################

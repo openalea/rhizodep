@@ -14,6 +14,7 @@ from math import trunc
 from decimal import Decimal
 import pandas as pd
 import os
+import time
 
 import openalea.plantgl.all as pgl
 import rhizodep.model as model
@@ -121,11 +122,9 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         print("WATCH OUT: No simulation was done, as time input was 0.")
         n_steps = 0
     else:
-        n_steps = trunc(simulation_period_in_days / time_step_in_days) + 1
+        n_steps = trunc(simulation_period_in_days / time_step_in_days)
 
     # We initialize empty variables at t=0:
-    step = 0
-    time = 0.
     total_struct_mass = 0.
     cumulated_hexose_exudation = 0.
     cumulated_respired_CO2 = 0.
@@ -189,7 +188,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     z_dictionary_series = []
 
     if recording_images:
-        # We define the directory of root images doesn't exist:
+        # We define the directory of root images if it doesn't exist:
         if not os.path.exists(root_images_directory):
             # Then we create it:
             os.mkdir(root_images_directory)
@@ -237,9 +236,22 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                              simulation_period_in_days=simulation_period_in_days,
                                              do_not_execute_if_file_with_suitable_size_exists=False)
 
+        # We then initialize the step and time according to the first line of the inputs dataframe:
+        initial_step_number = input_frame['step_number'].loc[0]
+        initial_time_in_days = input_frame['initial_time_in_days'].loc[0]
+    else:
+        # We then initialize the step and time according to the first line of the inputs dataframe:
+        initial_step_number = 0
+        initial_time_in_days = 0.
+
+    step = initial_step_number
+
+    # If we want to save all results at specified time intervals, we can create a list corresponding time steps:
+    recording_steps_list = list(range(initial_step_number - 1, initial_step_number + n_steps,
+                                      round(recording_interval_in_days / time_step_in_days)))
+
     # RECORDING THE INITIAL STATE OF THE MTG:
     # ---------------------------------------
-    step = 0
 
     # If the rotation of the camera around the root system is required:
     if camera_rotation:
@@ -278,8 +290,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                             y_cam=0,
                             z_cam=z_camera)
         # We move the camera further from the root system:
-        x_camera = x_cam + x_cam * step_back_coefficient * step
-        z_camera = z_cam + z_cam * step_back_coefficient * step
+        x_camera = x_cam + x_cam * step_back_coefficient * (step - initial_step_number)
+        z_camera = z_cam + z_cam * step_back_coefficient * (step - initial_step_number)
 
     # We finally display the MTG on PlantGL and possibly record it:
     if plotting:
@@ -296,12 +308,11 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         z_dictionary["time_in_days"] = 0.0
         z_dictionary_series.append(z_dictionary)
 
-    # For recording the MTG at each time step to load it later on:
-    # ------------------------------------------------------------
-    if recording_g:
-        g_file_name = os.path.join(g_directory, 'root%.5d.pckl')
-        with open(g_file_name % step, 'wb') as output_file:
-            pickle.dump(g, output_file, protocol=2)
+    # For recording the initial MTG to load it later on:
+    # --------------------------------------------------
+    g_file_name = os.path.join(g_directory, 'root%.5d.pckl')
+    with open(g_file_name % step, 'wb') as output_file:
+        pickle.dump(g, output_file, protocol=2)
 
     # For recording the properties of g in a csv file at each time step :
     # -------------------------------------------------------------------
@@ -401,7 +412,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         # We can record all the results in a CSV file:
         if recording_sum:
             # We create a data_frame from the vectors generated in the main program up to this point:
-            data_frame = pd.DataFrame({"Time (days)": time_in_days_series,
+            data_frame = pd.DataFrame({"Final time (days)": time_in_days_series,
                                        "Sucrose input (mol of sucrose)": sucrose_input_series,
                                        "Root structural mass (g)": total_living_root_struct_mass_series,
                                        "Root necromass (g)": total_dead_root_struct_mass_series,
@@ -451,7 +462,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                        "Soil temperature (degree Celsius)": soil_temperature_series
                                        },
                                       # We re-order the columns:
-                                      columns=["Time (days)",
+                                      columns=["Final time (days)",
                                                "Sucrose input (mol of sucrose)",
                                                "Final deficit in sucrose of the whole root system (mol of sucrose)",
                                                "Cumulated amount of C present in the root-soil system (mol of C)",
@@ -528,7 +539,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     try:
 
         # An iteration is done for each time step:
-        for step in range(1, n_steps):
+        for step in range(initial_step_number, initial_step_number + n_steps):
 
             # We calculate the current time in hours:
             current_time_in_hours = step * time_step_in_days * 24.
@@ -538,14 +549,14 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             if forcing_constant_inputs:
                 sucrose_input_rate = constant_sucrose_input_rate
             else:
-                sucrose_input_rate = input_frame.loc[step, 'sucrose_input_rate']
+                sucrose_input_rate = input_frame.loc[step - initial_step_number, 'sucrose_input_rate']
 
             # DEFINING THE TEMPERATURE OF THE SOIL FOR THIS TIME STEP:
             # --------------------------------------------------------
             if constant_soil_temperature_in_Celsius > 0 and forcing_constant_inputs:  # or input_file == "None":
                 soil_temperature = constant_soil_temperature_in_Celsius
             else:
-                soil_temperature = input_frame.loc[step, 'soil_temperature_in_degree_Celsius']
+                soil_temperature = input_frame.loc[step - initial_step_number, 'soil_temperature_in_degree_Celsius']
 
             # CALCULATING AN EQUIVALENT OF THERMAL TIME:
             # -------------------------------------------
@@ -562,8 +573,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             # --------------------------------
             print("")
             print("(SCENARIO {})".format(scenario_id))
-            print("From t =", "{:.2f}".format(Decimal((step - 1) * time_step_in_days)), "days to t =",
-                  "{:.2f}".format(Decimal(step * time_step_in_days)), "days:")
+            print("From t =", "{:.2f}".format(Decimal((step) * time_step_in_days)), "days to t =",
+                  "{:.2f}".format(Decimal((step+1) * time_step_in_days)), "days:")
             print("------------------------------------")
             print("   Soil temperature is", "{:.2f}".format(Decimal(soil_temperature)), "degree Celsius.")
             print("   The input rate of sucrose to the root for time=", "{:.2f}".format(Decimal(current_time_in_hours)),
@@ -724,12 +735,14 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                     y_cam=0,
                                     z_cam=z_camera)
                 # We move the camera further from the root system:
-                x_camera = x_cam + x_cam * step_back_coefficient * step
-                z_camera = z_cam + z_cam * step_back_coefficient * step
+                x_camera = x_cam + x_cam * step_back_coefficient * (step - initial_step_number)
+                z_camera = z_cam + z_cam * step_back_coefficient * (step - initial_step_number)
 
             # We finally display the MTG on PlantGL and possibly record it:
             if plotting:
                 pgl.Viewer.display(sc)
+                # If needed, we wait for a few seconds so that the graph is well positioned:
+                time.sleep(0.5)
                 if recording_images:
                     image_name = os.path.join(root_images_directory, 'root%.5d.png')
                     pgl.Viewer.saveSnapshot(image_name % step)
@@ -768,7 +781,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                            printing_all=False)
 
             if recording_sum:
-                time_in_days_series.append(time_step_in_days * step)
+                time_in_days_series.append(time_step_in_days * (step+1))
                 sucrose_input_series.append(sucrose_input_rate * time_step_in_seconds)
                 total_living_root_length_series.append(dictionary["total_living_root_length"])
                 total_dead_root_length_series.append(dictionary["total_dead_root_length"])
@@ -856,15 +869,11 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             print("   The root system finally includes", len(g) - 1, "root elements.")
             print("(SCENARIO {})".format(scenario_id))
 
-            # If we want to save all results at specified time intervals:
-            recording_steps_list = list(range(0, n_steps, trunc(recording_interval_in_days / time_step_in_days)+1))
-            # We remove the first element of the list, as it makes no sense to record the properties at the beginning:
-            recording_steps_list.pop(0)
             # If the current iteration correspond to the time where one full time interval for recording has been reached:
             if step in recording_steps_list:
                 # Then we record the current simulation results:
-                print("Recording the simulation results obtained so far (time t = {:.2f}".format(
-                    Decimal(step * time_step_in_days)), "days)...")
+                print("Recording the simulation results obtained so far (until time t = {:.2f}".format(
+                    Decimal((step+1) * time_step_in_days)), "days)...")
                 recording_attempt()
 
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -873,7 +882,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     # -------------------------------------------------------------------------------------------
     finally:
         print("")
-        print("The program has stopped at time t = {:.2f}".format(Decimal(step * time_step_in_days)), "days.")
+        print("The program has stopped at final time t = {:.2f}".format(Decimal((step+1) * time_step_in_days)), "days.")
         recording_attempt()
 
         # # For preventing the interpreter to close all windows at the end of the program, we ask the user to press a key

@@ -28,7 +28,8 @@ import rhizodep.parameters as param
 # FUNCTIONS FOR DATA PREPROCESSING :
 ####################################
 
-def formatted_inputs(original_input_file="None", final_input_file='updated_input_file.csv', original_time_step_in_days=1 / 24., final_time_step_in_days=1.,
+def formatted_inputs(original_input_file="None", final_input_file='updated_input_file.csv',
+                     original_time_step_in_days=1 / 24., final_time_step_in_days=1.,
                      simulation_period_in_days=60., do_not_execute_if_file_with_suitable_size_exists=False):
     """
     This function creates a new input file containing data on soil temperature and sucrose input rate (in mol of sucrose per second),
@@ -46,7 +47,8 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
         df = pd.read_csv(PATH1, sep=',', header=0)
 
         # simulation_period_in_days = df['time_in_days'].max()-df['time_in_days'].min()
-        n_steps = int(floor(simulation_period_in_days / final_time_step_in_days)) + 1
+        n_steps = round(simulation_period_in_days / final_time_step_in_days)
+        print("The total number of steps is", n_steps)
 
         if do_not_execute_if_file_with_suitable_size_exists:
             PATH2 = os.path.join('.', 'input_file.csv')
@@ -61,8 +63,10 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
         input_frame = pd.DataFrame(
             columns=["step_number", "initial_time_in_days", "final_time_in_days", "soil_temperature_in_degree_Celsius",
                      "sucrose_input_rate"])
-        input_frame["step_number"] = range(1, n_steps + 1)
-        input_frame["initial_time_in_days"] = (input_frame["step_number"] - 1) * final_time_step_in_days * 1.
+        initial_step_number = df["step_number"].iloc[0]
+        input_frame["step_number"] = range(initial_step_number * round(original_time_step_in_days/final_time_step_in_days),
+                                           initial_step_number * round(original_time_step_in_days/final_time_step_in_days) + n_steps)
+        input_frame["initial_time_in_days"] = input_frame["step_number"] * final_time_step_in_days
         input_frame["final_time_in_days"] = input_frame["initial_time_in_days"] + final_time_step_in_days
 
         print("Creating a new input file adapted to the required time step (time step =",
@@ -199,6 +203,7 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
 
     input_frame.to_csv(final_input_file, na_rep='NA', index=False, header=True)
     print("The new input file adapted to the required time step has been created and saved as 'updated_input_file.csv'.")
+    print("")
 
     return input_frame
 

@@ -15,66 +15,79 @@ import pandas as pd
 import multiprocessing as mp
 import shutil
 import time
+import pickle
 
 import rhizodep.model as model
 import rhizodep.simulation as simulation
 import rhizodep.parameters as param
 import rhizodep.tools as tools
 
+########################################################################################################################
+
+# Function for running the instruction of one scenario:
+#------------------------------------------------------
 def run_one_scenario(scenario_id=1,
                      inputs_dir_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
                      outputs_dir_path='outputs',
                      scenarios_list="scenarios_list.xlsx"):
     """
-    Run main_simulation() of simulation_old.py using parameters of a specific scenario
+    This function runs the main_simulation() using instructions from a specific scenario read in a file.
 
     :param int scenario_id: the index of the scenario to be read in the file containing the list of scenarios
     :param str inputs_dir_path: the path directory of inputs
     :param str outputs_dir_path: the path to save outputs
+    :param str scenarios_list: the name of the .csv or .xlsx file where scenario's instructions are written
     """
-    # -- OUTPUTS DIRECTORY OF THE SCENARIO --
+
+    # HANDLING GENERAL INPUTS AND OUTPUTS FOLDERS:
     # We define the path of the directory that will contain the outputs of the model:
     if not outputs_dir_path:
         OUTPUTS_DIRPATH = outputs_dir_path
     else:
         OUTPUTS_DIRPATH = 'outputs'
+    # If the folder doesn't exist:
     if not os.path.exists(OUTPUTS_DIRPATH):
         # We create it:
         os.mkdir(OUTPUTS_DIRPATH)
 
-    # -- INPUTS DIRECTORY OF THE SCENARIO --
     # We define the path of the directory that contains the inputs of the model:
     if inputs_dir_path:
         INPUTS_DIRPATH = inputs_dir_path
     else:
         INPUTS_DIRPATH = 'inputs'
 
-    # READING SCENARIO INSTRUCTIONS:
-    if os.path.splitext(scenarios_list)[1]==".csv":
+    # READING SCENARIO'S INSTRUCTIONS:
+    # If we handle a CSV file:
+    if os.path.splitext(scenarios_list)[1] == ".csv":
         # FOR A CSV FILE, ONE SCENARIO CORRESPONDS TO ONE LINE:
         # We read the scenario to be run:
         scenarios_df = pd.read_csv(os.path.join(INPUTS_DIRPATH, scenarios_list), index_col='Scenario')
         scenario = scenarios_df.loc[scenario_id].to_dict()
         scenario_name = 'Scenario_%.4d' % scenario_id
-    elif os.path.splitext(scenarios_list)[1]==".xlsx":
-        # ONE SCENARIO CORRESPONDS TO ONE COLUMN (from EXCEL FILE):
+    # If we handle an Excel file:
+    elif os.path.splitext(scenarios_list)[1] == ".xlsx":
+        # FOR AN EXCEL FILE, ONE SCENARIO CORRESPONDS TO ONE COLUMN:
         # We read the scenario to be run:
-        scenarios_df = pd.read_excel(os.path.join(INPUTS_DIRPATH, scenarios_list), header=0, sheet_name="scenarios_as_columns")
+        scenarios_df = pd.read_excel(os.path.join(INPUTS_DIRPATH, scenarios_list), header=0,
+                                     sheet_name="scenarios_as_columns")
         # We remove the columns containing unnecessary details about parameters:
         useless_columns = ["Explanation", "Type/ Unit", "Reference_value"]
         scenarios_df.drop(useless_columns, axis=1, inplace=True)
         # Before transposing the dataframe, we rename the first column as 'Scenario':
-        scenarios_df.rename(columns={'Parameter':'Scenario'}, inplace= True)
+        scenarios_df.rename(columns={'Parameter': 'Scenario'}, inplace=True)
         # Because the way of dealing with data type is not well suited with the current Excel file, we transpose the
-        # dataframe, record it as a CSV file in the outputs folder, and reload it with the proper type for each parameter:
+        # dataframe, record it as a CSV file in the outputs folder, and reload it with the proper type for each
+        # parameter:
         transposed_df = scenarios_df.T
         transposed_df.to_csv(os.path.join('outputs', 'scenarios_list.csv'), na_rep='NA', header=False)
-        new_scenarios_df = pd.read_csv(os.path.join('outputs', 'scenarios_list.csv'), index_col='Scenario', header=0)
+        new_scenarios_df = pd.read_csv(os.path.join('outputs', 'scenarios_list.csv'), index_col='Scenario',
+                                       header=0)
         scenario = new_scenarios_df.loc[scenario_id].to_dict()
         scenario_name = 'Scenario_%.4d' % scenario_id
     else:
         print("The extension of the 'scenarios_list' file has not been recognized (either .csv or .xlsx)!")
 
+    # CREATING THE GENERAL OUTPUT FOLDER FOR THIS SCENARIO:
     # We define the specific directory in which the outputs of this scenario will be recorded:
     scenario_dirpath = os.path.join(OUTPUTS_DIRPATH, scenario_name)
     # If the output directory doesn't exist:
@@ -86,9 +99,8 @@ def run_one_scenario(scenario_id=1,
         for root, dirs, files in os.walk(scenario_dirpath):
             for file in files:
                 os.remove(os.path.join(root, file))
-    # # We create the csv file that will contain the results corresponding to this scenario:
-    # SCENARIO_OUTPUT_FILE = os.path.join(scenario_dirpath, 'simulation_results.csv')
-    # Z_CLASSIFICATION_FILE = os.path.join(scenario_dirpath, 'z_classification.csv')
+
+    # CREATING/VERIFYING THE OTHER FOLDERS (in which data are read or recorded):
     # We define the specific directory in which the images of the root systems may be recorded:
     images_dirpath = os.path.join(scenario_dirpath, "root_images")
     if not os.path.exists(images_dirpath):
@@ -102,7 +114,7 @@ def run_one_scenario(scenario_id=1,
     if not os.path.exists(MTG_properties_dirpath):
         os.mkdir(MTG_properties_dirpath)
 
-    # -- SIMULATION PARAMETERS --
+    # SIMULATION PARAMETERS:
     # We create a dictionary containing the parameters specified in the scenario:
     scenario_parameters = tools.buildDic(scenario)
     # We update the parameters of the model with the parameters indicated in the scenario:
@@ -114,17 +126,14 @@ def run_one_scenario(scenario_id=1,
     data_frame_parameters.head(1).to_csv(os.path.join(scenario_dirpath, 'updated_parameters.csv'),
                                  na_rep='NA', index=False, header=True)
 
-    # We read the input file containing data on time, temperature and sucrose input
+    # We read the other specific instructions of the scenario that don't correspond to the parameters in the list
     # (Note: The following function "get" looks if the first argument is present in the scenario parameters.
-    # If not, it returns the default value indicated in the second argument)
-    SCENARIO_INPUT_FILENAME = scenario_parameters.get('input_file', None)
-    if SCENARIO_INPUT_FILENAME:
-        SCENARIO_INPUT_FILE = os.path.join(INPUTS_DIRPATH, SCENARIO_INPUT_FILENAME)
-    else:
-        SCENARIO_INPUT_FILE = None
+    # If not, it returns the default value indicated in the second argument):
+    START_FROM_A_KNOWN_ROOT_MTG = scenario_parameters.get('start_from_a_known_root_MTG', False)
+    ROOT_MTG_FILE = scenario_parameters.get('root_MTG_file', 'initial_root_MTG.pckl')
 
-    # We read the other specific instructions of the scenario that don't correspond to the parameters in the list:
     INPUT_FILE_TIME_STEP = scenario_parameters.get('input_file_time_step_in_days', 1.)
+    STARTING_TIME_IN_DAYS = scenario_parameters.get('starting_time_in_days', 0.)
     SIMULATION_PERIOD = scenario_parameters.get('simulation_period_in_days', 10.)
     TIME_STEP = scenario_parameters.get('time_step_in_days', 1. / 24.)
 
@@ -186,64 +195,106 @@ def run_one_scenario(scenario_id=1,
         print("No solver will be used to compute the balance between C pools.")
         print("")
 
-    # We initiate the properties of the MTG "g":
-    g = model.initiate_mtg(random=RANDOM_OPTION,
-                           ArchiSimple=ARCHISIMPLE_OPTION,
-                           initial_segment_length=INITIAL_SEGMENT_LENGTH,
-                           initial_apex_length=INITIAL_APEX_LENGTH,
-                           initial_C_sucrose_root=INITIAL_C_SUCROSE_ROOT,
-                           initial_C_hexose_root=INITIAL_C_HEXOSE_ROOT,
-                           input_file_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
-                           forcing_seminal_roots_events=FORCING_SEMINAL_ROOTS_EVENTS,
-                           forcing_adventitious_roots_events=FORCING_ADVENTITIOUS_ROOTS_EVENTS,
-                           seminal_roots_events_file="seminal_roots_inputs.csv",
-                           adventitious_roots_events_file="adventitious_roots_inputs.csv")
-    print("The MTG has been initialized!")
+    # LOOKING AT THE INPUT DATA OVER TIME:
+    # We finally read the input file containing data on time, temperature and sucrose input:
+    SCENARIO_INPUT_FILENAME = scenario_parameters.get('input_file', None)
+    if SCENARIO_INPUT_FILENAME:
+        SCENARIO_INPUT_FILE = os.path.join(INPUTS_DIRPATH, SCENARIO_INPUT_FILENAME)
+    else:
+        SCENARIO_INPUT_FILE = None
+    # If the instructions are to start the simulation(s) at a specific time step in the input file:
+    if SCENARIO_INPUT_FILE != None and STARTING_TIME_IN_DAYS > 0:
+        # Then we read the file and copy it in a dataframe "df":
+        original_input_frame = pd.read_csv(SCENARIO_INPUT_FILE, sep=',')
+        # And we only keep the lines for which time_in days is higher than starting_time_in_days:
+        new_input_frame = original_input_frame.loc[original_input_frame["time_in_days"] >= STARTING_TIME_IN_DAYS ]
+        # We finally record the new data frame in the output directory of the scenario:
+        new_input_file_name = 'adjusted_inputs_S' + str(scenario_id) + '.csv'
+        new_input_frame.to_csv(os.path.join(OUTPUTS_DIRPATH, new_input_file_name),
+                               na_rep='NA', index=False, header=True)
+        # And we assign the SCENARIO_INPUT_FILE path to this dataframe:
+        SCENARIO_INPUT_FILE = os.path.join(OUTPUTS_DIRPATH, new_input_file_name)
 
-    # We launch the main simulation program:
-    simulation.main_simulation(g, simulation_period_in_days=SIMULATION_PERIOD, time_step_in_days=TIME_STEP,
-                               radial_growth=RADIAL_GROWTH,
+    # LOOKING AT THE INITIAL ROOT MTG:
+    # We initalize a Boolean for authorizing the simulation:
+    simulation_allowed = True
+    # If we decide to start from a given root MTG to be loaded:
+    if START_FROM_A_KNOWN_ROOT_MTG:
+        filename = os.path.join(inputs_dir_path, ROOT_MTG_FILE)
+        if not os.path.exists(filename):
+            print("!!! ERROR: the file", ROOT_MTG_FILE,"could not be found in the folder", inputs_dir_path, "!!!")
+            print("The simulation stops here!")
+            simulation_allowed=False
+        else:
+            # We load the MTG file and name it "g":
+            f = open(filename, 'rb')
+            g = pickle.load(f)
+            f.close()
+            print("The MTG", ROOT_MTG_FILE,"has been loaded!")
+    # Otherwise we initiate the properties of the MTG "g":
+    else:
+        g = model.initiate_mtg(random=RANDOM_OPTION,
                                ArchiSimple=ARCHISIMPLE_OPTION,
-                               ArchiSimple_C_fraction=ARCHISIMPLE_C_FRACTION,
-                               input_file=SCENARIO_INPUT_FILE,
-                               input_file_time_step_in_days=INPUT_FILE_TIME_STEP,
-                               outputs_directory=scenario_dirpath,
-                               forcing_constant_inputs=FORCING_INPUTS,
-                               constant_sucrose_input_rate=SUCROSE_INPUT_RATE,
-                               constant_soil_temperature_in_Celsius=SOIL_TEMPERATURE,
-                               nodules=NODULES_OPTION,
-                               root_order_limitation=ROOT_ORDER_LIMITATION_OPTION,
-                               root_order_treshold=ROOT_ORDER_TRESHOLD,
-                               using_solver=USING_SOLVER,
-                               printing_solver_outputs=PRINTING_SOLVER_OUTPUTS,
-                               simulation_results_file='simulation_results.csv',
-                               z_classification=CLASSIFICATION_BY_LAYERS,
-                               z_classification_file='z_classification.csv',
-                               recording_interval_in_days=RECORDING_INTERVAL_IN_DAYS,
-                               z_min=LAYERS_Z_MIN, z_max=LAYERS_Z_MAX, z_interval=LAYERS_THICKNESS,
-                               recording_images=RECORDING_IMAGES_OPTION,
-                               root_images_directory=images_dirpath,
-                               printing_sum=PRINTING_SUM_OPTION,
-                               recording_sum=RECORDING_SUM_OPTION,
-                               printing_warnings=PRINTING_WARNINGS_OPTION,
-                               recording_g=RECORDING_MTG_FILES_OPTION,
-                               g_directory=MTG_files_dirpath,
-                               recording_g_properties=RECORDING_MTG_PROPERTIES_OPTION,
-                               g_properties_directory=MTG_properties_dirpath,
-                               random=RANDOM_OPTION,
-                               plotting=PLOTTING,
-                               scenario_id=scenario_id,
-                               displayed_property=DISPLAYED_PROPERTY,
-                               displayed_vmin=DISPLAYED_MIN_VALUE, displayed_vmax=DISPLAYED_MAX_VALUE,
-                               log_scale=LOG_SCALE, cmap=COLOR_MAP,
-                               root_hairs_display=ROOT_HAIRS_DISPLAY,
-                               width=WIDTH, height=HEIGHT,
-                               x_center=X_CENTER, y_center=Y_CENTER, z_center=Z_CENTER, z_cam=Z_CAMERA,
-                               camera_distance=CAMERA_DISTANCE, step_back_coefficient=STEP_BACK_COEFFICIENT,
-                               camera_rotation=CAMERA_ROTATION_OPTION, n_rotation_points=CAMERA_ROTATION_N_POINTS)
+                               initial_segment_length=INITIAL_SEGMENT_LENGTH,
+                               initial_apex_length=INITIAL_APEX_LENGTH,
+                               initial_C_sucrose_root=INITIAL_C_SUCROSE_ROOT,
+                               initial_C_hexose_root=INITIAL_C_HEXOSE_ROOT,
+                               input_file_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
+                               forcing_seminal_roots_events=FORCING_SEMINAL_ROOTS_EVENTS,
+                               forcing_adventitious_roots_events=FORCING_ADVENTITIOUS_ROOTS_EVENTS,
+                               seminal_roots_events_file="seminal_roots_inputs.csv",
+                               adventitious_roots_events_file="adventitious_roots_inputs.csv")
+        print("The MTG has been initialized!")
+
+    # LAUNCHING THE SIMULATION:
+    # If the simulation has been allowed (i.e. the MTG "g" has been defined):
+    if simulation_allowed:
+        # We launch the main simulation program:
+        simulation.main_simulation(g, simulation_period_in_days=SIMULATION_PERIOD, time_step_in_days=TIME_STEP,
+                                   radial_growth=RADIAL_GROWTH,
+                                   ArchiSimple=ARCHISIMPLE_OPTION,
+                                   ArchiSimple_C_fraction=ARCHISIMPLE_C_FRACTION,
+                                   input_file=SCENARIO_INPUT_FILE,
+                                   input_file_time_step_in_days=INPUT_FILE_TIME_STEP,
+                                   outputs_directory=scenario_dirpath,
+                                   forcing_constant_inputs=FORCING_INPUTS,
+                                   constant_sucrose_input_rate=SUCROSE_INPUT_RATE,
+                                   constant_soil_temperature_in_Celsius=SOIL_TEMPERATURE,
+                                   nodules=NODULES_OPTION,
+                                   root_order_limitation=ROOT_ORDER_LIMITATION_OPTION,
+                                   root_order_treshold=ROOT_ORDER_TRESHOLD,
+                                   using_solver=USING_SOLVER,
+                                   printing_solver_outputs=PRINTING_SOLVER_OUTPUTS,
+                                   simulation_results_file='simulation_results.csv',
+                                   z_classification=CLASSIFICATION_BY_LAYERS,
+                                   z_classification_file='z_classification.csv',
+                                   recording_interval_in_days=RECORDING_INTERVAL_IN_DAYS,
+                                   z_min=LAYERS_Z_MIN, z_max=LAYERS_Z_MAX, z_interval=LAYERS_THICKNESS,
+                                   recording_images=RECORDING_IMAGES_OPTION,
+                                   root_images_directory=images_dirpath,
+                                   printing_sum=PRINTING_SUM_OPTION,
+                                   recording_sum=RECORDING_SUM_OPTION,
+                                   printing_warnings=PRINTING_WARNINGS_OPTION,
+                                   recording_g=RECORDING_MTG_FILES_OPTION,
+                                   g_directory=MTG_files_dirpath,
+                                   recording_g_properties=RECORDING_MTG_PROPERTIES_OPTION,
+                                   g_properties_directory=MTG_properties_dirpath,
+                                   random=RANDOM_OPTION,
+                                   plotting=PLOTTING,
+                                   scenario_id=scenario_id,
+                                   displayed_property=DISPLAYED_PROPERTY,
+                                   displayed_vmin=DISPLAYED_MIN_VALUE, displayed_vmax=DISPLAYED_MAX_VALUE,
+                                   log_scale=LOG_SCALE, cmap=COLOR_MAP,
+                                   root_hairs_display=ROOT_HAIRS_DISPLAY,
+                                   width=WIDTH, height=HEIGHT,
+                                   x_center=X_CENTER, y_center=Y_CENTER, z_center=Z_CENTER, z_cam=Z_CAMERA,
+                                   camera_distance=CAMERA_DISTANCE, step_back_coefficient=STEP_BACK_COEFFICIENT,
+                                   camera_rotation=CAMERA_ROTATION_OPTION, n_rotation_points=CAMERA_ROTATION_N_POINTS)
 
     return
 
+# Function for clearing the previous results:
+#--------------------------------------------
 def previous_outputs_clearing(clearing = False):
 
     if clearing:
@@ -263,6 +314,8 @@ def previous_outputs_clearing(clearing = False):
             os.mkdir('outputs')
     return
 
+# Function for running several scenarios in parallel:
+#----------------------------------------------------
 def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx"):
 
     # READING SCENARIO INSTRUCTIONS:
@@ -307,6 +360,11 @@ def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx"):
     print("Multiprocessing took %4.3f minutes!" % tmp)
 
     return
+########################################################################################################################
+########################################################################################################################
+
+# MAIN PROGRAM:
+###############
 
 if __name__ == '__main__':
 # (Note: this condition avoids launching automatically the program when imported in another file)

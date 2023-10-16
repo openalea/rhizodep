@@ -69,7 +69,7 @@ n_seminal_roots = 5
 
 # Maximal number of roots emerging from the base (including primary and seminal roots)(dimensionless):
 #-----------------------------------------------------------------------------------------------------
-n_adventitious_roots = 10.
+n_adventitious_roots = 10
 
 # Time when adventitious roots start to successively emerge (in second equivalent to temperature T_ref_growth):
 #--------------------------------------------------------------------------------------------------------------
@@ -255,18 +255,10 @@ surfacic_unloading_rate_reference = 0.03 / 12 * 1e-6 / (0.5 * 1)
 # is equivalent to 0.5 m2 of surface. However, the unloading of sucrose is not done exactly the same in CN-Wheat as in
 # RhizoDep (for example, exudation is a fraction of the sucrose unloading, unlike in RhizoDep where it is a fraction
 # of hexose).
-
-# Reference consumption rate of hexose for growth for a given root element (used to multiply the reference unloading rate
-# when growth has consumed hexose) (mol of hexose per second):
-reference_rate_of_hexose_consumption_by_growth = 5e-10
-
-# Maximum unloading rate of sucrose from the phloem through the section of a primordium
-# (in mol of sucrose per m2 per second):
-surfacic_unloading_rate_primordium = surfacic_unloading_rate_reference * 3.
-# => We expect the maximum unloading rate through an emerging primordium to be xxx times higher
-# than the usual unloading rate
+max_unloading_rate = 2e-7
 
 # ALTERNATIVE: We use a permeability coefficient and unloading occurs through diffusion only !
+unloading_by_diffusion = True
 # Coefficient of permeability of unloading phloem (in gram per m2 per second):
 phloem_permeability = 5.76
 # => According to Ross-Eliott et al. (2017), an unloading flow of sucrose of 1.2e-13 mol of sucrose per second can be
@@ -279,16 +271,20 @@ phloem_permeability = 5.76
 # CHEATING:
 phloem_permeability = 2e-4
 
+# Reference consumption rate of hexose for growth for a given root element (used to multiply the reference unloading rate
+# when growth has consumed hexose) (mol of hexose per second):
+reference_rate_of_hexose_consumption_by_growth = 3e-14
+
 # Temperature dependence for this parameter:
 #"""""""""""""""""""""""""""""""""""""""""""
-phloem_permeability_T_ref = 10
-phloem_permeability_A = -0.04
-phloem_permeability_B = 2.9
-phloem_permeability_C = 1
+phloem_unloading_T_ref = 10
+phloem_unloading_A = -0.04
+phloem_unloading_B = 2.9
+phloem_unloading_C = 1
 # => We reuse the observed evolution of Frankenberger and Johanson (1983) on invertase activity in different soils
 # with temperature from 10 to 100 degree Celsius which show an increase of about 5 times between 20 degrees and
-# 50 degrees (maximum), assuming that the generation of hexose from phloem unloading would be mainly limited
-# by the activity of invertase outside the phloem tissues.
+# 50 degrees (maximum), assuming that the activity of invertase outside the phloem tissues is correlated to
+# the unloading rate of sucrose from phloem.
 
 # Maximum reloading rate of hexose inside the phloem vessels (in mol of hexose per m2 per second):
 #-------------------------------------------------------------------------------------------------
@@ -296,6 +292,8 @@ surfacic_loading_rate_reference = 1.2e-13/(3.6e-6*pi*350e-6) * 2.
 # => We assume that the maximum loading rate should equal twice the unloading rate estimated from the calculations of
 # Ross-Eliott et al. (2017), corresponding to an unloading flow of sucrose of 1.2e-13 mol of sucrose per second
 # for a sieve element of 3.6 µm and the length of the unloading zone of 350 µm.
+
+max_loading_rate = 2e-7
 
 # Temperature dependence for this parameter:
 #"""""""""""""""""""""""""""""""""""""""""""
@@ -504,14 +502,14 @@ Cs_cells_soil_max = 10 # TODO: do a real estimation!
 
 # Maximum degradation rate of hexose in soil (in mol of hexose per m2 per s):
 #----------------------------------------------------------------------------
-soil_hexose_degradation_rate_max = uptake_rate_max * 10.
+hexose_degradation_rate_max = uptake_rate_max * 10.
 # => We assume that the maximum degradation rate is 10 times higher than the maximum uptake rate
 # Temperature dependence for this parameter:
 #"""""""""""""""""""""""""""""""""""""""""""
-soil_hexose_degradation_rate_max_T_ref = 20
-soil_hexose_degradation_rate_max_A = 0
-soil_hexose_degradation_rate_max_B = 3.98
-soil_hexose_degradation_rate_max_C = 1
+hexose_degradation_rate_max_T_ref = 20
+hexose_degradation_rate_max_A = 0
+hexose_degradation_rate_max_B = 3.98
+hexose_degradation_rate_max_C = 1
 # => The value for B (Q10) has been fitted from the evolution of Vmax measured by Coody et al. (1986, SBB),
 # who provided the evolution of the maximal uptake of glucose by soil microorganisms at 4, 12 and 25 degree C.
 
@@ -523,14 +521,14 @@ Km_hexose_degradation = Km_uptake / 2.
 
 # Maximum degradation rate of mucilage in soil (in mol of equivalent-hexose per m2 per s):
 #-----------------------------------------------------------------------------------------
-soil_mucilage_degradation_rate_max = soil_hexose_degradation_rate_max
+mucilage_degradation_rate_max = hexose_degradation_rate_max
 # => We assume that the maximum degradation rate for mucilage is equivalent to the one defined for hexose.
 # Temperature dependence for this parameter:
 #"""""""""""""""""""""""""""""""""""""""""""
-soil_mucilage_degradation_rate_max_T_ref = soil_hexose_degradation_rate_max_T_ref
-soil_mucilage_degradation_rate_max_A = soil_hexose_degradation_rate_max_A
-soil_mucilage_degradation_rate_max_B = soil_hexose_degradation_rate_max_B
-soil_mucilage_degradation_rate_max_C = soil_hexose_degradation_rate_max_C
+mucilage_degradation_rate_max_T_ref = hexose_degradation_rate_max_T_ref
+mucilage_degradation_rate_max_A = hexose_degradation_rate_max_A
+mucilage_degradation_rate_max_B = hexose_degradation_rate_max_B
+mucilage_degradation_rate_max_C = hexose_degradation_rate_max_C
 # => We assume that all other parameters for mucilage degradation are identical to the ones for hexose degradation.
 
 # Affinity constant for soil mucilage degradation (in mol of hexose per g of struct_mass):
@@ -540,14 +538,14 @@ Km_mucilage_degradation = Km_hexose_degradation
 
 # Maximum degradation rate of root cells at the soil/root interface (in mol of equivalent-hexose per m2 per s):
 #---------------------------------------------------------------------------------------------------------
-soil_cells_degradation_rate_max = soil_hexose_degradation_rate_max / 2.
+cells_degradation_rate_max = hexose_degradation_rate_max / 2.
 # => We assume that the maximum degradation rate for cells is equivalent to the half of the one defined for hexose.
 # Temperature dependence for this parameter:
 #"""""""""""""""""""""""""""""""""""""""""""
-soil_cells_degradation_rate_max_T_ref = soil_hexose_degradation_rate_max_T_ref
-soil_cells_degradation_rate_max_A = soil_hexose_degradation_rate_max_A
-soil_cells_degradation_rate_max_B = soil_hexose_degradation_rate_max_B
-soil_cells_degradation_rate_max_C = soil_hexose_degradation_rate_max_C
+cells_degradation_rate_max_T_ref = hexose_degradation_rate_max_T_ref
+cells_degradation_rate_max_A = hexose_degradation_rate_max_A
+cells_degradation_rate_max_B = hexose_degradation_rate_max_B
+cells_degradation_rate_max_C = hexose_degradation_rate_max_C
 # => We assume that all other parameters for cells degradation are identical to the ones for hexose degradation.
 
 # Affinity constant for soil cells degradation (in mol of equivalent-hexose per g of struct_mass):

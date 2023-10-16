@@ -11,14 +11,12 @@
 """
 
 # TODO: Check the calculation of "Structural mass produced (g)"
-# TODO: Check how "Just_dead" might mess up with the duration of certain process (ex: hexose uptake)
 # TODO: Update ArchiSimple option (e.g. with the new way to represent Seminal/Adventitious roots?)
 # TODO: Add a general upper scale for the whole root system, in which the properties about phloem sucrose could be stored?
 # TODO: Introduce explicit threshold concentration for limiting processes, rather than "0"
 # TODO: Consider giving priority to root maintenance, and trigger senescence when root maintenance is not ensured
 # TODO: Watch the calculation of surface and volume for the apices - if they correspond to cones, the mass balance for
 #  segmentation may not be correct! A "reverse" function for calculating length/radius from the volume should be used.
-# TODO: Check actual_elongation_rate with thermal time...
 
 # TODO: POSSIBLE FUTURE DEVELOPMENT - Modify the way the apex and elongation zone are discretized:
 #  instead of using a tip that is elongated and segmented over time, define a meristem object and an elongation zone
@@ -51,6 +49,9 @@
 #  from the third segment of axis R0.
 #  - R((0-S3-1)-S2-1)-A represents the apex of the first lateral root emerging from the segment described above.
 #  Check what is used in L-system and whether we are not reinventing the wheel!
+
+# TODO: POSSIBLE FUTURE DEVELOPMENT - Create a way to detect oscillatory events (e.g. when a concentration is either nil
+#  or very high from one step to another) and to avoid them (by blocking the consumption of the particular pool for example).
 
 import os
 import numpy as np
@@ -275,6 +276,8 @@ def transport_barriers(g, n, computation_with_age=True, computation_with_distanc
     element, based on either the distance to root tip or the age of the root segment.
     :param g: the root MTG to work on
     :param n: the root element where calculations will be made
+    :param computation_with_age: if True, the calculations are done according to the age of the root element
+    :param computation_with_distance_to_tip: if True, the calculations are done according to the distance of the root element from the tip
     :return: the updated element n with the new relative conductances
     """
 
@@ -3257,7 +3260,7 @@ def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_war
     """
     This function simulates the rate of sucrose unloading from phloem and its immediate conversion into hexose.
     The hexose pool is assumed to correspond to the symplastic compartment of root cells from the stelar and cortical
-    parenchyma and from the epidermis. The function also simulates the opposite process of sucrose loading.
+    parenchyma and from the epidermis. The function also simulates the opposite process of sucrose loading,
     considering that 2 mol of hexose are produced for 1 mol of sucrose.
     :param n: the root element to be considered
     :param soil_temperature_in_Celsius: the temperature experience by the root element n
@@ -3284,6 +3287,9 @@ def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_war
     hexose_production_from_phloem_rate = 0.
     sucrose_loading_in_phloem_rate  = 0.
 
+    # We check whether unloading should be described by a diffusion process or a Michaelis-Menten kinetics:
+    unloading_by_diffusion = param.unloading_by_diffusion
+
     # CONSIDERING CASES THAT SHOULD BE AVOIDED:
     #------------------------------------------
     # We initialize the possibility of exchange with phloem:
@@ -3296,59 +3302,85 @@ def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_war
 
         # SUCROSE UNLOADING:
         #-------------------
-        # We initially assume that phloem's permeability per m2 of surface is identical everywhere along the root:
-        phloem_permeability = param.phloem_permeability
+        # We initially assume that phloem unloading capacity is identical everywhere along the root:
+        if unloading_by_diffusion:
+            phloem_permeability = param.phloem_permeability
+        else:
+            max_unloading_rate = param.max_unloading_rate
+
+        # We initialize a second condition:
+        unloading_allowed = True
 
         # We forbid any sucrose unloading if there is already a global deficit of sucrose:
         global_sucrose_deficit = g.property('global_sucrose_deficit')[g.root]
         if global_sucrose_deficit > 0.:
-            phloem_permeability = 0.
+            if unloading_by_diffusion:
+                phloem_permeability = 0.
+                unloading_allowed = False
+            else:
+                max_unloading_rate = 0.
+                unloading_allowed = False
             if printing_warnings:
                 print("WARNING: No phloem unloading occured for node", n.index(),
                       "because there was a global deficit of sucrose!")
 
         # We verify that the concentration of sucrose is not negative or inferior to the one of hexose:
-        if C_sucrose_root <= C_hexose_root/2. or C_sucrose_root <=0.:
-            # If such, we forbid any sucrose unloading:
-            phloem_permeability = 0.
+        if C_sucrose_root <= C_hexose_root/2.:
+            if unloading_by_diffusion:
+                # If such, we forbid any sucrose unloading:
+                phloem_permeability = 0.
+                unloading_allowed = False
+            elif C_sucrose_root <= 0.:
+                max_unloading_rate = 0.
+                unloading_allowed = False
             if printing_warnings:
                 print("WARNING: No phloem unloading occured for node", n.index(),
                       "because root sucrose concentration was", n.C_sucrose_root, "mol/g.")
 
-        # ADJUSTING THE PERMEABILITY OF PHLOEM:
-        # We correct the phloem permeability according to the amount of hexose that has been used for sustaining growth:
-        if hexose_consumption_by_growth_rate >0. and phloem_permeability >0.:
-
-            # print("Before correction with growth, phloem permeability is", "{:.2E}".format(Decimal(phloem_permeability)),
-            #       "; sucrose concentration is", "{:.2E}".format(Decimal(n.C_sucrose_root)), "; hexose concentration is",
-            #       "{:.2E}".format(Decimal(n. C_hexose_root)),"and hexose consumption rate is",
-            #       "{:.2E}".format(Decimal(hexose_consumption_by_growth_rate)), "for the element", n.label, n.index())
-
+        # ADJUSTING THE UNLOADING OF PHLOEM ALONG THE ROOT:
+        # We now correct the phloem unloading capacity according to the amount of hexose that has been used for growth:
+        if unloading_allowed:
             # We use a reference value for the rate of hexose consumption by growth, independent from mass or surface.
-            # The permeability will then linearily increase with the rate of hexose consumption for growth, knowing that
-            # if the actual consumption rate equals the reference value, then the permeability of phloem is doubled.
+            # The unloading capacity will then linearily increase with the rate of hexose consumption for growth, knowing 
+            # that if the actual consumption rate equals the reference value, then the unloading capacity is doubled.
             reference_consumption_rate = param.reference_rate_of_hexose_consumption_by_growth
-            phloem_permeability = phloem_permeability \
-                                  * (1 + hexose_consumption_by_growth_rate / reference_consumption_rate)
-            # Note: As the permeability relates to phloem surface, and therefore to the size of the element,
-            # the calculation above will result in a total increase of the permeability (gDW per second) according to
-            # the actual, total consumption rate for growth (mol per second). There is therefore no need to relate the
-            # reference rate to the mass, length or surface of the element.
+            if unloading_by_diffusion:
+                # print(">>> Before adjustement, unloading with permeability is:", phloem_permeability * (C_sucrose_root - C_hexose_root / 2.))
+                phloem_permeability = phloem_permeability \
+                                      * (1 + hexose_consumption_by_growth_rate / reference_consumption_rate)
+                # Note: As the permeability relates to phloem surface, and therefore to the size of the element,
+                # the calculation above will result in a total increase of the permeability (gDW per second) according to
+                # the actual, total consumption rate for growth (mol per second). There is therefore no need to relate the
+                # reference rate to the mass, length or surface of the element.
+                # print(">>> After adjustement, unloading with permeability is:", phloem_permeability * (C_sucrose_root - C_hexose_root / 2.))
+            else:
+                # print(">>> Before adjustement, unloading without permeability is:", max_unloading_rate)
+                max_unloading_rate = max_unloading_rate \
+                                      * (1 + hexose_consumption_by_growth_rate / reference_consumption_rate)
+                # print(">>> After adjustement, unloading without permeability is:", max_unloading_rate)
 
-            # print("After correction, its phloem permeability is", "{:.2E}".format(Decimal(phloem_permeability)))
+            # We now correct the unloading rate according to soil temperature:
+            temperature_modifier = temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+                                                            process_at_T_ref=1,
+                                                            T_ref=param.phloem_unloading_T_ref,
+                                                            A=param.phloem_unloading_A,
+                                                            B=param.phloem_unloading_B,
+                                                            C=param.phloem_unloading_C)
+            if unloading_by_diffusion:
+                phloem_permeability = phloem_permeability * temperature_modifier
+            else:
+                max_unloading_rate = max_unloading_rate * temperature_modifier
 
-        # We now correct the unloading rate according to soil temperature:
-        phloem_permeability = phloem_permeability \
-                              * temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
-                                                         process_at_T_ref=1,
-                                                         T_ref=param.phloem_permeability_T_ref,
-                                                         A=param.phloem_permeability_A,
-                                                         B=param.phloem_permeability_B,
-                                                         C=param.phloem_permeability_C)
+            # Eventually, we compute the unloading rate and the automatical conversion into hexose:
+            if unloading_by_diffusion:
+                hexose_production_from_phloem_rate = 2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) \
+                                                     * exchange_surface
+                # print("With diffusion, the overall phloem unloading rate is", phloem_permeability * (C_sucrose_root - C_hexose_root / 2.))
+            else:
+                hexose_production_from_phloem_rate = 2. * max_unloading_rate * C_sucrose_root * exchange_surface \
+                                                     / (param.Km_unloading + C_sucrose_root )
+                # print("Without diffusion, the overall phloem unloading rate is", max_unloading_rate * C_sucrose_root / (param.Km_unloading + C_sucrose_root ))
 
-        # Eventually, we compute the unloading rate and the automatical conversion into hexose:
-        hexose_production_from_phloem_rate = 2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) \
-                                          * exchange_surface
         # AVOIDING PROBLEMS - We make sure that hexose production can't become negative:
         if hexose_production_from_phloem_rate < 0.:
                 print("!!!ERROR!!!  A negative sucrose unloading rate was computed for element", n.index(),
@@ -3361,7 +3393,7 @@ def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_war
         # max_loading_rate = param.surfacic_loading_rate_reference \
         #     * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
         # TODO: Reconsider the way the variation of the max loading rate along the root axis has been described!
-        max_loading_rate = param.surfacic_loading_rate_reference
+        max_loading_rate = param.max_loading_rate
 
         # We correct loading according to soil temperature:
         max_loading_rate = max_loading_rate \
@@ -3612,7 +3644,7 @@ def root_sugars_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warni
     This function computes the rate of hexose exudation (mol of hexose per seconds) for a given root element.
     Exudation corresponds to an efflux of hexose from the root to the soil by a passive diffusion. This efflux
     is calculated from the product of the exchange surface (m2) with the soil solution, a permeability coefficient (g m-2)
-    and the gradient of hexose concentration between parenchyma and soil (mol of hexose per gram of dry root structural mass).
+    and the gradient of hexose concentration between cells and soil (mol of hexose per gram of dry root structural mass).
     :param n: the root element to be considered
     :param soil_temperature_in_Celsius: the temperature experience by the root element n
     :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
@@ -3699,9 +3731,8 @@ def root_sugars_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warni
                 print("WARNING: a negative hexose exudation flux was calculated for the element", n.index(),
                       "; hexose exudation flux has therefore been set to zero!")
             hexose_exudation_rate = 0.
-            # TODO: Should we really limit the influx of hexose when the concentration of hexose in the soil is higher than in the root?
 
-        # NEW: we also include the direct exchange between soil solution and phloem vessels, when these are in direct
+        # We also include the direct exchange between soil solution and phloem vessels, when these are in direct
         # contact with the soil solution (e.g. in the meristem, or if a lateral roots disturbs all the barriers):
         phloem_hexose_exudation_rate = corrected_permeability_coeff * (2 * C_sucrose_root - C_hexose_soil) \
                                        * vascular_exchange_surface
