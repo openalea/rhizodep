@@ -28,7 +28,7 @@ import rhizodep.tools as tools
 #------------------------------------------------------
 def run_one_scenario(scenario_id=1,
                      inputs_dir_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
-                     outputs_dir_path='outputs',
+                     outputs_dir_path="C:/Users/frees/rhizodep/simulations/running_scenarios/outputs",
                      scenarios_list="scenarios_list.xlsx"):
     """
     This function runs the main_simulation() using instructions from a specific scenario read in a file.
@@ -41,7 +41,7 @@ def run_one_scenario(scenario_id=1,
 
     # HANDLING GENERAL INPUTS AND OUTPUTS FOLDERS:
     # We define the path of the directory that will contain the outputs of the model:
-    if not outputs_dir_path:
+    if outputs_dir_path:
         OUTPUTS_DIRPATH = outputs_dir_path
     else:
         OUTPUTS_DIRPATH = 'outputs'
@@ -79,8 +79,8 @@ def run_one_scenario(scenario_id=1,
         # dataframe, record it as a CSV file in the outputs folder, and reload it with the proper type for each
         # parameter:
         transposed_df = scenarios_df.T
-        transposed_df.to_csv(os.path.join('outputs', 'scenarios_list.csv'), na_rep='NA', header=False)
-        new_scenarios_df = pd.read_csv(os.path.join('outputs', 'scenarios_list.csv'), index_col='Scenario',
+        transposed_df.to_csv(os.path.join(OUTPUTS_DIRPATH, 'scenarios_list.csv'), na_rep='NA', header=False)
+        new_scenarios_df = pd.read_csv(os.path.join(OUTPUTS_DIRPATH, 'scenarios_list.csv'), index_col='Scenario',
                                        header=0)
         scenario = new_scenarios_df.loc[scenario_id].to_dict()
         scenario_name = 'Scenario_%.4d' % scenario_id
@@ -239,7 +239,7 @@ def run_one_scenario(scenario_id=1,
                                initial_apex_length=INITIAL_APEX_LENGTH,
                                initial_C_sucrose_root=INITIAL_C_SUCROSE_ROOT,
                                initial_C_hexose_root=INITIAL_C_HEXOSE_ROOT,
-                               input_file_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
+                               input_file_path="/running_scenarios/inputs",
                                forcing_seminal_roots_events=FORCING_SEMINAL_ROOTS_EVENTS,
                                forcing_adventitious_roots_events=FORCING_ADVENTITIOUS_ROOTS_EVENTS,
                                seminal_roots_events_file="seminal_roots_inputs.csv",
@@ -295,37 +295,38 @@ def run_one_scenario(scenario_id=1,
 
 # Function for clearing the previous results:
 #--------------------------------------------
-def previous_outputs_clearing(clearing = False):
+def previous_outputs_clearing(clearing = False,
+                              output_path="C:/Users/frees/rhizodep/simulations/running_scenarios/outputs"):
 
     if clearing:
         # If the output directory already exists:
-        if os.path.exists('outputs'):
+        if os.path.exists(output_path):
             try:
                 # We remove all files and subfolders:
                 print("Deleting the 'outputs' folder...")
-                shutil.rmtree('outputs')
+                shutil.rmtree(output_path)
                 print("Creating a new 'outputs' folder...")
-                os.mkdir('outputs')
+                os.mkdir(output_path)
             except OSError as e:
                 print("An error occured when trying to delete the output folder: %s - %s." % (e.filename, e.strerror))
         else:
             # We recreate an empty folder 'outputs':
             print("Creating a new 'outputs' folder...")
-            os.mkdir('outputs')
+            os.mkdir(output_path)
     return
 
 # Function for running several scenarios in parallel:
 #----------------------------------------------------
-def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx"):
+def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx", input_path='inputs', output_path='outputs'):
 
     # READING SCENARIO INSTRUCTIONS:
     # FROM A CSV FILE where scenarios are present in different lines:
     if os.path.splitext(scenarios_list)[1] == ".csv":
         # We read the data frame containing the different scenarios to be simulated:
         print("Loading the instructions of scenarios...")
-        scenarios_df = pd.read_csv(os.path.join('inputs', scenarios_list), index_col='Scenario')
+        scenarios_df = pd.read_csv(os.path.join(input_path, scenarios_list), index_col='Scenario')
         # We copy the list of scenarios' properties in the 'outputs' directory:
-        scenarios_df.to_csv(os.path.join('outputs', 'scenarios_list.csv'), na_rep='NA', index=False, header=True)
+        scenarios_df.to_csv(os.path.join(output_path, 'scenarios_list.csv'), na_rep='NA', index=False, header=True)
         # We record the number of each scenario to be simulated:
         scenarios_df['Scenario'] = scenarios_df.index
         scenarios = scenarios_df.Scenario
@@ -333,7 +334,7 @@ def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx"):
     elif os.path.splitext(scenarios_list)[1] == ".xlsx":
         # We read the data frame containing the different scenarios to be simulated:
         print("Loading the instructions of scenario(s)...")
-        scenarios_df = pd.read_excel(os.path.join('inputs', scenarios_list), sheet_name="scenarios_as_columns")
+        scenarios_df = pd.read_excel(os.path.join(input_path, scenarios_list), sheet_name="scenarios_as_columns")
         # We get a list of the names of the columns, which correspond to the scenarios' numbers:
         scenarios = list(scenarios_df.columns)
         # We remove the unnecessary names of the first 4 columns, so that scenarios only contains the scenario numbers:
@@ -389,13 +390,18 @@ if __name__ == '__main__':
     #     elif opt in ("-s", "--scenario"):
     #         scenario = int(arg)
     #
-    # run_one_scenario(inputs_dir_path=inputs, outputs_dir_path=outputs, scenario_id=scenario)
+    # run_one_scenario(scenario_id=1,
+    #                  inputs_dir_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
+    #                  outputs_dir_path='outputs',
+    #                  scenarios_list="scenarios_list.xlsx")
 
     # CASE 2 - CALLING MULTIPLE SCENARIOS:
     ######################################
     # We can clear the folder containing previous outputs:
-    previous_outputs_clearing(clearing=True)
+    previous_outputs_clearing(clearing=True, output_path="C:/Users/frees/rhizodep/simulations/running_scenarios/outputs")
     # We run the scenarios in parallel :
     # WATCH OUT: you will still need to manually modify the default arguments of 'run_one_scenarios',
     # e.g. the name of the file where to read scenario instructions, even if you have entered it below!!!!!!!!!!!!!!!!!!
-    run_multiple_scenarios(scenarios_list="scenarios_list.xlsx")
+    run_multiple_scenarios(scenarios_list="scenarios_list.xlsx",
+                           input_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
+                           output_path="C:/Users/frees/rhizodep/simulations/running_scenarios/outputs")
