@@ -17,18 +17,18 @@ import shutil
 import time
 import pickle
 
-import rhizodep.model as model
-import rhizodep.simulation as simulation
-import rhizodep.parameters as param
-import rhizodep.tools as tools
+import rhizodep.src.rhizodep.model as model
+import rhizodep.src.rhizodep.simulation as simulation
+import rhizodep.src.rhizodep.parameters as param
+import rhizodep.src.rhizodep.tools as tools
 
 ########################################################################################################################
 
 # Function for running the instruction of one scenario:
 #------------------------------------------------------
 def run_one_scenario(scenario_id=1,
-                     inputs_dir_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
-                     outputs_dir_path="C:/Users/frees/rhizodep/simulations/running_scenarios/outputs",
+                     inputs_dir_path=os.path.dirname(__file__) + "/inputs",
+                     outputs_dir_path=os.path.dirname(__file__) + "/outputs",
                      scenarios_list="scenarios_list.xlsx"):
     """
     This function runs the main_simulation() using instructions from a specific scenario read in a file.
@@ -296,7 +296,7 @@ def run_one_scenario(scenario_id=1,
 # Function for clearing the previous results:
 #--------------------------------------------
 def previous_outputs_clearing(clearing = False,
-                              output_path="C:/Users/frees/rhizodep/simulations/running_scenarios/outputs"):
+                              output_path=os.path.dirname(__file__) + "/outputs"):
 
     if clearing:
         # If the output directory already exists:
@@ -369,7 +369,7 @@ def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx", input_path='inp
 
 if __name__ == '__main__':
 # (Note: this condition avoids launching automatically the program when imported in another file)
-
+    working_dir = os.path.dirname(__file__)
     # # CASE 1 - CALLING ONE SCENARIO ONLY:
     # #####################################
     #
@@ -391,17 +391,17 @@ if __name__ == '__main__':
     #         scenario = int(arg)
     #
     # run_one_scenario(scenario_id=1,
-    #                  inputs_dir_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
+    #                  inputs_dir_path=os.path.dirname(__file__) + "/inputs",
     #                  outputs_dir_path='outputs',
     #                  scenarios_list="scenarios_list.xlsx")
 
     # CASE 2 - CALLING MULTIPLE SCENARIOS:
     ######################################
     # We can clear the folder containing previous outputs:
-    previous_outputs_clearing(clearing=True, output_path="C:/Users/frees/rhizodep/simulations/running_scenarios/outputs")
+    previous_outputs_clearing(clearing=True, output_path=working_dir + "/outputs")
     # We run the scenarios in parallel :
     # WATCH OUT: you will still need to manually modify the default arguments of 'run_one_scenarios',
     # e.g. the name of the file where to read scenario instructions, even if you have entered it below!!!!!!!!!!!!!!!!!!
     run_multiple_scenarios(scenarios_list="scenarios_list.xlsx",
-                           input_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
-                           output_path="C:/Users/frees/rhizodep/simulations/running_scenarios/outputs")
+                           input_path=working_dir + "/inputs",
+                           output_path=working_dir + "/outputs")

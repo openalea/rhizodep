@@ -4,7 +4,7 @@
 import numpy as np
 import os
 import timeit
-from rhizodep.simulation import *
+from rhizodep.src.rhizodep.simulation import *
 
 # # Setting the randomness in the whole code to reproduce the same root system over different runs:
 # # random_choice = int(round(np.random.normal(100,50)))

@@ -63,10 +63,10 @@ from scipy.integrate import solve_ivp
 from openalea.mtg import *
 from openalea.mtg.traversal import pre_order, post_order
 
-import rhizodep.parameters as param
+import rhizodep.src.rhizodep.parameters as param
 
-# To display more than 5 columns when printing a Panda datframe:
-pd.set_option('display.max_columns',20)
+# To display more than 5 columns when printing a Panda dataframe:
+pd.set_option('display.max_columns', 20)
 
 # FUNCTIONS FOR CALCULATING PROPERTIES ON THE MTG
 #################################################

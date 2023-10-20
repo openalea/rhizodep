@@ -2,8 +2,8 @@
 import numpy as np
 import pandas as pd
 import os
-import rhizodep.model as model
-import rhizodep.simulation as simulation
+import src.rhizodep.model as model
+import src.rhizodep.simulation as simulation
 import simulations.running_scenarios.run_scenarios as run_scenarios
 
 ########################################################################################################################
@@ -60,7 +60,7 @@ def compare_actual_to_desired(desired_data_path, actual_data_path, overwrite_des
 
 # Function for running the test simulation:
 #------------------------------------------
-def run_reference_simulation(run_test_scenario=True, scenario_ID=1, outputs_path='outputs',
+def run_reference_simulation(run_test_scenario=False, scenario_ID=1, outputs_path='outputs',
                              images_path='root_images', MTG_path='MTG_files', MTG_properties_path='MTG_properties'):
     """
     This function performs the actual simulation for the test, either using the default value of parameters with an
@@ -68,13 +68,15 @@ def run_reference_simulation(run_test_scenario=True, scenario_ID=1, outputs_path
     :param bool run_test_scenario: if True, the test is based on the instructions from 'scenario_test.xlsx'
     """
 
+    working_dir = os.path.dirname(__file__)
+
     # We launch the main simulation program:
     print("Simulation starts ...")
 
     if run_test_scenario:
         # OPTION 1: We run a default scenario, starting from an already existing root MTG:
         run_scenarios.run_one_scenario(scenario_id=scenario_ID,
-                                       inputs_dir_path="C:/Users/frees/rhizodep/test/inputs",
+                                       inputs_dir_path=working_dir + "/inputs",
                                        outputs_dir_path=outputs_path,
                                        scenarios_list="scenario_test.xlsx")
     else:
@@ -197,7 +199,9 @@ if __name__ == '__main__':
     CREATING_NEW_REFERENCE_DATA=False
     # WATCH OUT: Set this to True only if you want to alter the reference file!
 
+    working_dir = os.path.dirname(__file__)
+
     test_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
-             run_test_scenario=True, scenario_ID=1,
-             reference_path="C:/Users/frees/rhizodep/test/reference", reference_file='desired_simulation_results.csv',
-             outputs_path="C:/Users/frees/rhizodep/test/outputs/", results_file='simulation_results.csv')
+             run_test_scenario=False, scenario_ID=1,
+             reference_path=working_dir + "/reference", reference_file='desired_simulation_results.csv',
+             outputs_path=working_dir + "/outputs/", results_file='simulation_results.csv')

@@ -22,7 +22,7 @@ from copy import deepcopy # Allows to make a copy of a dictionnary and change it
 from openalea.mtg import turtle as turt
 from openalea.mtg.plantframe import color
 import openalea.plantgl.all as pgl
-import rhizodep.parameters as param
+import rhizodep.src.rhizodep.parameters as param
 
 
 # FUNCTIONS FOR DATA PREPROCESSING :
