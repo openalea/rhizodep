@@ -253,49 +253,56 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     # RECORDING THE INITIAL STATE OF THE MTG:
     # ---------------------------------------
 
-    # If the rotation of the camera around the root system is required:
-    if camera_rotation:
-        # We calculate the coordinates of the camera on the circle around the center:
-        x_coordinates, y_coordinates, z_coordinates = tools.circle_coordinates(z_center=z_cam, radius=camera_distance,
-                                                                               n_points=n_rotation_points)
-        # We initialize the index for reading each coordinates:
-        index_camera = 0
-        x_cam = x_coordinates[index_camera]
-        y_cam = y_coordinates[index_camera]
-        z_cam = z_coordinates[index_camera]
-        sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
-                            vmax=displayed_vmax, cmap=cmap,
-                            root_hairs_display=root_hairs_display,
-                            width=width,
-                            height=height,
-                            x_center=x_center,
-                            y_center=y_center,
-                            z_center=z_center,
-                            x_cam=x_cam,
-                            y_cam=y_cam,
-                            z_cam=z_cam)
-    else:
-        x_camera = camera_distance
-        x_cam = camera_distance
-        z_camera = z_cam
-        sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
-                            vmax=displayed_vmax, cmap=cmap,
-                            root_hairs_display=root_hairs_display,
-                            width=width,
-                            height=height,
-                            x_center=x_center,
-                            y_center=y_center,
-                            z_center=z_center,
-                            x_cam=x_camera,
-                            y_cam=0,
-                            z_cam=z_camera)
-        # We move the camera further from the root system:
-        x_camera = x_cam + x_cam * step_back_coefficient * (step - initial_step_number)
-        z_camera = z_cam + z_cam * step_back_coefficient * (step - initial_step_number)
-
-    # We finally display the MTG on PlantGL and possibly record it:
+    # We display the MTG on PlantGL and possibly record it:
     if plotting:
+
+        # If the rotation of the camera around the root system is required:
+        if camera_rotation:
+            index_camera=0
+            x_cam = x_coordinates[index_camera]
+            y_cam = y_coordinates[index_camera]
+            z_cam = z_coordinates[index_camera]
+            sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+                                vmax=displayed_vmax, cmap=cmap,
+                                root_hairs_display=root_hairs_display,
+                                width=width,
+                                height=height,
+                                x_center=x_center,
+                                y_center=y_center,
+                                z_center=z_center,
+                                x_cam=x_cam,
+                                y_cam=y_cam,
+                                z_cam=z_cam)
+            # We define the index of the coordinates to read at the next step:
+            index_camera = index_camera + 1
+            # If this index is higher than the number of coordinates in each vector:
+            if index_camera >= n_rotation_points:
+                # Then we reset the index to 0:
+                index_camera = 0
+
+        # Otherwise, the camera will stay on a fixed direction:
+        else:
+            x_cam = camera_distance
+            y_cam = 0
+            z_cam = z_cam
+            sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+                                vmax=displayed_vmax, cmap=cmap,
+                                root_hairs_display=root_hairs_display,
+                                width=width,
+                                height=height,
+                                x_center=x_center,
+                                y_center=y_center,
+                                z_center=z_center,
+                                x_cam=x_cam,
+                                y_cam=0,
+                                z_cam=z_cam)
+            # We move the camera further from the root system:
+            x_camera = x_cam * (1 + step_back_coefficient)
+            z_camera = z_cam * (1 + step_back_coefficient)
+        # We display the scene:
         pgl.Viewer.display(sc)
+        # If needed, we wait for a few seconds so that the graph is well positioned:
+        time.sleep(0.5)
         if recording_images:
             # pgl.Viewer.frameGL.setSize(width, height)
             image_name = os.path.join(root_images_directory, 'root%.5d.png')
@@ -720,7 +727,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 if index_camera >= n_rotation_points:
                     # Then we reset the index to 0:
                     index_camera = 0
-
             # Otherwise, the camera will stay on a fixed position:
             else:
                 sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
@@ -745,7 +751,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 time.sleep(0.5)
                 if recording_images:
                     image_name = os.path.join(root_images_directory, 'root%.5d.png')
-                    pgl.Viewer.saveSnapshot(image_name % step)
+                    pgl.Viewer.saveSnapshot(image_name % (step +1))
 
             # For integrating root variables on the z axis:
             # ----------------------------------------------
@@ -758,14 +764,14 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             # ------------------------------------------------------------
             if recording_g:
                 g_file_name = os.path.join(g_directory, 'root%.5d.pckl')
-                with open(g_file_name % step, 'wb') as output:
+                with open(g_file_name % (step+1), 'wb') as output:
                     pickle.dump(g, output, protocol=2)
 
             # For recording the properties of g in a csv file at each time step:
             # ------------------------------------------------------------------
             if recording_g_properties:
                 prop_file_name = os.path.join(g_properties_directory, 'root%.5d.csv')
-                model.recording_MTG_properties(g, file_name=prop_file_name % step)
+                model.recording_MTG_properties(g, file_name=prop_file_name % (step+1))
 
             # SUMMING AND PRINTING VARIABLES ON THE ROOT SYSTEM:
             # --------------------------------------------------

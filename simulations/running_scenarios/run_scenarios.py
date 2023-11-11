@@ -231,6 +231,11 @@ def run_one_scenario(scenario_id=1,
             g = pickle.load(f)
             f.close()
             print("The MTG", ROOT_MTG_FILE,"has been loaded!")
+            # And by precaution we save the initial MTG in the outputs:
+            g_file_name = os.path.join(OUTPUTS_DIRPATH, 'initial_root_MTG.pckl')
+            with open(g_file_name, 'wb') as output:
+                pickle.dump(g, output, protocol=2)
+            print("The initial MTG file has been saved in the outputs.")
     # Otherwise we initiate the properties of the MTG "g":
     else:
         g = model.initiate_mtg(random=RANDOM_OPTION,

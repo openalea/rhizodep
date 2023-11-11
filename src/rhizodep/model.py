@@ -1146,7 +1146,7 @@ def elongated_length(initial_length=0., radius=0., C_hexose_root=1,
     else:
         # Otherwise, we additionally consider a limitation of the elongation according to the local concentration of hexose,
         # based on a Michaelis-Menten formalism:
-        if C_hexose_root > 0.:
+        if C_hexose_root > param.C_hexose_min_for_elongation:
             elongation = param.EL * 2. * radius * C_hexose_root / (
                     param.Km_elongation + C_hexose_root) * elongation_time_in_seconds
         else:
@@ -1827,7 +1827,8 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
             # Then the potential radius to form is equal to the theoretical one determined by geometry:
             segment.potential_radius = segment.theoretical_radius
         # Otherwise, if we don't strictly follow simple ArchiSimple rules and if there can be an increase in radius:
-        elif segment.length > 0. and segment.theoretical_radius > segment.radius:
+        elif segment.length > 0. and segment.theoretical_radius > segment.radius \
+                and segment.C_hexose_root > param.C_hexose_min_for_thickening:
             # We calculate the maximal increase in radius that can be achieved over this time step,
             # based on a Michaelis-Menten formalism that regulates the maximal rate of increase
             # according to the amount of hexose available:
@@ -2530,35 +2531,48 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
         # ---------------------------------------------------------
 
         # We initialize each amount of hexose available for growth:
-        hexose_possibly_required_for_elongation = 0.
+        hexose_available_for_elongation = 0.
         hexose_available_for_thickening = 0.
 
         # If elongation is possible:
         if n.potential_length > n.length:
-            hexose_possibly_required_for_elongation = n.hexose_possibly_required_for_elongation
+            # TODO: Check how useful it is to limit the growth so that the concentration does not go below a treshold.
+            # NEW - We calculate the actual amount of hexose that can be used for growth according to the treshold
+            # concentration below which no growth process is authorized:
+            hexose_available_for_elongation \
+                = n.hexose_possibly_required_for_elongation \
+                  - n.struct_mass_contributing_to_elongation * param.C_hexose_min_for_elongation
+            if hexose_available_for_elongation <0.:
+                hexose_available_for_elongation = 0.
             list_of_elongation_supporting_elements = n.list_of_elongation_supporting_elements
             list_of_elongation_supporting_elements_hexose = n.list_of_elongation_supporting_elements_hexose
             list_of_elongation_supporting_elements_mass = n.list_of_elongation_supporting_elements_mass
 
         # If radial growth is possible:
         if n.potential_radius > n.radius:
-            # We only consider the amount of hexose immediately available in the element that can increase in radius:
-            hexose_available_for_thickening = n.hexose_available_for_thickening
+            # We only consider the amount of hexose immediately available in the element that can increase in radius.
+            # TODO: Check how useful it is to limit the growth so that the concentration does not go below a treshold.
+            # NEW - We calculate the actual amount of hexose that can be used for thickening according to the treshold
+            # concentration below which no thickening is authorized:
+            hexose_available_for_thickening = n.hexose_available_for_thickening \
+                                              - n.struct_mass * param.C_hexose_min_for_thickening
+            if hexose_available_for_thickening <0.:
+                hexose_available_for_thickening = 0.
 
         # In case no hexose is available at all:
-        if (hexose_possibly_required_for_elongation + hexose_available_for_thickening) <= 0.:
+        if (hexose_available_for_elongation + hexose_available_for_thickening) <= 0.:
             # Then we move to the next element in the main loop:
             continue
 
         # We initialize the temporary variable "remaining_hexose" that computes the amount of hexose left for growth:
-        remaining_hexose_for_elongation = hexose_possibly_required_for_elongation
+        remaining_hexose_for_elongation = hexose_available_for_elongation
         remaining_hexose_for_thickening = hexose_available_for_thickening
 
         # ACTUAL ELONGATION IS FIRST CONSIDERED:
         # ---------------------------------------
 
         # We calculate the maximal possible length of the root element according to all the hexose available for elongation:
-        volume_max = initial_volume + hexose_possibly_required_for_elongation * 6. \
+        volume_max = initial_volume + hexose_available_for_elongation * 6. \
                      / (param.root_tissue_density * param.struct_mass_C_content) * param.yield_growth
         length_max = volume_max / (pi * n.initial_radius ** 2)
 
@@ -2590,10 +2604,10 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
                     index = list_of_elongation_supporting_elements[i]
                     supplying_element = g.node(index)
                     # We define the actual contribution of the current element based on total hexose consumption by growth
-                    # of element n and the relative contribution of the current element to the pool of the available hexose:
+                    # of element n and the relative contribution of the current element to the pool of the potentially available hexose:
                     hexose_actual_contribution_to_elongation = hexose_consumption_by_elongation \
                                                                * list_of_elongation_supporting_elements_hexose[i] \
-                                                               / hexose_possibly_required_for_elongation
+                                                               / n.hexose_possibly_required_for_elongation
                     # The amount of hexose used for growth in this element is increased:
                     supplying_element.hexose_consumption_by_growth += hexose_actual_contribution_to_elongation
                     supplying_element.hexose_consumption_by_growth_rate += hexose_actual_contribution_to_elongation / time_step_in_seconds

@@ -503,25 +503,25 @@ if __name__ == "__main__":
     # # Creating a new movie from root systems for one given scenario:
     # ################################################################
 
-    # # FROM ORIGINAL GRAPHS:
-    # resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0099'),
-    #                          # outputs_path='C:/Users/frees/rhizodep/simulations/saving_outputs/outputs_2023-08/Scenario_0069',
-    #                          images_folder='root_images',
-    #                          # images_folder='root_new_images',
-    #                          resized_images_folder='root_images_resized',
-    #                          film_making=True,
-    #                          film_name="root_movie_C_hexose.gif",
-    #                          image_transforming=True,
-    #                          resizing=False, dividing_size_by=1.,
-    #                          colorbar_option=True, colorbar_position=1,
-    #                          # colorbar_title="Net rhizodeposition rate (mol of hexose per day per cm)",
-    #                          colorbar_title="Hexose concentration (mol of hexose per gram)",
-    #                          colorbar_cmap='jet', colorbar_lognorm=True,
-    #                          n_thicks_for_linear_scale=6,
-    #                          vmin=1e-6, vmax=1e-3,
-    #                          time_printing=True, time_position=1,
-    #                          time_step_in_days=1./24., sampling_frequency=1, fps=6,
-    #                          title="")
+    # FROM ORIGINAL GRAPHS:
+    resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0114'),
+                             # outputs_path='C:/Users/frees/rhizodep/simulations/saving_outputs/outputs_2023-08/Scenario_0069',
+                             images_folder='root_images',
+                             # images_folder='root_new_images',
+                             resized_images_folder='root_images_resized',
+                             film_making=True,
+                             film_name="root_movie_C_hexose.gif",
+                             image_transforming=True,
+                             resizing=False, dividing_size_by=1.,
+                             colorbar_option=True, colorbar_position=1,
+                             # colorbar_title="Net rhizodeposition rate (mol of hexose per day per cm)",
+                             colorbar_title="Hexose concentration (mol of hexose per gram)",
+                             colorbar_cmap='jet', colorbar_lognorm=True,
+                             n_thicks_for_linear_scale=6,
+                             vmin=1e-6, vmax=1e-3,
+                             time_printing=True, time_position=1,
+                             time_step_in_days=1./24., sampling_frequency=6, fps=24,
+                             title="")
 
     # # FROM REDRAWN GRAPHS:
     # resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0088'),

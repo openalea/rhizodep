@@ -579,6 +579,14 @@ Km_thickening = Km_elongation
 relative_root_thickening_rate_max = 5. / 100. / (24. * 60. * 60.)
 # => We consider that the radius can't increase by more than 5% every day
 
+# Treshold hexose concentration for elongation (in mol of hexose per g of struct_mass):
+# #------------------------------------------------------------------------------------
+C_hexose_min_for_elongation = 1e-5
+
+# Treshold hexose concentration for elongation (in mol of hexose per g of struct_mass):
+# #------------------------------------------------------------------------------------
+C_hexose_min_for_thickening = 1e-5
+
 #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Parameters from nodules dynamics:
 #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -652,3 +660,24 @@ exodermis_c = 1.11 / (60.*60.*24.) # This parameter reflects the slope of the in
 max_thermal_time_since_endodermis_disruption = 6 * 60. * 60. # We assume that after 6h, no disruption is observed anymore!
 max_thermal_time_since_exodermis_disruption = 48 * 60. * 60. # We assume that after 48h, no disruption is observed anymore!
 
+########################################################################################################################
+
+# FOR MYCORRHIZAL FUNGI
+#######################
+
+# Hyphal tissue density (in gram of structural mass per cubic meter):
+#------------------------------------------------------------------
+hyphal_tissue_density = 0.10 * 1e6
+# => Reference: RTD=0.1 g cm-3
+
+# C content of structural mass (mol of C per gram of structural mass):
+#-----------------------------------------------------------------
+hyphal_struct_mass_C_content = 0.44 / 12.01
+# => We assume that the structural mass contains 44% of C.
+
+C_hexose_fungus_min = 1e-6
+
+fungus_permeability = phloem_permeability
+fungus_yield_growth = 0.8
+
+min_distance_for_fungus_infection = 2 * segment_length
