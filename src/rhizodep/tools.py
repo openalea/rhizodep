@@ -425,6 +425,7 @@ def circle_coordinates(x_center=0., y_center=0., z_center=0., radius=1., n_point
 
 def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-12, vmax=3e-7,
              root_hairs_display=True,
+             mycorrhizal_fungus_display=True,
              width=1200, height=1200,
              x_center=0., y_center=0., z_center=0.,
              x_cam=1., y_cam=0., z_cam=0.):
@@ -476,9 +477,10 @@ def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-
             else:
                 # Otherwise, we print it in black in a semi-transparent way:
                 shapes[vid].appearance = pgl.Material([0, 0, 0], transparency=0.8)
-            # property=g.property(prop_cmap)
-            # if n.property <=0:
-            #     shapes[vid].appearance = pgl.Material([0, 0, 200])
+            # # SPECIAL CASE:
+            # if mycorrhizal_fungus_display and n.fungal_infection_severity > 0.:
+            #     # Otherwise, we print it in black in a semi-transparent way:
+            #     shapes[vid].appearance = pgl.Material([255, 255, 255], transparency=0.0)
 
             # SPECIAL CASE: If the element is a nodule, we transform the cylinder into a sphere:
             if n.type == "Root_nodule":
@@ -506,11 +508,10 @@ def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-
         # We make the graph upside down:
         turtle_for_hair.down(180)
         # We initialize the scene with the MTG g:
-        # scene_for_hair = turt.TurtleFrame(g, visitor=visitor_for_hair, turtle=turtle_for_hair, gc=False)
         scene_for_hair = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_hair, gc=False)
-        # We update the scene with the specified position of the center of the graph and the camera:
-        prepareScene(scene_for_hair, width=width, height=height,
-                     x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+        # # We update the scene with the specified position of the center of the graph and the camera:
+        # prepareScene(scene_for_hair, width=width, height=height,
+        #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
         # We get a list of all shapes in the scene:
         shapes_for_hair = dict((sh.id, sh) for sh in scene_for_hair)
 
@@ -558,15 +559,55 @@ def plot_mtg(g, prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-
                         # For the base of the root system [don't ask why this has not the same formalism..!]:
                         shapes_for_hair[vid].geometry.geometry.radius = n.radius + n.root_hair_length
 
+    # DISPLAYING MYCORRHIZAL FUNGI:
+    #------------------------------
+    if mycorrhizal_fungus_display:
+        # We recreate a new list of shapes corresponding to the MTG:
+        visitor_for_fungus = get_root_visitor()
+        # We initialize a new turtle in PlantGL:
+        turtle_for_fungus = turt.PglTurtle()
+        # We make the graph upside down:
+        turtle_for_fungus.down(180)
+        # We initialize the scene with the MTG g:
+        scene_for_fungus = turt.TurtleFrame(g, visitor=visitor_for_fungus, turtle=turtle_for_fungus, gc=False)
+        # We get a list of all shapes in the scene:
+        shapes_for_fungus = dict((sh.id, sh) for sh in scene_for_fungus)
+
+        for vid in colors:
+            if vid in shapes_for_fungus:
+                n = g.node(vid)
+
+                # If the current root element has been infected by the fungus:
+                if n.fungal_infection_severity > 0.:
+                    # We set the reference color:
+                    color_vector = [150, 50, 100]
+                    # We set the transparency based on the level of infection:
+                    transparency = 0.2 + (1 - n.fungal_infection_severity) * 0.8
+                    shapes_for_fungus[vid].appearance = pgl.Material(color_vector, transparency=transparency)
+
+                    # We finally transform the radius of the cylinder:
+                    if vid > 1:
+                        # For normal cases:
+                        shapes_for_fungus[vid].geometry.geometry.geometry.radius = (n.radius + n.root_hair_length) * 1.1
+                    else:
+                        # For the base of the root system [don't ask why this has not the same formalism ...!]:
+                        shapes_for_fungus[vid].geometry.geometry.radius = (n.radius + n.root_hair_length) * 1.1
+
     # CREATING THE ACTUAL SCENE:
     #---------------------------
     # Finally, we update the scene with shapes from roots and, if specified, shapes from root hairs:
     new_scene = pgl.Scene()
+    # We start by adding the shapes corresponding to the property to be displayed:
     for vid in shapes:
         new_scene += shapes[vid]
+    # We then add the shapes from the root hairs:
     if root_hairs_display:
         for vid in shapes_for_hair:
             new_scene += shapes_for_hair[vid]
+    # And we eventually add the shapes of the mycorrhizal fungi, if any:
+    if mycorrhizal_fungus_display:
+        for vid in shapes_for_fungus:
+            new_scene += shapes_for_fungus[vid]
 
     return new_scene
 
