@@ -21,6 +21,7 @@ import rhizodep.model as model
 import rhizodep.simulation as simulation
 import rhizodep.parameters as param
 import rhizodep.tools as tools
+import rhizodep.mycorrhizae as mycorrhizae
 
 ########################################################################################################################
 
@@ -131,6 +132,7 @@ def run_one_scenario(scenario_id=1,
     # If not, it returns the default value indicated in the second argument):
     START_FROM_A_KNOWN_ROOT_MTG = scenario_parameters.get('start_from_a_known_root_MTG', False)
     ROOT_MTG_FILE = scenario_parameters.get('root_MTG_file', 'initial_root_MTG.pckl')
+    MYCORRHIZAL_FUNGUS = scenario_parameters.get('mycorrhizal_fungus', False)
 
     INPUT_FILE_TIME_STEP = scenario_parameters.get('input_file_time_step_in_days', 1.)
     STARTING_TIME_IN_DAYS = scenario_parameters.get('starting_time_in_days', 0.)
@@ -244,12 +246,17 @@ def run_one_scenario(scenario_id=1,
                                initial_apex_length=INITIAL_APEX_LENGTH,
                                initial_C_sucrose_root=INITIAL_C_SUCROSE_ROOT,
                                initial_C_hexose_root=INITIAL_C_HEXOSE_ROOT,
-                               input_file_path="/running_scenarios/inputs",
+                               input_file_path=INPUTS_DIRPATH,
                                forcing_seminal_roots_events=FORCING_SEMINAL_ROOTS_EVENTS,
                                forcing_adventitious_roots_events=FORCING_ADVENTITIOUS_ROOTS_EVENTS,
                                seminal_roots_events_file="seminal_roots_inputs.csv",
                                adventitious_roots_events_file="adventitious_roots_inputs.csv")
-        print("The MTG has been initialized!")
+        print("The root MTG has been initialized!")
+
+    if MYCORRHIZAL_FUNGUS:
+        f = mycorrhizae.initiate_mycorrhizal_fungus()
+    else:
+        f = None
 
     # LAUNCHING THE SIMULATION:
     # If the simulation has been allowed (i.e. the MTG "g" has been defined):
@@ -266,6 +273,8 @@ def run_one_scenario(scenario_id=1,
                                    constant_sucrose_input_rate=SUCROSE_INPUT_RATE,
                                    constant_soil_temperature_in_Celsius=SOIL_TEMPERATURE,
                                    nodules=NODULES_OPTION,
+                                   mycorrhizal_fungus=MYCORRHIZAL_FUNGUS,
+                                   fungus_MTG=f,
                                    root_order_limitation=ROOT_ORDER_LIMITATION_OPTION,
                                    root_order_treshold=ROOT_ORDER_TRESHOLD,
                                    using_solver=USING_SOLVER,

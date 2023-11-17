@@ -504,7 +504,7 @@ if __name__ == "__main__":
     # ################################################################
 
     # FROM ORIGINAL GRAPHS:
-    resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0114'),
+    resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0123'),
                              # outputs_path='C:/Users/frees/rhizodep/simulations/saving_outputs/outputs_2023-08/Scenario_0069',
                              images_folder='root_images',
                              # images_folder='root_new_images',

@@ -17,9 +17,11 @@ import os
 import time
 
 import openalea.plantgl.all as pgl
+from openalea.mtg import turtle as turt
 import rhizodep.model as model
 import rhizodep.tools as tools
 import rhizodep.parameters as param
+import rhizodep.mycorrhizae as mycorrhizae
 
 import pickle
 
@@ -34,6 +36,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     forcing_constant_inputs=False, constant_sucrose_input_rate=1.e-6,
                     constant_soil_temperature_in_Celsius=20,
                     nodules=False,
+                    mycorrhizal_fungus=True,
+                    fungus_MTG=None,
                     root_order_limitation=False,
                     root_order_treshold=2,
                     using_solver=False,
@@ -256,23 +260,51 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     # We display the MTG on PlantGL and possibly record it:
     if plotting:
 
+        # visitor = tools.get_root_visitor()
+        # # We initialize a turtle in PlantGL:
+        # turtle_for_roots = turt.PglTurtle()
+        # turtle_for_hairs = turt.PglTurtle()
+        # turtle_for_fungus = turt.PglTurtle()
+        # # We make the graph upside down:
+        # turtle_for_roots.down(180)
+        # turtle_for_hairs.down(180)
+        # turtle_for_fungus.down(180)
+        # # We initialize the scene with the MTG g:
+        # scene_for_roots = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_roots, gc=False)
+        # scene_for_hairs = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_hairs, gc=False)
+        # scene_for_fungus = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_fungus, gc=False)
+
+        # x_cam = camera_distance
+        # y_cam = 0
+        # z_cam = z_cam
+        # tools.prepareScene(scene_for_roots, width=width, height=height,
+        #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+        # tools.prepareScene(scene_for_hairs, width=width, height=height,
+        #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+        # tools.prepareScene(scene_for_fungus, width=width, height=height,
+        #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+
         # If the rotation of the camera around the root system is required:
         if camera_rotation:
             index_camera=0
             x_cam = x_coordinates[index_camera]
             y_cam = y_coordinates[index_camera]
             z_cam = z_coordinates[index_camera]
-            sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+
+            # # We prepare the scene with the specified position of the center of the graph and the camera:
+            # tools.prepareScene(scene_for_roots, width=width, height=height,
+            #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+
+            sc = tools.plot_mtg(g,
+                                # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
+                                prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                                 vmax=displayed_vmax, cmap=cmap,
                                 root_hairs_display=root_hairs_display,
-                                width=width,
-                                height=height,
-                                x_center=x_center,
-                                y_center=y_center,
-                                z_center=z_center,
-                                x_cam=x_cam,
-                                y_cam=y_cam,
-                                z_cam=z_cam)
+                                mycorrhizal_fungus_display=mycorrhizal_fungus,
+                                width=width, height=height,
+                                x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam,
+                                y_cam=y_cam, z_cam=z_cam)
+
             # We define the index of the coordinates to read at the next step:
             index_camera = index_camera + 1
             # If this index is higher than the number of coordinates in each vector:
@@ -285,20 +317,25 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             x_cam = camera_distance
             y_cam = 0
             z_cam = z_cam
-            sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+
+            # # We prepare the scene with the specified position of the center of the graph and the camera:
+            # tools.prepareScene(scene_for_roots, width=width, height=height,
+            #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+
+            sc = tools.plot_mtg(g,
+                                # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
+                                prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                                 vmax=displayed_vmax, cmap=cmap,
                                 root_hairs_display=root_hairs_display,
-                                width=width,
-                                height=height,
-                                x_center=x_center,
-                                y_center=y_center,
-                                z_center=z_center,
-                                x_cam=x_cam,
-                                y_cam=0,
-                                z_cam=z_cam)
+                                mycorrhizal_fungus_display=mycorrhizal_fungus,
+                                width=width, height=height,
+                                x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam,
+                                y_cam=y_cam, z_cam=z_cam)
+
             # We move the camera further from the root system:
             x_camera = x_cam * (1 + step_back_coefficient)
             z_camera = z_cam * (1 + step_back_coefficient)
+
         # We display the scene:
         pgl.Viewer.display(sc)
         # If needed, we wait for a few seconds so that the graph is well positioned:
@@ -558,6 +595,11 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             else:
                 sucrose_input_rate = input_frame.loc[step - initial_step_number, 'sucrose_input_rate']
 
+            # TODO: WATHC OUT - her we artificially increase the supply of C depending on the mass of the fungus!
+            if mycorrhizal_fungus:
+                if fungus_MTG.overall_infection_severity > 0.:
+                    sucrose_input_rate =sucrose_input_rate * (1 + fungus_MTG.overall_infection_severity * 1)
+
             # DEFINING THE TEMPERATURE OF THE SOIL FOR THIS TIME STEP:
             # --------------------------------------------------------
             if constant_soil_temperature_in_Celsius > 0 and forcing_constant_inputs:  # or input_file == "None":
@@ -675,7 +717,13 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                           soil_temperature_in_Celsius=soil_temperature,
                                           printing_warnings=printing_warnings)
 
-                # 2d - CARBON EXCHANGE
+                # 2d - SPECIFIC MYCORRHIZAL FUNGI DYNAMICS:
+                # =========================================
+                if mycorrhizal_fungus:
+                    mycorrhizae.mycorrhizal_interaction(root_MTG=g, fungus=fungus_MTG,
+                                                        step=step, time_step_in_seconds=time_step_in_seconds)
+
+                # 2e - CARBON EXCHANGE
                 # ====================
 
                 # We now proceed to all the exchanges of C for each root element in each root axis
@@ -705,44 +753,70 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             # PLOTTING THE MTG:
             # ------------------
 
+            # visitor = tools.get_root_visitor()
+            # # We initialize a turtle in PlantGL:
+            # turtle = turt.PglTurtle()
+            # # We make the graph upside down:
+            # turtle.down(180)
+            # # We initialize the scene with the MTG g:
+            # scene_for_roots = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
+            # scene_for_hairs = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
+            # scene_for_fungus = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
+
             # If the rotation of the camera around the root system is required:
             if camera_rotation:
+                index_camera = 0
                 x_cam = x_coordinates[index_camera]
                 y_cam = y_coordinates[index_camera]
                 z_cam = z_coordinates[index_camera]
-                sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+
+                # # We prepare the scene with the specified position of the center of the graph and the camera:
+                # tools.prepareScene(scene_for_roots, width=width, height=height,
+                #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam,
+                #                    z_cam=z_cam)
+
+                sc = tools.plot_mtg(g,
+                                    # scene=scene_for_roots, scene_for_hairs=scene_for_hairs,
+                                    scene_for_fungus=scene_for_fungus,
+                                    prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                                     vmax=displayed_vmax, cmap=cmap,
                                     root_hairs_display=root_hairs_display,
-                                    width=width,
-                                    height=height,
-                                    x_center=x_center,
-                                    y_center=y_center,
-                                    z_center=z_center,
-                                    x_cam=x_cam,
-                                    y_cam=y_cam,
-                                    z_cam=z_cam)
+                                    mycorrhizal_fungus_display=mycorrhizal_fungus,
+                                    width=width, height=height,
+                                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam,
+                                    y_cam=y_cam, z_cam=z_cam)
+
                 # We define the index of the coordinates to read at the next step:
                 index_camera = index_camera + 1
                 # If this index is higher than the number of coordinates in each vector:
                 if index_camera >= n_rotation_points:
                     # Then we reset the index to 0:
                     index_camera = 0
-            # Otherwise, the camera will stay on a fixed position:
+
+            # Otherwise, the camera will stay on a fixed direction:
             else:
-                sc = tools.plot_mtg(g, prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+                x_cam = camera_distance
+                y_cam = 0
+                z_cam = z_cam
+
+                # # We prepare the scene with the specified position of the center of the graph and the camera:
+                # tools.prepareScene(scene_for_roots, width=width, height=height,
+                #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam,
+                #                    z_cam=z_cam)
+
+                sc = tools.plot_mtg(g,
+                                    # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
+                                    prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                                     vmax=displayed_vmax, cmap=cmap,
                                     root_hairs_display=root_hairs_display,
-                                    width=width,
-                                    height=height,
-                                    x_center=x_center,
-                                    y_center=y_center,
-                                    z_center=z_center,
-                                    x_cam=x_camera,
-                                    y_cam=0,
-                                    z_cam=z_camera)
+                                    mycorrhizal_fungus_display=mycorrhizal_fungus,
+                                    width=width, height=height,
+                                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam,
+                                    y_cam=y_cam, z_cam=z_cam)
+
                 # We move the camera further from the root system:
-                x_camera = x_cam + x_cam * step_back_coefficient * (step - initial_step_number)
-                z_camera = z_cam + z_cam * step_back_coefficient * (step - initial_step_number)
+                x_camera = x_cam * (1 + step_back_coefficient)
+                z_camera = z_cam * (1 + step_back_coefficient)
 
             # We finally display the MTG on PlantGL and possibly record it:
             if plotting:

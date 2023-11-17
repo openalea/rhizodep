@@ -2915,6 +2915,8 @@ def reinitializing_growth_variables(g):
         n.actual_elongation = 0.
         n.actual_elongation_rate = 0.
 
+        n.hexose_consumption_rate_by_fungus = 0.
+
         # We make sure that the initial values of length, radius and struct_mass are correctly initialized:
         n.initial_length = n.length
         n.initial_radius = n.radius
@@ -4429,13 +4431,21 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
         + n.hexose_immobilization_as_reserve_rate - n.hexose_mobilization_from_reserve_rate \
         - n.Deficit_hexose_reserve_rate
 
+    # Before calculating the evolution of the amount of hexose root, we make sure that all the terms in the equation are
+    # known. In particular, we set the consumption rate by mycorrhizal fungus to 0 in case the interaction with the
+    # fungus has not been considered so far.
+    try:
+        n.hexose_consumption_rate_by_fungus += 0.
+    except:
+        n.hexose_consumption_rate_by_fungus = 0.
+
     # We calculate the derivative of the amount of hexose in the mobile pool of the root:
     y_derivatives['hexose_root'] = \
         - n.hexose_exudation_rate + n.hexose_uptake_from_soil_rate \
         - n.mucilage_secretion_rate \
         - n.cells_release_rate \
         - n.resp_maintenance_rate / 6. \
-        - n.hexose_consumption_by_growth_rate \
+        - n.hexose_consumption_by_growth_rate - n.hexose_consumption_rate_by_fungus \
         + n.hexose_production_from_phloem_rate - 2. * n.sucrose_loading_in_phloem_rate \
         + n.hexose_mobilization_from_reserve_rate - n.hexose_immobilization_as_reserve_rate \
         - n.Deficit_hexose_root_rate

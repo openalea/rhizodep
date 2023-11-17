@@ -677,7 +677,14 @@ hyphal_struct_mass_C_content = 0.44 / 12.01
 
 C_hexose_fungus_min = 1e-6
 
-fungus_permeability = phloem_permeability
+initial_fungus_infection_risk = 1e-1
+initial_fungus_infection_risk = 1
+initial_infected_surface_fraction = 1e-4
+
+fungus_permeability = 1e-5
 fungus_yield_growth = 0.8
 
 min_distance_for_fungus_infection = 2 * segment_length
+min_distance_for_fungus_infection = segment_length * 1.1
+
+fungus_surface_to_mass_ratio = 0.1 # m2 per gram of structural mass
