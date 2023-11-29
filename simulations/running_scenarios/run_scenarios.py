@@ -17,10 +17,10 @@ import shutil
 import time
 import pickle
 
-import rhizodep.src.rhizodep.model as model
-import rhizodep.src.rhizodep.simulation as simulation
-import rhizodep.src.rhizodep.parameters as param
-import rhizodep.src.rhizodep.tools as tools
+import rhizodep.model as model
+import rhizodep.simulation as simulation
+import rhizodep.parameters as param
+import rhizodep.tools as tools
 
 ########################################################################################################################
 
@@ -370,6 +370,7 @@ def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx", input_path='inp
 if __name__ == '__main__':
 # (Note: this condition avoids launching automatically the program when imported in another file)
     working_dir = os.path.dirname(__file__)
+    print(working_dir)
     # # CASE 1 - CALLING ONE SCENARIO ONLY:
     # #####################################
     #

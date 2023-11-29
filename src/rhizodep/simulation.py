@@ -17,9 +17,9 @@ import os
 import time
 
 import openalea.plantgl.all as pgl
-import rhizodep.src.rhizodep.model as model
-import rhizodep.src.rhizodep.tools as tools
-import rhizodep.src.rhizodep.parameters as param
+import rhizodep.model as model
+import rhizodep.tools as tools
+import rhizodep.parameters as param
 
 import pickle
 

@@ -2,9 +2,9 @@
 import numpy as np
 import pandas as pd
 import os
-import src.rhizodep.model as model
-import src.rhizodep.simulation as simulation
-import simulations.running_scenarios.run_scenarios as run_scenarios
+import rhizodep.src.rhizodep.model as model
+import rhizodep.src.rhizodep.simulation as simulation
+import rhizodep.simulations.running_scenarios.run_scenarios as run_scenarios
 
 ########################################################################################################################
 # DEFINING INPUT/OUTPUT FOLDERS AND SPECIFIC PARAMETERS FOR THE TEST:
