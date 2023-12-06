@@ -70,11 +70,39 @@ pd.set_option('display.max_columns', 20)
 
 
 class RootCarbonModel:
-    def __int__(self):
-        pass
+    def __init__(self, g, time_step_in_seconds):
+        self.g = g
+        self.time_steps_in_seconds = time_step_in_seconds
 
     # Modification of a process according to soil temperature:
     # --------------------------------------------------------
+
+    def exchanges_and_balance(self):
+
+        # 2d - CARBON EXCHANGE
+        # ====================
+
+        # We now proceed to all the exchanges of C for each root element in each root axis
+        # (NOTE: the supply of sucrose from the shoot is excluded in this calculation):
+        self.C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(
+                soil_temperature_in_Celsius=soil_temperature,
+                using_solver=using_solver,
+                printing_solver_outputs=printing_solver_outputs,
+                printing_warnings=printing_warnings)
+        # NOTE: we also use this function to record specifically the concentration of hexose in the root apex
+        # of the primary root!
+
+        # Supply of sucrose from the shoots to the roots and spreading into the whole phloem:
+        self.shoot_sucrose_supply_and_spreading(sucrose_input_rate=sucrose_input_rate,
+                                                 time_step_in_seconds=time_step_in_seconds,
+                                                 printing_warnings=printing_warnings)
+        # WARNING: The function "shoot_sucrose_supply_and_spreading" must be called AFTER the function "balance",
+        # otherwise the deficit in sucrose may be counted twice!!!
+        # TODO: check this affirmation about the position of shoot_sucrose_supply_and_spreading
+
+        # # OPTIONAL: checking of possible anomalies in the root system:
+        # model.control_of_anomalies(g)
+
     def temperature_modification(self, temperature_in_Celsius, process_at_T_ref=1., T_ref=0., A=-0.05, B=3., C=1.):
         """
         This function calculates how the value of a process should be modified according to soil temperature (in degrees Celsius).
@@ -154,7 +182,7 @@ class RootCarbonModel:
 
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+        temperature_time_adjustment = self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                process_at_T_ref=1,
                                                                T_ref=param.root_growth_T_ref,
                                                                A=param.root_growth_A,
@@ -192,10 +220,10 @@ class RootCarbonModel:
 
             # We calculate the initial volume of the element:
             initial_volume = \
-            volume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.initial_length)["volume"]
+            TODOvolume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.initial_length)["volume"]
             # We calculate the potential volume of the element based on the potential radius and potential length:
             potential_volume = \
-            volume_and_external_surface_from_radius_and_length(g, n, n.potential_radius, n.potential_length)["volume"]
+            TODOvolume_and_external_surface_from_radius_and_length(g, n, n.potential_radius, n.potential_length)["volume"]
             # We calculate the number of moles of hexose required for growth, including the respiration cost according to
             # the yield growth included in the model of Thornley and Cannell (2000), where root_tissue_density is the dry structural
             # weight per volume (g m-3) and struct_mass_C_content is the amount of C per gram of dry structural mass (mol_C g-1):
@@ -302,7 +330,7 @@ class RootCarbonModel:
                     / (param.root_tissue_density * param.struct_mass_C_content)
                 # We calculate the maximal possible volume based on the volume of the new cylinder after elongation
                 # and the increase in volume that could be achieved by consuming all the remaining hexose:
-                volume_max = volume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.length)[
+                volume_max = TODOvolume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.length)[
                                  "volume"] \
                              + possible_radial_increase_in_volume
                 # We then calculate the corresponding new possible radius corresponding to this maximum volume:
@@ -327,8 +355,8 @@ class RootCarbonModel:
                     # Otherwise, radial growth is done up to the full potential and the remaining hexose is calculated:
                     n.radius = n.potential_radius
                     net_increase_in_volume = \
-                    volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"] \
-                    - volume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.length)["volume"]
+                    TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"] \
+                    - TODOvolume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.length)["volume"]
                     # net_increase_in_volume = pi * (n.radius ** 2 - n.initial_radius ** 2) * n.length
                     # We then calculate the remaining amount of hexose after thickening:
                     hexose_actual_contribution_to_thickening = \
@@ -369,9 +397,9 @@ class RootCarbonModel:
             # -----------------------------------------------
 
             # The new volume and surfaces of the element is automatically calculated:
-            n.external_surface = volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)[
+            n.external_surface = TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)[
                 "external_surface"]
-            n.volume = volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"]
+            n.volume = TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"]
             # The new dry structural struct_mass of the element is calculated from its new volume:
             n.struct_mass = n.volume * param.root_tissue_density
             n.struct_mass_produced = (n.volume - initial_volume) * param.root_tissue_density
@@ -491,7 +519,7 @@ class RootCarbonModel:
 
         # We calculate the remaining amount of sucrose in the root system,
         # based on the current sucrose concentration and structural mass of each root element:
-        total_sucrose_root, total_living_struct_mass = total_root_sucrose_and_living_struct_mass(g)
+        total_sucrose_root, total_living_struct_mass = self.total_root_sucrose_and_living_struct_mass(g)
         # Note: The total sucrose is the total amount of sucrose present in the root system, including local deficits
         # but excluding the possible global deficit of the whole root system, which is considered below.
         # The total struct_mass corresponds to the structural mass of the living roots & hairs
@@ -654,7 +682,7 @@ class RootCarbonModel:
                     # print(">>> After adjustement, unloading without permeability is:", max_unloading_rate)
 
                 # We now correct the unloading rate according to soil temperature:
-                temperature_modifier = temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+                temperature_modifier = self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                 process_at_T_ref=1,
                                                                 T_ref=param.phloem_unloading_T_ref,
                                                                 A=param.phloem_unloading_A,
@@ -692,7 +720,7 @@ class RootCarbonModel:
 
             # We correct loading according to soil temperature:
             max_loading_rate = max_loading_rate \
-                               * temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+                               * self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                           process_at_T_ref=1,
                                                           T_ref=param.max_loading_rate_T_ref,
                                                           A=param.max_loading_rate_A,
@@ -779,7 +807,7 @@ class RootCarbonModel:
         if C_hexose_root < 0. or C_hexose_reserve < 0.:
             if printing_warnings:
                 print("WARNING: No exchange with reserve occurred for node", n.index(),
-                      "because root sucrose concentration was", C_sucrose_root,
+                      "because root sucrose concentration was", self.C_sucrose_root,
                       "mol/g, root hexose concentration was", C_hexose_root,
                       "mol/g, and hexose reserve concentration was", C_hexose_reserve)
             possible_exchange_with_reserve = False
@@ -797,7 +825,7 @@ class RootCarbonModel:
 
             # We correct maximum rates according to soil temperature:
             corrected_max_mobilization_rate = param.max_mobilization_rate \
-                                              * temperature_modification(
+                                              * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
                 T_ref=param.max_mobilization_rate_T_ref,
@@ -805,7 +833,7 @@ class RootCarbonModel:
                 B=param.max_mobilization_rate_B,
                 C=param.max_mobilization_rate_C)
             corrected_max_immobilization_rate = param.max_immobilization_rate \
-                                                * temperature_modification(
+                                                * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
                 T_ref=param.max_immobilization_rate_T_ref,
@@ -903,7 +931,7 @@ class RootCarbonModel:
         if possible_maintenance:
             # We correct the maximal respiration rate according to soil temperature:
             corrected_resp_maintenance_max = param.resp_maintenance_max \
-                                             * temperature_modification(
+                                             * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
                 T_ref=param.resp_maintenance_max_T_ref,
@@ -1002,7 +1030,7 @@ class RootCarbonModel:
             # ---------------------------------------------
             # We correct the maximal permeability according to soil temperature:
             corrected_P_max_apex = param.Pmax_apex \
-                                   * temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+                                   * self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                               process_at_T_ref=1,
                                                               T_ref=param.permeability_coeff_T_ref,
                                                               A=param.permeability_coeff_A,
@@ -1109,7 +1137,7 @@ class RootCarbonModel:
             # ----------------------------------
             # We correct the maximal uptake rate according to soil temperature:
             corrected_uptake_rate_max = param.uptake_rate_max \
-                                        * temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+                                        * self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                    process_at_T_ref=1,
                                                                    T_ref=param.uptake_rate_max_T_ref,
                                                                    A=param.uptake_rate_max_A,
@@ -1195,7 +1223,7 @@ class RootCarbonModel:
             # (This could to a bell-shape where the maximum is obtained at 27 degree Celsius,
             # as suggested by Morré et al. (1967) for maize mucilage secretion):
             corrected_secretion_rate_max = param.secretion_rate_max \
-                                           * temperature_modification(
+                                           * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
                 T_ref=param.secretion_rate_max_T_ref,
@@ -1322,7 +1350,7 @@ class RootCarbonModel:
 
             # We correct the release rate according to soil temperature:
             corrected_cells_surfacic_release = cells_surfacic_release \
-                                               * temperature_modification(
+                                               * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
                 T_ref=param.surfacic_cells_release_rate_T_ref,
@@ -1370,23 +1398,23 @@ class RootCarbonModel:
         # TODO FOR TRISTAN: Consider adding here N-related rates (or building a similar function to be possibly used in a solver).
 
         # Unloading of sucrose from phloem and conversion of sucrose into hexose, or reloading of sucrose:
-        exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius, printing_warnings)
+        self.exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius, printing_warnings)
         # Net immobilization of hexose into the reserve pool:
-        exchange_with_reserve_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        self.exchange_with_reserve_rate(n, soil_temperature_in_Celsius, printing_warnings)
         # Maintenance respiration:
-        maintenance_respiration_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        self.maintenance_respiration_rate(n, soil_temperature_in_Celsius, printing_warnings)
         # Transfer of hexose from the root to the soil:
-        root_sugars_exudation_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        self.root_sugars_exudation_rate(n, soil_temperature_in_Celsius, printing_warnings)
         # Transfer of hexose from the soil to the root:
-        root_hexose_uptake_from_soil_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        self.root_hexose_uptake_from_soil_rate(n, soil_temperature_in_Celsius, printing_warnings)
         # Consumption of hexose in the soil:
-        hexose_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        soilhexose_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
         # Secretion of mucilage into the soil:
-        mucilage_secretion_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        soilmucilage_secretion_rate(n, soil_temperature_in_Celsius, printing_warnings)
         # Consumption of mucilage in the soil:
-        mucilage_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        soilmucilage_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
         # Release of root cells into the soil:
-        cells_release_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        self.cells_release_rate(n, soil_temperature_in_Celsius, printing_warnings)
         # Consumption of root cells in the soil:
         cells_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
 
@@ -1769,13 +1797,13 @@ class RootCarbonModel:
             #  Calculation of all C-related fluxes:
             # -------------------------------------
             # We call an external function that computes all the fluxes for given element n, based on the new concentrations:
-            calculating_all_growth_independent_fluxes(self.g, self.n, self.soil_temperature_in_Celsius,
+            self.calculating_all_growth_independent_fluxes(self.g, self.n, self.soil_temperature_in_Celsius,
                                                       self.printing_warnings)
 
             # Calculation of time derivatives:
             # ---------------------------------
             # We get a list of all derivatives of the amount in each pool, i.e. their rate of evolution over time (dQ/dt):
-            time_derivatives = calculating_time_derivatives_of_the_amount_in_each_pool(self.n)
+            time_derivatives = self.calculating_time_derivatives_of_the_amount_in_each_pool(self.n)
             # # And we record the new time derivatives. We cover all the variables in the differential equations system,
             # and assign the corresponding derivative over time:
             for variable_name in self.variables_in_the_system:
@@ -1979,16 +2007,16 @@ class RootCarbonModel:
                 # ---------------------------------------------------
 
                 # We calculate all C-related fluxes (independent of the time step):
-                calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius, printing_warnings)
+                self.calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius, printing_warnings)
 
                 # We then calculate the quantities that correspond to these fluxes (dependent of the time step):
-                calculating_amounts_from_fluxes(n, time_step_in_seconds)
+                self.calculating_amounts_from_fluxes(n, time_step_in_seconds)
 
                 # Calculating the new variations of the quantities in each pool over time:
                 # -------------------------------------------------------------------------
                 # We call a dictionary containing the time derivative (dQ/dt) of the amount present in each pool,
                 # based on the C balance:
-                y_time_derivatives = calculating_time_derivatives_of_the_amount_in_each_pool(n)
+                y_time_derivatives = self.calculating_time_derivatives_of_the_amount_in_each_pool(n)
 
                 # Calculating new concentrations based on C balance:
                 # ---------------------------------------------------
@@ -2041,7 +2069,7 @@ class RootCarbonModel:
                     print("Considering for the solver the element", n.index(), "of length", n.length, "...")
 
                 # We use the class corresponding to the system of differential equations and its resolution:
-                System = Differential_Equation_System(g, n,
+                System = self.Differential_Equation_System(g, n,
                                                       time_step_in_seconds,
                                                       soil_temperature_in_Celsius,
                                                       printing_warnings=printing_warnings,
@@ -2067,7 +2095,7 @@ class RootCarbonModel:
                 # We call again a dictionary containing the time derivative (dQ/dt) of the amount present in each pool, and
                 # in particular sucrose, based on the balance between different rates (NOTE: the transfer of sucrose
                 # between elements through the phloem is not considered at this stage!):
-                y_time_derivatives = calculating_time_derivatives_of_the_amount_in_each_pool(n)
+                y_time_derivatives = self.calculating_time_derivatives_of_the_amount_in_each_pool(n)
                 estimated_sucrose_root_derivative = y_time_derivatives['sucrose_root'] * time_step_in_seconds
                 # Eventually, the new concentration of sucrose in the root element is calculated:
                 n.C_sucrose_root = (initial_sucrose_root_amount + estimated_sucrose_root_derivative) \
@@ -2080,11 +2108,11 @@ class RootCarbonModel:
             # --------------------------------------
             # We make sure that new concentration in each pool is not negative - otherwise we set it to 0 and record the
             # corresponding deficit to balance the next calculation of the concentration:
-            adjusting_pools_and_deficits(n, time_step_in_seconds, printing_warnings)
+            self.adjusting_pools_and_deficits(n, time_step_in_seconds, printing_warnings)
 
             #  Calculation of additional variables:
             # -------------------------------------
-            calculating_extra_variables(n, time_step_in_seconds)
+            self.calculating_extra_variables(n, time_step_in_seconds)
 
             # SPECIAL CASE: we record the property of the apex of the primary root
             # ---------------------------------------------------------------------
@@ -2097,9 +2125,10 @@ class RootCarbonModel:
         return tip_C_hexose_root
 
 
-class RootRadialTopology:
-    def __init__(self):
-        pass
+class RootAnatomy:
+    def __init__(self, g, time_step_in_seconds):
+        self.g = g
+        self.time_steps_in_seconds = time_step_in_seconds
 
     def volume_and_external_surface_from_radius_and_length(self, g, element, radius, length):
         """
@@ -2526,10 +2555,433 @@ class RootRadialTopology:
     # Defining the distance of a vertex from the tip for the whole root system:
     # -------------------------------------------------------------------------
 
+    def update_local_anatomy(self):
+        # We update the surfaces and the volume for each root element in each root axis:
+        self.update_surfaces_and_volumes()
+
+        # 2c - SPECIFIC ROOT HAIR DYNAMICS
+        # ================================
+
+        # We modifiy root hairs characteristics according to their specific dynamics:
+        self.root_hairs_dynamics(soil_temperature_in_Celsius=soil_temperature,
+                                  printing_warnings=printing_warnings)
+
 
 class RootGrowthModel:
-    def __init__(self):
-        pass
+    def __init__(self, time_step_in_seconds):
+        self.time_step_in_seconds = time_step_in_seconds
+
+    # Initialization of the root system:
+    # -----------------------------------
+    def initiate_mtg(self, random=True,
+                     ArchiSimple=False,
+                     initial_segment_length=1e-3,
+                     initial_apex_length=0.,
+                     initial_C_sucrose_root=0.,
+                     initial_C_hexose_root=0.,
+                     input_file_path="C:/Users/frees/rhizodep/src/rhizodep/",
+                     forcing_seminal_roots_events=True,
+                     seminal_roots_events_file="seminal_roots_inputs.csv",
+                     forcing_adventitious_roots_events=True,
+                     adventitious_roots_events_file="adventitious_roots_inputs.csv"):
+
+        """
+        This functions generates a root MTG from nothing, containing only one segment of a specific length,
+        terminated by an apex (preferably of length 0).
+        :param random:
+        :param initial_segment_length:
+        :param initial_C_sucrose_root:
+        :param initial_C_hexose_root:
+        :return:
+        """
+
+        # TODO FOR TRISTAN: Add all initial N-related variables that need to be explicited before N fluxes computation.
+
+        # We create a new MTG called g:
+        g = MTG()
+
+        # Properties shared by the whole root system (stored in the first element at the base of the root system):
+        # --------------------------------------------------------------------------------------------------------
+        # We initiate the global variable that corresponds to a possible general deficit in sucrose of the whole root system:
+        g.add_property('global_sucrose_deficit')
+        g.property('global_sucrose_deficit')[g.root] = 0.
+
+        # We first add one initial element:
+        # ---------------------------------
+        id_segment = g.add_component(g.root, label='Segment')
+        base_segment = g.node(id_segment)
+
+        # Characteristics:
+        # -----------------
+        base_segment.type = "Base_of_the_root_system"
+        # By definition, we set the order of the primary root to 1:
+        base_segment.root_order = 1
+
+        # Authorizations and C requirements:
+        # -----------------------------------
+        base_segment.lateral_root_emergence_possibility = 'Impossible'
+        base_segment.emergence_cost = 0.
+
+        # Geometry and topology:
+        # -----------------------
+
+        base_radius = param.D_ini / 2.
+
+        base_segment.angle_down = 0
+        base_segment.angle_roll = 0
+        base_segment.length = initial_segment_length
+        base_segment.radius = base_radius
+        base_segment.original_radius = base_radius
+        base_segment.initial_length = initial_segment_length
+        base_segment.initial_radius = base_radius
+
+        base_segment.root_hair_radius = param.root_hair_radius
+        base_segment.root_hair_length = 0.
+        base_segment.actual_length_with_hairs = 0.
+        base_segment.living_root_hairs_number = 0.
+        base_segment.dead_root_hairs_number = 0.
+        base_segment.total_root_hairs_number = 0.
+
+        base_segment.actual_time_since_root_hairs_emergence_started = 0.
+        base_segment.thermal_time_since_root_hairs_emergence_started = 0.
+        base_segment.actual_time_since_root_hairs_emergence_stopped = 0.
+        base_segment.thermal_time_since_root_hairs_emergence_stopped = 0.
+        base_segment.all_root_hairs_formed = False
+        base_segment.root_hairs_lifespan = param.root_hairs_lifespan
+        base_segment.root_hairs_external_surface = 0.
+        base_segment.root_hairs_volume = 0.
+        base_segment.living_root_hairs_external_surface = 0.
+        base_segment.initial_living_root_hairs_external_surface = 0.
+        base_segment.root_hairs_struct_mass = 0.
+        base_segment.root_hairs_struct_mass_produced = 0.
+        base_segment.living_root_hairs_struct_mass = 0.
+        # TODO add external_surface and volume to parameters to avoid issues,
+        #  then make sure it is updated by RootAnatomy before first C-N flows
+        base_segment.external_surface = param.external_surface
+        base_segment.initial_external_surface = base_segment.external_surface
+        base_segment.volume = param.volume
+
+        base_segment.distance_from_tip = base_segment.length
+        base_segment.former_distance_from_tip = base_segment.length
+        base_segment.dist_to_ramif = 0.
+        base_segment.actual_elongation = base_segment.length
+        base_segment.actual_elongation_rate = 0
+
+        # TODO switch to another init Quantities and concentrations:
+        # -------------------------------
+        base_segment.struct_mass = base_segment.volume * param.root_tissue_density
+        base_segment.initial_struct_mass = base_segment.struct_mass
+        base_segment.initial_living_root_hairs_struct_mass = base_segment.living_root_hairs_struct_mass
+        # We define the initial concentrations:
+        base_segment.C_sucrose_root = initial_C_sucrose_root
+        base_segment.C_hexose_root = initial_C_hexose_root
+        base_segment.C_hexose_reserve = 0.
+        base_segment.C_hexose_soil = 0.
+        base_segment.Cs_mucilage_soil = 0.
+        base_segment.Cs_cells_soil = 0.
+
+        # We calculate the possible deficits:
+        base_segment.Deficit_sucrose_root = 0.
+        base_segment.Deficit_hexose_root = 0.
+        base_segment.Deficit_hexose_reserve = 0.
+        base_segment.Deficit_hexose_soil = 0.
+        base_segment.Deficit_mucilage_soil = 0.
+        base_segment.Deficit_cells_soil = 0.
+        base_segment.Deficit_sucrose_root_rate = 0.
+        base_segment.Deficit_hexose_root_rate = 0.
+        base_segment.Deficit_hexose_reserve_rate = 0.
+        base_segment.Deficit_hexose_soil_rate = 0.
+        base_segment.Deficit_mucilage_soil_rate = 0.
+        base_segment.Deficit_cells_soil_rate = 0.
+
+        # Fluxes:
+        # --------
+        base_segment.resp_maintenance = 0.
+        base_segment.resp_growth = 0.
+        base_segment.hexose_growth_demand = 0.
+        base_segment.hexose_possibly_required_for_elongation = 0.
+        base_segment.hexose_consumption_by_growth = 0.
+        base_segment.hexose_production_from_phloem = 0.
+        base_segment.sucrose_loading_in_phloem = 0.
+        base_segment.hexose_mobilization_from_reserve = 0.
+        base_segment.hexose_immobilization_as_reserve = 0.
+        base_segment.hexose_exudation = 0.
+        base_segment.hexose_uptake_from_soil = 0.
+        base_segment.phloem_hexose_exudation = 0.
+        base_segment.phloem_hexose_uptake_from_soil = 0.
+        base_segment.mucilage_secretion = 0.
+        base_segment.cells_release = 0.
+        base_segment.total_net_rhizodeposition = 0.
+        base_segment.hexose_degradation = 0.
+        base_segment.mucilage_degradation = 0.
+        base_segment.cells_degradation = 0.
+        base_segment.specific_net_exudation = 0.
+
+        # Rates:
+        # -------
+        base_segment.resp_maintenance_rate = 0.
+        base_segment.resp_growth_rate = 0.
+        base_segment.hexose_growth_demand_rate = 0.
+        base_segment.hexose_consumption_by_growth_rate = 0.
+        base_segment.hexose_production_from_phloem_rate = 0.
+        base_segment.sucrose_loading_in_phloem_rate = 0.
+        base_segment.hexose_mobilization_from_reserve_rate = 0.
+        base_segment.hexose_immobilization_as_reserve_rate = 0.
+        base_segment.hexose_exudation_rate = 0.
+        base_segment.hexose_uptake_from_soil_rate = 0.
+        base_segment.phloem_hexose_exudation_rate = 0.
+        base_segment.phloem_hexose_uptake_from_soil_rate = 0.
+        base_segment.mucilage_secretion_rate = 0.
+        base_segment.cells_release_rate = 0.
+        base_segment.hexose_degradation_rate = 0.
+        base_segment.mucilage_degradation_rate = 0.
+        base_segment.cells_degradation_rate = 0.
+
+        # Time indications:
+        # ------------------
+        # base_segment.growth_duration = param.GDs * (2. * base_radius) ** 2 * param.main_roots_growth_extender #WATCH OUT!!! we artificially multiply growth duration for seminal and adventious roots!!!!!!!!!!!!!!!!!!!!!!
+        base_segment.growth_duration = self.calculate_growth_duration(radius=base_radius, index=id_segment,
+                                                                                   root_order=1,
+                                                                                   ArchiSimple=ArchiSimple)
+        base_segment.life_duration = param.LDs * (2. * base_radius) * param.root_tissue_density
+        base_segment.actual_time_since_primordium_formation = 0.
+        base_segment.actual_time_since_emergence = 0.
+        base_segment.actual_time_since_cells_formation = 0.
+        base_segment.actual_time_since_growth_stopped = 0.
+        base_segment.actual_time_since_death = 0.
+        base_segment.thermal_time_since_primordium_formation = 0.
+        base_segment.thermal_time_since_emergence = 0.
+        base_segment.thermal_time_since_cells_formation = 0.
+        base_segment.thermal_potential_time_since_emergence = 0.
+        base_segment.thermal_time_since_growth_stopped = 0.
+        base_segment.thermal_time_since_death = 0.
+        # TODO up to here
+
+        segment = base_segment
+
+        # ADDING THE PRIMORDIA OF ALL POSSIBLE SEMINAL ROOTS:
+        # ----------------------------------------------------
+        # If there is more than one seminal root (i.e. roots already formed in the seed):
+        if param.n_seminal_roots > 1 or not forcing_seminal_roots_events:
+
+            # We read additional parameters that are stored in a CSV file, with one column containing the delay for each
+            # emergence event, and the second column containing the number of seminal roots that have to emerge at each event:
+            # We try to access an already-existing CSV file:
+            seminal_inputs_path = os.path.join(input_file_path, seminal_roots_events_file)
+            # If the file doesn't exist, we construct a new table using the specified parameters:
+            if not os.path.exists(seminal_inputs_path) or forcing_seminal_roots_events:
+                print("NOTE: no CSV file describing the apparitions of seminal roots can be used!")
+                print("=> We therefore built a table according to the parameters 'n_seminal_roots' and 'ER'.")
+                print("")
+                # We initialize an empty data frame:
+                seminal_inputs_file = pd.DataFrame()
+                # We define a list that will contain the successive thermal times corresponding to root emergence:
+                list_time = [x * 1 / param.ER for x in range(1, param.n_seminal_roots)]
+                # We define another list containing only "1" as the number of roots to be emerged for each event:
+                list_number = np.ones(param.n_seminal_roots - 1, dtype='int8')
+                # We assigned the two lists to the dataframe, and record it:
+                seminal_inputs_file['emergence_delay_in_thermal_time'] = list_time
+                seminal_inputs_file['number_of_seminal_roots_per_event'] = list_number
+                # seminal_inputs_file.to_csv(os.path.join(input_file_path, seminal_roots_events_file),
+                #                                 na_rep='NA', index=False, header=True)
+            else:
+                seminal_inputs_file = pd.read_csv(seminal_inputs_path)
+
+            # For each event of seminal roots emergence:
+            for i in range(0, len(seminal_inputs_file.emergence_delay_in_thermal_time)):
+                # For each seminal root that can emerge at this emergence event:
+                for j in range(0, seminal_inputs_file.number_of_seminal_roots_per_event[i]):
+
+                    # We make sure that the seminal roots will have different random insertion angles:
+                    np.random.seed(param.random_choice + i * j)
+
+                    # Then we form one supporting segment of length 0 + one primordium of seminal root.
+                    # We add one new segment without any length on the same axis as the base:
+                    segment = self.ADDING_A_CHILD(mother_element=segment, edge_type='<', label='Segment',
+                                                               type='Support_for_seminal_root',
+                                                               root_order=1,
+                                                               angle_down=0,
+                                                               angle_roll=abs(np.random.normal(180, 180)),
+                                                               length=0.,
+                                                               radius=base_radius,
+                                                               identical_properties=False,
+                                                               nil_properties=True)
+
+                    # We define the radius of a seminal root according to the parameter Di:
+                    if random:
+                        radius_seminal = abs(np.random.normal(param.D_ini / 2. * param.D_sem_to_D_ini_ratio,
+                                                              param.D_ini / 2. * param.D_sem_to_D_ini_ratio * param.CVDD))
+
+                    # And we add one new primordium of seminal root on the previously defined segment:
+                    apex_seminal = self.ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Apex',
+                                                                    type='Seminal_root_before_emergence',
+                                                                    root_order=1,
+                                                                    angle_down=abs(np.random.normal(60, 10)),
+                                                                    angle_roll=5,
+                                                                    length=0.,
+                                                                    radius=radius_seminal,
+                                                                    identical_properties=False,
+                                                                    nil_properties=True)
+                    apex_seminal.original_radius = radius_seminal
+                    apex_seminal.initial_radius = radius_seminal
+                    # apex_seminal.growth_duration = param.GDs * (2. * radius_seminal) ** 2 * param.main_roots_growth_extender
+                    apex_seminal.growth_duration = self.calculate_growth_duration(radius=radius_seminal,
+                                                                                               index=apex_seminal.index(),
+                                                                                               root_order=1,
+                                                                                               ArchiSimple=ArchiSimple)
+                    apex_seminal.life_duration = param.LDs * (2. * radius_seminal) * param.root_tissue_density
+
+                    # We defined the delay of emergence for the new primordium:
+                    apex_seminal.emergence_delay_in_thermal_time = seminal_inputs_file.emergence_delay_in_thermal_time[
+                        i]
+
+        # ADDING THE PRIMORDIA OF ALL POSSIBLE ADVENTIOUS ROOTS:
+        # ------------------------------------------------------
+        # If there should be more than one main root (i.e. adventitious roots formed at the basis):
+        if param.n_adventitious_roots > 0 or not forcing_adventitious_roots_events:
+
+            # We read additional parameters from a table, with one column containing the delay for each emergence event,
+            # and the second column containing the number of adventitious roots that have to emerge at each event.
+            # We try to access an already-existing CSV file:
+            adventitious_inputs_path = os.path.join(input_file_path, adventitious_roots_events_file)
+            # If the file doesn't exist, we construct a new table using the specified parameters:
+            if not os.path.exists(adventitious_inputs_path) or forcing_adventitious_roots_events:
+                print("NOTE: no CSV file describing the apparitions of adventitious roots can be used!")
+                print("=> We therefore built a table according to the parameters 'n_adventitious_roots' and 'ER'.")
+                print("")
+                # We initialize an empty data frame:
+                adventitious_inputs_file = pd.DataFrame()
+                # We define a list that will contain the successive thermal times corresponding to root emergence:
+                list_time = [param.starting_time_for_adventitious_roots_emergence + x * 1 / param.ER
+                             for x in range(0, param.n_adventitious_roots)]
+                # We define another list containing only "1" as the number of roots to be emerged for each event:
+                list_number = np.ones(param.n_adventitious_roots, dtype='int8')
+                # We assigned the two lists to the dataframe, and record it:
+                adventitious_inputs_file['emergence_delay_in_thermal_time'] = list_time
+                adventitious_inputs_file['number_of_adventitious_roots_per_event'] = list_number
+                # adventitious_inputs_file.to_csv(os.path.join(input_file_path, adventitious_roots_events_file),
+                #                                 na_rep='NA', index=False, header=True)
+            else:
+                adventitious_inputs_file = pd.read_csv(adventitious_inputs_path)
+
+            # For each event of adventitious roots emergence:
+            for i in range(0, len(adventitious_inputs_file.emergence_delay_in_thermal_time)):
+                # For each adventitious root that can emerge at this emergence event:
+                for j in range(0, int(adventitious_inputs_file.number_of_adventitious_roots_per_event[i])):
+
+                    # We make sure that the adventitious roots will have different random insertion angles:
+                    np.random.seed(param.random_choice + i * j * 3)
+
+                    # Then we form one supporting segment of length 0 + one primordium of seminal root.
+                    # We add one new segment without any length on the same axis as the base:
+                    segment = self.ADDING_A_CHILD(mother_element=segment, edge_type='<', label='Segment',
+                                                               type='Support_for_adventitious_root',
+                                                               root_order=1,
+                                                               angle_down=0,
+                                                               angle_roll=abs(np.random.normal(0, 180)),
+                                                               length=0.,
+                                                               radius=base_radius,
+                                                               identical_properties=False,
+                                                               nil_properties=True)
+
+                    # We define the radius of a adventitious root according to the parameter Di:
+                    if random:
+                        radius_adventitious = abs(np.random.normal(param.D_ini / 2. * param.D_adv_to_D_ini_ratio,
+                                                                   param.D_ini / 2. * param.D_adv_to_D_ini_ratio *
+                                                                   param.CVDD))
+
+                    # And we add one new primordium of adventitious root on the previously defined segment:
+                    apex_adventitious = self.ADDING_A_CHILD(mother_element=segment, edge_type='+',
+                                                                         label='Apex',
+                                                                         type='Adventitious_root_before_emergence',
+                                                                         root_order=1,
+                                                                         angle_down=abs(np.random.normal(60, 10)),
+                                                                         angle_roll=5,
+                                                                         length=0.,
+                                                                         radius=radius_adventitious,
+                                                                         identical_properties=False,
+                                                                         nil_properties=True)
+                    apex_adventitious.original_radius = radius_adventitious
+                    apex_adventitious.initial_radius = radius_adventitious
+                    # apex_adventitious.growth_duration = param.GDs * (2. * radius_adventitious) ** 2 * param.main_roots_growth_extender
+                    apex_adventitious.growth_duration = self.calculate_growth_duration(
+                        radius=radius_adventitious,
+                        index=apex_adventitious.index(),
+                        root_order=1,
+                        ArchiSimple=ArchiSimple)
+                    apex_adventitious.life_duration = param.LDs * (2. * radius_adventitious) * param.root_tissue_density
+
+                    # We defined the delay of emergence for the new primordium:
+                    apex_adventitious.emergence_delay_in_thermal_time \
+                        = adventitious_inputs_file.emergence_delay_in_thermal_time[i]
+
+        # FINAL APEX CONFIGURATION AT THE END OF THE MAIN ROOT:
+        # ------------------------------------------------------
+        apex = self.ADDING_A_CHILD(mother_element=segment, edge_type='<', label='Apex',
+                                                type='Normal_root_after_emergence',
+                                                root_order=1,
+                                                angle_down=0,
+                                                angle_roll=0,
+                                                length=initial_apex_length,
+                                                radius=base_radius,
+                                                identical_properties=False,
+                                                nil_properties=True)
+        apex.original_radius = apex.radius
+        apex.initial_radius = apex.radius
+        # apex.growth_duration = param.GDs * (2. * base_radius) ** 2 * param.main_roots_growth_extender
+        apex.growth_duration = self.calculate_growth_duration(radius=base_radius,
+                                                                           index=apex.index(),
+                                                                           root_order=1,
+                                                                           ArchiSimple=ArchiSimple)
+        apex.life_duration = param.LDs * (2. * base_radius) * param.root_tissue_density
+
+        if initial_apex_length <= 0.:
+            apex.C_sucrose_root = 0.
+            apex.C_hexose_root = 0.
+        else:
+            apex.C_sucrose_root = initial_C_sucrose_root
+            apex.C_hexose_root = initial_C_hexose_root
+        apex.C_hexose_soil = 0.
+        apex.Cs_mucilage_soil = 0.
+        apex.Cs_cells_soil = 0.
+
+        apex.volume = param.volume
+        apex.struct_mass = apex.volume * param.root_tissue_density
+        apex.initial_struct_mass = apex.struct_mass
+        apex.initial_living_root_hairs_struct_mass = apex.living_root_hairs_struct_mass
+        apex.initial_external_surface = apex.external_surface
+        apex.initial_living_root_hairs_external_surface = apex.living_root_hairs_external_surface
+
+        self.g = g
+        return self.g
+
+    def time_step_growth(self):
+        # We reset to 0 all growth-associated C costs and initialize the initial dimensions or masses:
+        self.reinitializing_growth_variables()
+
+        # We calculate the potential growth of the root system without consideration of the amount of available hexose:
+        self.potential_growth(radial_growth=radial_growth,
+                               soil_temperature_in_Celsius=soil_temperature,
+                               ArchiSimple=False)
+
+        # We calculate the actual growth based on the amount of hexose remaining in the roots, and we record
+        # the corresponding consumption of hexose in the root:
+        self.actual_growth_and_corresponding_respiration(soil_temperature_in_Celsius=soil_temperature,
+                                                          printing_warnings=printing_warnings)
+
+        # NEW GEOMETRY
+        # =================
+
+        # We proceed to the segmentation of the whole root system
+        # (NOTE: segmentation should always occur AFTER actual growth):
+        self.segmentation_and_primordia_formation(soil_temperature_in_Celsius=soil_temperature,
+                                                   random=random,
+                                                   nodules=nodules,
+                                                   root_order_limitation=root_order_limitation,
+                                                   root_order_treshold=root_order_treshold)
+
+        # We update the distance from tip for each root element in each root axis:
+        self.update_distance_from_tip()
 
     def update_distance_from_tip(self, g):
         """
@@ -2971,7 +3423,7 @@ class RootGrowthModel:
 
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+        temperature_time_adjustment = self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                process_at_T_ref=1,
                                                                T_ref=param.root_growth_T_ref,
                                                                A=param.root_growth_A,
@@ -3214,7 +3666,7 @@ class RootGrowthModel:
 
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+        temperature_time_adjustment = self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                process_at_T_ref=1,
                                                                T_ref=param.root_growth_T_ref,
                                                                A=param.root_growth_A,
@@ -3492,7 +3944,7 @@ class RootGrowthModel:
                               / (param.Km_nodule_thickening + C_hexose_regulating_nodule_growth)
             # We calculate a coefficient that will modify the rate of thickening according to soil temperature
             # assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-            thickening_rate = thickening_rate * temperature_modification(
+            thickening_rate = thickening_rate * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
                 T_ref=param.root_growth_T_ref,
@@ -3528,7 +3980,7 @@ class RootGrowthModel:
 
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+        temperature_time_adjustment = self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                process_at_T_ref=1,
                                                                T_ref=param.root_growth_T_ref,
                                                                A=param.root_growth_A,
@@ -3617,7 +4069,7 @@ class RootGrowthModel:
                                   * segment.C_hexose_root / (param.Km_thickening + segment.C_hexose_root)
                 # We calculate a coefficient that will modify the rate of thickening according to soil temperature
                 # assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-                thickening_rate = thickening_rate * temperature_modification(
+                thickening_rate = thickening_rate * self.temperature_modification(
                     temperature_in_Celsius=soil_temperature_in_Celsius,
                     process_at_T_ref=1,
                     T_ref=param.root_growth_T_ref,
@@ -3761,7 +4213,7 @@ class RootGrowthModel:
         # CALCULATING AN EQUIVALENT OF THERMAL TIME:
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+        temperature_time_adjustment = self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                process_at_T_ref=1,
                                                                T_ref=param.root_growth_T_ref,
                                                                A=param.root_growth_A,
@@ -4293,7 +4745,7 @@ class RootGrowthModel:
 
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+        temperature_time_adjustment = self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                process_at_T_ref=1,
                                                                T_ref=param.root_growth_T_ref,
                                                                A=param.root_growth_A,
@@ -4359,7 +4811,7 @@ class RootGrowthModel:
 
     # Function for reinitializing all growth-related variables at the beginning or end of a time step:
     # -------------------------------------------------------------------------------------------------
-    def reinitializing_growth_variables(self, g):
+    def reinitializing_growth_variables(self):
         """
         This function re-initializes different growth-related variables (e.g. potential growth variables).
         :param g: the root MTG to be considered
@@ -4369,9 +4821,9 @@ class RootGrowthModel:
         # TODO FOR TRISTAN: Consider reinitializing the demand/cost for N in each element here, at the begining of a new time step
 
         # We cover all the vertices in the MTG:
-        for vid in g.vertices_iter(scale=1):
+        for vid in self.g.vertices_iter(scale=1):
             # n represents the vertex:
-            n = g.node(vid)
+            n = self.g.node(vid)
 
             # We set to 0 the growth-related variables:
             n.hexose_consumption_by_growth = 0.
@@ -4434,7 +4886,7 @@ class RootGrowthModel:
             # # when the element becomes a segment.
 
             # We calculate the equivalent of a thermal time for the current time step:
-            temperature_time_adjustment = temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+            temperature_time_adjustment = self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                    process_at_T_ref=1,
                                                                    T_ref=param.root_growth_T_ref,
                                                                    A=param.root_growth_A,
@@ -4621,9 +5073,10 @@ class RootGrowthModel:
         return nodule
 
 
-class RhizoSoilModel:
-    def __init__(self):
-        pass
+class SoilModel:
+    def __init__(self, g, time_step_in_seconds):
+        self.g = g
+        self.time_step_in_seconds = time_step_in_seconds
 
     # MODULE "SOIL TRANSFORMATION"
 
@@ -4632,6 +5085,9 @@ class RhizoSoilModel:
 
     # We create a class containing the system of differential equations to be solved with a solver:
     # ----------------------------------------------------------------------------------------------
+
+    def exchanges_and_balance(self):
+        pass
 
     def hexose_degradation_rate(self, n, soil_temperature_in_Celsius=20, printing_warnings=False):
         """
@@ -4686,7 +5142,7 @@ class RhizoSoilModel:
             # ------------------------------------------------------
 
             # We correct the maximal degradation rate according to soil temperature:
-            corrected_hexose_degradation_rate_max = param.hexose_degradation_rate_max * temperature_modification(
+            corrected_hexose_degradation_rate_max = param.hexose_degradation_rate_max * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
                 T_ref=param.hexose_degradation_rate_max_T_ref,
@@ -4753,7 +5209,7 @@ class RhizoSoilModel:
             # -------------------------------------------------------
 
             # We correct the maximal degradation rate according to soil temperature:
-            corrected_mucilage_degradation_rate_max = param.mucilage_degradation_rate_max * temperature_modification(
+            corrected_mucilage_degradation_rate_max = param.mucilage_degradation_rate_max * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
                 T_ref=param.mucilage_degradation_rate_max_T_ref,
@@ -4818,7 +5274,7 @@ class RhizoSoilModel:
             # CALCULATION OF THE MAXIMAL RATE OF CELLS DEGRADATION:
             # -----------------------------------------------------
             # We correct the maximal degradation rate according to soil temperature:
-            corrected_cells_degradation_rate_max = param.cells_degradation_rate_max * temperature_modification(
+            corrected_cells_degradation_rate_max = param.cells_degradation_rate_max * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
                 T_ref=param.cells_degradation_rate_max_T_ref,
@@ -4964,7 +5420,7 @@ class MTGOutputs:
                 # We make sure that the vertex has a positive length:
                 if n.length > 0.:
                     # We calculate the fraction of the length of this vertex that is included in the current range of z value:
-                    fraction_length = sub_length_z(x1=n.x1, y1=n.y1, z1=-n.z1, x2=n.x2, y2=n.y2, z2=-n.z2,
+                    fraction_length = self.sub_length_z(x1=n.x1, y1=n.y1, z1=-n.z1, x2=n.x2, y2=n.y2, z2=-n.z2,
                                                    z_up=z_start,
                                                    z_down=z_start + z_interval) / n.length
                     included_length[vid] = fraction_length * n.length
@@ -5171,12 +5627,12 @@ class MTGOutputs:
                 # Note: we only include dead root hairs in the necromass balance when the root element itself has died!
                 total_dead_struct_mass += n.struct_mass + n.root_hairs_struct_mass
                 total_dead_length += n.length
-                total_dead_surface += volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)[
+                total_dead_surface += TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)[
                     "external_surface"]
             else:
                 total_length += n.length
                 total_struct_mass += n.struct_mass + n.root_hairs_struct_mass
-                total_surface += volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)[
+                total_surface += TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)[
                     "external_surface"]
                 # Note that living root hairs are NOT included in the total surface of living roots!
                 # Additionaly, we calculate the total surface of living root hairs:
@@ -5327,381 +5783,4 @@ class MTGOutputs:
         return dictionary
 
 
-# Initialization of the root system:
-#-----------------------------------
-def initiate_mtg(random=True,
-                 ArchiSimple=False,
-                 initial_segment_length=1e-3,
-                 initial_apex_length=0.,
-                 initial_C_sucrose_root=0.,
-                 initial_C_hexose_root=0.,
-                 input_file_path="C:/Users/frees/rhizodep/src/rhizodep/",
-                 forcing_seminal_roots_events=True,
-                 seminal_roots_events_file="seminal_roots_inputs.csv",
-                 forcing_adventitious_roots_events=True,
-                 adventitious_roots_events_file="adventitious_roots_inputs.csv"):
-
-    """
-    This functions generates a root MTG from nothing, containing only one segment of a specific length,
-    terminated by an apex (preferably of length 0).
-    :param random:
-    :param initial_segment_length:
-    :param initial_C_sucrose_root:
-    :param initial_C_hexose_root:
-    :return:
-    """
-
-    # TODO FOR TRISTAN: Add all initial N-related variables that need to be explicited before N fluxes computation.
-
-    # We create a new MTG called g:
-    g = MTG()
-
-    # Properties shared by the whole root system (stored in the first element at the base of the root system):
-    # --------------------------------------------------------------------------------------------------------
-    # We initiate the global variable that corresponds to a possible general deficit in sucrose of the whole root system:
-    g.add_property('global_sucrose_deficit')
-    g.property('global_sucrose_deficit')[g.root] = 0.
-
-    # We first add one initial element:
-    # ---------------------------------
-    id_segment = g.add_component(g.root, label='Segment')
-    base_segment = g.node(id_segment)
-
-    # Characteristics:
-    # -----------------
-    base_segment.type = "Base_of_the_root_system"
-    # By definition, we set the order of the primary root to 1:
-    base_segment.root_order = 1
-
-    # Authorizations and C requirements:
-    # -----------------------------------
-    base_segment.lateral_root_emergence_possibility = 'Impossible'
-    base_segment.emergence_cost = 0.
-
-    # Geometry and topology:
-    # -----------------------
-
-    base_radius = param.D_ini / 2.
-
-    base_segment.angle_down = 0
-    base_segment.angle_roll = 0
-    base_segment.length = initial_segment_length
-    base_segment.radius = base_radius
-    base_segment.original_radius = base_radius
-    base_segment.initial_length = initial_segment_length
-    base_segment.initial_radius = base_radius
-
-    base_segment.root_hair_radius = param.root_hair_radius
-    base_segment.root_hair_length = 0.
-    base_segment.actual_length_with_hairs = 0.
-    base_segment.living_root_hairs_number = 0.
-    base_segment.dead_root_hairs_number = 0.
-    base_segment.total_root_hairs_number = 0.
-
-    base_segment.actual_time_since_root_hairs_emergence_started = 0.
-    base_segment.thermal_time_since_root_hairs_emergence_started = 0.
-    base_segment.actual_time_since_root_hairs_emergence_stopped= 0.
-    base_segment.thermal_time_since_root_hairs_emergence_stopped = 0.
-    base_segment.all_root_hairs_formed = False
-    base_segment.root_hairs_lifespan = param.root_hairs_lifespan
-    base_segment.root_hairs_external_surface = 0.
-    base_segment.root_hairs_volume = 0.
-    base_segment.living_root_hairs_external_surface = 0.
-    base_segment.initial_living_root_hairs_external_surface = 0.
-    base_segment.root_hairs_struct_mass = 0.
-    base_segment.root_hairs_struct_mass_produced = 0.
-    base_segment.living_root_hairs_struct_mass = 0.
-
-    surface_dictionary = volume_and_external_surface_from_radius_and_length(g, base_segment, base_segment.radius, base_segment.length)
-    base_segment.external_surface = surface_dictionary["external_surface"]
-    base_segment.initial_external_surface = base_segment.external_surface
-    base_segment.volume = surface_dictionary["volume"]
-
-    base_segment.distance_from_tip = base_segment.length
-    base_segment.former_distance_from_tip = base_segment.length
-    base_segment.dist_to_ramif = 0.
-    base_segment.actual_elongation = base_segment.length
-    base_segment.actual_elongation_rate = 0
-
-    # Quantities and concentrations:
-    # -------------------------------
-    base_segment.struct_mass = base_segment.volume * param.root_tissue_density
-    base_segment.initial_struct_mass = base_segment.struct_mass
-    base_segment.initial_living_root_hairs_struct_mass = base_segment.living_root_hairs_struct_mass
-    # We define the initial concentrations:
-    base_segment.C_sucrose_root = initial_C_sucrose_root
-    base_segment.C_hexose_root = initial_C_hexose_root
-    base_segment.C_hexose_reserve = 0.
-    base_segment.C_hexose_soil = 0.
-    base_segment.Cs_mucilage_soil = 0.
-    base_segment.Cs_cells_soil = 0.
-
-    # We calculate the possible deficits:
-    base_segment.Deficit_sucrose_root = 0.
-    base_segment.Deficit_hexose_root = 0.
-    base_segment.Deficit_hexose_reserve = 0.
-    base_segment.Deficit_hexose_soil = 0.
-    base_segment.Deficit_mucilage_soil = 0.
-    base_segment.Deficit_cells_soil = 0.
-    base_segment.Deficit_sucrose_root_rate = 0.
-    base_segment.Deficit_hexose_root_rate = 0.
-    base_segment.Deficit_hexose_reserve_rate = 0.
-    base_segment.Deficit_hexose_soil_rate = 0.
-    base_segment.Deficit_mucilage_soil_rate = 0.
-    base_segment.Deficit_cells_soil_rate = 0.
-
-    # Fluxes:
-    # --------
-    base_segment.resp_maintenance = 0.
-    base_segment.resp_growth = 0.
-    base_segment.hexose_growth_demand = 0.
-    base_segment.hexose_possibly_required_for_elongation = 0.
-    base_segment.hexose_consumption_by_growth = 0.
-    base_segment.hexose_production_from_phloem = 0.
-    base_segment.sucrose_loading_in_phloem = 0.
-    base_segment.hexose_mobilization_from_reserve = 0.
-    base_segment.hexose_immobilization_as_reserve = 0.
-    base_segment.hexose_exudation = 0.
-    base_segment.hexose_uptake_from_soil = 0.
-    base_segment.phloem_hexose_exudation = 0.
-    base_segment.phloem_hexose_uptake_from_soil = 0.
-    base_segment.mucilage_secretion = 0.
-    base_segment.cells_release = 0.
-    base_segment.total_net_rhizodeposition = 0.
-    base_segment.hexose_degradation = 0.
-    base_segment.mucilage_degradation = 0.
-    base_segment.cells_degradation = 0.
-    base_segment.specific_net_exudation = 0.
-
-    # Rates:
-    #-------
-    base_segment.resp_maintenance_rate = 0.
-    base_segment.resp_growth_rate = 0.
-    base_segment.hexose_growth_demand_rate = 0.
-    base_segment.hexose_consumption_by_growth_rate = 0.
-    base_segment.hexose_production_from_phloem_rate = 0.
-    base_segment.sucrose_loading_in_phloem_rate = 0.
-    base_segment.hexose_mobilization_from_reserve_rate = 0.
-    base_segment.hexose_immobilization_as_reserve_rate = 0.
-    base_segment.hexose_exudation_rate = 0.
-    base_segment.hexose_uptake_from_soil_rate = 0.
-    base_segment.phloem_hexose_exudation_rate = 0.
-    base_segment.phloem_hexose_uptake_from_soil_rate = 0.
-    base_segment.mucilage_secretion_rate = 0.
-    base_segment.cells_release_rate = 0.
-    base_segment.hexose_degradation_rate = 0.
-    base_segment.mucilage_degradation_rate = 0.
-    base_segment.cells_degradation_rate = 0.
-
-    # Time indications:
-    # ------------------
-    # base_segment.growth_duration = param.GDs * (2. * base_radius) ** 2 * param.main_roots_growth_extender #WATCH OUT!!! we artificially multiply growth duration for seminal and adventious roots!!!!!!!!!!!!!!!!!!!!!!
-    base_segment.growth_duration = calculate_growth_duration(radius=base_radius, index=id_segment, root_order=1,
-                                                             ArchiSimple=ArchiSimple)
-    base_segment.life_duration = param.LDs * (2. * base_radius) * param.root_tissue_density
-    base_segment.actual_time_since_primordium_formation = 0.
-    base_segment.actual_time_since_emergence = 0.
-    base_segment.actual_time_since_cells_formation = 0.
-    base_segment.actual_time_since_growth_stopped = 0.
-    base_segment.actual_time_since_death = 0.
-    base_segment.thermal_time_since_primordium_formation = 0.
-    base_segment.thermal_time_since_emergence = 0.
-    base_segment.thermal_time_since_cells_formation = 0.
-    base_segment.thermal_potential_time_since_emergence = 0.
-    base_segment.thermal_time_since_growth_stopped = 0.
-    base_segment.thermal_time_since_death = 0.
-
-    segment = base_segment
-
-    # ADDING THE PRIMORDIA OF ALL POSSIBLE SEMINAL ROOTS:
-    #----------------------------------------------------
-    # If there is more than one seminal root (i.e. roots already formed in the seed):
-    if param.n_seminal_roots > 1 or not forcing_seminal_roots_events:
-
-        # We read additional parameters that are stored in a CSV file, with one column containing the delay for each
-        # emergence event, and the second column containing the number of seminal roots that have to emerge at each event:
-        # We try to access an already-existing CSV file:
-        seminal_inputs_path = os.path.join(input_file_path, seminal_roots_events_file)
-        # If the file doesn't exist, we construct a new table using the specified parameters:
-        if not os.path.exists(seminal_inputs_path) or forcing_seminal_roots_events:
-            print("NOTE: no CSV file describing the apparitions of seminal roots can be used!")
-            print("=> We therefore built a table according to the parameters 'n_seminal_roots' and 'ER'.")
-            print("")
-            # We initialize an empty data frame:
-            seminal_inputs_file = pd.DataFrame()
-            # We define a list that will contain the successive thermal times corresponding to root emergence:
-            list_time = [x * 1/param.ER for x in range(1, param.n_seminal_roots)]
-            # We define another list containing only "1" as the number of roots to be emerged for each event:
-            list_number = np.ones(param.n_seminal_roots-1, dtype='int8')
-            # We assigned the two lists to the dataframe, and record it:
-            seminal_inputs_file['emergence_delay_in_thermal_time'] = list_time
-            seminal_inputs_file['number_of_seminal_roots_per_event'] = list_number
-            # seminal_inputs_file.to_csv(os.path.join(input_file_path, seminal_roots_events_file),
-            #                                 na_rep='NA', index=False, header=True)
-        else:
-            seminal_inputs_file = pd.read_csv(seminal_inputs_path)
-
-        # For each event of seminal roots emergence:
-        for i in range(0, len(seminal_inputs_file.emergence_delay_in_thermal_time)):
-            # For each seminal root that can emerge at this emergence event:
-            for j in range(0,seminal_inputs_file.number_of_seminal_roots_per_event[i]):
-
-                # We make sure that the seminal roots will have different random insertion angles:
-                np.random.seed(param.random_choice + i*j)
-
-                # Then we form one supporting segment of length 0 + one primordium of seminal root.
-                # We add one new segment without any length on the same axis as the base:
-                segment = ADDING_A_CHILD(mother_element=segment, edge_type='<', label='Segment',
-                                         type='Support_for_seminal_root',
-                                         root_order=1,
-                                         angle_down=0,
-                                         angle_roll=abs(np.random.normal(180, 180)),
-                                         length=0.,
-                                         radius=base_radius,
-                                         identical_properties=False,
-                                         nil_properties=True)
-
-                # We define the radius of a seminal root according to the parameter Di:
-                if random:
-                    radius_seminal = abs(np.random.normal(param.D_ini / 2. * param.D_sem_to_D_ini_ratio,
-                                         param.D_ini / 2. * param.D_sem_to_D_ini_ratio * param.CVDD))
-
-                # And we add one new primordium of seminal root on the previously defined segment:
-                apex_seminal = ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Apex',
-                                                   type='Seminal_root_before_emergence',
-                                                   root_order=1,
-                                                   angle_down=abs(np.random.normal(60, 10)),
-                                                   angle_roll=5,
-                                                   length=0.,
-                                                   radius=radius_seminal,
-                                                   identical_properties=False,
-                                                   nil_properties=True)
-                apex_seminal.original_radius = radius_seminal
-                apex_seminal.initial_radius = radius_seminal
-                # apex_seminal.growth_duration = param.GDs * (2. * radius_seminal) ** 2 * param.main_roots_growth_extender
-                apex_seminal.growth_duration = calculate_growth_duration(radius=radius_seminal,
-                                                                         index=apex_seminal.index(),
-                                                                         root_order=1,
-                                                                         ArchiSimple=ArchiSimple)
-                apex_seminal.life_duration = param.LDs * (2. * radius_seminal) * param.root_tissue_density
-
-                # We defined the delay of emergence for the new primordium:
-                apex_seminal.emergence_delay_in_thermal_time = seminal_inputs_file.emergence_delay_in_thermal_time[i]
-
-    # ADDING THE PRIMORDIA OF ALL POSSIBLE ADVENTIOUS ROOTS:
-    # ------------------------------------------------------
-    # If there should be more than one main root (i.e. adventitious roots formed at the basis):
-    if param.n_adventitious_roots > 0 or not forcing_adventitious_roots_events:
-
-        # We read additional parameters from a table, with one column containing the delay for each emergence event,
-        # and the second column containing the number of adventitious roots that have to emerge at each event.
-        # We try to access an already-existing CSV file:
-        adventitious_inputs_path = os.path.join(input_file_path, adventitious_roots_events_file)
-        # If the file doesn't exist, we construct a new table using the specified parameters:
-        if not os.path.exists(adventitious_inputs_path) or forcing_adventitious_roots_events:
-            print("NOTE: no CSV file describing the apparitions of adventitious roots can be used!")
-            print("=> We therefore built a table according to the parameters 'n_adventitious_roots' and 'ER'.")
-            print("")
-            # We initialize an empty data frame:
-            adventitious_inputs_file = pd.DataFrame()
-            # We define a list that will contain the successive thermal times corresponding to root emergence:
-            list_time = [param.starting_time_for_adventitious_roots_emergence + x * 1/param.ER
-                         for x in range(0, param.n_adventitious_roots)]
-            # We define another list containing only "1" as the number of roots to be emerged for each event:
-            list_number = np.ones(param.n_adventitious_roots, dtype='int8')
-            # We assigned the two lists to the dataframe, and record it:
-            adventitious_inputs_file['emergence_delay_in_thermal_time'] = list_time
-            adventitious_inputs_file['number_of_adventitious_roots_per_event'] = list_number
-            # adventitious_inputs_file.to_csv(os.path.join(input_file_path, adventitious_roots_events_file),
-            #                                 na_rep='NA', index=False, header=True)
-        else:
-            adventitious_inputs_file = pd.read_csv(adventitious_inputs_path)
-
-        # For each event of adventitious roots emergence:
-        for i in range(0, len(adventitious_inputs_file.emergence_delay_in_thermal_time)):
-            # For each adventitious root that can emerge at this emergence event:
-            for j in range(0, int(adventitious_inputs_file.number_of_adventitious_roots_per_event[i])):
-
-                # We make sure that the adventitious roots will have different random insertion angles:
-                np.random.seed(param.random_choice + i * j*3)
-
-                # Then we form one supporting segment of length 0 + one primordium of seminal root.
-                # We add one new segment without any length on the same axis as the base:
-                segment = ADDING_A_CHILD(mother_element=segment, edge_type='<', label='Segment',
-                                         type='Support_for_adventitious_root',
-                                         root_order=1,
-                                         angle_down=0,
-                                         angle_roll=abs(np.random.normal(0, 180)),
-                                         length=0.,
-                                         radius=base_radius,
-                                         identical_properties=False,
-                                         nil_properties=True)
-
-                # We define the radius of a adventitious root according to the parameter Di:
-                if random:
-                    radius_adventitious = abs(np.random.normal(param.D_ini / 2. * param.D_adv_to_D_ini_ratio,
-                                                          param.D_ini / 2. * param.D_adv_to_D_ini_ratio *
-                                                          param.CVDD))
-
-                # And we add one new primordium of adventitious root on the previously defined segment:
-                apex_adventitious = ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Apex',
-                                              type='Adventitious_root_before_emergence',
-                                              root_order=1,
-                                              angle_down=abs(np.random.normal(60, 10)),
-                                              angle_roll=5,
-                                              length=0.,
-                                              radius=radius_adventitious,
-                                              identical_properties=False,
-                                              nil_properties=True)
-                apex_adventitious.original_radius = radius_adventitious
-                apex_adventitious.initial_radius = radius_adventitious
-                # apex_adventitious.growth_duration = param.GDs * (2. * radius_adventitious) ** 2 * param.main_roots_growth_extender
-                apex_adventitious.growth_duration = calculate_growth_duration(radius=radius_adventitious,
-                                                                              index=apex_adventitious.index(),
-                                                                              root_order=1,
-                                                                              ArchiSimple=ArchiSimple)
-                apex_adventitious.life_duration = param.LDs * (2. * radius_adventitious) * param.root_tissue_density
-
-                # We defined the delay of emergence for the new primordium:
-                apex_adventitious.emergence_delay_in_thermal_time \
-                    = adventitious_inputs_file.emergence_delay_in_thermal_time[i]
-
-    # FINAL APEX CONFIGURATION AT THE END OF THE MAIN ROOT:
-    #------------------------------------------------------
-    apex = ADDING_A_CHILD(mother_element=segment, edge_type='<', label='Apex',
-                          type='Normal_root_after_emergence',
-                          root_order=1,
-                          angle_down=0,
-                          angle_roll=0,
-                          length=initial_apex_length,
-                          radius=base_radius,
-                          identical_properties=False,
-                          nil_properties=True)
-    apex.original_radius = apex.radius
-    apex.initial_radius = apex.radius
-    # apex.growth_duration = param.GDs * (2. * base_radius) ** 2 * param.main_roots_growth_extender
-    apex.growth_duration = calculate_growth_duration(radius=base_radius,
-                                                     index=apex.index(),
-                                                     root_order=1,
-                                                     ArchiSimple=ArchiSimple)
-    apex.life_duration = param.LDs * (2. * base_radius) * param.root_tissue_density
-
-    if initial_apex_length <=0.:
-        apex.C_sucrose_root=0.
-        apex.C_hexose_root=0.
-    else:
-        apex.C_sucrose_root=initial_C_sucrose_root
-        apex.C_hexose_root=initial_C_hexose_root
-    apex.C_hexose_soil=0.
-    apex.Cs_mucilage_soil=0.
-    apex.Cs_cells_soil=0.
-
-    apex.volume = volume_and_external_surface_from_radius_and_length(g, apex, apex.radius, apex.length)["volume"]
-    apex.struct_mass = apex.volume * param.root_tissue_density
-    apex.initial_struct_mass = apex.struct_mass
-    apex.initial_living_root_hairs_struct_mass = apex.living_root_hairs_struct_mass
-    apex.initial_external_surface = apex.external_surface
-    apex.initial_living_root_hairs_external_surface = apex.living_root_hairs_external_surface
-
-    return g
 

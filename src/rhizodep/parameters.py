@@ -22,6 +22,12 @@ random_choice = 8
 D_ini = 0.80 / 1000.
 # => Reference: Di=0.8 mm
 
+# Initial external surface of the collar element (in square meters)
+external_surface = 1e-6
+
+# Initial volume of the collar element (in cube meters)
+volume = 1e-7
+
 # Proportionality coefficient between the tip diameter of a seminal root and D_ini (dimensionless):
 #--------------------------------------------------------------------------------------------------
 D_sem_to_D_ini_ratio = 0.95
