@@ -74,6 +74,13 @@ class RootCarbonModel:
         self.g = g
         self.time_steps_in_seconds = time_step_in_seconds
 
+        self.inputs = {
+            # Common
+            "soil": [
+                "soil_temperature"
+            ]
+        }
+
     # Modification of a process according to soil temperature:
     # --------------------------------------------------------
 
@@ -84,11 +91,7 @@ class RootCarbonModel:
 
         # We now proceed to all the exchanges of C for each root element in each root axis
         # (NOTE: the supply of sucrose from the shoot is excluded in this calculation):
-        self.C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(
-                soil_temperature_in_Celsius=soil_temperature,
-                using_solver=using_solver,
-                printing_solver_outputs=printing_solver_outputs,
-                printing_warnings=printing_warnings)
+        self.C_exchange_and_balance_in_roots_and_at_the_root_soil_interface()
         # NOTE: we also use this function to record specifically the concentration of hexose in the root apex
         # of the primary root!
 
@@ -578,7 +581,8 @@ class RootCarbonModel:
 
     # Unloading of sucrose from the phloem and conversion of sucrose into hexose:
     # --------------------------------------------------------------------------
-    def exchange_with_phloem_rate(self, g, n, soil_temperature_in_Celsius=20, printing_warnings=False):
+    def exchange_with_phloem_rate(self, type, length, struct_mass, original_radius, distance_from_tip, C_sucrose_root,
+                                  C_hexose_root, hexose_consumption_by_growth_rate, exchange_surface, **kwargs):
         """
         This function simulates the rate of sucrose unloading from phloem and its immediate conversion into hexose.
         The hexose pool is assumed to correspond to the symplastic compartment of root cells from the stelar and cortical
@@ -590,27 +594,14 @@ class RootCarbonModel:
         :return: the updated root element n
         """
 
-        # READING THE VALUES:
-        # --------------------
-        # We read the values of interest in the element n only once, so that it's not called too many times:
-        type = n.type
-        length = n.length
-        struct_mass = n.struct_mass
-        original_radius = n.original_radius
-        distance_from_tip = n.distance_from_tip
-        C_sucrose_root = n.C_sucrose_root
-        C_hexose_root = n.C_hexose_root
-        hexose_consumption_by_growth_rate = n.hexose_consumption_by_growth_rate
 
-        # We also calculate the relevant surface of the element:
-        exchange_surface = n.phloem_surface
 
         # We initialize the rates that will be computed:
         hexose_production_from_phloem_rate = 0.
         sucrose_loading_in_phloem_rate = 0.
 
         # We check whether unloading should be described by a diffusion process or a Michaelis-Menten kinetics:
-        unloading_by_diffusion = param.unloading_by_diffusion
+        # unloading_by_diffusion = param.unloading_by_diffusion
 
         # CONSIDERING CASES THAT SHOULD BE AVOIDED:
         # ------------------------------------------
@@ -625,39 +616,22 @@ class RootCarbonModel:
             # SUCROSE UNLOADING:
             # -------------------
             # We initially assume that phloem unloading capacity is identical everywhere along the root:
-            if unloading_by_diffusion:
-                phloem_permeability = param.phloem_permeability
+            if kwargs["unloading_by_diffusion"]:
+                phloem_permeability = kwargs["phloem_permeability"]
             else:
-                max_unloading_rate = param.max_unloading_rate
+                max_unloading_rate = kwargs["max_unloading_rate"]
 
             # We initialize a second condition:
             unloading_allowed = True
-
             # We forbid any sucrose unloading if there is already a global deficit of sucrose:
             global_sucrose_deficit = g.property('global_sucrose_deficit')[g.root]
-            if global_sucrose_deficit > 0.:
-                if unloading_by_diffusion:
+            if (global_sucrose_deficit > 0.) or (C_sucrose_root <= C_hexose_root / 2.):
+                if kwargs["unloading_by_diffusion"]:
                     phloem_permeability = 0.
                     unloading_allowed = False
                 else:
                     max_unloading_rate = 0.
                     unloading_allowed = False
-                if printing_warnings:
-                    print("WARNING: No phloem unloading occured for node", n.index(),
-                          "because there was a global deficit of sucrose!")
-
-            # We verify that the concentration of sucrose is not negative or inferior to the one of hexose:
-            if C_sucrose_root <= C_hexose_root / 2.:
-                if unloading_by_diffusion:
-                    # If such, we forbid any sucrose unloading:
-                    phloem_permeability = 0.
-                    unloading_allowed = False
-                elif C_sucrose_root <= 0.:
-                    max_unloading_rate = 0.
-                    unloading_allowed = False
-                if printing_warnings:
-                    print("WARNING: No phloem unloading occured for node", n.index(),
-                          "because root sucrose concentration was", n.C_sucrose_root, "mol/g.")
 
             # ADJUSTING THE UNLOADING OF PHLOEM ALONG THE ROOT:
             # We now correct the phloem unloading capacity according to the amount of hexose that has been used for growth:
@@ -665,9 +639,8 @@ class RootCarbonModel:
                 # We use a reference value for the rate of hexose consumption by growth, independent from mass or surface.
                 # The unloading capacity will then linearily increase with the rate of hexose consumption for growth, knowing
                 # that if the actual consumption rate equals the reference value, then the unloading capacity is doubled.
-                reference_consumption_rate = param.reference_rate_of_hexose_consumption_by_growth
-                if unloading_by_diffusion:
-                    # print(">>> Before adjustement, unloading with permeability is:", phloem_permeability * (C_sucrose_root - C_hexose_root / 2.))
+                reference_consumption_rate = kwargs["reference_rate_of_hexose_consumption_by_growth"]
+                if kwargs["unloading_by_diffusion"]:
                     phloem_permeability = phloem_permeability \
                                           * (1 + hexose_consumption_by_growth_rate / reference_consumption_rate)
                     # Note: As the permeability relates to phloem surface, and therefore to the size of the element,
@@ -676,10 +649,8 @@ class RootCarbonModel:
                     # reference rate to the mass, length or surface of the element.
                     # print(">>> After adjustement, unloading with permeability is:", phloem_permeability * (C_sucrose_root - C_hexose_root / 2.))
                 else:
-                    # print(">>> Before adjustement, unloading without permeability is:", max_unloading_rate)
                     max_unloading_rate = max_unloading_rate \
                                          * (1 + hexose_consumption_by_growth_rate / reference_consumption_rate)
-                    # print(">>> After adjustement, unloading without permeability is:", max_unloading_rate)
 
                 # We now correct the unloading rate according to soil temperature:
                 temperature_modifier = self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
@@ -688,13 +659,13 @@ class RootCarbonModel:
                                                                 A=param.phloem_unloading_A,
                                                                 B=param.phloem_unloading_B,
                                                                 C=param.phloem_unloading_C)
-                if unloading_by_diffusion:
+                if kwargs["unloading_by_diffusion"]:
                     phloem_permeability = phloem_permeability * temperature_modifier
                 else:
                     max_unloading_rate = max_unloading_rate * temperature_modifier
 
                 # Eventually, we compute the unloading rate and the automatical conversion into hexose:
-                if unloading_by_diffusion:
+                if kwargs["unloading_by_diffusion"]:
                     hexose_production_from_phloem_rate = 2. * phloem_permeability * (
                                 C_sucrose_root - C_hexose_root / 2.) \
                                                          * exchange_surface
@@ -1407,16 +1378,18 @@ class RootCarbonModel:
         self.root_sugars_exudation_rate(n, soil_temperature_in_Celsius, printing_warnings)
         # Transfer of hexose from the soil to the root:
         self.root_hexose_uptake_from_soil_rate(n, soil_temperature_in_Celsius, printing_warnings)
-        # Consumption of hexose in the soil:
-        soilhexose_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
-        # Secretion of mucilage into the soil:
-        soilmucilage_secretion_rate(n, soil_temperature_in_Celsius, printing_warnings)
-        # Consumption of mucilage in the soil:
-        soilmucilage_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
-        # Release of root cells into the soil:
-        self.cells_release_rate(n, soil_temperature_in_Celsius, printing_warnings)
-        # Consumption of root cells in the soil:
-        cells_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
+
+        # TODO : REPORT TO SOIL
+        # # Consumption of hexose in the soil:
+        # soilhexose_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        # # Secretion of mucilage into the soil:
+        # soilmucilage_secretion_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        # # Consumption of mucilage in the soil:
+        # soilmucilage_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        # # Release of root cells into the soil:
+        # self.cells_release_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        # # Consumption of root cells in the soil:
+        # cells_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
 
         return n
 
@@ -1961,9 +1934,8 @@ class RootCarbonModel:
     # ------------------------------------------------------
     # NOTE: The function alls all processes of C exchange between pools on each root element and performs a new C balance,
     # with or without using a solver:
-    def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(self, g,
+    def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(self,
                                                                        time_step_in_seconds=1. * (60. * 60. * 24.),
-                                                                       soil_temperature_in_Celsius=20,
                                                                        using_solver=False,
                                                                        printing_solver_outputs=False,
                                                                        printing_warnings=False):
@@ -1984,10 +1956,10 @@ class RootCarbonModel:
         tip_C_hexose_root = -1
 
         # We cover all the vertices in the MTG:
-        for vid in g.vertices_iter(scale=1):
+        for vid in self.g.vertices_iter(scale=1):
 
             # n represents the vertex:
-            n = g.node(vid)
+            n = self.g.node(vid)
 
             # First, we ensure that the element has a positive length:
             if n.length <= 0.:
@@ -2000,6 +1972,7 @@ class RootCarbonModel:
             ##########################
 
             if not using_solver:
+                # TODO C : Separate flows precisely
                 # We simply calculate all related fluxes and the new concentrations based on the initial conditions
                 # at the beginning of the time step.
 
@@ -2007,7 +1980,7 @@ class RootCarbonModel:
                 # ---------------------------------------------------
 
                 # We calculate all C-related fluxes (independent of the time step):
-                self.calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius, printing_warnings)
+                self.calculating_all_growth_independent_fluxes(self.g, n, self.soil_temperature, printing_warnings)
 
                 # We then calculate the quantities that correspond to these fluxes (dependent of the time step):
                 self.calculating_amounts_from_fluxes(n, time_step_in_seconds)
@@ -2069,9 +2042,9 @@ class RootCarbonModel:
                     print("Considering for the solver the element", n.index(), "of length", n.length, "...")
 
                 # We use the class corresponding to the system of differential equations and its resolution:
-                System = self.Differential_Equation_System(g, n,
+                System = self.Differential_Equation_System(self.g, n,
                                                       time_step_in_seconds,
-                                                      soil_temperature_in_Celsius,
+                                                      self.soil_temperature_in_Celsius,
                                                       printing_warnings=printing_warnings,
                                                       printing_solver_outputs=printing_solver_outputs)
                 System.run()
@@ -5077,6 +5050,9 @@ class SoilModel:
     def __init__(self, g, time_step_in_seconds):
         self.g = g
         self.time_step_in_seconds = time_step_in_seconds
+
+        # TODO TP hardcode
+        self.soil_temperature = 20.0
 
     # MODULE "SOIL TRANSFORMATION"
 
