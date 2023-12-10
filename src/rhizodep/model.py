@@ -571,164 +571,76 @@ class RootCarbonModel:
 
         return g
 
-    ########################################################################################################################
-
-    ########################################################################################################################
-    ########################################################################################################################
-    # MODULE "EXCHANGE BETWEEN SUCROSE AND HEXOSE"
-    ########################################################################################################################
-    ########################################################################################################################
 
     # Unloading of sucrose from the phloem and conversion of sucrose into hexose:
     # --------------------------------------------------------------------------
-    def exchange_with_phloem_rate(self, type, length, struct_mass, original_radius, distance_from_tip, C_sucrose_root,
-                                  C_hexose_root, hexose_consumption_by_growth_rate, exchange_surface, **kwargs):
-        """
-        This function simulates the rate of sucrose unloading from phloem and its immediate conversion into hexose.
-        The hexose pool is assumed to correspond to the symplastic compartment of root cells from the stelar and cortical
-        parenchyma and from the epidermis. The function also simulates the opposite process of sucrose loading,
-        considering that 2 mol of hexose are produced for 1 mol of sucrose.
-        :param n: the root element to be considered
-        :param soil_temperature_in_Celsius: the temperature experience by the root element n
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
-        :return: the updated root element n
-        """
+    # These 3 functions simulate the rate of sucrose unloading from phloem and its immediate conversion into hexose.
+    # The hexose pool is assumed to correspond to the symplastic compartment of root cells from the stelar and cortical
+    # parenchyma and from the epidermis. The function also simulates the opposite process of sucrose loading,
+    # considering that 2 mol of hexose are produced for 1 mol of sucrose.
 
-
-
-        # We initialize the rates that will be computed:
-        hexose_production_from_phloem_rate = 0.
-        sucrose_loading_in_phloem_rate = 0.
-
-        # We check whether unloading should be described by a diffusion process or a Michaelis-Menten kinetics:
-        # unloading_by_diffusion = param.unloading_by_diffusion
-
-        # CONSIDERING CASES THAT SHOULD BE AVOIDED:
-        # ------------------------------------------
-        # We initialize the possibility of exchange with phloem:
-        possible_exchange_with_phloem = True
+    def process_hexose_diffusion_from_phloem(self, length, exchange_surface, C_sucrose_root, C_hexose_root,
+                                             hexose_consumption_by_growth_rate, soil_temperature_in_Celsius, **kwargs):
         # We consider all the cases where no net exchange should be allowed:
         if length <= 0. or exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
-            possible_exchange_with_phloem = False
+            return 0
 
-        if possible_exchange_with_phloem:
-
-            # SUCROSE UNLOADING:
-            # -------------------
-            # We initially assume that phloem unloading capacity is identical everywhere along the root:
-            if kwargs["unloading_by_diffusion"]:
-                phloem_permeability = kwargs["phloem_permeability"]
-            else:
-                max_unloading_rate = kwargs["max_unloading_rate"]
-
-            # We initialize a second condition:
-            unloading_allowed = True
-            # We forbid any sucrose unloading if there is already a global deficit of sucrose:
-            global_sucrose_deficit = g.property('global_sucrose_deficit')[g.root]
+        else:
+            global_sucrose_deficit = self.g.property('global_sucrose_deficit')[self.g.root]
             if (global_sucrose_deficit > 0.) or (C_sucrose_root <= C_hexose_root / 2.):
-                if kwargs["unloading_by_diffusion"]:
-                    phloem_permeability = 0.
-                    unloading_allowed = False
-                else:
-                    max_unloading_rate = 0.
-                    unloading_allowed = False
-
-            # ADJUSTING THE UNLOADING OF PHLOEM ALONG THE ROOT:
-            # We now correct the phloem unloading capacity according to the amount of hexose that has been used for growth:
-            if unloading_allowed:
-                # We use a reference value for the rate of hexose consumption by growth, independent from mass or surface.
-                # The unloading capacity will then linearily increase with the rate of hexose consumption for growth, knowing
-                # that if the actual consumption rate equals the reference value, then the unloading capacity is doubled.
-                reference_consumption_rate = kwargs["reference_rate_of_hexose_consumption_by_growth"]
-                if kwargs["unloading_by_diffusion"]:
-                    phloem_permeability = phloem_permeability \
-                                          * (1 + hexose_consumption_by_growth_rate / reference_consumption_rate)
-                    # Note: As the permeability relates to phloem surface, and therefore to the size of the element,
-                    # the calculation above will result in a total increase of the permeability (gDW per second) according to
-                    # the actual, total consumption rate for growth (mol per second). There is therefore no need to relate the
-                    # reference rate to the mass, length or surface of the element.
-                    # print(">>> After adjustement, unloading with permeability is:", phloem_permeability * (C_sucrose_root - C_hexose_root / 2.))
-                else:
-                    max_unloading_rate = max_unloading_rate \
-                                         * (1 + hexose_consumption_by_growth_rate / reference_consumption_rate)
-
-                # We now correct the unloading rate according to soil temperature:
-                temperature_modifier = self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+                return 0
+            else:
+                phloem_permeability = kwargs["phloem_permeability"] \
+                                      * (1 + hexose_consumption_by_growth_rate / kwargs["reference_rate_of_hexose_consumption_by_growth"])
+                phloem_permeability *= self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
                                                                 process_at_T_ref=1,
-                                                                T_ref=param.phloem_unloading_T_ref,
-                                                                A=param.phloem_unloading_A,
-                                                                B=param.phloem_unloading_B,
-                                                                C=param.phloem_unloading_C)
-                if kwargs["unloading_by_diffusion"]:
-                    phloem_permeability = phloem_permeability * temperature_modifier
-                else:
-                    max_unloading_rate = max_unloading_rate * temperature_modifier
+                                                                T_ref=kwargs["phloem_unloading_T_ref"],
+                                                                A=kwargs["phloem_unloading_A"],
+                                                                B=kwargs["phloem_unloading_B"],
+                                                                C=kwargs["phloem_unloading_C"])
+                return max(2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) * exchange_surface, 0)
 
-                # Eventually, we compute the unloading rate and the automatical conversion into hexose:
-                if kwargs["unloading_by_diffusion"]:
-                    hexose_production_from_phloem_rate = 2. * phloem_permeability * (
-                                C_sucrose_root - C_hexose_root / 2.) \
-                                                         * exchange_surface
-                    # print("With diffusion, the overall phloem unloading rate is", phloem_permeability * (C_sucrose_root - C_hexose_root / 2.))
-                else:
-                    hexose_production_from_phloem_rate = 2. * max_unloading_rate * C_sucrose_root * exchange_surface \
-                                                         / (param.Km_unloading + C_sucrose_root)
-                    # print("Without diffusion, the overall phloem unloading rate is", max_unloading_rate * C_sucrose_root / (param.Km_unloading + C_sucrose_root ))
+    def process_hexose_active_production_from_phloem(self,length, exchange_surface, C_sucrose_root, C_hexose_root,
+                                             hexose_consumption_by_growth_rate, soil_temperature_in_Celsius, **kwargs):
+        # We consider all the cases where no net exchange should be allowed:
+        if length <= 0. or exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
+            return 0
 
-            # AVOIDING PROBLEMS - We make sure that hexose production can't become negative:
-            if hexose_production_from_phloem_rate < 0.:
-                print("!!!ERROR!!!  A negative sucrose unloading rate was computed for element", n.index(),
-                      "; we therefore set the loading rate to 0!")
-                hexose_production_from_phloem_rate = 0.
+        else:
+            global_sucrose_deficit = self.g.property('global_sucrose_deficit')[self.g.root]
+            if (global_sucrose_deficit > 0.) or (C_sucrose_root <= C_hexose_root / 2.):
+                return 0
+            else:
+                max_unloading_rate = kwargs["max_unloading_rate"] \
+                                     * (1 + hexose_consumption_by_growth_rate / kwargs["reference_rate_of_hexose_consumption_by_growth"])
+                max_unloading_rate *= self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+                                                                     process_at_T_ref=1,
+                                                                     T_ref=kwargs["phloem_unloading_T_ref"],
+                                                                     A=kwargs["phloem_unloading_A"],
+                                                                     B=kwargs["phloem_unloading_B"],
+                                                                     C=kwargs["phloem_unloading_C"])
+                return max(2. * max_unloading_rate * C_sucrose_root * exchange_surface / (kwargs["Km_unloading"] + C_sucrose_root), 0)
 
-            # SUCROSE LOADING:
-            # ----------------
-            # # We correct the max loading rate according to the distance from the tip in the middle of the segment.
-            # max_loading_rate = param.surfacic_loading_rate_reference \
-            #     * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
-            # TODO: Reconsider the way the variation of the max loading rate along the root axis has been described!
-            max_loading_rate = param.max_loading_rate
+    def process_sucrose_loading(self, soil_temperature_in_Celsius, C_hexose_root, exchange_surface, C_hexose_root, **kwargs):
+        # # We correct the max loading rate according to the distance from the tip in the middle of the segment.
+        # max_loading_rate = param.surfacic_loading_rate_reference \
+        #     * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
+        # TODO: Reconsider the way the variation of the max loading rate along the root axis has been described!
 
-            # We correct loading according to soil temperature:
-            max_loading_rate = max_loading_rate \
-                               * self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
-                                                          process_at_T_ref=1,
-                                                          T_ref=param.max_loading_rate_T_ref,
-                                                          A=param.max_loading_rate_A,
-                                                          B=param.max_loading_rate_B,
-                                                          C=param.max_loading_rate_C)
+        # We correct loading according to soil temperature:
+        max_loading_rate = kwargs["max_loading_rate"] \
+                           * self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+                                                           process_at_T_ref=1,
+                                                           T_ref=param.max_loading_rate_T_ref,
+                                                           A=param.max_loading_rate_A,
+                                                           B=param.max_loading_rate_B,
+                                                           C=param.max_loading_rate_C)
+        if C_hexose_root <= 0.:
+            return 0.
+        else:
+            return max(0.5 * max_loading_rate * exchange_surface * C_hexose_root / (param.Km_loading + C_hexose_root), 0.)
 
-            # We verify that the concentration of hexose in root is not nil or negative:
-            if C_hexose_root <= 0.:
-                if printing_warnings:
-                    print("WARNING: No phloem loading occured for node", n.index(),
-                          "because root hexose concentration was", C_hexose_root,
-                          "mol/g.")
-                max_loading_rate = 0.
 
-            # If there is a demand for growth, we set the loading rate to 0:
-            # TODO: Here we forbid the loading into the phloem if there is a growth consumption in the current element - should it be so? or should we also include the demand for growth?
-            if hexose_consumption_by_growth_rate > 0.:
-                max_loading_rate = 0.
-
-            # We calculate the potential production of sucrose from root hexose (in mol) according to the Michaelis-Menten function:
-            sucrose_loading_in_phloem_rate = 0.5 * max_loading_rate * exchange_surface * C_hexose_root \
-                                             / (param.Km_loading + C_hexose_root)
-
-            # AVOIDING PROBLEMS - We make sure that hexose production can't become negative:
-            if sucrose_loading_in_phloem_rate < 0.:
-                print("!!!ERROR!!!  A negative sucrose loading rate was computed for element", n.index(),
-                      "; we therefore set the loading rate to 0!")
-                sucrose_loading_in_phloem_rate = 0.
-
-        # RECORDING THE RESULTS:
-        # -----------------------
-        # Eventually, we record all new values  in the element n, including the difference between unloading and loading:
-        n.hexose_production_from_phloem_rate = hexose_production_from_phloem_rate
-        n.sucrose_loading_in_phloem_rate = sucrose_loading_in_phloem_rate
-        n.net_sucrose_unloading_rate = hexose_production_from_phloem_rate / 2. - sucrose_loading_in_phloem_rate
-
-        return n
 
     ########################################################################################################################
 
@@ -1369,7 +1281,7 @@ class RootCarbonModel:
         # TODO FOR TRISTAN: Consider adding here N-related rates (or building a similar function to be possibly used in a solver).
 
         # Unloading of sucrose from phloem and conversion of sucrose into hexose, or reloading of sucrose:
-        self.exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius, printing_warnings)
+        # DONE self.exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius, printing_warnings)
         # Net immobilization of hexose into the reserve pool:
         self.exchange_with_reserve_rate(n, soil_temperature_in_Celsius, printing_warnings)
         # Maintenance respiration:
