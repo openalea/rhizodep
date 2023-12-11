@@ -621,7 +621,7 @@ class RootCarbonModel:
                                                                      C=kwargs["phloem_unloading_C"])
                 return max(2. * max_unloading_rate * C_sucrose_root * exchange_surface / (kwargs["Km_unloading"] + C_sucrose_root), 0)
 
-    def process_sucrose_loading(self, soil_temperature_in_Celsius, C_hexose_root, exchange_surface, C_hexose_root, **kwargs):
+    def process_sucrose_loading(self, soil_temperature_in_Celsius, exchange_surface, C_hexose_root, **kwargs):
         # # We correct the max loading rate according to the distance from the tip in the middle of the segment.
         # max_loading_rate = param.surfacic_loading_rate_reference \
         #     * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
@@ -652,111 +652,47 @@ class RootCarbonModel:
 
     # Unloading of sucrose from the phloem and conversion of sucrose into hexose:
     # --------------------------------------------------------------------------
-    def exchange_with_reserve_rate(self, n, soil_temperature_in_Celsius=20, printing_warnings=False):
-        """
-        This function simulates the rate of hexose immobilization into the reserve pool of a given root element n,
-        and the rate of hexose mobilization from this reserve.
-        :param n: the root element to be considered
-        :param soil_temperature_in_Celsius: the temperature experience by the root element n
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
-        :return: the updated root element n
-        """
 
-        # TODO FOR TRISTAN: Consider doing a similar function for N reserve pool (?)
-
-        # READING THE VALUES:
-        # --------------------
-        # We read the values of interest in the element n only once, so that it's not called too many times:
-        type = n.type
-        length = n.length
-        C_hexose_root = n.C_hexose_root
-        C_hexose_reserve = n.C_hexose_reserve
-        struct_mass = n.struct_mass
-        living_root_hairs_struct_mass = n.living_root_hairs_struct_mass
-
-        # CONSIDERING CASES THAT SHOULD BE AVOIDED:
-        # ------------------------------------------
-        # We initialize the rates:
-        hexose_mobilization_from_reserve_rate = 0.
-        hexose_immobilization_as_reserve_rate = 0.
-
-        # We initialize the possibility of exchange with reserve:
-        possible_exchange_with_reserve = True
-
+    def process_mobilization_from_hexose(self, length, C_hexose_root, C_hexose_reserve, type, struct_mass,
+                                         living_root_hairs_struct_mass, soil_temperature_in_Celsius, **kwargs):
+        # CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE:
         # We verify that the element does not correspond to a primordium that has not emerged:
-        if length <= 0.:
-            possible_exchange_with_reserve = False
-        # We verify that the concentration of hexose are not negative:
-        if C_hexose_root < 0. or C_hexose_reserve < 0.:
-            if printing_warnings:
-                print("WARNING: No exchange with reserve occurred for node", n.index(),
-                      "because root sucrose concentration was", self.C_sucrose_root,
-                      "mol/g, root hexose concentration was", C_hexose_root,
-                      "mol/g, and hexose reserve concentration was", C_hexose_reserve)
-            possible_exchange_with_reserve = False
-
-        # If the element corresponds to a root nodule, we don't consider any reserve pool:
-        if type == "Root_nodule":
-            possible_exchange_with_reserve = False
-
-        # NOTE: If the element has died, special cases are included below in the calculations.
-
-        if possible_exchange_with_reserve:
-
-            # The maximal concentration in the reserve is defined here:
-            C_hexose_reserve_max = param.C_hexose_reserve_max
-
+        if length <= 0. or C_hexose_root < 0. or C_hexose_reserve < 0. or type == "Root_nodule":
+            return 0.
+        else:
             # We correct maximum rates according to soil temperature:
-            corrected_max_mobilization_rate = param.max_mobilization_rate \
-                                              * self.temperature_modification(
-                temperature_in_Celsius=soil_temperature_in_Celsius,
-                process_at_T_ref=1,
-                T_ref=param.max_mobilization_rate_T_ref,
-                A=param.max_mobilization_rate_A,
-                B=param.max_mobilization_rate_B,
-                C=param.max_mobilization_rate_C)
-            corrected_max_immobilization_rate = param.max_immobilization_rate \
+            corrected_max_mobilization_rate = kwargs["max_mobilization_rate"] * self.temperature_modification(
+                                                            temperature_in_Celsius=soil_temperature_in_Celsius,
+                                                            process_at_T_ref=1,
+                                                            T_ref=kwargs["max_mobilization_rate_T_ref"],
+                                                            A=kwargs["max_mobilization_rate_A"],
+                                                            B=kwargs["max_mobilization_rate_B"],
+                                                            C=kwargs["max_mobilization_rate_C"])
+            if C_hexose_reserve <= kwargs["C_hexose_reserve_min"]:
+                return 0.
+            else:
+                return corrected_max_mobilization_rate * C_hexose_reserve / (
+                        kwargs["Km_mobilization"] + C_hexose_reserve) * (struct_mass + living_root_hairs_struct_mass)
+
+    def process_immobilization_as_reserve(self, C_hexose_root, C_hexose_reserve, type, soil_temperature_in_Celsius,
+                                          struct_mass, living_root_hairs_struct_mass, **kwargs):
+        # CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE:
+        if C_hexose_root <= kwargs["C_hexose_root_min_for_reserve"] or C_hexose_reserve >= kwargs["C_hexose_reserve_max"] \
+                or type == "Just_dead" or type == "Dead":
+            return 0.
+        else:
+            corrected_max_immobilization_rate = kwargs["max_immobilization_rate"] \
                                                 * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
-                T_ref=param.max_immobilization_rate_T_ref,
-                A=param.max_immobilization_rate_A,
-                B=param.max_immobilization_rate_B,
-                C=param.max_immobilization_rate_C)
+                T_ref=kwargs["max_immobilization_rate_T_ref"],
+                A=kwargs["max_immobilization_rate_A"],
+                B=kwargs["max_immobilization_rate_B"],
+                C=kwargs["max_immobilization_rate_C"])
 
-            # CALCULATIONS OF THEORETICAL MOBILIZATION RATE:
-            # -----------------------------------------------
-            if C_hexose_reserve <= param.C_hexose_reserve_min:
-                hexose_mobilization_from_reserve_rate = 0.
-            else:
-                # We calculate the potential mobilization of hexose from reserve (in mol) according to the Michaelis-Menten function:
-                hexose_mobilization_from_reserve_rate = corrected_max_mobilization_rate * C_hexose_reserve \
-                                                        / (param.Km_mobilization + C_hexose_reserve) \
-                                                        * (struct_mass + living_root_hairs_struct_mass)
+            return corrected_max_immobilization_rate * C_hexose_root / (param.Km_immobilization + C_hexose_root) * (
+                    struct_mass + living_root_hairs_struct_mass)
 
-            # CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE:
-            # -----------------------------------------------
-            # If the concentration of mobile hexose is already too low or the concentration if the reserve pool too high,
-            # or if the element has died:
-            if C_hexose_root <= param.C_hexose_root_min_for_reserve or C_hexose_reserve >= param.C_hexose_reserve_max \
-                    or type == "Just_dead" or type == "Dead":
-                # Then there is no possible immobilization in the reserve:
-                hexose_immobilization_as_reserve_rate = 0.
-            else:
-                # We calculate the potential immobilization of hexose as reserve (in mol) according to the
-                # Michaelis-Menten function:
-                hexose_immobilization_as_reserve_rate = corrected_max_immobilization_rate * C_hexose_root \
-                                                        / (param.Km_immobilization + C_hexose_root) \
-                                                        * (struct_mass + living_root_hairs_struct_mass)
-
-        # RECORDING THE RESULTS:
-        # -----------------------
-        # Eventually, we record all new values in the element n, including the net difference of the two opposite rates:
-        n.hexose_immobilization_as_reserve_rate = hexose_immobilization_as_reserve_rate
-        n.hexose_mobilization_from_reserve_rate = hexose_mobilization_from_reserve_rate
-        n.net_hexose_immobilization_rate = hexose_immobilization_as_reserve_rate - hexose_mobilization_from_reserve_rate
-
-        return n
 
     ########################################################################################################################
 
@@ -1283,7 +1219,7 @@ class RootCarbonModel:
         # Unloading of sucrose from phloem and conversion of sucrose into hexose, or reloading of sucrose:
         # DONE self.exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius, printing_warnings)
         # Net immobilization of hexose into the reserve pool:
-        self.exchange_with_reserve_rate(n, soil_temperature_in_Celsius, printing_warnings)
+        # DONE self.exchange_with_reserve_rate(n, soil_temperature_in_Celsius, printing_warnings)
         # Maintenance respiration:
         self.maintenance_respiration_rate(n, soil_temperature_in_Celsius, printing_warnings)
         # Transfer of hexose from the root to the soil:
@@ -1925,24 +1861,25 @@ class RootCarbonModel:
                             n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
                                       + hexose_reserve_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
 
-                # We calculate the new concentration of hexose in the soil:
-                hexose_soil_derivative = y_time_derivatives["hexose_soil"] * time_step_in_seconds
-                n.C_hexose_soil = (n.C_hexose_soil * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                                   + hexose_soil_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
-
-                # We calculate the new concentration of hexose in the soil:
-                mucilage_soil_derivative = y_time_derivatives["mucilage_soil"] * time_step_in_seconds
-                n.Cs_mucilage_soil = (n.Cs_mucilage_soil * (n.initial_external_surface
-                                                            + n.initial_living_root_hairs_external_surface)
-                                      + mucilage_soil_derivative) / (
-                                                 n.external_surface + n.living_root_hairs_external_surface)
-
-                # We calculate the new concentration of cells in the soil:
-                cells_soil_derivative = y_time_derivatives["cells_soil"] * time_step_in_seconds
-                n.Cs_cells_soil = (n.Cs_cells_soil * (n.initial_external_surface
-                                                      + n.initial_living_root_hairs_external_surface)
-                                   + cells_soil_derivative) / (
-                                              n.external_surface + n.living_root_hairs_external_surface)
+                # TODO : report to soil
+                # # We calculate the new concentration of hexose in the soil:
+                # hexose_soil_derivative = y_time_derivatives["hexose_soil"] * time_step_in_seconds
+                # n.C_hexose_soil = (n.C_hexose_soil * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
+                #                    + hexose_soil_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+                #
+                # # We calculate the new concentration of hexose in the soil:
+                # mucilage_soil_derivative = y_time_derivatives["mucilage_soil"] * time_step_in_seconds
+                # n.Cs_mucilage_soil = (n.Cs_mucilage_soil * (n.initial_external_surface
+                #                                             + n.initial_living_root_hairs_external_surface)
+                #                       + mucilage_soil_derivative) / (
+                #                                  n.external_surface + n.living_root_hairs_external_surface)
+                #
+                # # We calculate the new concentration of cells in the soil:
+                # cells_soil_derivative = y_time_derivatives["cells_soil"] * time_step_in_seconds
+                # n.Cs_cells_soil = (n.Cs_cells_soil * (n.initial_external_surface
+                #                                       + n.initial_living_root_hairs_external_surface)
+                #                    + cells_soil_derivative) / (
+                #                               n.external_surface + n.living_root_hairs_external_surface)
 
             # OPTION 2: WITH SOLVER
             #######################
