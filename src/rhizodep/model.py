@@ -74,6 +74,10 @@ class RootCarbonModel:
         self.g = g
         self.time_steps_in_seconds = time_step_in_seconds
 
+        self.states = """
+        
+        """.split()
+
         self.inputs = {
             # Common
             "soil": [
@@ -640,16 +644,6 @@ class RootCarbonModel:
         else:
             return max(0.5 * max_loading_rate * exchange_surface * C_hexose_root / (param.Km_loading + C_hexose_root), 0.)
 
-
-
-    ########################################################################################################################
-
-    ########################################################################################################################
-    ########################################################################################################################
-    # MODULE "EXCHANGE BETWEEN MOBILE HEXOSE AND RESERVE"
-    ########################################################################################################################
-    ########################################################################################################################
-
     # Unloading of sucrose from the phloem and conversion of sucrose into hexose:
     # --------------------------------------------------------------------------
 
@@ -693,171 +687,68 @@ class RootCarbonModel:
             return corrected_max_immobilization_rate * C_hexose_root / (param.Km_immobilization + C_hexose_root) * (
                     struct_mass + living_root_hairs_struct_mass)
 
-
-    ########################################################################################################################
-
-    ########################################################################################################################
-    ########################################################################################################################
-    # MODULE "ROOT MAINTENANCE"
-    ########################################################################################################################
-    ########################################################################################################################
-
     # Function calculating maintenance respiration:
     # ----------------------------------------------
-    def maintenance_respiration_rate(self, n, soil_temperature_in_Celsius=20, printing_warnings=False):
-        """
-        This function calculates the rate of respiration (mol of CO2 per second) corresponding to the consumption
-        of a part of the local hexose pool to cover the costs of maintenance processes, i.e. any biological process in the
-        root that is NOT linked to the actual growth of the root. The calculation is derived from the model of Thornley and
-        Cannell (2000), who initially used this formalism to describe the residual maintenance costs that could not be
-        accounted for by known processes. The local amount of CO2 respired for maintenance is calculated relatively
-        to the structural dry mass of the element n and is regulated by a Michaelis-Menten function of the local
-        concentration of hexose.
-        :param n: the root element to be considered
-        :param soil_temperature_in_Celsius: the temperature experience by the root element n
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
-        :return: the updated root element n
-        """
+
+    # This function calculates the rate of respiration (mol of CO2 per second) corresponding to the consumption
+    # of a part of the local hexose pool to cover the costs of maintenance processes, i.e. any biological process in the
+    # root that is NOT linked to the actual growth of the root. The calculation is derived from the model of Thornley and
+    # Cannell (2000), who initially used this formalism to describe the residual maintenance costs that could not be
+    # accounted for by known processes. The local amount of CO2 respired for maintenance is calculated relatively
+    # to the structural dry mass of the element n and is regulated by a Michaelis-Menten function of the local
+    # concentration of hexose.
+
+    def process_maintenance_respiration(self, type, C_hexose_root, soil_temperature_in_Celsius, struct_mass,
+                                        living_root_hairs_struct_mass, **kwargs):
 
         # TODO FOR TRISTAN: Consider expliciting a respiration cost associated to the exchange of N in the root (e.g. cost for uptake, xylem loading)?
 
-        # READING THE VALUES:
-        # --------------------
-        # We read the values of interest in the element n only once, so that it's not called too many times:
-        type = n.type
-        C_hexose_root = n.C_hexose_root
-        struct_mass = n.struct_mass
-        living_root_hairs_struct_mass = n.living_root_hairs_struct_mass
-
         # CONSIDERING CASES THAT SHOULD BE AVOIDED:
-        # ------------------------------------------
-        # We initialize the rate:
-        resp_maintenance_rate = 0.
-
-        # We initialize the possibility of maintenance:
-        possible_maintenance = True
         # We consider that dead elements cannot respire (unless over the first time step following death,
         # i.e. when the type is "Just_dead"):
-        if type == "Dead":
-            possible_maintenance = False
-        # We also check whether the concentration of hexose in root is positive or not:
-        if C_hexose_root <= 0.:
-            possible_maintenance = False
-            if printing_warnings:
-                print("WARNING: No maintenance occurred for node", n.index(),
-                      "because root hexose concentration was", C_hexose_root, "mol/g.")
-
-        if possible_maintenance:
+        if type == "Dead" or C_hexose_root <= 0.:
+            return 0.
+        else:
             # We correct the maximal respiration rate according to soil temperature:
-            corrected_resp_maintenance_max = param.resp_maintenance_max \
+            corrected_resp_maintenance_max = kwargs["resp_maintenance_max"] \
                                              * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
-                T_ref=param.resp_maintenance_max_T_ref,
-                A=param.resp_maintenance_max_A,
-                B=param.resp_maintenance_max_B,
-                C=param.resp_maintenance_max_C)
+                T_ref=kwargs["resp_maintenance_max_T_ref"],
+                A=kwargs["resp_maintenance_max_A"],
+                B=kwargs["resp_maintenance_max_B"],
+                C=kwargs["resp_maintenance_max_C"])
 
-            # CALCULATIONS OF MAINTENANCE RATE:
-            # ----------------------------------
-
-            # We calculate the rate of maintenance respiration:
-            resp_maintenance_rate = corrected_resp_maintenance_max * C_hexose_root \
-                                    / (param.Km_maintenance + C_hexose_root) \
-                                    * (struct_mass + living_root_hairs_struct_mass)
-
-        # RECORDING THE RESULTS:
-        # -----------------------
-        # Eventually, we record all new values in the element n:
-        n.resp_maintenance_rate = resp_maintenance_rate
-
-        return n
-
-    ########################################################################################################################
-
-    ########################################################################################################################
-    ########################################################################################################################
-    # MODULE "NET RHIZODEPOSITION"
-    ########################################################################################################################
-    ########################################################################################################################
+            return corrected_resp_maintenance_max * C_hexose_root / (kwargs["Km_maintenance"] + C_hexose_root) * (
+                    struct_mass + living_root_hairs_struct_mass)
 
     # Exudation of hexose from the root into the soil:
     # ------------------------------------------------
-    def root_sugars_exudation_rate(self, n, soil_temperature_in_Celsius=20, printing_warnings=False):
-        """
-        This function computes the rate of hexose exudation (mol of hexose per seconds) for a given root element.
-        Exudation corresponds to an efflux of hexose from the root to the soil by a passive diffusion. This efflux
-        is calculated from the product of the exchange surface (m2) with the soil solution, a permeability coefficient (g m-2)
-        and the gradient of hexose concentration between cells and soil (mol of hexose per gram of dry root structural mass).
-        :param n: the root element to be considered
-        :param soil_temperature_in_Celsius: the temperature experience by the root element n
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
-        :return: the updated root element n
-        """
+    #This function computes the rate of hexose exudation (mol of hexose per seconds) for a given root element.
+    #Exudation corresponds to an efflux of hexose from the root to the soil by a passive diffusion. This efflux
+    #is calculated from the product of the exchange surface (m2) with the soil solution, a permeability coefficient (g m-2)
+    #and the gradient of hexose concentration between cells and soil (mol of hexose per gram of dry root structural mass).
 
-        # READING THE VALUES:
-        # -------------------
-        # We read the values of interest in the element n only once, so that it's not called too many times:
-        type = n.type
-        length = n.length
-        original_radius = n.original_radius
-        distance_from_tip = n.distance_from_tip
+    # TODO : report to anatomy module
+    # We calculate the total surface of exchange between symplasm and apoplasm in the root parenchyma, modulated by the
+    # conductance of cell walls (reduced in the meristematic zone) and the conductances of endodermis and exodermis
+    # barriers (when these barriers are mature, conductance is expected to be 0 in general, and part of the symplasm is
+    # not accessible anymore to the soil solution:
+    # non_vascular_exchange_surface = (S_epid + S_hairs) + cond_walls * (cond_exo * S_cortex + cond_endo * S_stele)
+    # vascular_exchange_surface = cond_walls * cond_exo * cond_endo * S_vessels
 
-        C_sucrose_root = n.C_sucrose_root
-        C_hexose_root = n.C_hexose_root
-        C_hexose_soil = n.C_hexose_soil
-
-        S_epid = n.epidermis_surface_without_hairs
-        S_hairs = n.living_root_hairs_external_surface
-        S_cortex = n.cortical_parenchyma_surface
-        S_stele = n.stelar_parenchyma_surface
-        S_vessels = n.phloem_surface
-
-        cond_walls = n.relative_conductance_walls
-        cond_exo = n.relative_conductance_exodermis
-        cond_endo = n.relative_conductance_endodermis
-
-        # We calculate the total surface of exchange between symplasm and apoplasm in the root parenchyma, modulated by the
-        # conductance of cell walls (reduced in the meristematic zone) and the conductances of endodermis and exodermis
-        # barriers (when these barriers are mature, conductance is expected to be 0 in general, and part of the symplasm is
-        # not accessible anymore to the soil solution:
-        non_vascular_exchange_surface = (S_epid + S_hairs) + cond_walls * (cond_exo * S_cortex + cond_endo * S_stele)
-        vascular_exchange_surface = cond_walls * cond_exo * cond_endo * S_vessels
-
-        # CONSIDERING CASES THAT SHOULD BE AVOIDED:
-        # ------------------------------------------
-        # We initialize the rate and the permeability coefficient of the element n:
-        hexose_exudation_rate = 0.
-        phloem_hexose_exudation_rate = 0.
-        corrected_permeability_coeff = 0.
-
-        # We initialize the possibility of exudation:
-        possible_exudation = True
-        # First, we ensure that the element has a positive length and surface of exchange:
-        if length <= 0 or non_vascular_exchange_surface <= 0.:
-            possible_exudation = False
-        # We check whether the concentration of hexose in root is positive or not:
-        if C_hexose_root <= 0.:
-            possible_exudation = False
-            if printing_warnings:
-                print("WARNING: No hexose exudation occurred for node", n.index(),
-                      "because root hexose concentration was", C_hexose_root, "mol/g.")
-
-        if possible_exudation:
-
-            # CALCULATION OF THE PERMEABILITY COEFFICIENT:
-            # ---------------------------------------------
-            # We correct the maximal permeability according to soil temperature:
-            corrected_P_max_apex = param.Pmax_apex \
+    def process_hexose_exudation(self, length, non_vascular_exchange_surface, C_hexose_root, soil_temperature_in_Celsius,
+                                 C_hexose_soil, **kwargs):
+        if length <= 0 or non_vascular_exchange_surface <= 0. or C_hexose_root <= 0.:
+            return 0.
+        else:
+            corrected_P_max_apex = kwargs["Pmax_apex"] \
                                    * self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
-                                                              process_at_T_ref=1,
-                                                              T_ref=param.permeability_coeff_T_ref,
-                                                              A=param.permeability_coeff_A,
-                                                              B=param.permeability_coeff_B,
-                                                              C=param.permeability_coeff_C)
-
-            # # MODIFICATION OF THE PERMEABILITY WITH THE DISTANCE FROM ROOT TIP:
-            # # The description of the evolution of P along the root is adapted from Personeni et al. (2007):
+                                                                   process_at_T_ref=1,
+                                                                   T_ref=kwargs["permeability_coeff_T_ref"],
+                                                                   A=kwargs["permeability_coeff_A"],
+                                                                   B=kwargs["permeability_coeff_B"],
+                                                                   C=kwargs["permeability_coeff_C"])
             # if distance_from_tip < length:
             #     print("!!!ERROR!!! The distance to tip is lower than the length of the root element", vid)
             # else:
@@ -865,467 +756,217 @@ class RootCarbonModel:
             #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
             corrected_permeability_coeff = corrected_P_max_apex
 
-            # CALCULATIONS OF EXUDATION RATE:
-            # --------------------------------
-            # We calculate the rate of hexose exudation, even for dead root elements:
-            hexose_exudation_rate = corrected_permeability_coeff * (
-                        C_hexose_root - C_hexose_soil) * non_vascular_exchange_surface
-            # NOTE : We consider that dead elements still liberate hexose in the soil, until they are empty.
-            if hexose_exudation_rate < 0.:
-                if printing_warnings:
-                    print("WARNING: a negative hexose exudation flux was calculated for the element", n.index(),
-                          "; hexose exudation flux has therefore been set to zero!")
-                hexose_exudation_rate = 0.
+            return max(corrected_permeability_coeff * (C_hexose_root - C_hexose_soil) * non_vascular_exchange_surface, 0)
 
-            # We also include the direct exchange between soil solution and phloem vessels, when these are in direct
-            # contact with the soil solution (e.g. in the meristem, or if a lateral roots disturbs all the barriers):
-            phloem_hexose_exudation_rate = corrected_permeability_coeff * (2 * C_sucrose_root - C_hexose_soil) \
-                                           * vascular_exchange_surface
-
-        # RECORDING THE RESULTS:
-        # ----------------------
-        # Eventually, we record all new values in the element n:
-        n.hexose_exudation_rate = hexose_exudation_rate
-        n.phloem_hexose_exudation_rate = phloem_hexose_exudation_rate
-        n.total_exudation_rate = hexose_exudation_rate + phloem_hexose_exudation_rate
-        n.permeability_coeff = corrected_permeability_coeff
-
-        return n
+    def process_phloem_hexose_exudation(self, length, non_vascular_exchange_surface, C_hexose_root,
+                                        soil_temperature_in_Celsius, C_sucrose_root, C_hexose_soil,
+                                        vascular_exchange_surface, **kwargs):
+        if length <= 0 or non_vascular_exchange_surface <= 0. or C_hexose_root <= 0.:
+            return 0.
+        else:
+            corrected_P_max_apex = kwargs["Pmax_apex"] \
+                                   * self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
+                                                                   process_at_T_ref=1,
+                                                                   T_ref=kwargs["permeability_coeff_T_ref"],
+                                                                   A=kwargs["permeability_coeff_A"],
+                                                                   B=kwargs["permeability_coeff_B"],
+                                                                   C=kwargs["permeability_coeff_C"])
+            # if distance_from_tip < length:
+            #     print("!!!ERROR!!! The distance to tip is lower than the length of the root element", vid)
+            # else:
+            #     corrected_permeability_coeff = corrected_P_max_apex \
+            #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
+            corrected_permeability_coeff = corrected_P_max_apex
+            return corrected_permeability_coeff * (2 * C_sucrose_root - C_hexose_soil) * vascular_exchange_surface
 
     # Uptake of hexose from the soil by the root:
     # -------------------------------------------
-    def root_hexose_uptake_from_soil_rate(self, n, soil_temperature_in_Celsius=20, printing_warnings=False):
-        """
-        This function computes the rate of hexose uptake by roots from the soil. This influx of hexose is represented
-        as an active process with a substrate-limited relationship (Michaelis-Menten function) depending on the hexose
-        concentration in the soil.
-        :param n: the root element to be considered
-        :param soil_temperature_in_Celsius: the temperature experience by the root element n
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
-        :return: the updated root element n
-        """
+    # This function computes the rate of hexose uptake by roots from the soil. This influx of hexose is represented
+    # as an active process with a substrate-limited relationship (Michaelis-Menten function) depending on the hexose
+    # concentration in the soil.
 
-        # READING THE VALUES:
-        # --------------------
-        # We read the values of interest in the element n only once, so that it's not called too many times:
-        type = n.type
-        length = n.length
-        C_hexose_soil = n.C_hexose_soil
+    def process_hexose_uptake_from_soil(self, length, non_vascular_exchange_surface, C_hexose_soil, type,
+                                        soil_temperature_in_Celsius, **kwargs):
+        if length <= 0 or non_vascular_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
+            return 0.
+        else:
+            corrected_uptake_rate_max = kwargs["uptake_rate_max"] \
+                                        * self.temperature_modification(
+                temperature_in_Celsius=soil_temperature_in_Celsius,
+                process_at_T_ref=1,
+                T_ref=kwargs["uptake_rate_max_T_ref"],
+                A=kwargs["uptake_rate_max_A"],
+                B=kwargs["uptake_rate_max_B"],
+                C=kwargs["uptake_rate_max_C"])
 
-        S_epid = n.epidermis_surface_without_hairs
-        S_hairs = n.living_root_hairs_external_surface
-        S_cortex = n.cortical_parenchyma_surface
-        S_stele = n.stelar_parenchyma_surface
-        S_vessels = n.phloem_surface
+            return corrected_uptake_rate_max * non_vascular_exchange_surface \
+                                           * C_hexose_soil / (kwargs["Km_uptake"] + C_hexose_soil)
 
-        cond_walls = n.relative_conductance_walls
-        cond_exo = n.relative_conductance_exodermis
-        cond_endo = n.relative_conductance_endodermis
+    def process_phloem_hexose_uptake_from_soil(self, length, vascular_exchange_surface, C_hexose_soil, type,
+                                        soil_temperature_in_Celsius,  **kwargs):
+        if length <= 0 or vascular_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
+            return 0.
+        else:
+            corrected_uptake_rate_max = kwargs["uptake_rate_max"] \
+                                        * self.temperature_modification(
+                temperature_in_Celsius=soil_temperature_in_Celsius,
+                process_at_T_ref=1,
+                T_ref=kwargs["uptake_rate_max_T_ref"],
+                A=kwargs["uptake_rate_max_A"],
+                B=kwargs["uptake_rate_max_B"],
+                C=kwargs["uptake_rate_max_C"])
 
-        # We calculate the total surface of exchange between symplasm and apoplasm in the root parenchyma, modulated by the
-        # conductance of cell walls (reduced in the meristematic zone) and the conductances of endodermis and exodermis
-        # barriers (when these barriers are mature, conductance is expected to be 0 in general, and part of the symplasm is
-        # not accessible anymore to the soil solution:
-        non_vascular_exchange_surface = (S_epid + S_hairs) + cond_walls * (cond_exo * S_cortex + cond_endo * S_stele)
-        vascular_exchange_surface = cond_walls * cond_exo * cond_endo * S_vessels
-
-        # CONSIDERING CASES THAT SHOULD BE AVOIDED:
-        # -----------------------------------------
-        # We initialize the rate of the element n:
-        hexose_uptake_from_soil_rate = 0.
-        phloem_hexose_uptake_from_soil_rate = 0.
-
-        # We initialize the possibility of uptake:
-        possible_uptake = True
-        # First, we ensure that the element has a positive length and surface of exchange:
-        if length <= 0 or non_vascular_exchange_surface <= 0.:
-            possible_uptake = False
-        # We check whether the concentration of hexose in root is positive or not:
-        if C_hexose_soil <= 0.:
-            possible_uptake = False
-            if printing_warnings:
-                print("WARNING: No hexose uptake occurred for node", n.index(),
-                      "because soil hexose concentration was", C_hexose_soil, "mol/g.")
-        # We consider that dead elements cannot take up any hexose from the soil:
-        if n.type == "Just_dead" or n.type == "Dead":
-            # TODO: Is it really correct to consider that Just_dead elements did not take up hexose over a given time step?
-            possible_uptake = False
-
-        if possible_uptake:
-            # CALCULATION OF THE MAXIMAL UPTAKE:
-            # ----------------------------------
-            # We correct the maximal uptake rate according to soil temperature:
-            corrected_uptake_rate_max = param.uptake_rate_max \
-                                        * self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
-                                                                   process_at_T_ref=1,
-                                                                   T_ref=param.uptake_rate_max_T_ref,
-                                                                   A=param.uptake_rate_max_A,
-                                                                   B=param.uptake_rate_max_B,
-                                                                   C=param.uptake_rate_max_C)
-
-            # CALCULATIONS OF UPTAKE RATE:
-            # ----------------------------
-            # We calculate the rate of hexose uptake:
-            hexose_uptake_from_soil_rate = corrected_uptake_rate_max * non_vascular_exchange_surface \
-                                           * C_hexose_soil / (param.Km_uptake + C_hexose_soil)
-
-            # NEW: we also include the direct exchange between soil solution and phloem vessels, when these are in direct
-            # contact with the soil solution (e.g. in the meristem, or if a lateral roots disturbs all the barriers):
-            phloem_hexose_uptake_from_soil_rate = corrected_uptake_rate_max * vascular_exchange_surface \
-                                                  * C_hexose_soil / (param.Km_uptake + C_hexose_soil)
-            # NOTE: We consider that the uptake rate though the surface of the phloem vessels in contact with
-            # the solution is the same as through the surface of the parenchyma cells where the mobile pool is kept!
-
-        # RECORDING THE RESULTS:
-        # ----------------------
-        # Eventually, we record the new rate:
-        n.hexose_uptake_from_soil_rate = hexose_uptake_from_soil_rate
-        n.phloem_hexose_uptake_from_soil_rate = phloem_hexose_uptake_from_soil_rate
-        n.total_hexose_uptake_from_soil_rate = hexose_uptake_from_soil_rate + phloem_hexose_uptake_from_soil_rate
-
-        return n
+            return corrected_uptake_rate_max * vascular_exchange_surface * C_hexose_soil / (
+                    kwargs["Km_uptake"] + C_hexose_soil)
 
     # Mucilage secretion:
     # ------------------
-    def mucilage_secretion_rate(self, n, soil_temperature_in_Celsius=20, printing_warnings=False):
-        """
-        This function computes the rate of mucilage secretion (in mol of equivalent hexose per second) for a given root element n.
-        :param n: the root element to be considered
-        :param soil_temperature_in_Celsius: the temperature experience by the root element n
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
-        :return: the updated root element n
-        """
-
-        # READING THE VALUES:
-        # --------------------
-        # We read the values of interest in the element n only once, so that it's not called too many times:
-        type = n.type
-        length = n.length
-        original_radius = n.original_radius
-        distance_from_tip = n.distance_from_tip
-        C_hexose_root = n.C_hexose_root
-        Cs_mucilage_soil = n.Cs_mucilage_soil
-
-        # We calculate the total surface of exchange with the soil for mucilage secretion:
-        exchange_surface = n.external_surface + n.living_root_hairs_external_surface
-
-        # CONSIDERING CASES THAT SHOULD BE AVOIDED:
-        # ------------------------------------------
-        # We initialize the rate of the element n:
-        mucilage_secretion_rate = 0.
-
-        # We initialize the possibility of mucilage secretion:
-        possible_secretion = True
+    # This function computes the rate of mucilage secretion (in mol of equivalent hexose per second) for a given root element n.
+    def process_mucilage_secretion(self, length, exchange_surface, C_hexose_root, type, distance_from_tip,
+                                   soil_temperature_in_Celsius, original_radius, Cs_mucilage_soil,  **kwargs):
         # First, we ensure that the element has a positive length and surface of exchange:
-        if length <= 0 or exchange_surface <= 0.:
-            possible_secretion = False
-        # We check whether the concentration of hexose in root is positive or not:
-        if C_hexose_root <= 0.:
-            possible_secretion = False
-            if printing_warnings:
-                print("WARNING: No mucilage secretion occurred for node", n.index(),
-                      "because root hexose concentration was", C_hexose_root, "mol/g.")
-        # We consider that dead elements cannot secrete any mucilage:
-        if n.type == "Dead":
-            possible_secretion = False
-        # We consider that elements from an axis that has stopped growing (e.g. apices) do not secrete any mucilage anymore:
-        if n.type == "Stopped":
-            possible_secretion = False
-
-        # TODO: Shouldn't we also introduce a limit with dist-to_tip, so that elements too far away from the tip are not even considered?
-
-        if possible_secretion:
-
-            # CALCULATION OF THE MAXIMAL RATE OF SECRETION:
-            # ---------------------------------------------
+        if length <= 0 or exchange_surface <= 0. or C_hexose_root <= 0. or type == "Dead" or type == "Stopped" or distance_from_tip < length:
+            return 0.
+        else:
             # We correct the maximal secretion rate according to soil temperature
             # (This could to a bell-shape where the maximum is obtained at 27 degree Celsius,
             # as suggested by Morré et al. (1967) for maize mucilage secretion):
-            corrected_secretion_rate_max = param.secretion_rate_max \
-                                           * self.temperature_modification(
+            corrected_secretion_rate_max = kwargs["secretion_rate_max"] * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
-                T_ref=param.secretion_rate_max_T_ref,
-                A=param.secretion_rate_max_A,
-                B=param.secretion_rate_max_B,
-                C=param.secretion_rate_max_C)
-
-            # We modify the maximal secretion rate according to the distance to the apex, similarly to
-            # what has been done for hexose exudation:
-            if distance_from_tip < length:
-                print("!!!ERROR!!! The distance to tip is lower than the length of the root element", vid)
-                corrected_secretion_rate_max = 0.
-            else:
-                # TODO: Re-visit this formalism of mucilage secretion along roots (e.g. should it include root hairs)?
-                corrected_secretion_rate_max = corrected_secretion_rate_max \
-                                               / (1 + (
-                            distance_from_tip - length / 2.) / original_radius) ** param.gamma_secretion
-
-            # We also regulate the rate according to the potential accumulation of mucilage around the root:
-            # the rate is maximal when no mucilage accumulates around, and linearily decreases with the concentration
-            # of mucilage at the soil-root interface, until reaching 0 when the concentration is equal or higher than
-            # the maximal concentration soil (NOTE: Cs_mucilage_soil is expressed in mol of equivalent hexose per m2 of
-            # external surface):
-            corrected_secretion_rate_max = corrected_secretion_rate_max \
-                                           * (
-                                                       param.Cs_mucilage_soil_max - Cs_mucilage_soil) / param.Cs_mucilage_soil_max
+                T_ref=kwargs["secretion_rate_max_T_ref"],
+                A=kwargs["secretion_rate_max_A"],
+                B=kwargs["secretion_rate_max_B"],
+                C=kwargs["secretion_rate_max_C"]
+                # We also regulate the rate according to the potential accumulation of mucilage around the root:
+                # the rate is maximal when no mucilage accumulates around, and linearily decreases with the concentration
+                # of mucilage at the soil-root interface, until reaching 0 when the concentration is equal or higher than
+                # the maximal concentration soil (NOTE: Cs_mucilage_soil is expressed in mol of equivalent hexose per m2 of
+                # external surface):
+                ) / (
+                (1 + (distance_from_tip - length / 2.) / original_radius) ** kwargs["gamma_secretion"]
+                ) * (
+                param.Cs_mucilage_soil_max - Cs_mucilage_soil) / kwargs["Cs_mucilage_soil_max"]
             # TODO: Validate this linear decrease until reaching the max surfacic density.
 
-            # We verify that the rate is not negative:
-            if corrected_secretion_rate_max < 0.:
-                corrected_secretion_rate_max = 0.
-
-            # CALCULATIONS OF SECRETION RATE:
-            # --------------------------------
-            # We calculate the rate of secretion according to a Michaelis-Menten formalis:
-            mucilage_secretion_rate = corrected_secretion_rate_max * exchange_surface \
-                                      * C_hexose_root / (param.Km_secretion + C_hexose_root)
-            # TODO: Should the mucilage secretion really be limited by hexose availability, or should it rather depend on the growth rate?
-
-        # RECORDING THE RESULTS:
-        # ----------------------
-        # Eventually, we record all new values in the element n:
-        n.mucilage_secretion_rate = mucilage_secretion_rate
-
-        return n
+            return max(corrected_secretion_rate_max * exchange_surface * C_hexose_root / (
+                    kwargs["Km_secretion"] + C_hexose_root), 0.)
 
     # Release of root cells:
     # ----------------------
-    def cells_release_rate(self, n, soil_temperature_in_Celsius=20, printing_warnings=False):
-        """
-        This function computes the rate of release of epidermal or cap root cells (in mol of equivalent hexose per second)
-        into the soil for a given root element. The rate of release linearily decreases with increasing length from the tip,
-        until reaching 0 at the end of the elongation zone. The external concentration of root cells (mol of equivalent-
-        hexose per m2) is also linearily decreasing the release of cells at the interface.
-        :param n: the root element to be considered
-        :param soil_temperature_in_Celsius: the temperature experience by the root element n
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
-        :return: the updated root element n
-        """
+    # This function computes the rate of release of epidermal or cap root cells (in mol of equivalent hexose per second)
+    # into the soil for a given root element. The rate of release linearily decreases with increasing length from the tip,
+    # until reaching 0 at the end of the elongation zone. The external concentration of root cells (mol of equivalent-
+    # hexose per m2) is also linearily decreasing the release of cells at the interface.
 
-        # READING THE VALUES:
-        # --------------------
-        # We read the values of interest in the element n only once, so that it's not called too many times:
-        type = n.type
-        length = n.length
-        radius = n.radius
-        distance_from_tip = n.distance_from_tip
-        C_hexose_root = n.C_hexose_root
-        Cs_cells_soil = n.Cs_cells_soil
-
-        # We calculate the total surface of exchange with the soil for mucilage secretion:
-        exchange_surface = n.external_surface
-
-        # CONSIDERING CASES THAT SHOULD BE AVOIDED:
-        # ------------------------------------------
-        # We initialize the rate of the element n:
-        cells_release_rate = 0.
-
-        # We initialize the possibility of cells release:
-        possible_cells_release = True
-
+    def process_cells_release(self, length, exchange_surface, C_hexose_root, type, distance_from_tip, radius,
+                           soil_temperature_in_Celsius, Cs_cells_soil, **kwargs):
         # First, we ensure that the element has a positive length and surface of exchange:
-        if length <= 0 or exchange_surface <= 0.:
-            possible_cells_release = False
-
-        # Then we also make sure that there is some hexose available in the root to produce the cells:
-        if C_hexose_root <= 0.:
-            possible_cells_degradation = False
-            if printing_warnings:
-                print("WARNING: No cells release occurred for node", n.index(),
-                      "because root hexose concentration was", C_hexose_root, "mol/g.")
-
-        # We consider that dead root elements can't release cells anymore:
-        if n.type == "Just_dead" or n.type == "Dead":
-            possible_cells_release = False
-
-        # We also consider that if the root axis has stopped elongating, no cells are released anymore:
-        if n.type == "Stopped":
-            possible_cells_release = False
-
-        if possible_cells_release:
-
-            # CALCULATION OF THE MAXIMAL RATE OF CELLS RELEASE:
-            # --------------------------------------------------
-
+        if length <= 0 or exchange_surface <= 0. or C_hexose_root <= 0. or type == "Just_dead" or type == "Dead" or type == "Stopped":
+            return 0.
+        else:
             # We modify the maximal surfacic release rate according to the mean distance to the tip (in the middle of the
             # root element), assuming that the release decreases linearily with the distance to the tip, until reaching 0
             # when the this distance becomes higher than the growing zone length:
-            if distance_from_tip < param.growing_zone_factor * radius:
+            if distance_from_tip < kwargs["growing_zone_factor"] * radius:
                 average_distance = distance_from_tip - length / 2.
-                reduction = (param.growing_zone_factor * radius - average_distance) \
-                            / (param.growing_zone_factor * radius)
-                cells_surfacic_release = param.surfacic_cells_release_rate * reduction
+                reduction = (kwargs["growing_zone_factor"] * radius - average_distance) \
+                            / (kwargs["growing_zone_factor"] * radius)
+                cells_surfacic_release = kwargs["surfacic_cells_release_rate"] * reduction
             # In the special case where the end of the growing zone is located somewhere on the root element:
-            elif distance_from_tip - length < param.growing_zone_factor * radius:
-                average_distance = (distance_from_tip - length) + (param.growing_zone_factor * radius
+            elif distance_from_tip - length < kwargs["growing_zone_factor"] * radius:
+                average_distance = (distance_from_tip - length) + (kwargs["growing_zone_factor"] * radius
                                                                    - (distance_from_tip - length)) / 2.
-                reduction = (param.growing_zone_factor * radius - average_distance) \
-                            / (param.growing_zone_factor * radius)
-                cells_surfacic_release = param.surfacic_cells_release_rate * reduction
+                reduction = (kwargs["growing_zone_factor"] * radius - average_distance) \
+                            / (kwargs["growing_zone_factor"] * radius)
+                cells_surfacic_release = kwargs["surfacic_cells_release_rate"] * reduction
             # Otherwise, there is no cells release:
             else:
-                cells_surfacic_release = 0.
+                return 0.
 
             # We correct the release rate according to soil temperature:
-            corrected_cells_surfacic_release = cells_surfacic_release \
-                                               * self.temperature_modification(
+            corrected_cells_surfacic_release = cells_surfacic_release * self.temperature_modification(
                 temperature_in_Celsius=soil_temperature_in_Celsius,
                 process_at_T_ref=1,
-                T_ref=param.surfacic_cells_release_rate_T_ref,
-                A=param.surfacic_cells_release_rate_A,
-                B=param.surfacic_cells_release_rate_B,
-                C=param.surfacic_cells_release_rate_C)
+                T_ref=kwargs["surfacic_cells_release_rate_T_ref"],
+                A=kwargs["surfacic_cells_release_rate_A"],
+                B=kwargs["surfacic_cells_release_rate_B"],
+                C=kwargs["surfacic_cells_release_rate_C"])
 
             # We also regulate the surface release rate according to the potential accumulation of cells around the root:
             # the rate is maximal when no cells are around, and linearily decreases with the concentration of cells
             # in the soil, until reaching 0 when the concentration is equal or higher than the maximal concentration in the
             # soil (NOTE: Cs_cells_soil is expressed in mol of equivalent hexose per m2 of external surface):
-            corrected_cells_surfacic_release = corrected_cells_surfacic_release \
-                                               * (param.Cs_cells_soil_max - Cs_cells_soil) / param.Cs_cells_soil_max
+            corrected_cells_surfacic_release = corrected_cells_surfacic_release * (
+                    kwargs["Cs_cells_soil_max"] - Cs_cells_soil) / kwargs["Cs_cells_soil_max"]
             # TODO: Validate this linear decrease until reaching the max surfacic density.
 
-            # We verify that cells release is not negative:
-            if corrected_cells_surfacic_release < 0.:
-                corrected_cells_surfacic_release = 0.
-
-            # CALCULATIONS OF CELLS RELEASE RATE:
-            # ------------------------------------
-
             # The release of cells by the root is then calculated according to this surface:
-            cells_release_rate = exchange_surface * corrected_cells_surfacic_release
             # TODO: Are we sure that cells release is not dependent on C availability?
+            return max(exchange_surface * corrected_cells_surfacic_release, 0.)
 
-        # RECORDING THE RESULTS:
-        # ----------------------
-        # Eventually, we record all new values in the element n:
-        n.cells_release_rate = cells_release_rate
+    # These methods calculate the time derivative (dQ/dt) of the amount in each pool, for a given root element, based on
+    # a C balance.
+    # TODO account for struct mass evolution in the update. When is it updated?
+    # TODO FOR TRISTAN: Consider adding N balance here (to be possibly used in the solver).
+    def update_sucrose_root(self, sucrose_root, struct_mass, hexose_production_from_phloem_rate,
+                            phloem_hexose_exudation_rate, sucrose_loading_in_phloem_rate,
+                            phloem_hexose_uptake_from_soil_rate, Deficit_sucrose_root_rate, **kwargs):
+        return sucrose_root + (self.time_steps_in_seconds / struct_mass) * (
+                - hexose_production_from_phloem_rate / 2.
+                - phloem_hexose_exudation_rate / 2.
+                + sucrose_loading_in_phloem_rate
+                + phloem_hexose_uptake_from_soil_rate / 2.
+                - Deficit_sucrose_root_rate)
 
-        return n
+    def update_hexose_reserve(self, hexose_reserve, struct_mass, hexose_immobilization_as_reserve_rate,
+                              hexose_mobilization_from_reserve_rate, Deficit_hexose_reserve_rate, **kwargs):
+        return hexose_reserve * (self.time_steps_in_seconds / struct_mass) * (
+                hexose_immobilization_as_reserve_rate
+                - hexose_mobilization_from_reserve_rate
+                - Deficit_hexose_reserve_rate)
 
-    def calculating_all_growth_independent_fluxes(self, g, n, soil_temperature_in_Celsius, printing_warnings):
-        """
-        This function simply calls all the fluxes-related (not growth-dependent) functions of the model and runs them on a
-        given element n.
-        :param n: the root element to be considered
-        :param soil_temperature_in_Celsius: the temperature experience by the root element n
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the
-        console
-        :return: the updated root element n
-        """
+    def update_hexose_root(self, hexose_root, struct_mass, hexose_exudation_rate, hexose_uptake_from_soil_rate,
+                           mucilage_secretion_rate, cells_release_rate, resp_maintenance_rate,
+                           hexose_consumption_by_growth_rate, hexose_production_from_phloem_rate,
+                           sucrose_loading_in_phloem_rate, hexose_mobilization_from_reserve_rate,
+                           hexose_immobilization_as_reserve_rate, Deficit_hexose_root_rate, **kwargs):
+        return hexose_root * (self.time_steps_in_seconds / struct_mass) * (
+                - hexose_exudation_rate
+                + hexose_uptake_from_soil_rate
+                - mucilage_secretion_rate
+                - cells_release_rate
+                - resp_maintenance_rate / 6.
+                - hexose_consumption_by_growth_rate
+                + hexose_production_from_phloem_rate
+                - 2. * sucrose_loading_in_phloem_rate
+                + hexose_mobilization_from_reserve_rate
+                - hexose_immobilization_as_reserve_rate
+                - Deficit_hexose_root_rate)
 
-        # TODO FOR TRISTAN: Consider adding here N-related rates (or building a similar function to be possibly used in a solver).
-
-        # Unloading of sucrose from phloem and conversion of sucrose into hexose, or reloading of sucrose:
-        # DONE self.exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius, printing_warnings)
-        # Net immobilization of hexose into the reserve pool:
-        # DONE self.exchange_with_reserve_rate(n, soil_temperature_in_Celsius, printing_warnings)
-        # Maintenance respiration:
-        self.maintenance_respiration_rate(n, soil_temperature_in_Celsius, printing_warnings)
-        # Transfer of hexose from the root to the soil:
-        self.root_sugars_exudation_rate(n, soil_temperature_in_Celsius, printing_warnings)
-        # Transfer of hexose from the soil to the root:
-        self.root_hexose_uptake_from_soil_rate(n, soil_temperature_in_Celsius, printing_warnings)
-
-        # TODO : REPORT TO SOIL
-        # # Consumption of hexose in the soil:
-        # soilhexose_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
-        # # Secretion of mucilage into the soil:
-        # soilmucilage_secretion_rate(n, soil_temperature_in_Celsius, printing_warnings)
-        # # Consumption of mucilage in the soil:
-        # soilmucilage_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
-        # # Release of root cells into the soil:
-        # self.cells_release_rate(n, soil_temperature_in_Celsius, printing_warnings)
-        # # Consumption of root cells in the soil:
-        # cells_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
-
-        return n
-
-    def calculating_amounts_from_fluxes(self, n, time_step_in_seconds):
-        """
-        This function simply integrates the values of several fluxes over a given time step for a given root element n.
-        :param n: the root element to be considered
-        :param time_step_in_seconds: the time step over which the amounts will be calculated
-        :return: the updated root element n
-        """
-
-        # TODO FOR TRISTAN: Consider adding N-related amounts here (or building a similar function to be possibly used in a solver).
-
-        n.hexose_production_from_phloem = n.hexose_production_from_phloem_rate * time_step_in_seconds
-        n.sucrose_loading_in_phloem = n.sucrose_loading_in_phloem_rate * time_step_in_seconds
-        n.hexose_immobilization_as_reserve = n.hexose_immobilization_as_reserve_rate * time_step_in_seconds
-        n.hexose_mobilization_from_reserve = n.hexose_mobilization_from_reserve_rate * time_step_in_seconds
-        n.resp_maintenance = n.resp_maintenance_rate * time_step_in_seconds
-        n.hexose_exudation = n.hexose_exudation_rate * time_step_in_seconds
-        n.phloem_hexose_exudation = n.phloem_hexose_exudation_rate * time_step_in_seconds
-        n.hexose_uptake_from_soil = n.hexose_uptake_from_soil_rate * time_step_in_seconds
-        n.phloem_hexose_uptake_from_soil = n.phloem_hexose_uptake_from_soil_rate * time_step_in_seconds
-        n.hexose_degradation = n.hexose_degradation_rate * time_step_in_seconds
-        n.mucilage_secretion = n.mucilage_secretion_rate * time_step_in_seconds
-        n.mucilage_degradation = n.mucilage_degradation_rate * time_step_in_seconds
-        n.cells_release = n.cells_release_rate * time_step_in_seconds
-        n.cells_degradation = n.cells_degradation_rate * time_step_in_seconds
-
-        return n
-
-    def calculating_time_derivatives_of_the_amount_in_each_pool(n):
-        """
-        This function calculates the time derivative (dQ/dt) of the amount in each pool, for a given root element, based on
-        a C balance.
-        :param n: the root element to be considered
-        :return: a dictionary "y_derivatives" containing the values of net evolution rates for each pool.
-        """
-
-        # TODO FOR TRISTAN: Consider adding N balance here (to be possibly used in the solver).
-
-        # We initialize an empty dictionary which will contain the different fluxes:
-        y_derivatives = {}
-
-        # We calculate the derivative of the amount of sucrose for this element
-        # (NOTE: we don't consider here the transfer of sucrose from other elements through the phloem):
-        y_derivatives['sucrose_root'] = \
-            - n.hexose_production_from_phloem_rate / 2. \
-            - n.phloem_hexose_exudation_rate / 2. \
-            + n.sucrose_loading_in_phloem_rate \
-            + n.phloem_hexose_uptake_from_soil_rate / 2. \
-            - n.Deficit_sucrose_root_rate
-
-        # We calculate the derivative of the amount of hexose in the root reserve pool:
-        y_derivatives['hexose_reserve'] = \
-            + n.hexose_immobilization_as_reserve_rate - n.hexose_mobilization_from_reserve_rate \
-            - n.Deficit_hexose_reserve_rate
-
-        # We calculate the derivative of the amount of hexose in the mobile pool of the root:
-        y_derivatives['hexose_root'] = \
-            - n.hexose_exudation_rate + n.hexose_uptake_from_soil_rate \
-            - n.mucilage_secretion_rate \
-            - n.cells_release_rate \
-            - n.resp_maintenance_rate / 6. \
-            - n.hexose_consumption_by_growth_rate \
-            + n.hexose_production_from_phloem_rate - 2. * n.sucrose_loading_in_phloem_rate \
-            + n.hexose_mobilization_from_reserve_rate - n.hexose_immobilization_as_reserve_rate \
-            - n.Deficit_hexose_root_rate
-
-        # We calculate the derivative of the amount of hexose in the soil pool:
-        y_derivatives['hexose_soil'] = \
-            - n.hexose_degradation_rate \
-            + n.hexose_exudation_rate - n.hexose_uptake_from_soil_rate \
-            + n.phloem_hexose_exudation_rate - n.phloem_hexose_uptake_from_soil_rate \
-            - n.Deficit_hexose_soil_rate
-
-        # We calculate the derivative of the amount of mucilage in the soil pool:
-        y_derivatives['mucilage_soil'] = \
-            + n.mucilage_secretion_rate \
-            - n.mucilage_degradation_rate \
-            - n.Deficit_mucilage_soil_rate
-
-        # We calculate the derivative of the amount of root cells in the soil pool:
-        y_derivatives['cells_soil'] = \
-            + n.cells_release_rate \
-            - n.cells_degradation_rate \
-            - n.Deficit_cells_soil_rate
-
-        return y_derivatives
+    # # TODO report to soil
+    # def calculating_time_derivatives_of_the_amount_in_each_pool(n):
+    #
+    #     # We calculate the derivative of the amount of hexose in the soil pool:
+    #     y_derivatives['hexose_soil'] = \
+    #         - n.hexose_degradation_rate \
+    #         + n.hexose_exudation_rate - n.hexose_uptake_from_soil_rate \
+    #         + n.phloem_hexose_exudation_rate - n.phloem_hexose_uptake_from_soil_rate \
+    #         - n.Deficit_hexose_soil_rate
+    #
+    #     # We calculate the derivative of the amount of mucilage in the soil pool:
+    #     y_derivatives['mucilage_soil'] = \
+    #         + n.mucilage_secretion_rate \
+    #         - n.mucilage_degradation_rate \
+    #         - n.Deficit_mucilage_soil_rate
+    #
+    #     # We calculate the derivative of the amount of root cells in the soil pool:
+    #     y_derivatives['cells_soil'] = \
+    #         + n.cells_release_rate \
+    #         - n.cells_degradation_rate \
+    #         - n.Deficit_cells_soil_rate
+    #
+    #     return y_derivatives
 
     def adjusting_pools_and_deficits(self, n, time_step_in_seconds, printing_warnings=False):
         """
@@ -1398,43 +1039,43 @@ class RootCarbonModel:
             # And we set the concentration to 0:
             n.C_hexose_reserve = 0.
 
-        # Looking at hexose in the soil:
-        if n.C_hexose_soil < 0:
-            if printing_warnings:
-                print("WARNING: After balance, there is a deficit of soil hexose for element", n.index(),
-                      "that corresponds to", n.Deficit_hexose_soil,
-                      "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-            # We define a positive deficit (mol of hexose) based on the negative concentration:
-            n.Deficit_hexose_soil = -n.C_hexose_soil * (n.struct_mass + n.living_root_hairs_struct_mass)
-            n.Deficit_hexose_soil_rate = n.Deficit_hexose_soil / time_step_in_seconds
-            # And we set the concentration to 0:
-            n.C_hexose_soil = 0.
+        # TODO : report to soil model
 
-        # Looking at mucilage in the soil:
-        if n.Cs_mucilage_soil < 0:
-            if printing_warnings:
-                print("WARNING: After balance, there is a deficit of soil mucilage for element", n.index(),
-                      "that corresponds to", n.Deficit_mucilage_soil,
-                      "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-            # We define a positive deficit (mol of equivalent-hexose) based on the negative concentration:
-            n.Deficit_mucilage_soil = -n.Cs_mucilage_soil * (n.external_surface + n.living_root_hairs_external_surface)
-            n.Deficit_mucilage_soil_rate = n.Deficit_mucilage_soil / time_step_in_seconds
-            # And we set the concentration to 0:
-            n.Cs_mucilage_soil = 0.
-
-        # Looking at the root cells in the soil:
-        if n.Cs_cells_soil < 0:
-            if printing_warnings:
-                print("WARNING: After balance, there is a deficit of root cells in the soil for element", n.index(),
-                      "that corresponds to", n.Deficit_cells_soil,
-                      "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-            # We define a positive deficit (mol of hexose-equivalent) based on the negative concentration:
-            n.Deficit_cells_soil = -n.Cs_cells_soil * (n.external_surface + n.living_root_hairs_external_surface)
-            n.Deficit_cells_soil_rate = n.Deficit_cells_soil / time_step_in_seconds
-            # And we set the concentration to 0:
-            n.Cs_cells_soil = 0.
-
-        return n
+        # # Looking at hexose in the soil:
+        # if n.C_hexose_soil < 0:
+        #     if printing_warnings:
+        #         print("WARNING: After balance, there is a deficit of soil hexose for element", n.index(),
+        #               "that corresponds to", n.Deficit_hexose_soil,
+        #               "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        #     # We define a positive deficit (mol of hexose) based on the negative concentration:
+        #     n.Deficit_hexose_soil = -n.C_hexose_soil * (n.struct_mass + n.living_root_hairs_struct_mass)
+        #     n.Deficit_hexose_soil_rate = n.Deficit_hexose_soil / time_step_in_seconds
+        #     # And we set the concentration to 0:
+        #     n.C_hexose_soil = 0.
+        #
+        # # Looking at mucilage in the soil:
+        # if n.Cs_mucilage_soil < 0:
+        #     if printing_warnings:
+        #         print("WARNING: After balance, there is a deficit of soil mucilage for element", n.index(),
+        #               "that corresponds to", n.Deficit_mucilage_soil,
+        #               "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        #     # We define a positive deficit (mol of equivalent-hexose) based on the negative concentration:
+        #     n.Deficit_mucilage_soil = -n.Cs_mucilage_soil * (n.external_surface + n.living_root_hairs_external_surface)
+        #     n.Deficit_mucilage_soil_rate = n.Deficit_mucilage_soil / time_step_in_seconds
+        #     # And we set the concentration to 0:
+        #     n.Cs_mucilage_soil = 0.
+        #
+        # # Looking at the root cells in the soil:
+        # if n.Cs_cells_soil < 0:
+        #     if printing_warnings:
+        #         print("WARNING: After balance, there is a deficit of root cells in the soil for element", n.index(),
+        #               "that corresponds to", n.Deficit_cells_soil,
+        #               "; the concentration has been set to 0 and the deficit will be included in the next balance.")
+        #     # We define a positive deficit (mol of hexose-equivalent) based on the negative concentration:
+        #     n.Deficit_cells_soil = -n.Cs_cells_soil * (n.external_surface + n.living_root_hairs_external_surface)
+        #     n.Deficit_cells_soil_rate = n.Deficit_cells_soil / time_step_in_seconds
+        #     # And we set the concentration to 0:
+        #     n.Cs_cells_soil = 0.
 
     # Control of anomalies in the MTG:
     # --------------------------------
@@ -1828,16 +1469,16 @@ class RootCarbonModel:
                 # ---------------------------------------------------
 
                 # We calculate all C-related fluxes (independent of the time step):
-                self.calculating_all_growth_independent_fluxes(self.g, n, self.soil_temperature, printing_warnings)
+                #DONE self.calculating_all_growth_independent_fluxes(self.g, n, self.soil_temperature, printing_warnings)
 
                 # We then calculate the quantities that correspond to these fluxes (dependent of the time step):
-                self.calculating_amounts_from_fluxes(n, time_step_in_seconds)
+                # REPORTED IN UPDATE self.calculating_amounts_from_fluxes(n, time_step_in_seconds)
 
                 # Calculating the new variations of the quantities in each pool over time:
                 # -------------------------------------------------------------------------
                 # We call a dictionary containing the time derivative (dQ/dt) of the amount present in each pool,
                 # based on the C balance:
-                y_time_derivatives = self.calculating_time_derivatives_of_the_amount_in_each_pool(n)
+                # DONE y_time_derivatives = self.calculating_time_derivatives_of_the_amount_in_each_pool(n)
 
                 # Calculating new concentrations based on C balance:
                 # ---------------------------------------------------
@@ -1845,21 +1486,23 @@ class RootCarbonModel:
                 # WATCH OUT: Below, the possible deficits are not included, since they have been already taken into account
                 # as rates in the function "calculating_time_derivatives_of_the_amount_in_each_pool(n)" called above!
 
-                # We calculate the new concentration of sucrose in the root according to sucrose conversion into hexose:
-                sucrose_root_derivative = y_time_derivatives["sucrose_root"] * time_step_in_seconds
-                n.C_sucrose_root = (n.C_sucrose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                                    + sucrose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+                # TODO : get insights from bellow for mass actualization in update methods
 
-                # We calculate the new concentration of hexose in the root cytoplasm:
-                hexose_root_derivative = y_time_derivatives["hexose_root"] * time_step_in_seconds
-                n.C_hexose_root = (n.C_hexose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                                   + hexose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
-
-                # We calculate the new concentration of hexose in the reserve:
-                hexose_reserve_derivative = y_time_derivatives["hexose_reserve"] * time_step_in_seconds
-                n.C_hexose_reserve = (n.C_hexose_reserve * (
-                            n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                                      + hexose_reserve_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+                # # We calculate the new concentration of sucrose in the root according to sucrose conversion into hexose:
+                # sucrose_root_derivative = y_time_derivatives["sucrose_root"] * time_step_in_seconds
+                # n.C_sucrose_root = (n.C_sucrose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
+                #                     + sucrose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+                #
+                # # We calculate the new concentration of hexose in the root cytoplasm:
+                # hexose_root_derivative = y_time_derivatives["hexose_root"] * time_step_in_seconds
+                # n.C_hexose_root = (n.C_hexose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
+                #                    + hexose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+                #
+                # # We calculate the new concentration of hexose in the reserve:
+                # hexose_reserve_derivative = y_time_derivatives["hexose_reserve"] * time_step_in_seconds
+                # n.C_hexose_reserve = (n.C_hexose_reserve * (
+                #             n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
+                #                       + hexose_reserve_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
 
                 # TODO : report to soil
                 # # We calculate the new concentration of hexose in the soil:
@@ -1934,17 +1577,17 @@ class RootCarbonModel:
 
             #  Calculation of additional variables:
             # -------------------------------------
-            self.calculating_extra_variables(n, time_step_in_seconds)
+            # MOVED TO TOOLS self.calculating_extra_variables(n, time_step_in_seconds)
 
-            # SPECIAL CASE: we record the property of the apex of the primary root
-            # ---------------------------------------------------------------------
-            # If the element corresponds to the apex of the primary root:
-            if n.radius == param.D_ini / 2. and n.label == "Apex":
-                # Then the function will give its specific concentration of mobile hexose:
-                tip_C_hexose_root = n.C_hexose_root
-
-        # We return the concentration of hexose in the apex of the primary root:
-        return tip_C_hexose_root
+        #     # SPECIAL CASE: we record the property of the apex of the primary root
+        #     # ---------------------------------------------------------------------
+        #     # If the element corresponds to the apex of the primary root:
+        #     if n.radius == param.D_ini / 2. and n.label == "Apex":
+        #         # Then the function will give its specific concentration of mobile hexose:
+        #         tip_C_hexose_root = n.C_hexose_root
+        #
+        # # We return the concentration of hexose in the apex of the primary root:
+        # return tip_C_hexose_root
 
 
 class RootAnatomy:
