@@ -85,14 +85,59 @@ class RootCarbonModel:
         self.props = self.g.properties()
         self.time_steps_in_seconds = time_step_in_seconds
 
+        # TODO clarify names to be sure we talk about concentrations or amounts
         self.states = """
+            C_sucrose_root
+            sucrose_root
+            C_hexose_root
+            hexose_root
+            
+            C_hexose_soil
+            hexose_soil
+            
+            type
+            struct_mass
+            living_root_hairs_struct_mass
+            length
+            radius
+            original_radius
+            exchange_surface
+            non_vascular_exchange_surface
+            distance_from_tip
         
+            hexose_production_from_phloem
+            phloem_hexose_exudation
+            sucrose_loading_in_phloem
+            phloem_hexose_uptake_from_soil
+            hexose_immobilization_as_reserve
+            hexose_mobilization_from_reserve
+            hexose_exudation
+            hexose_uptake_from_soil
+            mucilage_secretion
+            cells_release
+            resp_maintenance
+            hexose_consumption_by_growth
+            sucrose_loading_in_phloem
+            hexose_mobilization_from_reserve,
+            hexose_immobilization_as_reserve
+            
+            deficit_sucrose_root
+            deficit_hexose_reserve
+            deficit_hexose_root
         """.split()
+
+        for name in self.states:
+            setattr(self, name, self.props[name])
 
         self.inputs = {
             # Common
             "soil": [
-                "soil_temperature"
+                "soil_temperature_in_Celsius"
+                "Cs_mucilage_soil"
+                "Cs_cells_soil"
+            ],
+            "growth": [
+                "hexose_consumption_by_growth"
             ]
         }
 
@@ -128,7 +173,7 @@ class RootCarbonModel:
         self.deficit_args = [[partial(self.get_up_to_date, arg) for arg in ins.getfullargspec(getattr(self, func))[0] if arg != "self"]
                              for func in dir(self) if
                              (callable(getattr(self, func)) and '__' not in func and 'deficit' in func)]
-        self.deficit_names = [func[8:] for func in dir(self) if
+        self.deficit_names = [func for func in dir(self) if
                               (callable(getattr(self, func)) and '__' not in func and 'deficit' in func)]
 
     def exchanges_and_balance(self):
@@ -641,22 +686,22 @@ class RootCarbonModel:
     # a C balance.
     # TODO account for struct mass evolution in the update. When is it updated?
     # TODO FOR TRISTAN: Consider adding N balance here (to be possibly used in the solver).
-    def update_sucrose_root(self, sucrose_root, struct_mass, hexose_production_from_phloem_rate,
-                            phloem_hexose_exudation_rate, sucrose_loading_in_phloem_rate,
-                            phloem_hexose_uptake_from_soil_rate, Deficit_sucrose_root_rate, **kwargs):
+    def update_sucrose_root(self, sucrose_root, struct_mass, hexose_production_from_phloem,
+                            phloem_hexose_exudation, sucrose_loading_in_phloem,
+                            phloem_hexose_uptake_from_soil, deficit_sucrose_root, **kwargs):
         return sucrose_root + (self.time_steps_in_seconds / struct_mass) * (
-                - hexose_production_from_phloem_rate / 2.
-                - phloem_hexose_exudation_rate / 2.
-                + sucrose_loading_in_phloem_rate
-                + phloem_hexose_uptake_from_soil_rate / 2.
-                - Deficit_sucrose_root_rate)
+                - hexose_production_from_phloem / 2.
+                - phloem_hexose_exudation / 2.
+                + sucrose_loading_in_phloem
+                + phloem_hexose_uptake_from_soil / 2.
+                - deficit_sucrose_root)
 
-    def update_hexose_reserve(self, hexose_reserve, struct_mass, hexose_immobilization_as_reserve_rate,
-                              hexose_mobilization_from_reserve_rate, Deficit_hexose_reserve_rate, **kwargs):
+    def update_hexose_reserve(self, hexose_reserve, struct_mass, hexose_immobilization_as_reserve,
+                              hexose_mobilization_from_reserve, deficit_hexose_reserve, **kwargs):
         return hexose_reserve * (self.time_steps_in_seconds / struct_mass) * (
-                hexose_immobilization_as_reserve_rate
-                - hexose_mobilization_from_reserve_rate
-                - Deficit_hexose_reserve_rate)
+                hexose_immobilization_as_reserve
+                - hexose_mobilization_from_reserve
+                - deficit_hexose_reserve)
 
     def update_hexose_root(self, hexose_root, struct_mass, hexose_exudation, hexose_uptake_from_soil,
                            mucilage_secretion, cells_release, resp_maintenance,
