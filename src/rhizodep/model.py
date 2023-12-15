@@ -59,19 +59,30 @@ import pandas as pd
 from math import sqrt, pi, floor, exp, isnan
 from decimal import Decimal
 from scipy.integrate import solve_ivp
+from dataclasses import dataclass, asdict
+import inspect as ins
+from functools import partial
 
 from openalea.mtg import *
 from openalea.mtg.traversal import pre_order, post_order
 
 import rhizodep.parameters as param
 
-# To display more than 5 columns when printing a Panda dataframe:
-pd.set_option('display.max_columns', 20)
+
+@dataclass
+class ProcessCarbon:
+    pass
+
+
+@dataclass
+class UpdateCarbon:
+    pass
 
 
 class RootCarbonModel:
     def __init__(self, g, time_step_in_seconds):
         self.g = g
+        self.props = self.g.properties()
         self.time_steps_in_seconds = time_step_in_seconds
 
         self.states = """
@@ -85,31 +96,85 @@ class RootCarbonModel:
             ]
         }
 
-    # Modification of a process according to soil temperature:
-    # --------------------------------------------------------
+    def store_functions_call(self):
+        # Storing function calls
+        #
+        # Local and plant scale processes...
+        self.process_param = asdict(ProcessCarbon())
+        self.process_methods = [partial(getattr(self, func), **self.process_param)
+                                for func in dir(self) if
+                                (callable(getattr(self, func)) and '__' not in func and 'process' in func)]
+        self.process_args = [[partial(self.get_up_to_date, arg) for arg in ins.getfullargspec(getattr(self, func))[0] if arg != "self"]
+                                for func in dir(self) if
+                                (callable(getattr(self, func)) and '__' not in func and 'process' in func)]
+        self.process_names = [func[8:] for func in dir(self) if
+                                (callable(getattr(self, func)) and '__' not in func and 'process' in func)]
+
+        # Local and plant scale update...
+        self.update_param = asdict(UpdateCarbon())
+        self.update_methods = [partial(getattr(self, func), **self.update_param)
+                                for func in dir(self) if
+                                (callable(getattr(self, func)) and '__' not in func and 'update' in func)]
+        self.update_args = [[partial(self.get_up_to_date, arg) for arg in ins.getfullargspec(getattr(self, func))[0] if arg != "self"]
+                             for func in dir(self) if
+                             (callable(getattr(self, func)) and '__' not in func and 'update' in func)]
+        self.update_names = [func[7:] for func in dir(self) if
+                              (callable(getattr(self, func)) and '__' not in func and 'update' in func)]
+
+        # Local deficits update...
+        self.deficit_methods = [partial(getattr(self, func), **self.update_param)
+                                              for func in dir(self) if
+                                (callable(getattr(self, func)) and '__' not in func and 'deficit' in func)]
+        self.deficit_args = [[partial(self.get_up_to_date, arg) for arg in ins.getfullargspec(getattr(self, func))[0] if arg != "self"]
+                             for func in dir(self) if
+                             (callable(getattr(self, func)) and '__' not in func and 'deficit' in func)]
+        self.deficit_names = [func[8:] for func in dir(self) if
+                              (callable(getattr(self, func)) and '__' not in func and 'deficit' in func)]
 
     def exchanges_and_balance(self):
 
         # 2d - CARBON EXCHANGE
         # ====================
-
+        # TODO initialize new elements based on struct mass property at the same time?
+        # TODO concentrations update related to struct mass update
         # We now proceed to all the exchanges of C for each root element in each root axis
         # (NOTE: the supply of sucrose from the shoot is excluded in this calculation):
-        self.C_exchange_and_balance_in_roots_and_at_the_root_soil_interface()
-        # NOTE: we also use this function to record specifically the concentration of hexose in the root apex
-        # of the primary root!
+        self.props.update(self.prc_resolution())
+        self.props.update(self.upd_resolution())
+
+        # Computing the deficits after this balance
+        self.props.update(self.dfc_resolution())
+        # Then bring concentrations back to 0 if negative
+        # NOTE : a bit raw
+        self.props.update(self.forbid_negatives())
 
         # Supply of sucrose from the shoots to the roots and spreading into the whole phloem:
-        self.shoot_sucrose_supply_and_spreading(sucrose_input_rate=sucrose_input_rate,
-                                                 time_step_in_seconds=time_step_in_seconds,
-                                                 printing_warnings=printing_warnings)
-        # WARNING: The function "shoot_sucrose_supply_and_spreading" must be called AFTER the function "balance",
-        # otherwise the deficit in sucrose may be counted twice!!!
-        # TODO: check this affirmation about the position of shoot_sucrose_supply_and_spreading
+        self.shoot_sucrose_supply_and_spreading()
 
         # # OPTIONAL: checking of possible anomalies in the root system:
-        # model.control_of_anomalies(g)
+        self.control_of_anomalies()
 
+    def prc_resolution(self):
+        return dict(zip([name for name in self.process_names], map(self.dict_mapper, *(self.process_methods, self.process_args))))
+
+    def upd_resolution(self):
+        return dict(zip([name for name in self.update_names], map(self.dict_mapper, *(self.update_methods, self.update_args))))
+
+    def dfc_resolution(self):
+        return dict(zip([name for name in self.deficit_names], map(self.dict_mapper, *(self.deficit_methods, self.deficit_args))))
+
+    def forbid_negatives(self):
+        return dict(zip(["hexose_root", "hexose_reserve", "sucrose_root"],
+                        map(self.dict_mapper, *([partial(max, 0.)]*3, [self.hexose_root, self.hexose_reserve, self.sucrose_root]))))
+
+    def dict_mapper(self, fcn, args):
+        return dict(zip(args[0](), map(fcn, *(d().values() for d in args))))
+
+    def get_up_to_date(self, prop):
+        return getattr(self, prop)
+
+    # Modification of a process according to soil temperature:
+    # --------------------------------------------------------
     def temperature_modification(self, temperature_in_Celsius, process_at_T_ref=1., T_ref=0., A=-0.05, B=3., C=1.):
         """
         This function calculates how the value of a process should be modified according to soil temperature (in degrees Celsius).
@@ -154,379 +219,47 @@ class RootCarbonModel:
 
         return modified_process
 
-    ########################################################################################################################
-
-    ########################################################################################################################
-    ########################################################################################################################
-    # MODULE "ACTUAL GROWTH AND ASSOCIATED RESPIRATION"
-    ########################################################################################################################
-    ########################################################################################################################
-
-    # Actual elongation, radial growth and growth respiration of root elements:
-    # --------------------------------------------------------------------------
-    def actual_growth_and_corresponding_respiration(self, g, time_step_in_seconds, soil_temperature_in_Celsius=20,
-                                                    printing_warnings=False):
-        """
-        This function defines how a segment, an apex and possibly an emerging root primordium will grow according to the amount
-        of hexose present in the segment, taking into account growth respiration based on the model of Thornley and Cannell
-        (2000). The calculation is based on the values of potential_radius, potential_length, lateral_root_emergence_possibility
-        and emergence_cost defined in each element by the module "POTENTIAL GROWTH".
-        The function returns the MTG "g" with modified values of radius and length of each element, the possibility of the
-        emergence of lateral roots, and the cost of growth in terms of hexose consumption.
-        :param g: the root MTG to be considered
-        :param time_step_in_seconds: the time step over which growth is considered
-        :param soil_temperature_in_Celsius: the same, homogeneous temperature experienced by the whole root system
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
-        :return: g, the updated MTG
-        """
-
-        # TODO FOR TRISTAN: Here you would need to explicit at least a cost of N associated to the actual growth,
-        #  and consider how to limit the actual growth when not enough N is available.
-        #  In a second step, you may consider how the emergence of primordia may depend on N availability in the root or in the soil.
-
-        # CALCULATING AN EQUIVALENT OF THERMAL TIME:
-        # -------------------------------------------
-
-        # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
-        # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = self.temperature_modification(temperature_in_Celsius=soil_temperature_in_Celsius,
-                                                               process_at_T_ref=1,
-                                                               T_ref=param.root_growth_T_ref,
-                                                               A=param.root_growth_A,
-                                                               B=param.root_growth_B,
-                                                               C=param.root_growth_C)
-
-        # PROCEEDING TO ACTUAL GROWTH:
-        # -----------------------------
-
-        # We have to cover each vertex from the apices up to the base one time:
-        root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
-        root = next(root_gen)
-        # We cover all the vertices in the MTG, from the tips to the base:
-        for vid in post_order(g, root):
-
-            # n represents the current root element:
-            n = g.node(vid)
-
-            # AVOIDANCE OF UNWANTED CASES:
-            # -----------------------------
-            # We make sure that the element is not dead:
-            if n.type == "Dead" or n.type == "Just_dead" or n.type == "Support_for_seminal_root" or n.type == "Support_for_adventitious_root":
-                # In such case, we just pass to the next element in the iteration:
-                continue
-
-            # We make sure that there is a potential growth for this element:
-            if n.potential_length <= n.initial_length and n.potential_radius <= n.initial_radius:
-                # In such case, we just pass to the next element in the iteration:
-                continue
-
-            # INITIALIZATION AND CALCULATIONS OF POTENTIAL GROWTH DEMAND IN HEXOSE:
-            # ----------------------------------------------------------------------
-
-            # WARNING: All growth related variables should have been initialized by another module at the beginning of the time step!!!
-
-            # We calculate the initial volume of the element:
-            initial_volume = \
-            TODOvolume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.initial_length)["volume"]
-            # We calculate the potential volume of the element based on the potential radius and potential length:
-            potential_volume = \
-            TODOvolume_and_external_surface_from_radius_and_length(g, n, n.potential_radius, n.potential_length)["volume"]
-            # We calculate the number of moles of hexose required for growth, including the respiration cost according to
-            # the yield growth included in the model of Thornley and Cannell (2000), where root_tissue_density is the dry structural
-            # weight per volume (g m-3) and struct_mass_C_content is the amount of C per gram of dry structural mass (mol_C g-1):
-            n.hexose_growth_demand = (potential_volume - initial_volume) \
-                                     * param.root_tissue_density * param.struct_mass_C_content / param.yield_growth * 1 / 6.
-            # We verify that this potential growth demand is positive:
-            if n.hexose_growth_demand < 0.:
-                print("!!! ERROR: a negative growth demand of", n.hexose_growth_demand,
-                      "was calculated for the element", n.index(), "of class", n.label)
-                print("The initial volume is", initial_volume, "the potential volume is", potential_volume)
-                print("The initial length was", n.initial_length, "and the potential length was", n.potential_length)
-                print("The initial radius was", n.initial_radius, "and the potential radius was", n.potential_radius)
-                n.hexose_growth_demand = 0.
-                # In such case, we just pass to the next element in the iteration:
-                continue
-            elif n.hexose_growth_demand == 0.:
-                continue
-
-            # CALCULATIONS OF THE AMOUNT OF HEXOSE AVAILABLE FOR GROWTH:
-            # ---------------------------------------------------------
-
-            # We initialize each amount of hexose available for growth:
-            hexose_possibly_required_for_elongation = 0.
-            hexose_available_for_thickening = 0.
-
-            # If elongation is possible:
-            if n.potential_length > n.length:
-                hexose_possibly_required_for_elongation = n.hexose_possibly_required_for_elongation
-                list_of_elongation_supporting_elements = n.list_of_elongation_supporting_elements
-                list_of_elongation_supporting_elements_hexose = n.list_of_elongation_supporting_elements_hexose
-                list_of_elongation_supporting_elements_mass = n.list_of_elongation_supporting_elements_mass
-
-            # If radial growth is possible:
-            if n.potential_radius > n.radius:
-                # We only consider the amount of hexose immediately available in the element that can increase in radius:
-                hexose_available_for_thickening = n.hexose_available_for_thickening
-
-            # In case no hexose is available at all:
-            if (hexose_possibly_required_for_elongation + hexose_available_for_thickening) <= 0.:
-                # Then we move to the next element in the main loop:
-                continue
-
-            # We initialize the temporary variable "remaining_hexose" that computes the amount of hexose left for growth:
-            remaining_hexose_for_elongation = hexose_possibly_required_for_elongation
-            remaining_hexose_for_thickening = hexose_available_for_thickening
-
-            # ACTUAL ELONGATION IS FIRST CONSIDERED:
-            # ---------------------------------------
-
-            # We calculate the maximal possible length of the root element according to all the hexose available for elongation:
-            volume_max = initial_volume + hexose_possibly_required_for_elongation * 6. \
-                         / (param.root_tissue_density * param.struct_mass_C_content) * param.yield_growth
-            length_max = volume_max / (pi * n.initial_radius ** 2)
-
-            # If the element can elongate:
-            if n.potential_length > n.initial_length:
-
-                # CALCULATING ACTUAL ELONGATION:
-                # If elongation is possible but is limited by the amount of hexose available:
-                if n.potential_length >= length_max:
-                    # Elongation is limited using all the amount of hexose available:
-                    n.length = length_max
-                # Otherwise, elongation can be done up to the full potential:
-                else:
-                    # Elongation is done up to the full potential:
-                    n.length = n.potential_length
-                # The corresponding new volume is calculated:
-                volume_after_elongation = (pi * n.initial_radius ** 2) * n.length
-                # The overall cost of elongation is calculated as:
-                hexose_consumption_by_elongation = \
-                    1. / 6. * (volume_after_elongation - initial_volume) \
-                    * param.root_tissue_density * param.struct_mass_C_content / param.yield_growth
-
-                # If there has been an actual elongation:
-                if n.length > n.initial_length:
-
-                    # REGISTERING THE COSTS FOR ELONGATION:
-                    # We cover each of the elements that have provided hexose for sustaining the elongation of element n:
-                    for i in range(0, len(list_of_elongation_supporting_elements)):
-                        index = list_of_elongation_supporting_elements[i]
-                        supplying_element = g.node(index)
-                        # We define the actual contribution of the current element based on total hexose consumption by growth
-                        # of element n and the relative contribution of the current element to the pool of the available hexose:
-                        hexose_actual_contribution_to_elongation = hexose_consumption_by_elongation \
-                                                                   * list_of_elongation_supporting_elements_hexose[i] \
-                                                                   / hexose_possibly_required_for_elongation
-                        # The amount of hexose used for growth in this element is increased:
-                        supplying_element.hexose_consumption_by_growth += hexose_actual_contribution_to_elongation
-                        supplying_element.hexose_consumption_by_growth_rate += hexose_actual_contribution_to_elongation / time_step_in_seconds
-                        # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
-                        supplying_element.resp_growth += hexose_actual_contribution_to_elongation \
-                                                         * (1 - param.yield_growth) * 6.
-
-            # ACTUAL RADIAL GROWTH IS THEN CONSIDERED:
-            # -----------------------------------------
-
-            # If the radius of the element can increase:
-            if n.potential_radius > n.initial_radius:
-
-                # CALCULATING ACTUAL THICKENING:
-                # We calculate the increase in volume that can be achieved with the amount of hexose available:
-                possible_radial_increase_in_volume = \
-                    remaining_hexose_for_thickening * 6. * param.yield_growth \
-                    / (param.root_tissue_density * param.struct_mass_C_content)
-                # We calculate the maximal possible volume based on the volume of the new cylinder after elongation
-                # and the increase in volume that could be achieved by consuming all the remaining hexose:
-                volume_max = TODOvolume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.length)[
-                                 "volume"] \
-                             + possible_radial_increase_in_volume
-                # We then calculate the corresponding new possible radius corresponding to this maximum volume:
-                if n.type == "Root_nodule":
-                    # If the element corresponds to a nodule, then it we calculate the radius of a theoretical sphere:
-                    possible_radius = (3. / (4. * pi)) ** (1. / 3.)
-                else:
-                    # Otherwise, we calculate the radius of a cylinder:
-                    possible_radius = sqrt(volume_max / (n.length * pi))
-                if possible_radius < 0.9999 * n.initial_radius:  # We authorize a difference of 0.01% due to calculation errors!
-                    print("!!! ERROR: the calculated new radius of element", n.index(),
-                          "is lower than the initial one!")
-                    print("The possible radius was", possible_radius, "and the initial radius was", n.initial_radius)
-
-                # If the maximal radius that can be obtained is lower than the potential radius suggested by the potential growth module:
-                if possible_radius <= n.potential_radius:
-                    # Then radial growth is limited and there is no remaining hexose after radial growth:
-                    n.radius = possible_radius
-                    hexose_actual_contribution_to_thickening = remaining_hexose_for_thickening
-                    remaining_hexose_for_thickening = 0.
-                else:
-                    # Otherwise, radial growth is done up to the full potential and the remaining hexose is calculated:
-                    n.radius = n.potential_radius
-                    net_increase_in_volume = \
-                    TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"] \
-                    - TODOvolume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.length)["volume"]
-                    # net_increase_in_volume = pi * (n.radius ** 2 - n.initial_radius ** 2) * n.length
-                    # We then calculate the remaining amount of hexose after thickening:
-                    hexose_actual_contribution_to_thickening = \
-                        1. / 6. * net_increase_in_volume \
-                        * param.root_tissue_density * param.struct_mass_C_content / param.yield_growth
-
-                # REGISTERING THE COSTS FOR THICKENING:
-                # --------------------------------------
-                fraction_of_available_hexose_in_the_element = \
-                    (n.C_hexose_root * n.initial_struct_mass) / hexose_available_for_thickening
-                # The amount of hexose used for growth in this element is increased:
-                n.hexose_consumption_by_growth += \
-                    (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
-                n.hexose_consumption_by_growth_rate += \
-                    (
-                                hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) / time_step_in_seconds
-                # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
-                n.resp_growth += \
-                    (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) \
-                    * (1 - param.yield_growth) * 6.
-                if n.type == "Root_nodule":
-                    index_parent = g.Father(n.index(), EdgeType='+')
-                    parent = g.node(index_parent)
-                    fraction_of_available_hexose_in_the_element = \
-                        (parent.C_hexose_root * parent.initial_struct_mass) / hexose_available_for_thickening
-                    # The amount of hexose used for growth in this element is increased:
-                    parent.hexose_consumption_by_growth += \
-                        (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
-                    parent.hexose_consumption_by_growth_rate += \
-                        (
-                                    hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) / time_step_in_seconds
-                    # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
-                    parent.resp_growth += \
-                        (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) \
-                        * (1 - param.yield_growth) * 6.
-
-            # RECORDING THE ACTUAL STRUCTURAL MODIFICATIONS:
-            # -----------------------------------------------
-
-            # The new volume and surfaces of the element is automatically calculated:
-            n.external_surface = TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)[
-                "external_surface"]
-            n.volume = TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"]
-            # The new dry structural struct_mass of the element is calculated from its new volume:
-            n.struct_mass = n.volume * param.root_tissue_density
-            n.struct_mass_produced = (n.volume - initial_volume) * param.root_tissue_density
-
-            # Verification: we check that no negative length or struct_mass have been generated!
-            if n.volume < 0:
-                print("!!! ERROR: the element", n.index(), "of class", n.label, "has a length of", n.length,
-                      "and a mass of", n.struct_mass)
-                # We then reset all the geometrical values to their initial values:
-                n.length = n.initial_length
-                n.radius = n.initial_radius
-                n.struct_mass = n.initial_struct_mass
-                n.struct_mass_produced = 0.
-                n.external_surface = n.initial_external_surface
-                n.volume = initial_volume
-
-            # MODIFYING SPECIFIC PROPERTIES AFTER ELONGATION:
-            # -----------------------------------------------
-            # If there has been an actual elongation:
-            if n.length > n.initial_length:
-
-                # If the elongated apex corresponded to any primordium that has been allowed to emerge:
-                if n.type == "Seminal_root_before_emergence" \
-                        or n.type == "Adventitious_root_before_emergence" \
-                        or n.type == "Normal_root_before_emergence":
-                    # We now consider the apex to have emerged:
-                    n.type = "Normal_root_after_emergence"
-                    # The exact time since emergence is recorded:
-                    n.thermal_time_since_emergence = n.thermal_potential_time_since_emergence
-                    n.actual_time_since_emergence = n.thermal_time_since_emergence / temperature_time_adjustment
-                    # The actual elongation rate is calculated:
-                    n.actual_elongation = n.length - n.initial_length
-                    n.actual_elongation_rate = n.actual_elongation / n.actual_time_since_emergence
-                    # Note: at this stage, no sugar has been allocated to the emerging primordium itself!
-                    # if n.type == "Adventitious_root_before_emergence":
-                    #     print("> A new adventitious root has emerged, starting from element", n.index(), "!")
-                elif n.type == "Normal_root_after_emergence":
-                    # The actual elongation rate is calculated:
-                    n.actual_elongation = n.length - n.initial_length
-                    n.actual_elongation_rate = n.actual_elongation / time_step_in_seconds
-
-                # # IF THE AGE OF CELLS NEEDS TO BE UPDATED AT THIS STAGE:
-                # # In both cases, we calculate a new, average age of the root cells in the elongated apex, based on the
-                # # principle that cells appear at the very end of the root tip, and then age. In this case, the average age
-                # # of the element that has elongated is calculated as the mean value between the incremented age of the part
-                # # that was already formed and the average age of the new part that has been created:
-                # initial_time_since_cells_formation = n.actual_time_since_cells_formation
-                # Age_non_elongated = initial_time_since_cells_formation + time_step_in_seconds
-                # Age_elongated =  0.5 * n.actual_elongation / n.actual_elongation_rate
-                # n.actual_time_since_cells_formation = (n.initial_length * Age_non_elongated + n.actual_elongation * Age_elongated) / n.length
-                # n.thermal_time_since_cells_formation += (n.actual_time_since_cells_formation - initial_time_since_cells_formation) * temperature_time_adjustment
-
-                # The distance to the last ramification is increased:
-                n.dist_to_ramif += n.actual_elongation
-
-        return g
-
-    ########################################################################################################################
-
-    ########################################################################################################################
-    ########################################################################################################################
-    # MODULE "SUCROSE SUPPLY FROM THE SHOOTS"
-    ########################################################################################################################
-    ########################################################################################################################
-
     # Calculation of the total amount of sucrose and structural struct_mass in the root system:
     # -----------------------------------------------------------------------------------------
-    def total_root_sucrose_and_living_struct_mass(self, g):
+    def total_root_sucrose_and_living_struct_mass(self):
         """
         This function computes the total amount of sucrose of the root system (in mol of sucrose),
         and the total dry structural mass of the root system (in g of dry structural mass).
         :param g: the investigated MTG
         :return: total_sucrose_root (mol of sucrose), total_struct_mass (g of dry structural mass)
+        (untouched)
         """
-
         # We initialize the values to 0:
-        total_sucrose_root = 0.
-        total_living_struct_mass = 0.
+        self.total_sucrose_root[1] = 0.
+        self.total_living_struct_mass[1] = 0.
 
         # We cover all the vertices in the MTG, whether they are dead or not:
-        for vid in g.vertices_iter(scale=1):
-            # n represents the vertex:
-            n = g.node(vid)
-
-            if n.length <= 0.:
+        for vid in self.g.vertices_iter(scale=1):
+            if self.length <= 0.:
                 continue
             else:
                 # We increment the total amount of sucrose in the root system, including dead root elements (if any):
-                total_sucrose_root += n.C_sucrose_root * (n.struct_mass + n.living_root_hairs_struct_mass) \
-                                      - n.Deficit_sucrose_root
+                self.total_sucrose_root += self.C_sucrose_root[vid] * (self.struct_mass[vid] + self.living_root_hairs_struct_mass[vid]) \
+                                      - self.Deficit_sucrose_root[vid]
 
                 # We only select the elements that have a positive struct_mass and are not dead
                 # (if they have just died, we still include them in the balance):
-                if n.struct_mass > 0. and n.type != "Dead" and n.type != "Just_dead":
+                if self.struct_mass[vid] > 0. and self.type[vid] != "Dead" and self.type[vid] != "Just_dead":
                     # We calculate the total living struct_mass by summing all the local struct_masses:
-                    total_living_struct_mass += n.struct_mass + n.living_root_hairs_struct_mass
-        # We return a list of two numeric values:
-        return total_sucrose_root, total_living_struct_mass
+                    self.total_living_struct_mass += self.struct_mass + self.living_root_hairs_struct_mass
 
     # Calculating the net input of sucrose by the aerial parts into the root system:
     # ------------------------------------------------------------------------------
-    def shoot_sucrose_supply_and_spreading(self, g, sucrose_input_rate=1e-9, time_step_in_seconds=1. * 60. * 60. * 24.,
-                                           printing_warnings=False):
+    def shoot_sucrose_supply_and_spreading(self):
         """
         This function calculates the new root sucrose concentration (mol of sucrose per gram of dry root structural mass)
         AFTER supplying sucrose from the shoot.
-        :param g: the root MTG to be considered
-        :param sucrose_input_rate: the rate of sucrose supply from the shoots into the roots (mol of sucrose per second)
-        :param time_step_in_seconds: the time step over which the supply is considered
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
-        :return: g, the updated MTG
+        (nearly untouched)
         """
-
-        # The input of sucrose over this time step is calculated
-        # from the sucrose transport rate provided as input of the function:
-        sucrose_input = sucrose_input_rate * time_step_in_seconds
 
         # We calculate the remaining amount of sucrose in the root system,
         # based on the current sucrose concentration and structural mass of each root element:
-        total_sucrose_root, total_living_struct_mass = self.total_root_sucrose_and_living_struct_mass(g)
+        self.total_root_sucrose_and_living_struct_mass()
         # Note: The total sucrose is the total amount of sucrose present in the root system, including local deficits
         # but excluding the possible global deficit of the whole root system, which is considered below.
         # The total struct_mass corresponds to the structural mass of the living roots & hairs
@@ -534,49 +267,48 @@ class RootCarbonModel:
 
         # We use a global variable recorded outside this function that corresponds to the possible deficit of sucrose
         # (in moles of sucrose) of the whole root system calculated at the previous time_step:
-        global_sucrose_deficit = g.property('global_sucrose_deficit')[g.root]
         # Note that this value is stored in the base node of the root system.
-        if global_sucrose_deficit > 0.:
+        if self.global_sucrose_deficit[1] > 0.:
             print("!!! Before homogenizing sucrose concentration, the global deficit in sucrose was",
-                  global_sucrose_deficit)
+                  self.global_sucrose_deficit[1])
         # The new average sucrose concentration in the root system is calculated as:
-        C_sucrose_root_after_supply = (total_sucrose_root + sucrose_input - global_sucrose_deficit) \
-                                      / total_living_struct_mass
+        C_sucrose_root_after_supply = (self.total_sucrose_root[1] + (self.sucrose_input_rate * self.time_steps_in_seconds) - self.global_sucrose_deficit[1]) \
+                                      / self.total_living_struct_mass[1]
         # This new concentration includes the amount of sucrose from element that have just died,
         # but excludes the mass of these dead elements!
 
         if C_sucrose_root_after_supply >= 0.:
             new_C_sucrose_root = C_sucrose_root_after_supply
             # We reset the global variable global_sucrose_deficit:
-            g.property('global_sucrose_deficit')[g.root] = 0.
+            self.global_sucrose_deficit[1] = 0.
         else:
-            new_sucrose_deficit = - C_sucrose_root_after_supply * total_living_struct_mass
             # We record the general deficit in sucrose:
-            g.property('global_sucrose_deficit')[g.root] = new_sucrose_deficit
+            self.global_sucrose_deficit[1] = - C_sucrose_root_after_supply * self.total_living_struct_mass[1]
+
             print("!!! After homogenizing sucrose concentration, the deficit in sucrose is",
-                  new_sucrose_deficit)
+                  self.global_sucrose_deficit[1])
             # We defined the new concentration of sucrose as 0:
             new_C_sucrose_root = 0.
 
         # We go through the MTG to modify the sugars concentrations:
-        for vid in g.vertices_iter(scale=1):
-            n = g.node(vid)
+        for vid in self.g.vertices_iter(scale=1):
             # If the element has not emerged yet, it doesn't contain any sucrose yet;
             # if has died, it should not contain any sucrose anymore:
-            if n.length <= 0. or n.type == "Dead" or n.type == "Just_dead":
-                n.C_sucrose_root = 0.
+            if self.length[vid] <= 0. or self.type[vid] == "Dead" or self.type[vid] == "Just_dead":
+                self.C_sucrose_root[vid] = 0.
             else:
                 # The local sucrose concentration in the root is calculated from the new sucrose concentration calculated above:
-                n.C_sucrose_root = new_C_sucrose_root
+                self.C_sucrose_root[vid] = new_C_sucrose_root
             # AND BECAUSE THE LOCAL DEFICITS OF SUCROSE HAVE BEEN ALREADY INCLUDED IN THE TOTAL SUCROSE CALCULATION,
             # WE RESET ALL LOCAL DEFICITS TO 0:
-            n.Deficit_sucrose_root = 0.
-            n.Deficit_sucrose_root_rate = 0.
+            self.Deficit_sucrose_root[vid] = 0.
+            self.Deficit_sucrose_root_rate[vid] = 0.
 
-        return g
-
+    def actualize_concentrations_struct_mass(self):
+        return
 
     # Unloading of sucrose from the phloem and conversion of sucrose into hexose:
+
     # --------------------------------------------------------------------------
     # These 3 functions simulate the rate of sucrose unloading from phloem and its immediate conversion into hexose.
     # The hexose pool is assumed to correspond to the symplastic compartment of root cells from the stelar and cortical
@@ -926,23 +658,23 @@ class RootCarbonModel:
                 - hexose_mobilization_from_reserve_rate
                 - Deficit_hexose_reserve_rate)
 
-    def update_hexose_root(self, hexose_root, struct_mass, hexose_exudation_rate, hexose_uptake_from_soil_rate,
-                           mucilage_secretion_rate, cells_release_rate, resp_maintenance_rate,
-                           hexose_consumption_by_growth_rate, hexose_production_from_phloem_rate,
-                           sucrose_loading_in_phloem_rate, hexose_mobilization_from_reserve_rate,
-                           hexose_immobilization_as_reserve_rate, Deficit_hexose_root_rate, **kwargs):
+    def update_hexose_root(self, hexose_root, struct_mass, hexose_exudation, hexose_uptake_from_soil,
+                           mucilage_secretion, cells_release, resp_maintenance,
+                           hexose_consumption_by_growth, hexose_production_from_phloem,
+                           sucrose_loading_in_phloem, hexose_mobilization_from_reserve,
+                           hexose_immobilization_as_reserve, deficit_hexose_root, **kwargs):
         return hexose_root * (self.time_steps_in_seconds / struct_mass) * (
-                - hexose_exudation_rate
-                + hexose_uptake_from_soil_rate
-                - mucilage_secretion_rate
-                - cells_release_rate
-                - resp_maintenance_rate / 6.
-                - hexose_consumption_by_growth_rate
-                + hexose_production_from_phloem_rate
-                - 2. * sucrose_loading_in_phloem_rate
-                + hexose_mobilization_from_reserve_rate
-                - hexose_immobilization_as_reserve_rate
-                - Deficit_hexose_root_rate)
+                - hexose_exudation
+                + hexose_uptake_from_soil
+                - mucilage_secretion
+                - cells_release
+                - resp_maintenance / 6.
+                - hexose_consumption_by_growth
+                + hexose_production_from_phloem
+                - 2. * sucrose_loading_in_phloem
+                + hexose_mobilization_from_reserve
+                - hexose_immobilization_as_reserve
+                - deficit_hexose_root)
 
     # # TODO report to soil
     # def calculating_time_derivatives_of_the_amount_in_each_pool(n):
@@ -968,79 +700,32 @@ class RootCarbonModel:
     #
     #     return y_derivatives
 
-    def adjusting_pools_and_deficits(self, n, time_step_in_seconds, printing_warnings=False):
-        """
-        This function adjusts possibly negative concentrations by setting them to 0 and by recording the corresponding deficit.
-        WATCH OUT: This function must be called once the concentrations have already been calculated with the previous deficits!
-        :param n: the root element where calculations are made
-        :param time_step_in_seconds: the time step over which deficits are included
-        :param printing_warnings: if True, warning messages will be printed
-        :return: the updated element n
-        """
 
-        # TODO FOR TRISTAN: Consider doing similar balance with recorded deficits for N compounds?
+    # This function adjusts possibly negative concentrations by setting them to 0 and by recording the corresponding deficit.
+    # WATCH OUT: This function must be called once the concentrations have already been calculated with the previous deficits!
+    def deficit_sucrose_root(self, C_sucrose_root, struct_mass, living_root_hairs_struct_mass):
+        if C_sucrose_root < 0:
+            return - C_sucrose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_steps_in_seconds
+        else:
+            # TODO : or None could be more efficient?
+            return 0.
 
-        # We calculate possible deficits to be included in the next time step:
-        # ---------------------------------------------------------------------
+    def deficit_hexose_reserve(self, hexose_reserve, struct_mass, living_root_hairs_struct_mass):
+        if hexose_reserve < 0:
+            return - hexose_reserve * (struct_mass + living_root_hairs_struct_mass) / self.time_steps_in_seconds
+        else:
+            return 0.
 
-        # We reset the local deficits to 0 (as the deficits are supposed to have been included in calculations before calling this function!):
-        n.Deficit_sucrose_root = 0.
-        n.Deficit_hexose_root = 0.
-        n.Deficit_hexose_reserve = 0.
-        n.Deficit_hexose_soil = 0.
-        n.Deficit_mucilage_soil = 0.
-        n.Deficit_cells_soil = 0.
+    def deficit_hexose_root(self, hexose_reserve, struct_mass, living_root_hairs_struct_mass):
+        if hexose_reserve < 0:
+            return - hexose_reserve * (struct_mass + living_root_hairs_struct_mass) / self.time_steps_in_seconds
+        else:
+            return 0.
 
-        # We also reset the rates at which local deficits are included in the calculations:
-        n.Deficit_sucrose_root_rate = 0.
-        n.Deficit_hexose_root_rate = 0.
-        n.Deficit_hexose_reserve_rate = 0.
-        n.Deficit_hexose_soil_rate = 0.
-        n.Deficit_mucilage_soil_rate = 0.
-        n.Deficit_cells_soil_rate = 0.
+    # TODO map partial max(0, ) to some properties after deficit storage.
 
-        # Looking at sucrose:
-        if n.C_sucrose_root < 0:
-            # We define a positive deficit (mol of sucrose) based on the negative concentration:
-            n.Deficit_sucrose_root = -n.C_sucrose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
-            n.Deficit_sucrose_root_rate = n.Deficit_sucrose_root / time_step_in_seconds
-            # And we set the concentration to 0:
-            if printing_warnings:
-                print("WARNING: After balance, there is a deficit in root sucrose for element", n.index(),
-                      "that corresponds to", n.Deficit_sucrose_root,
-                      "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-            # And we set the concentration to zero:
-            n.C_sucrose_root = 0.
-        # PLEASE NOTE: The global (if any) deficit in sucrose is only used by the function "shoot_sucrose_and_spreading"
-        # when defining the new homogeneous concentration of sucrose within the root system, and when performing a true
-        # carbon balance of the root system in "summing".
-
-        # Looking at hexose in the mobile pool of the root:
-        if n.C_hexose_root < 0:
-            if printing_warnings:
-                print("WARNING: After balance, there is a deficit of root hexose for element", n.index(),
-                      "that corresponds to", n.Deficit_hexose_root,
-                      "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-            # We define a positive deficit (mol of hexose) based on the negative concentration:
-            n.Deficit_hexose_root = - n.C_hexose_root * (n.struct_mass + n.living_root_hairs_struct_mass)
-            n.Deficit_hexose_root_rate = n.Deficit_hexose_root / time_step_in_seconds
-            # And we set the concentration to 0:
-            n.C_hexose_root = 0.
-
-        # Looking at hexose in the reserve pool:
-        if n.C_hexose_reserve < 0:
-            if printing_warnings:
-                print("WARNING: After balance, there is a deficit of reserve hexose for element", n.index(),
-                      "that corresponds to", n.Deficit_hexose_reserve,
-                      "; the concentration has been set to 0 and the deficit will be included in the next balance.")
-            # We define a positive deficit (mol of hexose) based on the negative concentration:
-            n.Deficit_hexose_reserve = - n.C_hexose_reserve * (n.struct_mass + n.living_root_hairs_struct_mass)
-            n.Deficit_hexose_reserve_rate = n.Deficit_hexose_reserve / time_step_in_seconds
-            # And we set the concentration to 0:
-            n.C_hexose_reserve = 0.
-
+    # def adjusting_pools_and_deficits(self, n, time_step_in_seconds, printing_warnings=False):
         # TODO : report to soil model
-
         # # Looking at hexose in the soil:
         # if n.C_hexose_soil < 0:
         #     if printing_warnings:
@@ -1076,19 +761,19 @@ class RootCarbonModel:
         #     n.Deficit_cells_soil_rate = n.Deficit_cells_soil / time_step_in_seconds
         #     # And we set the concentration to 0:
         #     n.Cs_cells_soil = 0.
+        return
 
-    # Control of anomalies in the MTG:
-    # --------------------------------
-    def control_of_anomalies(self, g):
+    def control_of_anomalies(self):
         """
         The function contol_of_anomalies checks for the presence of elements with negative measurable properties (e.g. length, concentrations).
+        (untouched)
         """
 
         # CHECKING THAT UNEMERGED ROOT ELEMENTS DO NOT CONTAIN CARBON:
         # We cover all the vertices in the MTG:
-        for vid in g.vertices_iter(scale=1):
+        for vid in self.g.vertices_iter(scale=1):
             # n represents the vertex:
-            n = g.node(vid)
+            n = self.g.node(vid)
             if n.length <= 0.:
                 if n.C_sucrose_root != 0.:
                     print("")
@@ -1103,8 +788,7 @@ class RootCarbonModel:
                     print("??? ERROR: for element", n.index(), " of length", n.length,
                           "m, the concentration of soil hexose is", n.C_hexose_soil)
 
-        return
-
+    # TODO adapt to class structure
     class Differential_Equation_System(object):
 
         # TODO FOR TRISTAN: Consider adding N-related variables here to be computed together with C fluxes...
@@ -1423,171 +1107,172 @@ class RootCarbonModel:
     # ------------------------------------------------------
     # NOTE: The function alls all processes of C exchange between pools on each root element and performs a new C balance,
     # with or without using a solver:
-    def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(self,
-                                                                       time_step_in_seconds=1. * (60. * 60. * 24.),
-                                                                       using_solver=False,
-                                                                       printing_solver_outputs=False,
-                                                                       printing_warnings=False):
-        """
-
-        :param g:
-        :param time_step_in_seconds: the time step over which the balance is done
-        :param soil_temperature_in_Celsius:
-        :param using_solver:
-        :param printing_solver_outputs:
-        :param printing_warnings:
-        :return:
-        """
-
-        # TODO FOR TRISTAN: Consider updating this function with N fluxes, or doing a similar function separated from here.
-
-        # We initialize a tip concentration:
-        tip_C_hexose_root = -1
-
-        # We cover all the vertices in the MTG:
-        for vid in self.g.vertices_iter(scale=1):
-
-            # n represents the vertex:
-            n = self.g.node(vid)
-
-            # First, we ensure that the element has a positive length:
-            if n.length <= 0.:
-                continue
-
-            # # IF NOT DONE ELSEWHERE - We calculate an average flux of C consumption due to growth:
-            # n.hexose_consumption_by_growth_rate = n.hexose_consumption_by_growth / time_step_in_seconds
-
-            # OPTION 1: WITHOUT SOLVER
-            ##########################
-
-            if not using_solver:
-                # TODO C : Separate flows precisely
-                # We simply calculate all related fluxes and the new concentrations based on the initial conditions
-                # at the beginning of the time step.
-
-                # Calculating all new fluxes and related quantities:
-                # ---------------------------------------------------
-
-                # We calculate all C-related fluxes (independent of the time step):
-                #DONE self.calculating_all_growth_independent_fluxes(self.g, n, self.soil_temperature, printing_warnings)
-
-                # We then calculate the quantities that correspond to these fluxes (dependent of the time step):
-                # REPORTED IN UPDATE self.calculating_amounts_from_fluxes(n, time_step_in_seconds)
-
-                # Calculating the new variations of the quantities in each pool over time:
-                # -------------------------------------------------------------------------
-                # We call a dictionary containing the time derivative (dQ/dt) of the amount present in each pool,
-                # based on the C balance:
-                # DONE y_time_derivatives = self.calculating_time_derivatives_of_the_amount_in_each_pool(n)
-
-                # Calculating new concentrations based on C balance:
-                # ---------------------------------------------------
-
-                # WATCH OUT: Below, the possible deficits are not included, since they have been already taken into account
-                # as rates in the function "calculating_time_derivatives_of_the_amount_in_each_pool(n)" called above!
-
-                # TODO : get insights from bellow for mass actualization in update methods
-
-                # # We calculate the new concentration of sucrose in the root according to sucrose conversion into hexose:
-                # sucrose_root_derivative = y_time_derivatives["sucrose_root"] * time_step_in_seconds
-                # n.C_sucrose_root = (n.C_sucrose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                #                     + sucrose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
-                #
-                # # We calculate the new concentration of hexose in the root cytoplasm:
-                # hexose_root_derivative = y_time_derivatives["hexose_root"] * time_step_in_seconds
-                # n.C_hexose_root = (n.C_hexose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                #                    + hexose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
-                #
-                # # We calculate the new concentration of hexose in the reserve:
-                # hexose_reserve_derivative = y_time_derivatives["hexose_reserve"] * time_step_in_seconds
-                # n.C_hexose_reserve = (n.C_hexose_reserve * (
-                #             n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                #                       + hexose_reserve_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
-
-                # TODO : report to soil
-                # # We calculate the new concentration of hexose in the soil:
-                # hexose_soil_derivative = y_time_derivatives["hexose_soil"] * time_step_in_seconds
-                # n.C_hexose_soil = (n.C_hexose_soil * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                #                    + hexose_soil_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
-                #
-                # # We calculate the new concentration of hexose in the soil:
-                # mucilage_soil_derivative = y_time_derivatives["mucilage_soil"] * time_step_in_seconds
-                # n.Cs_mucilage_soil = (n.Cs_mucilage_soil * (n.initial_external_surface
-                #                                             + n.initial_living_root_hairs_external_surface)
-                #                       + mucilage_soil_derivative) / (
-                #                                  n.external_surface + n.living_root_hairs_external_surface)
-                #
-                # # We calculate the new concentration of cells in the soil:
-                # cells_soil_derivative = y_time_derivatives["cells_soil"] * time_step_in_seconds
-                # n.Cs_cells_soil = (n.Cs_cells_soil * (n.initial_external_surface
-                #                                       + n.initial_living_root_hairs_external_surface)
-                #                    + cells_soil_derivative) / (
-                #                               n.external_surface + n.living_root_hairs_external_surface)
-
-            # OPTION 2: WITH SOLVER
-            #######################
-            # We use a numeric solver to calculate the best equilibrium between pools over time, so that the fluxes
-            # still correspond to plausible values even when the time step is too large:
-            if using_solver:
-
-                if printing_solver_outputs:
-                    print("Considering for the solver the element", n.index(), "of length", n.length, "...")
-
-                # We use the class corresponding to the system of differential equations and its resolution:
-                System = self.Differential_Equation_System(self.g, n,
-                                                      time_step_in_seconds,
-                                                      self.soil_temperature_in_Celsius,
-                                                      printing_warnings=printing_warnings,
-                                                      printing_solver_outputs=printing_solver_outputs)
-                System.run()
-                # At this stage, the amounts in each pool pool have been updated by the solver, as well as the amount
-                # exchanged between pools corresponding to specific processes.
-
-                # We recalculate the new final concentrations based on (i) quantities at the end of the solver,
-                # and (ii) struct_mass (instead of initial_struct_mass as used in the solver):
-                n.C_hexose_root = n.hexose_root / (n.struct_mass + n.living_root_hairs_struct_mass)
-                n.C_hexose_reserve = n.hexose_reserve / (n.struct_mass + n.living_root_hairs_struct_mass)
-                n.C_hexose_soil = n.hexose_soil / (n.struct_mass + n.living_root_hairs_struct_mass)
-                n.Cs_mucilage_soil = n.mucilage_soil / (n.external_surface + n.living_root_hairs_external_surface)
-                n.Cs_cells_soil = n.cells_soil / (n.external_surface + n.living_root_hairs_external_surface)
-
-                # SPECIAL CASE FOR SUCROSE:
-                # As sucrose pool was not included in the solver, we update C_sucrose_root based on the mean exchange rates
-                # calculated over the time_step.
-                # We calculate the initial amount of sucrose in the root element:
-                initial_sucrose_root_amount = n.C_sucrose_root \
-                                              * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
-                # We call again a dictionary containing the time derivative (dQ/dt) of the amount present in each pool, and
-                # in particular sucrose, based on the balance between different rates (NOTE: the transfer of sucrose
-                # between elements through the phloem is not considered at this stage!):
-                y_time_derivatives = self.calculating_time_derivatives_of_the_amount_in_each_pool(n)
-                estimated_sucrose_root_derivative = y_time_derivatives['sucrose_root'] * time_step_in_seconds
-                # Eventually, the new concentration of sucrose in the root element is calculated:
-                n.C_sucrose_root = (initial_sucrose_root_amount + estimated_sucrose_root_derivative) \
-                                   / (n.struct_mass + n.living_root_hairs_struct_mass)
-
-            # WITH BOTH OPTIONS, AFTER ALL PROCESSES HAVE BEEN COMPUTED:
-            ############################################################
-
-            # Updating concentrations and deficits:
-            # --------------------------------------
-            # We make sure that new concentration in each pool is not negative - otherwise we set it to 0 and record the
-            # corresponding deficit to balance the next calculation of the concentration:
-            self.adjusting_pools_and_deficits(n, time_step_in_seconds, printing_warnings)
-
-            #  Calculation of additional variables:
-            # -------------------------------------
-            # MOVED TO TOOLS self.calculating_extra_variables(n, time_step_in_seconds)
-
-        #     # SPECIAL CASE: we record the property of the apex of the primary root
-        #     # ---------------------------------------------------------------------
-        #     # If the element corresponds to the apex of the primary root:
-        #     if n.radius == param.D_ini / 2. and n.label == "Apex":
-        #         # Then the function will give its specific concentration of mobile hexose:
-        #         tip_C_hexose_root = n.C_hexose_root
-        #
-        # # We return the concentration of hexose in the apex of the primary root:
-        # return tip_C_hexose_root
+    # def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(self,
+    #                                                                    time_step_in_seconds=1. * (60. * 60. * 24.),
+    #                                                                    using_solver=False,
+    #                                                                    printing_solver_outputs=False,
+    #                                                                    printing_warnings=False):
+    #     """
+    #
+    #     :param g:
+    #     :param time_step_in_seconds: the time step over which the balance is done
+    #     :param soil_temperature_in_Celsius:
+    #     :param using_solver:
+    #     :param printing_solver_outputs:
+    #     :param printing_warnings:
+    #     :return:
+    #     """
+    #
+    #     # TODO FOR TRISTAN: Consider updating this function with N fluxes, or doing a similar function separated from here.
+    #     # TODO : map with conditions on length or struct mass?
+    #     # We initialize a tip concentration:
+    #     tip_C_hexose_root = -1
+    #
+    #     # We cover all the vertices in the MTG:
+    #     for vid in self.g.vertices_iter(scale=1):
+    #
+    #         # n represents the vertex:
+    #         n = self.g.node(vid)
+    #
+    #         # First, we ensure that the element has a positive length:
+    #         if n.length <= 0.:
+    #             continue
+    #
+    #         # # IF NOT DONE ELSEWHERE - We calculate an average flux of C consumption due to growth:
+    #         # n.hexose_consumption_by_growth_rate = n.hexose_consumption_by_growth / time_step_in_seconds
+    #
+    #         # OPTION 1: WITHOUT SOLVER
+    #         ##########################
+    #
+    #         if not using_solver:
+    #             # TODO C : Separate flows precisely
+    #             # We simply calculate all related fluxes and the new concentrations based on the initial conditions
+    #             # at the beginning of the time step.
+    #
+    #             # Calculating all new fluxes and related quantities:
+    #             # ---------------------------------------------------
+    #
+    #             # We calculate all C-related fluxes (independent of the time step):
+    #             #DONE self.calculating_all_growth_independent_fluxes(self.g, n, self.soil_temperature, printing_warnings)
+    #
+    #             # We then calculate the quantities that correspond to these fluxes (dependent of the time step):
+    #             # REPORTED IN UPDATE self.calculating_amounts_from_fluxes(n, time_step_in_seconds)
+    #
+    #             # Calculating the new variations of the quantities in each pool over time:
+    #             # -------------------------------------------------------------------------
+    #             # We call a dictionary containing the time derivative (dQ/dt) of the amount present in each pool,
+    #             # based on the C balance:
+    #             # DONE y_time_derivatives = self.calculating_time_derivatives_of_the_amount_in_each_pool(n)
+    #
+    #             # Calculating new concentrations based on C balance:
+    #             # ---------------------------------------------------
+    #
+    #             # WATCH OUT: Below, the possible deficits are not included, since they have been already taken into account
+    #             # as rates in the function "calculating_time_derivatives_of_the_amount_in_each_pool(n)" called above!
+    #
+    #             # TODO : get insights from bellow for mass actualization in update methods
+    #
+    #             # # We calculate the new concentration of sucrose in the root according to sucrose conversion into hexose:
+    #             # sucrose_root_derivative = y_time_derivatives["sucrose_root"] * time_step_in_seconds
+    #             # n.C_sucrose_root = (n.C_sucrose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
+    #             #                     + sucrose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+    #             #
+    #             # # We calculate the new concentration of hexose in the root cytoplasm:
+    #             # hexose_root_derivative = y_time_derivatives["hexose_root"] * time_step_in_seconds
+    #             # n.C_hexose_root = (n.C_hexose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
+    #             #                    + hexose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+    #             #
+    #             # # We calculate the new concentration of hexose in the reserve:
+    #             # hexose_reserve_derivative = y_time_derivatives["hexose_reserve"] * time_step_in_seconds
+    #             # n.C_hexose_reserve = (n.C_hexose_reserve * (
+    #             #             n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
+    #             #                       + hexose_reserve_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+    #
+    #             # TODO : report to soil
+    #             # # We calculate the new concentration of hexose in the soil:
+    #             # hexose_soil_derivative = y_time_derivatives["hexose_soil"] * time_step_in_seconds
+    #             # n.C_hexose_soil = (n.C_hexose_soil * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
+    #             #                    + hexose_soil_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
+    #             #
+    #             # # We calculate the new concentration of hexose in the soil:
+    #             # mucilage_soil_derivative = y_time_derivatives["mucilage_soil"] * time_step_in_seconds
+    #             # n.Cs_mucilage_soil = (n.Cs_mucilage_soil * (n.initial_external_surface
+    #             #                                             + n.initial_living_root_hairs_external_surface)
+    #             #                       + mucilage_soil_derivative) / (
+    #             #                                  n.external_surface + n.living_root_hairs_external_surface)
+    #             #
+    #             # # We calculate the new concentration of cells in the soil:
+    #             # cells_soil_derivative = y_time_derivatives["cells_soil"] * time_step_in_seconds
+    #             # n.Cs_cells_soil = (n.Cs_cells_soil * (n.initial_external_surface
+    #             #                                       + n.initial_living_root_hairs_external_surface)
+    #             #                    + cells_soil_derivative) / (
+    #             #                               n.external_surface + n.living_root_hairs_external_surface)
+    #             pass
+    #
+    #         # OPTION 2: WITH SOLVER
+    #         #######################
+    #         # We use a numeric solver to calculate the best equilibrium between pools over time, so that the fluxes
+    #         # still correspond to plausible values even when the time step is too large:
+    #         if using_solver:
+    #
+    #             if printing_solver_outputs:
+    #                 print("Considering for the solver the element", n.index(), "of length", n.length, "...")
+    #
+    #             # We use the class corresponding to the system of differential equations and its resolution:
+    #             System = self.Differential_Equation_System(self.g, n,
+    #                                                   time_step_in_seconds,
+    #                                                   self.soil_temperature_in_Celsius,
+    #                                                   printing_warnings=printing_warnings,
+    #                                                   printing_solver_outputs=printing_solver_outputs)
+    #             System.run()
+    #             # At this stage, the amounts in each pool pool have been updated by the solver, as well as the amount
+    #             # exchanged between pools corresponding to specific processes.
+    #
+    #             # We recalculate the new final concentrations based on (i) quantities at the end of the solver,
+    #             # and (ii) struct_mass (instead of initial_struct_mass as used in the solver):
+    #             n.C_hexose_root = n.hexose_root / (n.struct_mass + n.living_root_hairs_struct_mass)
+    #             n.C_hexose_reserve = n.hexose_reserve / (n.struct_mass + n.living_root_hairs_struct_mass)
+    #             n.C_hexose_soil = n.hexose_soil / (n.struct_mass + n.living_root_hairs_struct_mass)
+    #             n.Cs_mucilage_soil = n.mucilage_soil / (n.external_surface + n.living_root_hairs_external_surface)
+    #             n.Cs_cells_soil = n.cells_soil / (n.external_surface + n.living_root_hairs_external_surface)
+    #
+    #             # SPECIAL CASE FOR SUCROSE:
+    #             # As sucrose pool was not included in the solver, we update C_sucrose_root based on the mean exchange rates
+    #             # calculated over the time_step.
+    #             # We calculate the initial amount of sucrose in the root element:
+    #             initial_sucrose_root_amount = n.C_sucrose_root \
+    #                                           * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
+    #             # We call again a dictionary containing the time derivative (dQ/dt) of the amount present in each pool, and
+    #             # in particular sucrose, based on the balance between different rates (NOTE: the transfer of sucrose
+    #             # between elements through the phloem is not considered at this stage!):
+    #             y_time_derivatives = self.calculating_time_derivatives_of_the_amount_in_each_pool(n)
+    #             estimated_sucrose_root_derivative = y_time_derivatives['sucrose_root'] * time_step_in_seconds
+    #             # Eventually, the new concentration of sucrose in the root element is calculated:
+    #             n.C_sucrose_root = (initial_sucrose_root_amount + estimated_sucrose_root_derivative) \
+    #                                / (n.struct_mass + n.living_root_hairs_struct_mass)
+    #
+    #         # WITH BOTH OPTIONS, AFTER ALL PROCESSES HAVE BEEN COMPUTED:
+    #         ############################################################
+    #
+    #         # Updating concentrations and deficits:
+    #         # --------------------------------------
+    #         # We make sure that new concentration in each pool is not negative - otherwise we set it to 0 and record the
+    #         # corresponding deficit to balance the next calculation of the concentration:
+    #         # DONE self.adjusting_pools_and_deficits(n, time_step_in_seconds, printing_warnings)
+    #
+    #         #  Calculation of additional variables:
+    #         # -------------------------------------
+    #         # MOVED TO TOOLS self.calculating_extra_variables(n, time_step_in_seconds)
+    #
+    #     #     # SPECIAL CASE: we record the property of the apex of the primary root
+    #     #     # ---------------------------------------------------------------------
+    #     #     # If the element corresponds to the apex of the primary root:
+    #     #     if n.radius == param.D_ini / 2. and n.label == "Apex":
+    #     #         # Then the function will give its specific concentration of mobile hexose:
+    #     #         tip_C_hexose_root = n.C_hexose_root
+    #     #
+    #     # # We return the concentration of hexose in the apex of the primary root:
+    #     # return tip_C_hexose_root
 
 
 class RootAnatomy:
@@ -2447,6 +2132,317 @@ class RootGrowthModel:
 
         # We update the distance from tip for each root element in each root axis:
         self.update_distance_from_tip()
+
+    # Actual elongation, radial growth and growth respiration of root elements:
+    # --------------------------------------------------------------------------
+    def actual_growth_and_corresponding_respiration(self, g, time_step_in_seconds, soil_temperature_in_Celsius=20,
+                                                    printing_warnings=False):
+        """
+        This function defines how a segment, an apex and possibly an emerging root primordium will grow according to the amount
+        of hexose present in the segment, taking into account growth respiration based on the model of Thornley and Cannell
+        (2000). The calculation is based on the values of potential_radius, potential_length, lateral_root_emergence_possibility
+        and emergence_cost defined in each element by the module "POTENTIAL GROWTH".
+        The function returns the MTG "g" with modified values of radius and length of each element, the possibility of the
+        emergence of lateral roots, and the cost of growth in terms of hexose consumption.
+        :param g: the root MTG to be considered
+        :param time_step_in_seconds: the time step over which growth is considered
+        :param soil_temperature_in_Celsius: the same, homogeneous temperature experienced by the whole root system
+        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
+        :return: g, the updated MTG
+        """
+
+        # TODO FOR TRISTAN: Here you would need to explicit at least a cost of N associated to the actual growth,
+        #  and consider how to limit the actual growth when not enough N is available.
+        #  In a second step, you may consider how the emergence of primordia may depend on N availability in the root or in the soil.
+
+        # CALCULATING AN EQUIVALENT OF THERMAL TIME:
+        # -------------------------------------------
+
+        # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
+        # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
+        temperature_time_adjustment = self.temperature_modification(
+            temperature_in_Celsius=soil_temperature_in_Celsius,
+            process_at_T_ref=1,
+            T_ref=param.root_growth_T_ref,
+            A=param.root_growth_A,
+            B=param.root_growth_B,
+            C=param.root_growth_C)
+
+        # PROCEEDING TO ACTUAL GROWTH:
+        # -----------------------------
+
+        # We have to cover each vertex from the apices up to the base one time:
+        root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
+        root = next(root_gen)
+        # We cover all the vertices in the MTG, from the tips to the base:
+        for vid in post_order(g, root):
+
+            # n represents the current root element:
+            n = g.node(vid)
+
+            # AVOIDANCE OF UNWANTED CASES:
+            # -----------------------------
+            # We make sure that the element is not dead:
+            if n.type == "Dead" or n.type == "Just_dead" or n.type == "Support_for_seminal_root" or n.type == "Support_for_adventitious_root":
+                # In such case, we just pass to the next element in the iteration:
+                continue
+
+            # We make sure that there is a potential growth for this element:
+            if n.potential_length <= n.initial_length and n.potential_radius <= n.initial_radius:
+                # In such case, we just pass to the next element in the iteration:
+                continue
+
+            # INITIALIZATION AND CALCULATIONS OF POTENTIAL GROWTH DEMAND IN HEXOSE:
+            # ----------------------------------------------------------------------
+
+            # WARNING: All growth related variables should have been initialized by another module at the beginning of the time step!!!
+
+            # We calculate the initial volume of the element:
+            initial_volume = \
+                TODOvolume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.initial_length)[
+                    "volume"]
+            # We calculate the potential volume of the element based on the potential radius and potential length:
+            potential_volume = \
+                TODOvolume_and_external_surface_from_radius_and_length(g, n, n.potential_radius,
+                                                                       n.potential_length)["volume"]
+            # We calculate the number of moles of hexose required for growth, including the respiration cost according to
+            # the yield growth included in the model of Thornley and Cannell (2000), where root_tissue_density is the dry structural
+            # weight per volume (g m-3) and struct_mass_C_content is the amount of C per gram of dry structural mass (mol_C g-1):
+            n.hexose_growth_demand = (potential_volume - initial_volume) \
+                                     * param.root_tissue_density * param.struct_mass_C_content / param.yield_growth * 1 / 6.
+            # We verify that this potential growth demand is positive:
+            if n.hexose_growth_demand < 0.:
+                print("!!! ERROR: a negative growth demand of", n.hexose_growth_demand,
+                      "was calculated for the element", n.index(), "of class", n.label)
+                print("The initial volume is", initial_volume, "the potential volume is", potential_volume)
+                print("The initial length was", n.initial_length, "and the potential length was",
+                      n.potential_length)
+                print("The initial radius was", n.initial_radius, "and the potential radius was",
+                      n.potential_radius)
+                n.hexose_growth_demand = 0.
+                # In such case, we just pass to the next element in the iteration:
+                continue
+            elif n.hexose_growth_demand == 0.:
+                continue
+
+            # CALCULATIONS OF THE AMOUNT OF HEXOSE AVAILABLE FOR GROWTH:
+            # ---------------------------------------------------------
+
+            # We initialize each amount of hexose available for growth:
+            hexose_possibly_required_for_elongation = 0.
+            hexose_available_for_thickening = 0.
+
+            # If elongation is possible:
+            if n.potential_length > n.length:
+                hexose_possibly_required_for_elongation = n.hexose_possibly_required_for_elongation
+                list_of_elongation_supporting_elements = n.list_of_elongation_supporting_elements
+                list_of_elongation_supporting_elements_hexose = n.list_of_elongation_supporting_elements_hexose
+                list_of_elongation_supporting_elements_mass = n.list_of_elongation_supporting_elements_mass
+
+            # If radial growth is possible:
+            if n.potential_radius > n.radius:
+                # We only consider the amount of hexose immediately available in the element that can increase in radius:
+                hexose_available_for_thickening = n.hexose_available_for_thickening
+
+            # In case no hexose is available at all:
+            if (hexose_possibly_required_for_elongation + hexose_available_for_thickening) <= 0.:
+                # Then we move to the next element in the main loop:
+                continue
+
+            # We initialize the temporary variable "remaining_hexose" that computes the amount of hexose left for growth:
+            remaining_hexose_for_elongation = hexose_possibly_required_for_elongation
+            remaining_hexose_for_thickening = hexose_available_for_thickening
+
+            # ACTUAL ELONGATION IS FIRST CONSIDERED:
+            # ---------------------------------------
+
+            # We calculate the maximal possible length of the root element according to all the hexose available for elongation:
+            volume_max = initial_volume + hexose_possibly_required_for_elongation * 6. \
+                         / (param.root_tissue_density * param.struct_mass_C_content) * param.yield_growth
+            length_max = volume_max / (pi * n.initial_radius ** 2)
+
+            # If the element can elongate:
+            if n.potential_length > n.initial_length:
+
+                # CALCULATING ACTUAL ELONGATION:
+                # If elongation is possible but is limited by the amount of hexose available:
+                if n.potential_length >= length_max:
+                    # Elongation is limited using all the amount of hexose available:
+                    n.length = length_max
+                # Otherwise, elongation can be done up to the full potential:
+                else:
+                    # Elongation is done up to the full potential:
+                    n.length = n.potential_length
+                # The corresponding new volume is calculated:
+                volume_after_elongation = (pi * n.initial_radius ** 2) * n.length
+                # The overall cost of elongation is calculated as:
+                hexose_consumption_by_elongation = \
+                    1. / 6. * (volume_after_elongation - initial_volume) \
+                    * param.root_tissue_density * param.struct_mass_C_content / param.yield_growth
+
+                # If there has been an actual elongation:
+                if n.length > n.initial_length:
+
+                    # REGISTERING THE COSTS FOR ELONGATION:
+                    # We cover each of the elements that have provided hexose for sustaining the elongation of element n:
+                    for i in range(0, len(list_of_elongation_supporting_elements)):
+                        index = list_of_elongation_supporting_elements[i]
+                        supplying_element = g.node(index)
+                        # We define the actual contribution of the current element based on total hexose consumption by growth
+                        # of element n and the relative contribution of the current element to the pool of the available hexose:
+                        hexose_actual_contribution_to_elongation = hexose_consumption_by_elongation \
+                                                                   * list_of_elongation_supporting_elements_hexose[
+                                                                       i] \
+                                                                   / hexose_possibly_required_for_elongation
+                        # The amount of hexose used for growth in this element is increased:
+                        supplying_element.hexose_consumption_by_growth += hexose_actual_contribution_to_elongation
+                        supplying_element.hexose_consumption_by_growth_rate += hexose_actual_contribution_to_elongation / time_step_in_seconds
+                        # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
+                        supplying_element.resp_growth += hexose_actual_contribution_to_elongation \
+                                                         * (1 - param.yield_growth) * 6.
+
+            # ACTUAL RADIAL GROWTH IS THEN CONSIDERED:
+            # -----------------------------------------
+
+            # If the radius of the element can increase:
+            if n.potential_radius > n.initial_radius:
+
+                # CALCULATING ACTUAL THICKENING:
+                # We calculate the increase in volume that can be achieved with the amount of hexose available:
+                possible_radial_increase_in_volume = \
+                    remaining_hexose_for_thickening * 6. * param.yield_growth \
+                    / (param.root_tissue_density * param.struct_mass_C_content)
+                # We calculate the maximal possible volume based on the volume of the new cylinder after elongation
+                # and the increase in volume that could be achieved by consuming all the remaining hexose:
+                volume_max = \
+                TODOvolume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.length)[
+                    "volume"] \
+                + possible_radial_increase_in_volume
+                # We then calculate the corresponding new possible radius corresponding to this maximum volume:
+                if n.type == "Root_nodule":
+                    # If the element corresponds to a nodule, then it we calculate the radius of a theoretical sphere:
+                    possible_radius = (3. / (4. * pi)) ** (1. / 3.)
+                else:
+                    # Otherwise, we calculate the radius of a cylinder:
+                    possible_radius = sqrt(volume_max / (n.length * pi))
+                if possible_radius < 0.9999 * n.initial_radius:  # We authorize a difference of 0.01% due to calculation errors!
+                    print("!!! ERROR: the calculated new radius of element", n.index(),
+                          "is lower than the initial one!")
+                    print("The possible radius was", possible_radius, "and the initial radius was",
+                          n.initial_radius)
+
+                # If the maximal radius that can be obtained is lower than the potential radius suggested by the potential growth module:
+                if possible_radius <= n.potential_radius:
+                    # Then radial growth is limited and there is no remaining hexose after radial growth:
+                    n.radius = possible_radius
+                    hexose_actual_contribution_to_thickening = remaining_hexose_for_thickening
+                    remaining_hexose_for_thickening = 0.
+                else:
+                    # Otherwise, radial growth is done up to the full potential and the remaining hexose is calculated:
+                    n.radius = n.potential_radius
+                    net_increase_in_volume = \
+                        TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"] \
+                        - TODOvolume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.length)[
+                            "volume"]
+                    # net_increase_in_volume = pi * (n.radius ** 2 - n.initial_radius ** 2) * n.length
+                    # We then calculate the remaining amount of hexose after thickening:
+                    hexose_actual_contribution_to_thickening = \
+                        1. / 6. * net_increase_in_volume \
+                        * param.root_tissue_density * param.struct_mass_C_content / param.yield_growth
+
+                # REGISTERING THE COSTS FOR THICKENING:
+                # --------------------------------------
+                fraction_of_available_hexose_in_the_element = \
+                    (n.C_hexose_root * n.initial_struct_mass) / hexose_available_for_thickening
+                # The amount of hexose used for growth in this element is increased:
+                n.hexose_consumption_by_growth += \
+                    (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
+                n.hexose_consumption_by_growth_rate += \
+                    (
+                            hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) / time_step_in_seconds
+                # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
+                n.resp_growth += \
+                    (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) \
+                    * (1 - param.yield_growth) * 6.
+                if n.type == "Root_nodule":
+                    index_parent = g.Father(n.index(), EdgeType='+')
+                    parent = g.node(index_parent)
+                    fraction_of_available_hexose_in_the_element = \
+                        (parent.C_hexose_root * parent.initial_struct_mass) / hexose_available_for_thickening
+                    # The amount of hexose used for growth in this element is increased:
+                    parent.hexose_consumption_by_growth += \
+                        (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
+                    parent.hexose_consumption_by_growth_rate += \
+                        (
+                                hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) / time_step_in_seconds
+                    # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
+                    parent.resp_growth += \
+                        (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) \
+                        * (1 - param.yield_growth) * 6.
+
+            # RECORDING THE ACTUAL STRUCTURAL MODIFICATIONS:
+            # -----------------------------------------------
+
+            # The new volume and surfaces of the element is automatically calculated:
+            n.external_surface = TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)[
+                "external_surface"]
+            n.volume = TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"]
+            # The new dry structural struct_mass of the element is calculated from its new volume:
+            n.struct_mass = n.volume * param.root_tissue_density
+            n.struct_mass_produced = (n.volume - initial_volume) * param.root_tissue_density
+
+            # Verification: we check that no negative length or struct_mass have been generated!
+            if n.volume < 0:
+                print("!!! ERROR: the element", n.index(), "of class", n.label, "has a length of", n.length,
+                      "and a mass of", n.struct_mass)
+                # We then reset all the geometrical values to their initial values:
+                n.length = n.initial_length
+                n.radius = n.initial_radius
+                n.struct_mass = n.initial_struct_mass
+                n.struct_mass_produced = 0.
+                n.external_surface = n.initial_external_surface
+                n.volume = initial_volume
+
+            # MODIFYING SPECIFIC PROPERTIES AFTER ELONGATION:
+            # -----------------------------------------------
+            # If there has been an actual elongation:
+            if n.length > n.initial_length:
+
+                # If the elongated apex corresponded to any primordium that has been allowed to emerge:
+                if n.type == "Seminal_root_before_emergence" \
+                        or n.type == "Adventitious_root_before_emergence" \
+                        or n.type == "Normal_root_before_emergence":
+                    # We now consider the apex to have emerged:
+                    n.type = "Normal_root_after_emergence"
+                    # The exact time since emergence is recorded:
+                    n.thermal_time_since_emergence = n.thermal_potential_time_since_emergence
+                    n.actual_time_since_emergence = n.thermal_time_since_emergence / temperature_time_adjustment
+                    # The actual elongation rate is calculated:
+                    n.actual_elongation = n.length - n.initial_length
+                    n.actual_elongation_rate = n.actual_elongation / n.actual_time_since_emergence
+                    # Note: at this stage, no sugar has been allocated to the emerging primordium itself!
+                    # if n.type == "Adventitious_root_before_emergence":
+                    #     print("> A new adventitious root has emerged, starting from element", n.index(), "!")
+                elif n.type == "Normal_root_after_emergence":
+                    # The actual elongation rate is calculated:
+                    n.actual_elongation = n.length - n.initial_length
+                    n.actual_elongation_rate = n.actual_elongation / time_step_in_seconds
+
+                # # IF THE AGE OF CELLS NEEDS TO BE UPDATED AT THIS STAGE:
+                # # In both cases, we calculate a new, average age of the root cells in the elongated apex, based on the
+                # # principle that cells appear at the very end of the root tip, and then age. In this case, the average age
+                # # of the element that has elongated is calculated as the mean value between the incremented age of the part
+                # # that was already formed and the average age of the new part that has been created:
+                # initial_time_since_cells_formation = n.actual_time_since_cells_formation
+                # Age_non_elongated = initial_time_since_cells_formation + time_step_in_seconds
+                # Age_elongated =  0.5 * n.actual_elongation / n.actual_elongation_rate
+                # n.actual_time_since_cells_formation = (n.initial_length * Age_non_elongated + n.actual_elongation * Age_elongated) / n.length
+                # n.thermal_time_since_cells_formation += (n.actual_time_since_cells_formation - initial_time_since_cells_formation) * temperature_time_adjustment
+
+                # The distance to the last ramification is increased:
+                n.dist_to_ramif += n.actual_elongation
+
+        return g
 
     def update_distance_from_tip(self, g):
         """
