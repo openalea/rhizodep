@@ -13,10 +13,36 @@ from openalea.mtg.traversal import pre_order, post_order
 
 import rhizodep.parameters as param
 
+
 class RootAnatomy:
-    def __init__(self, g, time_step_in_seconds):
+    """
+    Root anatomy model originating from both Rhizodep model.py and Root_CyNAPS model_topology.py
+
+    Rhizodep forked :
+        https://forgemia.inra.fr/tristan.gerault/rhizodep/-/commits/rhizodep_2022?ref_type=heads
+    base_commit :
+        92a6f7ad927ffa0acf01aef645f9297a4531878c
+
+    Root_Cynaps forked :
+
+    base_commit :
+
+    """
+
+    def __init__(self, g, time_step_in_seconds: int):
+        """
+        DESCRIPTION
+        -----------
+        __init__ method
+
+        :param g: the root MTG
+        :param time_step_in_seconds: time step of the simulation (s)
+        :return:
+        """
+
         self.g = g
         self.time_steps_in_seconds = time_step_in_seconds
+
 
     def volume_and_external_surface_from_radius_and_length(self, g, element, radius, length):
         """
@@ -71,6 +97,9 @@ class RootAnatomy:
 
         # NOTE: the volume and external surface of the element have not been updated at this stage!
         return dictionary
+
+
+
 
     # Defining specific surfaces of exchange within a root element:
     # -------------------------------------------------------------

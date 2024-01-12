@@ -66,7 +66,25 @@ import rhizodep.parameters as param
 
 @dataclass
 class RootCarbonModel:
-    def __init__(self, g, time_step_in_seconds):
+    """
+    Root carbon balance model originating from Rhizodep model.py
+
+    forked :
+        https://forgemia.inra.fr/tristan.gerault/rhizodep/-/commits/rhizodep_2022?ref_type=heads
+    base_commit :
+        92a6f7ad927ffa0acf01aef645f9297a4531878c
+    """
+
+    def __init__(self, g, time_step_in_seconds: int):
+        """
+        DESCRIPTION
+        -----------
+        __init__ method
+
+        :param g: the root MTG
+        :param time_step_in_seconds: time step of the simulation (s)
+        :return:
+        """
         self.g = g
         self.props = self.g.properties()
         self.time_steps_in_seconds = time_step_in_seconds

@@ -26,14 +26,24 @@ import rhizodep.parameters as param
 
 @dataclass
 class RootGrowthModel:
+    """
+    DESCRIPTION
+    -----------
+    Root growth model originating from Rhizodep model.py
+
+    forked :
+        https://forgemia.inra.fr/tristan.gerault/rhizodep/-/commits/rhizodep_2022?ref_type=heads
+    base_commit :
+        92a6f7ad927ffa0acf01aef645f9297a4531878c
+    """
+
     # Inputs
     soil_temperature_in_Celsius: float = 20
-
     external_surface: float = field(default=1e-6, metadata=dict(unit="m2", unit_comment="", description="Initial external surface of the collar element", value_comment="", references="", variable_type="input", by="model_anatomy"))
-    volume: float = field(default=1e-7, metadata=dict(unit="m3", unit_comment="", description="Initial volume of the collar element", value_comment="", references="", variable_type="input", by="model_anatomy"))
     root_tissue_density: float = field(default=0.10 * 1e6, metadata=dict(unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", value_comment="", references="", variable_type="input", by="model_anatomy"))
 
     # Local state variables
+    volume: float = field(default=1e-7, metadata=dict(unit="m3", unit_comment="", description="Initial volume of the collar element", value_comment="", references="", variable_type="input", by="model_growth"))
 
     # Globals
     global_sucrose_deficit: float = 0
@@ -51,6 +61,7 @@ class RootGrowthModel:
     D_sem_to_D_ini_ratio: float = field(default=0.95, metadata=dict(unit="adim", unit_comment="", description="Proportionality coefficient between the tip diameter of a seminal root and D_ini", value_comment="", references="", variable_type="parameter", by="model_growth"))
     CVDD: float = field(default=0.2, metadata=dict(unit="adim", unit_comment="", description="Relative variation of the daughter root diameter", value_comment="", references="", variable_type="parameter", by="model_growth"))
     starting_time_for_adventitious_roots_emergence: float = field(default=(60. * 60. * 24.) * 9., metadata=dict(unit="s", unit_comment="time equivalent at temperature of T_ref", description="Time when adventitious roots start to successively emerge", value_comment="", references="", variable_type="parameter", by="model_growth"))
+    D_adv_to_D_ini_ratio: float = field(default=0.8, metadata=dict(unit="adim", unit_comment="", description="Proportionality coefficient between the tip diameter of an adventitious root and D_ini ", value_comment="", references="", variable_type="parameter", by="model_growth"))
 
 
     # Temperature
@@ -74,6 +85,10 @@ class RootGrowthModel:
     relative_root_thickening_rate_max: float = field(default=5. / 100. / (24. * 60. * 60.), metadata=dict(unit="s-1", unit_comment="", description="Maximal rate of relative increase in root radius", value_comment="", references="We consider that the radius can't increase by more than 5% every day (??)", variable_type="parameter", by="model_growth"))
     Km_thickening: float = field(default=Km_elongation, metadata=dict(unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for root thickening", value_comment="", references="We assume that the Michaelis-Menten constant for thickening is the same as for root elongation. (??)", variable_type="parameter", by="model_growth"))
 
+    # actual growth
+    struct_mass_C_content: float = field(default=0.44 / 12.01, metadata=dict(unit="mol.g-1", unit_comment="of carbon", description="C content of structural mass", value_comment="", references="We assume that the structural mass contains 44% of C. (??)", variable_type="parameter", by="model_growth"))
+    yield_growth: float = field(default=0.8, metadata=dict(unit="adim", unit_comment="mol of CO2 per mol of C used for structural mass", description="Growth yield", value_comment="", references="We use the range value (0.75-0.85) proposed by Thornley and Cannell (2000)", variable_type="parameter", by="model_growth"))
+
     # Simulation parameters
     # initiate MTG
     random: bool = True
@@ -95,9 +110,16 @@ class RootGrowthModel:
 
     # INIT METHODS
     # ------------
+    def __init__(self, time_step_in_seconds: int):
+        """
+        DESCRIPTION
+        -----------
+        __init__ method
 
-    def __init__(self, time_step_in_seconds):
-        self.g = self.initiate_mtg()
+        :param time_step_in_seconds: time step of the simulation (s)
+        :return:
+        """
+        self.g = field(default=self.initiate_mtg(), metadata=dict(description="the root MTG"))
         self.time_step_in_seconds = time_step_in_seconds
 
         # We define the list of apices for all vertices labelled as "Apex" or "Segment", from the tip to the base:
@@ -112,7 +134,8 @@ class RootGrowthModel:
         """
         This functions generates a root MTG from nothing, containing only one segment of a specific length,
         terminated by an apex (preferably of length 0).
-        :return:
+        :return: g: an initiated root MTG
+        Checked
         """
 
         # TODO FOR TRISTAN: Add all initial N-related variables that need to be explicited before N fluxes computation.
@@ -182,7 +205,7 @@ class RootGrowthModel:
         # base_segment.external_surface = self.external_surface
         # base_segment.initial_external_surface = base_segment.external_surface
         # USED
-        base_segment.volume = self.volume # FOR STRUCT MASS, to inputs
+        base_segment.volume = self.volume  # FOR STRUCT MASS, to inputs
         #
 
         base_segment.struct_mass = base_segment.volume * self.root_tissue_density
@@ -273,9 +296,7 @@ class RootGrowthModel:
         # ------------------
         # USED
         # base_segment.growth_duration = GDs * (2. * base_radius) ** 2 * main_roots_growth_extender #WATCH OUT!!! we artificially multiply growth duration for seminal and adventious roots!!!!!!!!!!!!!!!!!!!!!!
-        base_segment.growth_duration = self.calculate_growth_duration(radius=base_radius, index=id_segment,
-                                                                                   root_order=1,
-                                                                                   ArchiSimple=self.ArchiSimple)
+        base_segment.growth_duration = self.calculate_growth_duration(radius=base_radius, index=id_segment, root_order=1)
         base_segment.life_duration = self.LDs * (2. * base_radius) * self.root_tissue_density
         base_segment.actual_time_since_primordium_formation = 0.
         base_segment.actual_time_since_emergence = 0.
@@ -359,8 +380,7 @@ class RootGrowthModel:
                     # apex_seminal.growth_duration = GDs * (2. * radius_seminal) ** 2 * main_roots_growth_extender
                     apex_seminal.growth_duration = self.calculate_growth_duration(radius=radius_seminal,
                                                                                                index=apex_seminal.index(),
-                                                                                               root_order=1,
-                                                                                               ArchiSimple=self.ArchiSimple)
+                                                                                               root_order=1)
                     apex_seminal.life_duration = self.LDs * (2. * radius_seminal) * self.root_tissue_density
 
                     # We defined the delay of emergence for the new primordium:
@@ -439,8 +459,7 @@ class RootGrowthModel:
                     apex_adventitious.growth_duration = self.calculate_growth_duration(
                         radius=radius_adventitious,
                         index=apex_adventitious.index(),
-                        root_order=1,
-                        ArchiSimple=self.ArchiSimple)
+                        root_order=1)
                     apex_adventitious.life_duration = self.LDs * (2. * radius_adventitious) * self.root_tissue_density
 
                     # We defined the delay of emergence for the new primordium:
@@ -463,8 +482,7 @@ class RootGrowthModel:
         # apex.growth_duration = GDs * (2. * base_radius) ** 2 * main_roots_growth_extender
         apex.growth_duration = self.calculate_growth_duration(radius=base_radius,
                                                                            index=apex.index(),
-                                                                           root_order=1,
-                                                                           ArchiSimple=self.ArchiSimple)
+                                                                           root_order=1)
         apex.life_duration = self.LDs * (2. * base_radius) * self.root_tissue_density
 
         if self.initial_apex_length <= 0.:
@@ -484,323 +502,8 @@ class RootGrowthModel:
         apex.initial_external_surface = apex.external_surface
         apex.initial_living_root_hairs_external_surface = apex.living_root_hairs_external_surface
 
-        self.g = g
-        return self.g
+        return g
 
-    # GENERIC METHODS USED IN MANY PARTS OF THE MODEL
-    # -----------------------------------------------
-
-    # Modification of a process according to soil temperature:
-    def temperature_modification(self):
-        """
-        # TODO : make modular and avoid repetitions with the root Carbon model, method needs to be accesses by nearly every root module
-        This function calculates how the value of a process should be modified according to soil temperature (in degrees Celsius).
-        Parameters correspond to the value of the process at reference temperature T_ref (process_at_T_ref),
-        to two empirical coefficients A and B, and to a coefficient C used to switch between different formalisms.
-        If C=0 and B=1, then the relationship corresponds to a classical linear increase with temperature (thermal time).
-        If C=1, A=0 and B>1, then the relationship corresponds to a classical exponential increase with temperature (Q10).
-        If C=1, A<0 and B>0, then the relationship corresponds to bell-shaped curve, close to the one from Parent et al. (2010).
-        :return: the new value of the process
-        Checked
-        """
-
-        # We initialize the value of the temperature-modified process:
-        modified_process = 0.
-
-        # We avoid unwanted cases:
-        if self.C != 0 and self.C != 1:
-            print("The modification of the process at T =", self.soil_temperature_in_Celsius,
-                  "only works for C=0 or C=1!")
-            print("The modified process has been set to 0.")
-            modified_process = 0.
-            return 0.
-        elif self.C == 1:
-            if (self.A * (self.soil_temperature_in_Celsius - self.T_ref) + self.B) < 0.:
-                print("The modification of the process at T =", self.soil_temperature_in_Celsius,
-                      "is unstable with this set of parameters!")
-                print("The modified process has been set to 0.")
-                modified_process = 0.
-                return modified_process
-
-        # We compute a temperature-modified process, correspond to a Q10-modified relationship,
-        # based on the work of Tjoelker et al. (2001):
-        modified_process = self.process_at_T_ref * (
-                    self.A * (self.soil_temperature_in_Celsius - self.T_ref) + self.B) ** (1 - self.C) \
-                           * (self.A * (self.soil_temperature_in_Celsius - self.T_ref) + self.B) ** (
-                                   self.C * (self.soil_temperature_in_Celsius - self.T_ref) / 10.)
-
-        if modified_process < 0.:
-            modified_process = 0.
-
-        return modified_process
-
-        # Function for reinitializing all growth-related variables at the beginning or end of a time step:
-        # -------------------------------------------------------------------------------------------------
-
-    # Adding a new root element with pre-defined properties:
-    def ADDING_A_CHILD(self, mother_element, edge_type='+', label='Apex', type='Normal_root_before_emergence',
-                       root_order=1, angle_down=45., angle_roll=0., length=0., radius=0.,
-                       identical_properties=True, nil_properties=False):
-        """
-        This function creates a new child element on the mother element, based on the function add_child.
-        When called, this allows to automatically define standard properties without defining them in the main code.
-        :param mother_element: the node of the MTG on which the child element will be created
-        :param edge_type: the type of relationship between the mother element and its child ('+' or '<')
-        :param label: label of the child element
-        :param type: type of the child element
-        :param root_order: root_order of the child element
-        :param angle_down: angle_down of the child element
-        :param angle_roll: angle_roll of the child element
-        :param length: length of the child element
-        :param radius: radius of the child element
-        :param identical_properties: if True, the main properties of the child will be identical to those of the mother
-        :param nil_properties: if True, the main properties of the child will be 0
-        :return: the new child element
-
-        """
-
-        # TODO FOR TRISTAN: When working with a dynamic root structure, you will need to specify in this function
-        #  "ADDING_A_CHILD" your new variables that will either be set to 0 (nil properties) or be equal to that of the mother
-        #  element.
-
-        # If nil_properties = True, then we set most of the properties of the new element to 0:
-        if nil_properties:
-
-            new_child = mother_element.add_child(edge_type=edge_type,
-                                                 # Characteristics:
-                                                 # -----------------
-                                                 label=label,
-                                                 type=type,
-                                                 root_order=root_order,
-                                                 # Authorizations and C requirements:
-                                                 # -----------------------------------
-                                                 lateral_root_emergence_possibility='Impossible',
-                                                 emergence_cost=0.,
-                                                 # Geometry and topology:
-                                                 # -----------------------
-                                                 angle_down=angle_down,
-                                                 angle_roll=angle_roll,
-                                                 # The length of the primordium is set to 0:
-                                                 length=length,
-                                                 radius=radius,
-                                                 original_radius=radius,
-                                                 potential_length=0.,
-                                                 theoretical_radius=radius,
-                                                 potential_radius=radius,
-                                                 initial_length=0.,
-                                                 initial_radius=radius,
-                                                 external_surface=0.,
-                                                 volume=0.,
-                                                 dist_to_ramif=0.,
-                                                 distance_from_tip=0.,
-                                                 former_distance_from_tip=0.,
-                                                 actual_elongation=0.,
-                                                 actual_elongation_rate=0.,
-                                                 # Quantities and concentrations:
-                                                 # -------------------------------
-                                                 struct_mass=0.,
-                                                 initial_struct_mass=0.,
-                                                 C_hexose_root=0.,
-                                                 C_hexose_reserve=0.,
-                                                 C_hexose_soil=0.,
-                                                 Cs_mucilage_soil=0.,
-                                                 Cs_cells_soil=0.,
-                                                 C_sucrose_root=0.,
-                                                 Deficit_sucrose_root=0.,
-                                                 Deficit_hexose_root=0.,
-                                                 Deficit_hexose_reserve=0.,
-                                                 Deficit_hexose_soil=0.,
-                                                 Deficit_mucilage_soil=0.,
-                                                 Deficit_cells_soil=0.,
-                                                 Deficit_sucrose_root_rate=0.,
-                                                 Deficit_hexose_root_rate=0.,
-                                                 Deficit_hexose_reserve_rate=0.,
-                                                 Deficit_hexose_soil_rate=0.,
-                                                 Deficit_mucilage_soil_rate=0.,
-                                                 Deficit_cells_soil_rate=0.,
-                                                 # Root hairs:
-                                                 # ------------
-                                                 root_hair_radius=param.root_hair_radius,
-                                                 root_hair_length=0.,
-                                                 actual_length_with_hairs=0.,
-                                                 living_root_hairs_number=0.,
-                                                 dead_root_hairs_number=0.,
-                                                 total_root_hairs_number=0.,
-                                                 actual_time_since_root_hairs_emergence_started=0.,
-                                                 thermal_time_since_root_hairs_emergence_started=0.,
-                                                 actual_time_since_root_hairs_emergence_stopped=0.,
-                                                 thermal_time_since_root_hairs_emergence_stopped=0.,
-                                                 all_root_hairs_formed=False,
-                                                 root_hairs_lifespan=param.root_hairs_lifespan,
-                                                 root_hairs_external_surface=0.,
-                                                 living_root_hairs_external_surface=0.,
-                                                 root_hairs_volume=0.,
-                                                 root_hairs_struct_mass=0.,
-                                                 root_hairs_struct_mass_produced=0.,
-                                                 initial_living_root_hairs_struct_mass=0.,
-                                                 living_root_hairs_struct_mass=0.,
-                                                 # Fluxes:
-                                                 # --------
-                                                 resp_maintenance=0.,
-                                                 resp_growth=0.,
-                                                 struct_mass_produced=0.,
-                                                 hexose_growth_demand=0.,
-                                                 hexose_consumption_by_growth=0.,
-                                                 hexose_consumption_by_growth_rate=0.,
-                                                 hexose_possibly_required_for_elongation=0.,
-                                                 hexose_production_from_phloem=0.,
-                                                 sucrose_loading_in_phloem=0.,
-                                                 hexose_mobilization_from_reserve=0.,
-                                                 hexose_immobilization_as_reserve=0.,
-                                                 hexose_exudation=0.,
-                                                 hexose_uptake_from_soil=0.,
-                                                 phloem_hexose_exudation=0.,
-                                                 phloem_hexose_uptake_from_soil=0.,
-                                                 mucilage_secretion=0.,
-                                                 cells_release=0.,
-                                                 total_net_rhizodeposition=0.,
-                                                 hexose_degradation=0.,
-                                                 mucilage_degradation=0.,
-                                                 cells_degradation=0.,
-                                                 specific_net_exudation=0.,
-                                                 # Time indications:
-                                                 # ------------------
-                                                 growth_duration=param.GDs * (2 * radius) ** 2,
-                                                 life_duration=param.LDs * 2. * radius * param.root_tissue_density,
-                                                 actual_time_since_primordium_formation=0.,
-                                                 actual_time_since_emergence=0.,
-                                                 actual_time_since_cells_formation=0.,
-                                                 actual_potential_time_since_emergence=0.,
-                                                 actual_time_since_growth_stopped=0.,
-                                                 actual_time_since_death=0.,
-                                                 thermal_time_since_primordium_formation=0.,
-                                                 thermal_time_since_emergence=0.,
-                                                 thermal_time_since_cells_formation=0.,
-                                                 thermal_potential_time_since_emergence=0.,
-                                                 thermal_time_since_growth_stopped=0.,
-                                                 thermal_time_since_death=0.
-                                                 )
-
-        # Otherwise, if identical_properties=True, then we copy most of the properties of the mother element in the new element:
-        elif identical_properties:
-
-            new_child = mother_element.add_child(edge_type=edge_type,
-                                                 # Characteristics:
-                                                 # -----------------
-                                                 label=label,
-                                                 type=type,
-                                                 root_order=root_order,
-                                                 # Authorizations and C requirements:
-                                                 # -----------------------------------
-                                                 lateral_root_emergence_possibility='Impossible',
-                                                 emergence_cost=0.,
-                                                 # Geometry and topology:
-                                                 # -----------------------
-                                                 angle_down=angle_down,
-                                                 angle_roll=angle_roll,
-                                                 # The length of the primordium is set to 0:
-                                                 length=length,
-                                                 radius=mother_element.radius,
-                                                 original_radius=mother_element.radius,
-                                                 potential_length=length,
-                                                 theoretical_radius=mother_element.theoretical_radius,
-                                                 potential_radius=mother_element.potential_radius,
-                                                 initial_length=length,
-                                                 initial_radius=mother_element.radius,
-                                                 external_surface=0.,
-                                                 volume=0.,
-                                                 dist_to_ramif=mother_element.dist_to_ramif,
-                                                 distance_from_tip=mother_element.distance_from_tip,
-                                                 former_distance_from_tip=mother_element.former_distance_from_tip,
-                                                 actual_elongation=mother_element.actual_elongation,
-                                                 actual_elongation_rate=mother_element.actual_elongation_rate,
-                                                 # Quantities and concentrations:
-                                                 # -------------------------------
-                                                 struct_mass=mother_element.struct_mass,
-                                                 initial_struct_mass=mother_element.initial_struct_mass,
-                                                 C_hexose_root=mother_element.C_hexose_root,
-                                                 C_hexose_reserve=mother_element.C_hexose_reserve,
-                                                 C_hexose_soil=mother_element.C_hexose_soil,
-                                                 Cs_mucilage_soil=mother_element.Cs_mucilage_soil,
-                                                 Cs_cells_soil=mother_element.Cs_cells_soil,
-                                                 C_sucrose_root=mother_element.C_sucrose_root,
-                                                 Deficit_sucrose_root=mother_element.Deficit_sucrose_root,
-                                                 Deficit_hexose_root=mother_element.Deficit_hexose_root,
-                                                 Deficit_hexose_reserve=mother_element.Deficit_hexose_reserve,
-                                                 Deficit_hexose_soil=mother_element.Deficit_hexose_soil,
-                                                 Deficit_mucilage_soil=mother_element.Deficit_mucilage_soil,
-                                                 Deficit_cells_soil=mother_element.Deficit_cells_soil,
-                                                 Deficit_sucrose_root_rate=mother_element.Deficit_sucrose_root_rate,
-                                                 Deficit_hexose_root_rate=mother_element.Deficit_hexose_root_rate,
-                                                 Deficit_hexose_reserve_rate=mother_element.Deficit_hexose_reserve_rate,
-                                                 Deficit_hexose_soil_rate=mother_element.Deficit_hexose_soil_rate,
-                                                 Deficit_mucilage_soil_rate=mother_element.Deficit_mucilage_soil_rate,
-                                                 Deficit_cells_soil_rate=mother_element.Deficit_cells_soil_rate,
-
-                                                 # Root hairs:
-                                                 # ------------
-                                                 root_hair_radius=mother_element.root_hair_radius,
-                                                 root_hair_length=mother_element.root_hair_length,
-                                                 actual_length_with_hairs=mother_element.actual_length_with_hairs,
-                                                 living_root_hairs_number=mother_element.living_root_hairs_number,
-                                                 dead_root_hairs_number=mother_element.dead_root_hairs_number,
-                                                 total_root_hairs_number=mother_element.total_root_hairs_number,
-                                                 actual_time_since_root_hairs_emergence_started=mother_element.actual_time_since_root_hairs_emergence_started,
-                                                 thermal_time_since_root_hairs_emergence_started=mother_element.thermal_time_since_root_hairs_emergence_started,
-                                                 actual_time_since_root_hairs_emergence_stopped=mother_element.actual_time_since_root_hairs_emergence_stopped,
-                                                 thermal_time_since_root_hairs_emergence_stopped=mother_element.thermal_time_since_root_hairs_emergence_stopped,
-                                                 all_root_hairs_formed=mother_element.all_root_hairs_formed,
-                                                 root_hairs_lifespan=mother_element.root_hairs_lifespan,
-                                                 root_hairs_external_surface=mother_element.root_hairs_external_surface,
-                                                 living_root_hairs_external_surface=mother_element.living_root_hairs_external_surface,
-                                                 root_hairs_volume=mother_element.root_hairs_volume,
-                                                 root_hairs_struct_mass=mother_element.root_hairs_struct_mass,
-                                                 root_hairs_struct_mass_produced=mother_element.root_hairs_struct_mass_produced,
-                                                 living_root_hairs_struct_mass=mother_element.living_root_hairs_struct_mass,
-                                                 initial_living_root_hairs_struct_mass=mother_element.initial_living_root_hairs_struct_mass,
-                                                 # Fluxes:
-                                                 # -------
-                                                 resp_maintenance=mother_element.resp_maintenance,
-                                                 resp_growth=mother_element.resp_growth,
-                                                 struct_mass_produced=mother_element.struct_mass_produced,
-                                                 hexose_growth_demand=mother_element.hexose_growth_demand,
-                                                 hexose_possibly_required_for_elongation=mother_element.hexose_possibly_required_for_elongation,
-                                                 hexose_production_from_phloem=mother_element.hexose_production_from_phloem,
-                                                 sucrose_loading_in_phloem=mother_element.sucrose_loading_in_phloem,
-                                                 hexose_mobilization_from_reserve=mother_element.hexose_mobilization_from_reserve,
-                                                 hexose_immobilization_as_reserve=mother_element.hexose_immobilization_as_reserve,
-                                                 hexose_exudation=mother_element.hexose_exudation,
-                                                 hexose_uptake_from_soil=mother_element.hexose_uptake_from_soil,
-                                                 phloem_hexose_exudation=mother_element.phloem_hexose_exudation,
-                                                 phloem_hexose_uptake_from_soil=mother_element.phloem_hexose_uptake_from_soil,
-                                                 mucilage_secretion=mother_element.mucilage_secretion,
-                                                 cells_release=mother_element.cells_release,
-                                                 total_net_rhizodeposition=mother_element.total_net_rhizodeposition,
-                                                 hexose_degradation=mother_element.hexose_degradation,
-                                                 mucilage_degradation=mother_element.mucilage_degradation,
-                                                 cells_degradation=mother_element.cells_degradation,
-                                                 hexose_consumption_by_growth=mother_element.hexose_consumption_by_growth,
-                                                 hexose_consumption_by_growth_rate=mother_element.hexose_consumption_by_growth_rate,
-                                                 specific_net_exudation=mother_element.specific_net_exudation,
-                                                 # Time indications:
-                                                 # ------------------
-                                                 growth_duration=mother_element.growth_duration,
-                                                 life_duration=mother_element.life_duration,
-                                                 actual_time_since_primordium_formation=mother_element.actual_time_since_primordium_formation,
-                                                 actual_time_since_emergence=mother_element.actual_time_since_emergence,
-                                                 actual_time_since_cells_formation=mother_element.actual_time_since_cells_formation,
-                                                 actual_time_since_growth_stopped=mother_element.actual_time_since_growth_stopped,
-                                                 actual_time_since_death=mother_element.actual_time_since_death,
-
-                                                 thermal_time_since_primordium_formation=mother_element.thermal_time_since_primordium_formation,
-                                                 thermal_time_since_emergence=mother_element.thermal_time_since_emergence,
-                                                 thermal_time_since_cells_formation=mother_element.thermal_time_since_cells_formation,
-                                                 thermal_potential_time_since_emergence=mother_element.thermal_potential_time_since_emergence,
-                                                 thermal_time_since_growth_stopped=mother_element.thermal_time_since_growth_stopped,
-                                                 thermal_time_since_death=mother_element.thermal_time_since_death
-                                                 )
-
-        return new_child
 
     # ACTUAL CALLABLE SCHEDULING LOOP TODO: metadata?
     # -------------------------------
@@ -819,7 +522,6 @@ class RootGrowthModel:
         # =================
 
         # We proceed to the segmentation of the whole root system
-        # TODO : Warning missing erased simulation parameters
         # (NOTE: segmentation should always occur AFTER actual growth):
         self.segmentation_and_primordia_formation()
 
@@ -831,7 +533,7 @@ class RootGrowthModel:
     def reinitializing_growth_variables(self):
         """
         This function re-initializes different growth-related variables (e.g. potential growth variables).
-        :param g: the root MTG to be considered
+
         :return:
         """
 
@@ -869,8 +571,7 @@ class RootGrowthModel:
     def potential_growth(self):
         """
         This function covers the whole root MTG and computes the potential growth of segments and apices.
-        :param radial_growth: a Boolean (True/False) expliciting whether radial growth should be considered or not
-        :param ArchiSimple: a Boolean (True/False) expliciting whether original rules for ArchiSimple should be kept or not
+        :return:
         Checked
         """
         # We simulate the development of all apices and segments in the MTG:
@@ -1126,13 +827,8 @@ class RootGrowthModel:
                     # And the function returns this new apex and stops here:
                     return new_apex
 
-        # VERIFICATION: If the apex does not match any of the cases listed above:
-        print("!!! ERROR: No case found for defining growth of apex", apex.index(), "of type", apex.type)
-        new_apex.append(apex)
-        return new_apex
-
     # Function for calculating root elongation:
-    def elongated_length(self, initial_length, radius, C_hexose_root, elongation_time_in_seconds):
+    def elongated_length(self, initial_length: float, radius: float, C_hexose_root: float, elongation_time_in_seconds: float):
         """
         This function computes a new length (m) based on the elongation process described by ArchiSimple and regulated by
         the available concentration of hexose.
@@ -1490,12 +1186,9 @@ class RootGrowthModel:
         and emergence_cost defined in each element by the module "POTENTIAL GROWTH".
         The function returns the MTG "g" with modified values of radius and length of each element, the possibility of the
         emergence of lateral roots, and the cost of growth in terms of hexose consumption.
-        :param g: the root MTG to be considered
-        :param time_step_in_seconds: the time step over which growth is considered
-        :param soil_temperature_in_Celsius: the same, homogeneous temperature experienced by the whole root system
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
-        :return: g, the updated MTG
-        TODO
+
+        :return:
+        Checked
         """
 
         # TODO FOR TRISTAN: Here you would need to explicit at least a cost of N associated to the actual growth,
@@ -1539,18 +1232,14 @@ class RootGrowthModel:
             # WARNING: All growth related variables should have been initialized by another module at the beginning of the time step!!!
 
             # We calculate the initial volume of the element:
-            initial_volume = \
-                TODOvolume_and_external_surface_from_radius_and_length(n, n.initial_radius, n.initial_length)[
-                    "volume"]
+            initial_volume = self.volume_from_radius_and_length(n, n.initial_radius, n.initial_length)
             # We calculate the potential volume of the element based on the potential radius and potential length:
-            potential_volume = \
-                TODOvolume_and_external_surface_from_radius_and_length(n, n.potential_radius,
-                                                                       n.potential_length)["volume"]
+            potential_volume = self.volume_from_radius_and_length(n, n.potential_radius, n.potential_length)
             # We calculate the number of moles of hexose required for growth, including the respiration cost according to
             # the yield growth included in the model of Thornley and Cannell (2000), where root_tissue_density is the dry structural
             # weight per volume (g m-3) and struct_mass_C_content is the amount of C per gram of dry structural mass (mol_C g-1):
             n.hexose_growth_demand = (potential_volume - initial_volume) \
-                                     * param.root_tissue_density * param.struct_mass_C_content / param.yield_growth * 1 / 6.
+                                     * self.root_tissue_density * self.struct_mass_C_content / self.yield_growth * 1 / 6.
             # We verify that this potential growth demand is positive:
             if n.hexose_growth_demand < 0.:
                 print("!!! ERROR: a negative growth demand of", n.hexose_growth_demand,
@@ -1599,7 +1288,7 @@ class RootGrowthModel:
 
             # We calculate the maximal possible length of the root element according to all the hexose available for elongation:
             volume_max = initial_volume + hexose_possibly_required_for_elongation * 6. \
-                         / (param.root_tissue_density * param.struct_mass_C_content) * param.yield_growth
+                         / (self.root_tissue_density * self.struct_mass_C_content) * self.yield_growth
             length_max = volume_max / (pi * n.initial_radius ** 2)
 
             # If the element can elongate:
@@ -1615,11 +1304,11 @@ class RootGrowthModel:
                     # Elongation is done up to the full potential:
                     n.length = n.potential_length
                 # The corresponding new volume is calculated:
-                volume_after_elongation = (pi * n.initial_radius ** 2) * n.length
+                volume_after_elongation = self.volume_from_radius_and_length(n, n.initial_radius, n.length)
                 # The overall cost of elongation is calculated as:
                 hexose_consumption_by_elongation = \
                     1. / 6. * (volume_after_elongation - initial_volume) \
-                    * param.root_tissue_density * param.struct_mass_C_content / param.yield_growth
+                    * self.root_tissue_density * self.struct_mass_C_content / self.yield_growth
 
                 # If there has been an actual elongation:
                 if n.length > n.initial_length:
@@ -1633,14 +1322,12 @@ class RootGrowthModel:
                         # of element n and the relative contribution of the current element to the pool of the available hexose:
                         hexose_actual_contribution_to_elongation = hexose_consumption_by_elongation \
                                                                    * list_of_elongation_supporting_elements_hexose[
-                                                                       i] \
-                                                                   / hexose_possibly_required_for_elongation
+                                                                       i] / hexose_possibly_required_for_elongation
                         # The amount of hexose used for growth in this element is increased:
                         supplying_element.hexose_consumption_by_growth += hexose_actual_contribution_to_elongation
                         supplying_element.hexose_consumption_by_growth_rate += hexose_actual_contribution_to_elongation / self.time_step_in_seconds
                         # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
-                        supplying_element.resp_growth += hexose_actual_contribution_to_elongation \
-                                                         * (1 - param.yield_growth) * 6.
+                        supplying_element.resp_growth += hexose_actual_contribution_to_elongation * (1 - self.yield_growth) * 6.
 
             # ACTUAL RADIAL GROWTH IS THEN CONSIDERED:
             # -----------------------------------------
@@ -1651,14 +1338,11 @@ class RootGrowthModel:
                 # CALCULATING ACTUAL THICKENING:
                 # We calculate the increase in volume that can be achieved with the amount of hexose available:
                 possible_radial_increase_in_volume = \
-                    remaining_hexose_for_thickening * 6. * param.yield_growth \
-                    / (param.root_tissue_density * param.struct_mass_C_content)
+                    remaining_hexose_for_thickening * 6. * self.yield_growth \
+                    / (self.root_tissue_density * self.struct_mass_C_content)
                 # We calculate the maximal possible volume based on the volume of the new cylinder after elongation
                 # and the increase in volume that could be achieved by consuming all the remaining hexose:
-                volume_max = \
-                TODOvolume_and_external_surface_from_radius_and_length(n, n.initial_radius, n.length)[
-                    "volume"] \
-                + possible_radial_increase_in_volume
+                volume_max = self.volume_from_radius_and_length(n, n.initial_radius, n.length) + possible_radial_increase_in_volume
                 # We then calculate the corresponding new possible radius corresponding to this maximum volume:
                 if n.type == "Root_nodule":
                     # If the element corresponds to a nodule, then it we calculate the radius of a theoretical sphere:
@@ -1681,15 +1365,13 @@ class RootGrowthModel:
                 else:
                     # Otherwise, radial growth is done up to the full potential and the remaining hexose is calculated:
                     n.radius = n.potential_radius
-                    net_increase_in_volume = \
-                        TODOvolume_and_external_surface_from_radius_and_length(n, n.radius, n.length)["volume"] \
-                        - TODOvolume_and_external_surface_from_radius_and_length(n, n.initial_radius, n.length)[
-                            "volume"]
+                    net_increase_in_volume = self.volume_from_radius_and_length(n, n.radius, n.length) \
+                        - self.volume_from_radius_and_length(n, n.initial_radius, n.length)
                     # net_increase_in_volume = pi * (n.radius ** 2 - n.initial_radius ** 2) * n.length
                     # We then calculate the remaining amount of hexose after thickening:
                     hexose_actual_contribution_to_thickening = \
                         1. / 6. * net_increase_in_volume \
-                        * param.root_tissue_density * param.struct_mass_C_content / param.yield_growth
+                        * self.root_tissue_density * self.struct_mass_C_content / self.yield_growth
 
                 # REGISTERING THE COSTS FOR THICKENING:
                 # --------------------------------------
@@ -1699,12 +1381,11 @@ class RootGrowthModel:
                 n.hexose_consumption_by_growth += \
                     (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
                 n.hexose_consumption_by_growth_rate += \
-                    (
-                            hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) / self.time_step_in_seconds
+                    (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) / self.time_step_in_seconds
                 # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
                 n.resp_growth += \
                     (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) \
-                    * (1 - param.yield_growth) * 6.
+                    * (1 - self.yield_growth) * 6.
                 if n.type == "Root_nodule":
                     index_parent = self.g.Father(n.index(), EdgeType='+')
                     parent = self.g.node(index_parent)
@@ -1719,18 +1400,15 @@ class RootGrowthModel:
                     # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
                     parent.resp_growth += \
                         (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) \
-                        * (1 - param.yield_growth) * 6.
+                        * (1 - self.yield_growth) * 6.
 
             # RECORDING THE ACTUAL STRUCTURAL MODIFICATIONS:
             # -----------------------------------------------
-
-            # The new volume and surfaces of the element is automatically calculated:
-            n.external_surface = TODOvolume_and_external_surface_from_radius_and_length(n, n.radius, n.length)[
-                "external_surface"]
-            n.volume = TODOvolume_and_external_surface_from_radius_and_length(n, n.radius, n.length)["volume"]
+            # The new volume of the element is automatically calculated
+            n.volume = self.volume_from_radius_and_length(n, n.radius, n.length)
             # The new dry structural struct_mass of the element is calculated from its new volume:
-            n.struct_mass = n.volume * param.root_tissue_density
-            n.struct_mass_produced = (n.volume - initial_volume) * param.root_tissue_density
+            n.struct_mass = n.volume * self.root_tissue_density
+            n.struct_mass_produced = (n.volume - initial_volume) * self.root_tissue_density
 
             # Verification: we check that no negative length or struct_mass have been generated!
             if n.volume < 0:
@@ -1741,7 +1419,6 @@ class RootGrowthModel:
                 n.radius = n.initial_radius
                 n.struct_mass = n.initial_struct_mass
                 n.struct_mass_produced = 0.
-                n.external_surface = n.initial_external_surface
                 n.volume = initial_volume
 
             # MODIFYING SPECIFIC PROPERTIES AFTER ELONGATION:
@@ -1799,63 +1476,7 @@ class RootGrowthModel:
 
         return
 
-    # Calculating the growth duration of a given root apex:
-    # -----------------------------------------------------
-    def calculate_growth_duration(self, radius, index, root_order, ArchiSimple=False):
-        """
-        This function computes the growth duration of a given apex, based on its radius and root order. If ArchiSimple
-        option is activated, the function will calculate the duration proportionally to the square radius of the apex.
-        Otherwise, the duration is set from a probability test, largely independent from the radius of the apex.
-        :param radius: the radius of the apex element from which we compute the growth duration
-        :param index: the index of the apex element, used for setting a new random seed for this element
-        :param ArchiSimple: if True, the original rule set by ArchiSimple will be applied to compute the growth duration
-        :return: the growth duration of the apex (s)
-        """
 
-        # If we only want to apply original ArchiSimple rules:
-        if ArchiSimple:
-            # Then the growth duration of the apex is proportional to the square diameter of the apex:
-            growth_duration = param.GDs * (2. * radius) ** 2
-        # Otherwise, we define the growth duration as a fixed value, randomly chosen between three possibilities:
-        else:
-            # We first define the seed of random, depending on the index of the apex:
-            np.random.seed(param.random_choice * index)
-            # We then generate a random float number between 0 and 1, which will determine whether growth duration is low, medium or high:
-            random_result = np.random.random_sample()
-            # CASE 1: The apex corresponds to a seminal or adventitious root
-            if root_order == 1:
-                growth_duration = param.GD_highest
-            else:
-                # If we select random zoning, then the growth duration will be drawn from a range, for three different cases
-                # (from most likely to less likely):
-                if param.GD_by_frequency:
-                    # CASE 2: Most likely, the growth duration will be low for a lateral root
-                    if random_result < param.GD_prob_low:
-                        # We draw a random growth-duration in the lower range:
-                        growth_duration = np.random.uniform(0., param.GD_low)
-                    # CASE 3: Occasionnaly, the growth duration may be a bit higher for a lateral root
-                    if random_result < param.GD_prob_medium:
-                        # We draw a random growth-duration in the lower range:
-                        growth_duration = np.random.uniform(param.GD_low, param.GD_medium)
-                    # CASE 3: Occasionnaly, the growth duration may be a bit higher for a lateral root
-                    else:
-                        # We draw a random growth-duration in the lower range:
-                        growth_duration = np.random.uniform(param.GD_medium, param.GD_high)
-                # If random zoning has not been selected, a constant duration is selected for each probabibility range:
-                else:
-                    # CASE 2: Most likely, the growth duration will be low for a lateral root
-                    if random_result < param.GD_prob_low:
-                        growth_duration = param.GD_low
-                    # CASE 3: Occasionally, the growth duration of the lateral root may be significantly higher
-                    elif random_result < param.GD_prob_medium:
-                        growth_duration = param.GD_medium
-                    # CASE 4: Exceptionally, the growth duration of the lateral root is as high as that from a seminal root,
-                    # as long as the radius of the lateral root is high enough (i.e. twice as high as the minimal possible radius)
-                    elif radius > 2 * param.Dmin / 2.:
-                        growth_duration = param.GD_highest
-
-        # We return a modified version of the MTG "g" with the updated property "distance_from_tip":
-        return growth_duration
 
     ########################################################################################################################
 
@@ -1868,20 +1489,12 @@ class RootGrowthModel:
     # Formation of a root primordium at the apex of the mother root:
     # ---------------------------------------------------------------
 
-    def primordium_formation(self, g, apex, elongation_rate=0., time_step_in_seconds=1. * 60. * 60. * 24.,
-                             soil_temperature_in_Celsius=20, random=True,
-                             root_order_limitation=False, root_order_treshold=2, ArchiSimple=False):
+    def primordium_formation(self, apex, elongation_rate=0.):
         """
         This function considers the formation of a primordium on a root apex, and, if possible, creates this new element
         of length 0.
-        :param g: the MTG to work on
         :param apex: the apex on which the primordium may be created
         :param elongation_rate: the rate of elongation of the apex over the time step during which the primordium may be created (m s-1)
-        :param time_step_in_seconds: the time step during which the primordium may be created (s)
-        :param soil_temperature_in_Celsius: the temperature of root growth (degree Celsius)
-        :param random: if True, randomness of angles will be considered
-        :param root_order_limitation: if True, primordia of high root order will not be formed
-        :param root_order_treshold: the root order above which primordium formation may be forbidden.
         :return: the new primordium
         """
 
@@ -1910,7 +1523,7 @@ class RootGrowthModel:
             return new_apex
 
         # If the order of the current apex is too high, we forbid the formation of a new primordium of higher order:
-        if root_order_limitation and apex.root_order + 1 > root_order_treshold:
+        if self.root_order_limitation and apex.root_order + 1 > self.root_order_treshold:
             # Then we don't add any primordium and simply return the unaltered apex:
             new_apex.append(apex)
             return new_apex
@@ -1976,8 +1589,7 @@ class RootGrowthModel:
                                         nil_properties=True)
             # We specifically recomputes the growth duration:
             ramif.growth_duration = self.calculate_growth_duration(radius=ramif.radius, index=ramif.index(),
-                                                                   root_order=ramif.root_order,
-                                                                   ArchiSimple=ArchiSimple)
+                                                                   root_order=ramif.root_order)
             # We specify the exact time since formation:
             ramif.actual_time_since_primordium_formation = actual_time_since_formation
             ramif.thermal_time_since_primordium_formation = actual_time_since_formation * temperature_time_adjustment
@@ -2027,15 +1639,7 @@ class RootGrowthModel:
             """
             This function transforms an elongated root apex into a list of segments and a terminal, smaller apex. A primordium
             of a lateral root can be formed on the new segment in some cases, depending on the distance to tip and the root orders.
-            :param g: the root MTG to which the apex belongs
             :param apex: the root apex to be segmented
-            :param time_step_in_seconds: the time step over which segmentation may have occured
-            :param soil_temperature_in_Celsius: the temperature experienced by the root element
-            :param ArchiSimple: a Boolean (True/False) expliciting whether original rules for ArchiSimple should be kept or not
-            :param random: a Boolean (True/False) expliciting whether random orientations can be defined for the new elements
-            :param nodules: a Boolean (True/False) expliciting whether nodules could be formed or not
-            :param root_order_limitation: a Boolean (True/False) expliciting whether lateral roots should be prevented above a certain root order
-            :param root_order_treshold: the root order above which new lateral roots cannot be formed
             :return:
             """
 
@@ -2142,13 +1746,7 @@ class RootGrowthModel:
                 # We simply call the function primordium_formation to check whether a primordium should have been formed
                 # (Note: we assume that the segment length is always smaller than the inter-branching distance IBD,
                 # so that in this case, only 0 or 1 primordium may have been formed - the function is called only once):
-                new_apex.append(self.primordium_formation(g, apex, elongation_rate=initial_elongation_rate,
-                                                          time_step_in_seconds=time_step_in_seconds,
-                                                          soil_temperature_in_Celsius=soil_temperature_in_Celsius,
-                                                          random=random,
-                                                          root_order_limitation=root_order_limitation,
-                                                          root_order_treshold=root_order_treshold,
-                                                          ArchiSimple=ArchiSimple))
+                new_apex.append(self.primordium_formation(apex, elongation_rate=initial_elongation_rate))
 
                 # If there has been an actual elongation of the root apex:
                 if apex.actual_elongation_rate > 0.:
@@ -2165,7 +1763,7 @@ class RootGrowthModel:
                     # calculated as the mean value between the incremented age of the part that was already formed and has not
                     # elongated, and the average age of the new part formed.
                     # The age of the initially-existing part is simply incremented by the time step:
-                    Age_of_non_elongated_part = apex.actual_time_since_cells_formation + time_step_in_seconds
+                    Age_of_non_elongated_part = apex.actual_time_since_cells_formation + self.time_step_in_seconds
                     # The age of the cells at the top of the elongated part is by definition equal to:
                     Age_of_elongated_part_up = apex.actual_elongation / apex.actual_elongation_rate
                     # The age of the cells at the root tip is by definition 0:
@@ -2179,7 +1777,7 @@ class RootGrowthModel:
                                                              / apex.length
                     # We also calculate the thermal age of root cells according to the previous thermal time of
                     # initially-exisiting cells:
-                    Thermal_age_of_non_elongated_part = apex.thermal_time_since_cells_formation + time_step_in_seconds * \
+                    Thermal_age_of_non_elongated_part = apex.thermal_time_since_cells_formation + self.time_step_in_seconds * \
                                                         temperature_time_adjustment
                     Thermal_age_of_elongated_part = Age_of_elongated_part * temperature_time_adjustment
                     apex.thermal_time_since_cells_formation = (
@@ -2217,7 +1815,7 @@ class RootGrowthModel:
                     apex.dist_to_ramif = initial_dist_to_ramif - (initial_length - param.segment_length * i)
                     # We modify the geometrical features of the present element according to the new length:
                     apex.volume = \
-                        self.volume_and_external_surface_from_radius_and_length(g, apex, apex.radius, apex.length)[
+                        TODOvolume_and_external_surface_from_radius_and_length(self.g, apex, apex.radius, apex.length)[
                             "volume"]
                     apex.struct_mass = apex.volume * param.root_tissue_density
 
@@ -2286,7 +1884,7 @@ class RootGrowthModel:
                         # age of the part that was already formed and has not elongated, and the average age of the new part to
                         # complete the length of the segment.
                         # The age of the initially-existing part is simply incremented by the time step:
-                        Age_of_non_elongated_part = apex.actual_time_since_cells_formation + time_step_in_seconds
+                        Age_of_non_elongated_part = apex.actual_time_since_cells_formation + self.time_step_in_seconds
                         # The age of the cells at the top of the elongated part is by definition equal to:
                         Age_of_elongated_part_up = apex.actual_elongation / apex.actual_elongation_rate
                         # The age of the cells at the bottom of the new segment is defined according to the length below it:
@@ -2300,7 +1898,7 @@ class RootGrowthModel:
                                                                           apex.length - apex.initial_length) * Age_of_elongated_part) \
                                                                  / apex.length
                         # We also calculate the thermal age of root cells according to the previous thermal time of initially-exisiting cells:
-                        Thermal_age_of_non_elongated_part = apex.thermal_time_since_cells_formation + time_step_in_seconds * temperature_time_adjustment
+                        Thermal_age_of_non_elongated_part = apex.thermal_time_since_cells_formation + self.time_step_in_seconds * temperature_time_adjustment
                         Thermal_age_of_elongated_part = Age_of_elongated_part * temperature_time_adjustment
                         apex.thermal_time_since_cells_formation = (
                                                                           apex.initial_length * Thermal_age_of_non_elongated_part \
@@ -2320,13 +1918,7 @@ class RootGrowthModel:
 
                     # CONSIDERING POSSIBLE PRIMORDIUM FORMATION:
                     # We call the function that can add a primordium on the current apex depending on the new dist_to_ramif:
-                    new_apex.append(self.primordium_formation(g, apex, elongation_rate=initial_elongation_rate,
-                                                              time_step_in_seconds=time_step_in_seconds,
-                                                              soil_temperature_in_Celsius=soil_temperature_in_Celsius,
-                                                              random=random,
-                                                              root_order_limitation=root_order_limitation,
-                                                              root_order_treshold=root_order_treshold,
-                                                              ArchiSimple=ArchiSimple))
+                    new_apex.append(self.primordium_formation(apex, elongation_rate=initial_elongation_rate))
 
                     # The current element that has been elongated up to segment_length is now considered as a segment:
                     apex.label = 'Segment'
@@ -2349,9 +1941,9 @@ class RootGrowthModel:
                         # Otherwise, the loop will stop now, and we will add the terminal apex hereafter.
                         # NODULE OPTION:
                         # We add the possibility of a nodule formation on the segment that is closest to the apex:
-                        if nodules and len(
+                        if self.nodules and len(
                                 apex.children()) < 2 and np.random.random() < param.nodule_formation_probability:
-                            self.nodule_formation(g,
+                            self.nodule_formation(self.g,
                                                   mother_element=apex)  # WATCH OUT: here, "apex" still corresponds to the last segment!
 
                 # FORMATION OF THE TERMINAL APEX:
@@ -2373,7 +1965,7 @@ class RootGrowthModel:
 
                 # We modify the geometrical features of the new apex according to the defined length:
                 apex.volume = \
-                    self.volume_and_external_surface_from_radius_and_length(g, apex, apex.radius, apex.length)[
+                    TODOvolume_and_external_surface_from_radius_and_length(self.g, apex, apex.radius, apex.length)[
                         "volume"]
                 apex.struct_mass = apex.volume * param.root_tissue_density
                 # We modify the variables representing total amounts according to the new struct_mass:
@@ -2437,13 +2029,7 @@ class RootGrowthModel:
                 apex.thermal_time_since_cells_formation = apex.actual_time_since_cells_formation * temperature_time_adjustment
 
                 # And we call the function primordium_formation to check whether a primordium should have been formed:
-                new_apex.append(self.primordium_formation(g, apex, elongation_rate=initial_elongation_rate,
-                                                          time_step_in_seconds=time_step_in_seconds,
-                                                          soil_temperature_in_Celsius=soil_temperature_in_Celsius,
-                                                          random=random,
-                                                          root_order_limitation=root_order_limitation,
-                                                          root_order_treshold=root_order_treshold,
-                                                          ArchiSimple=ArchiSimple))
+                new_apex.append(self.primordium_formation(apex, elongation_rate=initial_elongation_rate))
 
                 # Finally, we add the last apex present at the end of the elongated axis:
                 new_apex.append(apex)
@@ -2479,11 +2065,11 @@ class RootGrowthModel:
 
             # We calculate the initial volume of the element:
             initial_volume = \
-                self.volume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.initial_length)[
+                TODOvolume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.initial_length)[
                     "volume"]
             # We calculate the potential volume of the element based on the potential radius and potential length:
             potential_volume = \
-                self.volume_and_external_surface_from_radius_and_length(g, n, n.potential_radius,
+                TODOvolume_and_external_surface_from_radius_and_length(g, n, n.potential_radius,
                                                                         n.potential_length)["volume"]
 
             # The growth demand of the element in struct_mass is calculated:
@@ -2573,7 +2159,7 @@ class RootGrowthModel:
 
             n.radius += (n.potential_radius - n.initial_radius) * relative_growth_increase
             # The volume of the element is automatically calculated:
-            n.volume = self.volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"]
+            n.volume = TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"]
             # The new dry structural struct_mass of the element is calculated from its new volume:
             n.struct_mass = n.volume * param.root_tissue_density
 
@@ -2798,7 +2384,7 @@ class RootGrowthModel:
         nodule.length = mother_element.radius
         nodule.radius = mother_element.radius
         nodule.original_radius = nodule.radius
-        dict = self.volume_and_external_surface_from_radius_and_length(g, element=nodule, radius=nodule.radius,
+        dict = TODO(g, element=nodule, radius=nodule.radius,
                                                                        length=nodule.length)
         nodule.external_surface = dict['external_surface']
         nodule.volume = dict['volume']
@@ -2815,6 +2401,7 @@ class RootGrowthModel:
         Note that the dist-to-tip of an apex is defined as its length (and not as 0).
         :param g: the investigated MTG
         :return: the MTG with an updated property 'distance_from_tip'
+        Checked
         """
 
         # We initialize an empty dictionary for to_tips:
@@ -2846,5 +2433,396 @@ class RootGrowthModel:
                 # Then we simply define the distance to the tip as the length of the element:
                 n.distance_from_tip = n.length
 
+    # GENERIC METHODS USED IN MANY PARTS OF THE MODEL
+    # -----------------------------------------------
 
+    # Modification of a process according to soil temperature:
+    def temperature_modification(self):
+        """
+        # TODO : make modular and avoid repetitions with the root Carbon model, method needs to be accesses by nearly every root module
+        This function calculates how the value of a process should be modified according to soil temperature (in degrees Celsius).
+        Parameters correspond to the value of the process at reference temperature T_ref (process_at_T_ref),
+        to two empirical coefficients A and B, and to a coefficient C used to switch between different formalisms.
+        If C=0 and B=1, then the relationship corresponds to a classical linear increase with temperature (thermal time).
+        If C=1, A=0 and B>1, then the relationship corresponds to a classical exponential increase with temperature (Q10).
+        If C=1, A<0 and B>0, then the relationship corresponds to bell-shaped curve, close to the one from Parent et al. (2010).
+        :return: the new value of the process
+        Checked
+        """
 
+        # We initialize the value of the temperature-modified process:
+        modified_process = 0.
+
+        # We avoid unwanted cases:
+        if self.C != 0 and self.C != 1:
+            print("The modification of the process at T =", self.soil_temperature_in_Celsius,
+                  "only works for C=0 or C=1!")
+            print("The modified process has been set to 0.")
+            modified_process = 0.
+            return 0.
+        elif self.C == 1:
+            if (self.A * (self.soil_temperature_in_Celsius - self.T_ref) + self.B) < 0.:
+                print("The modification of the process at T =", self.soil_temperature_in_Celsius,
+                      "is unstable with this set of parameters!")
+                print("The modified process has been set to 0.")
+                modified_process = 0.
+                return modified_process
+
+        # We compute a temperature-modified process, correspond to a Q10-modified relationship,
+        # based on the work of Tjoelker et al. (2001):
+        modified_process = self.process_at_T_ref * (
+                self.A * (self.soil_temperature_in_Celsius - self.T_ref) + self.B) ** (1 - self.C) \
+                           * (self.A * (self.soil_temperature_in_Celsius - self.T_ref) + self.B) ** (
+                                   self.C * (self.soil_temperature_in_Celsius - self.T_ref) / 10.)
+
+        if modified_process < 0.:
+            modified_process = 0.
+
+        return modified_process
+
+        # Function for reinitializing all growth-related variables at the beginning or end of a time step:
+        # -------------------------------------------------------------------------------------------------
+
+    # Adding a new root element with pre-defined properties:
+    def ADDING_A_CHILD(self, mother_element, edge_type='+', label='Apex', type='Normal_root_before_emergence',
+                       root_order=1, angle_down=45., angle_roll=0., length=0., radius=0.,
+                       identical_properties=True, nil_properties=False):
+        """
+        This function creates a new child element on the mother element, based on the function add_child.
+        When called, this allows to automatically define standard properties without defining them in the main code.
+        :param mother_element: the node of the MTG on which the child element will be created
+        :param edge_type: the type of relationship between the mother element and its child ('+' or '<')
+        :param label: label of the child element
+        :param type: type of the child element
+        :param root_order: root_order of the child element
+        :param angle_down: angle_down of the child element
+        :param angle_roll: angle_roll of the child element
+        :param length: length of the child element
+        :param radius: radius of the child element
+        :param identical_properties: if True, the main properties of the child will be identical to those of the mother
+        :param nil_properties: if True, the main properties of the child will be 0
+        :return: the new child element
+
+        """
+
+        # TODO FOR TRISTAN: When working with a dynamic root structure, you will need to specify in this function
+        #  "ADDING_A_CHILD" your new variables that will either be set to 0 (nil properties) or be equal to that of the mother
+        #  element.
+
+        # If nil_properties = True, then we set most of the properties of the new element to 0:
+        if nil_properties:
+
+            new_child = mother_element.add_child(edge_type=edge_type,
+                                                 # Characteristics:
+                                                 # -----------------
+                                                 label=label,
+                                                 type=type,
+                                                 root_order=root_order,
+                                                 # Authorizations and C requirements:
+                                                 # -----------------------------------
+                                                 lateral_root_emergence_possibility='Impossible',
+                                                 emergence_cost=0.,
+                                                 # Geometry and topology:
+                                                 # -----------------------
+                                                 angle_down=angle_down,
+                                                 angle_roll=angle_roll,
+                                                 # The length of the primordium is set to 0:
+                                                 length=length,
+                                                 radius=radius,
+                                                 original_radius=radius,
+                                                 potential_length=0.,
+                                                 theoretical_radius=radius,
+                                                 potential_radius=radius,
+                                                 initial_length=0.,
+                                                 initial_radius=radius,
+                                                 external_surface=0.,
+                                                 volume=0.,
+                                                 dist_to_ramif=0.,
+                                                 distance_from_tip=0.,
+                                                 former_distance_from_tip=0.,
+                                                 actual_elongation=0.,
+                                                 actual_elongation_rate=0.,
+                                                 # Quantities and concentrations:
+                                                 # -------------------------------
+                                                 struct_mass=0.,
+                                                 initial_struct_mass=0.,
+                                                 C_hexose_root=0.,
+                                                 C_hexose_reserve=0.,
+                                                 C_hexose_soil=0.,
+                                                 Cs_mucilage_soil=0.,
+                                                 Cs_cells_soil=0.,
+                                                 C_sucrose_root=0.,
+                                                 Deficit_sucrose_root=0.,
+                                                 Deficit_hexose_root=0.,
+                                                 Deficit_hexose_reserve=0.,
+                                                 Deficit_hexose_soil=0.,
+                                                 Deficit_mucilage_soil=0.,
+                                                 Deficit_cells_soil=0.,
+                                                 Deficit_sucrose_root_rate=0.,
+                                                 Deficit_hexose_root_rate=0.,
+                                                 Deficit_hexose_reserve_rate=0.,
+                                                 Deficit_hexose_soil_rate=0.,
+                                                 Deficit_mucilage_soil_rate=0.,
+                                                 Deficit_cells_soil_rate=0.,
+                                                 # Root hairs:
+                                                 # ------------
+                                                 root_hair_radius=param.root_hair_radius,
+                                                 root_hair_length=0.,
+                                                 actual_length_with_hairs=0.,
+                                                 living_root_hairs_number=0.,
+                                                 dead_root_hairs_number=0.,
+                                                 total_root_hairs_number=0.,
+                                                 actual_time_since_root_hairs_emergence_started=0.,
+                                                 thermal_time_since_root_hairs_emergence_started=0.,
+                                                 actual_time_since_root_hairs_emergence_stopped=0.,
+                                                 thermal_time_since_root_hairs_emergence_stopped=0.,
+                                                 all_root_hairs_formed=False,
+                                                 root_hairs_lifespan=param.root_hairs_lifespan,
+                                                 root_hairs_external_surface=0.,
+                                                 living_root_hairs_external_surface=0.,
+                                                 root_hairs_volume=0.,
+                                                 root_hairs_struct_mass=0.,
+                                                 root_hairs_struct_mass_produced=0.,
+                                                 initial_living_root_hairs_struct_mass=0.,
+                                                 living_root_hairs_struct_mass=0.,
+                                                 # Fluxes:
+                                                 # --------
+                                                 resp_maintenance=0.,
+                                                 resp_growth=0.,
+                                                 struct_mass_produced=0.,
+                                                 hexose_growth_demand=0.,
+                                                 hexose_consumption_by_growth=0.,
+                                                 hexose_consumption_by_growth_rate=0.,
+                                                 hexose_possibly_required_for_elongation=0.,
+                                                 hexose_production_from_phloem=0.,
+                                                 sucrose_loading_in_phloem=0.,
+                                                 hexose_mobilization_from_reserve=0.,
+                                                 hexose_immobilization_as_reserve=0.,
+                                                 hexose_exudation=0.,
+                                                 hexose_uptake_from_soil=0.,
+                                                 phloem_hexose_exudation=0.,
+                                                 phloem_hexose_uptake_from_soil=0.,
+                                                 mucilage_secretion=0.,
+                                                 cells_release=0.,
+                                                 total_net_rhizodeposition=0.,
+                                                 hexose_degradation=0.,
+                                                 mucilage_degradation=0.,
+                                                 cells_degradation=0.,
+                                                 specific_net_exudation=0.,
+                                                 # Time indications:
+                                                 # ------------------
+                                                 growth_duration=param.GDs * (2 * radius) ** 2,
+                                                 life_duration=param.LDs * 2. * radius * param.root_tissue_density,
+                                                 actual_time_since_primordium_formation=0.,
+                                                 actual_time_since_emergence=0.,
+                                                 actual_time_since_cells_formation=0.,
+                                                 actual_potential_time_since_emergence=0.,
+                                                 actual_time_since_growth_stopped=0.,
+                                                 actual_time_since_death=0.,
+                                                 thermal_time_since_primordium_formation=0.,
+                                                 thermal_time_since_emergence=0.,
+                                                 thermal_time_since_cells_formation=0.,
+                                                 thermal_potential_time_since_emergence=0.,
+                                                 thermal_time_since_growth_stopped=0.,
+                                                 thermal_time_since_death=0.
+                                                 )
+
+        # Otherwise, if identical_properties=True, then we copy most of the properties of the mother element in the new element:
+        elif identical_properties:
+
+            new_child = mother_element.add_child(edge_type=edge_type,
+                                                 # Characteristics:
+                                                 # -----------------
+                                                 label=label,
+                                                 type=type,
+                                                 root_order=root_order,
+                                                 # Authorizations and C requirements:
+                                                 # -----------------------------------
+                                                 lateral_root_emergence_possibility='Impossible',
+                                                 emergence_cost=0.,
+                                                 # Geometry and topology:
+                                                 # -----------------------
+                                                 angle_down=angle_down,
+                                                 angle_roll=angle_roll,
+                                                 # The length of the primordium is set to 0:
+                                                 length=length,
+                                                 radius=mother_element.radius,
+                                                 original_radius=mother_element.radius,
+                                                 potential_length=length,
+                                                 theoretical_radius=mother_element.theoretical_radius,
+                                                 potential_radius=mother_element.potential_radius,
+                                                 initial_length=length,
+                                                 initial_radius=mother_element.radius,
+                                                 external_surface=0.,
+                                                 volume=0.,
+                                                 dist_to_ramif=mother_element.dist_to_ramif,
+                                                 distance_from_tip=mother_element.distance_from_tip,
+                                                 former_distance_from_tip=mother_element.former_distance_from_tip,
+                                                 actual_elongation=mother_element.actual_elongation,
+                                                 actual_elongation_rate=mother_element.actual_elongation_rate,
+                                                 # Quantities and concentrations:
+                                                 # -------------------------------
+                                                 struct_mass=mother_element.struct_mass,
+                                                 initial_struct_mass=mother_element.initial_struct_mass,
+                                                 C_hexose_root=mother_element.C_hexose_root,
+                                                 C_hexose_reserve=mother_element.C_hexose_reserve,
+                                                 C_hexose_soil=mother_element.C_hexose_soil,
+                                                 Cs_mucilage_soil=mother_element.Cs_mucilage_soil,
+                                                 Cs_cells_soil=mother_element.Cs_cells_soil,
+                                                 C_sucrose_root=mother_element.C_sucrose_root,
+                                                 Deficit_sucrose_root=mother_element.Deficit_sucrose_root,
+                                                 Deficit_hexose_root=mother_element.Deficit_hexose_root,
+                                                 Deficit_hexose_reserve=mother_element.Deficit_hexose_reserve,
+                                                 Deficit_hexose_soil=mother_element.Deficit_hexose_soil,
+                                                 Deficit_mucilage_soil=mother_element.Deficit_mucilage_soil,
+                                                 Deficit_cells_soil=mother_element.Deficit_cells_soil,
+                                                 Deficit_sucrose_root_rate=mother_element.Deficit_sucrose_root_rate,
+                                                 Deficit_hexose_root_rate=mother_element.Deficit_hexose_root_rate,
+                                                 Deficit_hexose_reserve_rate=mother_element.Deficit_hexose_reserve_rate,
+                                                 Deficit_hexose_soil_rate=mother_element.Deficit_hexose_soil_rate,
+                                                 Deficit_mucilage_soil_rate=mother_element.Deficit_mucilage_soil_rate,
+                                                 Deficit_cells_soil_rate=mother_element.Deficit_cells_soil_rate,
+
+                                                 # Root hairs:
+                                                 # ------------
+                                                 root_hair_radius=mother_element.root_hair_radius,
+                                                 root_hair_length=mother_element.root_hair_length,
+                                                 actual_length_with_hairs=mother_element.actual_length_with_hairs,
+                                                 living_root_hairs_number=mother_element.living_root_hairs_number,
+                                                 dead_root_hairs_number=mother_element.dead_root_hairs_number,
+                                                 total_root_hairs_number=mother_element.total_root_hairs_number,
+                                                 actual_time_since_root_hairs_emergence_started=mother_element.actual_time_since_root_hairs_emergence_started,
+                                                 thermal_time_since_root_hairs_emergence_started=mother_element.thermal_time_since_root_hairs_emergence_started,
+                                                 actual_time_since_root_hairs_emergence_stopped=mother_element.actual_time_since_root_hairs_emergence_stopped,
+                                                 thermal_time_since_root_hairs_emergence_stopped=mother_element.thermal_time_since_root_hairs_emergence_stopped,
+                                                 all_root_hairs_formed=mother_element.all_root_hairs_formed,
+                                                 root_hairs_lifespan=mother_element.root_hairs_lifespan,
+                                                 root_hairs_external_surface=mother_element.root_hairs_external_surface,
+                                                 living_root_hairs_external_surface=mother_element.living_root_hairs_external_surface,
+                                                 root_hairs_volume=mother_element.root_hairs_volume,
+                                                 root_hairs_struct_mass=mother_element.root_hairs_struct_mass,
+                                                 root_hairs_struct_mass_produced=mother_element.root_hairs_struct_mass_produced,
+                                                 living_root_hairs_struct_mass=mother_element.living_root_hairs_struct_mass,
+                                                 initial_living_root_hairs_struct_mass=mother_element.initial_living_root_hairs_struct_mass,
+                                                 # Fluxes:
+                                                 # -------
+                                                 resp_maintenance=mother_element.resp_maintenance,
+                                                 resp_growth=mother_element.resp_growth,
+                                                 struct_mass_produced=mother_element.struct_mass_produced,
+                                                 hexose_growth_demand=mother_element.hexose_growth_demand,
+                                                 hexose_possibly_required_for_elongation=mother_element.hexose_possibly_required_for_elongation,
+                                                 hexose_production_from_phloem=mother_element.hexose_production_from_phloem,
+                                                 sucrose_loading_in_phloem=mother_element.sucrose_loading_in_phloem,
+                                                 hexose_mobilization_from_reserve=mother_element.hexose_mobilization_from_reserve,
+                                                 hexose_immobilization_as_reserve=mother_element.hexose_immobilization_as_reserve,
+                                                 hexose_exudation=mother_element.hexose_exudation,
+                                                 hexose_uptake_from_soil=mother_element.hexose_uptake_from_soil,
+                                                 phloem_hexose_exudation=mother_element.phloem_hexose_exudation,
+                                                 phloem_hexose_uptake_from_soil=mother_element.phloem_hexose_uptake_from_soil,
+                                                 mucilage_secretion=mother_element.mucilage_secretion,
+                                                 cells_release=mother_element.cells_release,
+                                                 total_net_rhizodeposition=mother_element.total_net_rhizodeposition,
+                                                 hexose_degradation=mother_element.hexose_degradation,
+                                                 mucilage_degradation=mother_element.mucilage_degradation,
+                                                 cells_degradation=mother_element.cells_degradation,
+                                                 hexose_consumption_by_growth=mother_element.hexose_consumption_by_growth,
+                                                 hexose_consumption_by_growth_rate=mother_element.hexose_consumption_by_growth_rate,
+                                                 specific_net_exudation=mother_element.specific_net_exudation,
+                                                 # Time indications:
+                                                 # ------------------
+                                                 growth_duration=mother_element.growth_duration,
+                                                 life_duration=mother_element.life_duration,
+                                                 actual_time_since_primordium_formation=mother_element.actual_time_since_primordium_formation,
+                                                 actual_time_since_emergence=mother_element.actual_time_since_emergence,
+                                                 actual_time_since_cells_formation=mother_element.actual_time_since_cells_formation,
+                                                 actual_time_since_growth_stopped=mother_element.actual_time_since_growth_stopped,
+                                                 actual_time_since_death=mother_element.actual_time_since_death,
+
+                                                 thermal_time_since_primordium_formation=mother_element.thermal_time_since_primordium_formation,
+                                                 thermal_time_since_emergence=mother_element.thermal_time_since_emergence,
+                                                 thermal_time_since_cells_formation=mother_element.thermal_time_since_cells_formation,
+                                                 thermal_potential_time_since_emergence=mother_element.thermal_potential_time_since_emergence,
+                                                 thermal_time_since_growth_stopped=mother_element.thermal_time_since_growth_stopped,
+                                                 thermal_time_since_death=mother_element.thermal_time_since_death
+                                                 )
+
+        return new_child
+
+    def volume_from_radius_and_length(self, element, radius: float, length: float):
+        """
+        This function computes the volume (m3) of a root element
+        based on the properties radius (m) and length (m) and possibly on its type.
+        :param element: the investigated node of the MTG
+        :param radius: radius of the element
+        :param length: length of the element
+        :return: the volume of the element
+        Checked
+        """
+
+        # If this is a regular root segment
+        if element.type != "Root_nodule":
+            # We consider the volume of a cylinder
+            volume = pi * radius ** 2 * length
+        else:
+            # We consider the volume of a sphere:
+            volume = 4 / 3. * pi * radius ** 3
+
+        return volume
+
+    # Calculating the growth duration of a given root apex:
+    # -----------------------------------------------------
+    def calculate_growth_duration(self, radius, index, root_order):
+        """
+        This function computes the growth duration of a given apex, based on its radius and root order. If ArchiSimple
+        option is activated, the function will calculate the duration proportionally to the square radius of the apex.
+        Otherwise, the duration is set from a probability test, largely independent from the radius of the apex.
+        :param radius: the radius of the apex element from which we compute the growth duration
+        :param index: the index of the apex element, used for setting a new random seed for this element
+        :param root_order: order of the considered segment
+        :return: the growth duration of the apex (s)
+        """
+
+        # If we only want to apply original ArchiSimple rules:
+        if self.ArchiSimple:
+            # Then the growth duration of the apex is proportional to the square diameter of the apex:
+            growth_duration = self.GDs * (2. * radius) ** 2
+        # Otherwise, we define the growth duration as a fixed value, randomly chosen between three possibilities:
+        else:
+            # We first define the seed of random, depending on the index of the apex:
+            np.random.seed(self.random_choice * index)
+            # We then generate a random float number between 0 and 1, which will determine whether growth duration is low, medium or high:
+            random_result = np.random.random_sample()
+            # CASE 1: The apex corresponds to a seminal or adventitious root
+            if root_order == 1:
+                growth_duration = param.GD_highest
+            else:
+                # If we select random zoning, then the growth duration will be drawn from a range, for three different cases
+                # (from most likely to less likely):
+                if param.GD_by_frequency:
+                    # CASE 2: Most likely, the growth duration will be low for a lateral root
+                    if random_result < param.GD_prob_low:
+                        # We draw a random growth-duration in the lower range:
+                        growth_duration = np.random.uniform(0., param.GD_low)
+                    # CASE 3: Occasionnaly, the growth duration may be a bit higher for a lateral root
+                    if random_result < param.GD_prob_medium:
+                        # We draw a random growth-duration in the lower range:
+                        growth_duration = np.random.uniform(param.GD_low, param.GD_medium)
+                    # CASE 3: Occasionnaly, the growth duration may be a bit higher for a lateral root
+                    else:
+                        # We draw a random growth-duration in the lower range:
+                        growth_duration = np.random.uniform(param.GD_medium, param.GD_high)
+                # If random zoning has not been selected, a constant duration is selected for each probabibility range:
+                else:
+                    # CASE 2: Most likely, the growth duration will be low for a lateral root
+                    if random_result < param.GD_prob_low:
+                        growth_duration = param.GD_low
+                    # CASE 3: Occasionally, the growth duration of the lateral root may be significantly higher
+                    elif random_result < param.GD_prob_medium:
+                        growth_duration = param.GD_medium
+                    # CASE 4: Exceptionally, the growth duration of the lateral root is as high as that from a seminal root,
+                    # as long as the radius of the lateral root is high enough (i.e. twice as high as the minimal possible radius)
+                    elif radius > 2 * param.Dmin / 2.:
+                        growth_duration = param.GD_highest
+
+        # We return a modified version of the MTG "g" with the updated property "distance_from_tip":
+        return growth_duration
