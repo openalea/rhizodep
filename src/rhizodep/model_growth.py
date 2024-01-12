@@ -39,7 +39,6 @@ class RootGrowthModel:
 
     # Inputs
     soil_temperature_in_Celsius: float = 20
-    external_surface: float = field(default=1e-6, metadata=dict(unit="m2", unit_comment="", description="Initial external surface of the collar element", value_comment="", references="", variable_type="input", by="model_anatomy"))
     root_tissue_density: float = field(default=0.10 * 1e6, metadata=dict(unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", value_comment="", references="", variable_type="input", by="model_anatomy"))
 
     # Local state variables
@@ -95,7 +94,7 @@ class RootGrowthModel:
     ArchiSimple: bool = True
     initial_segment_length: float = 1e-3
     initial_apex_length: float = 0.
-    initial_C_sucrose_root: float = 0.
+    #initial_C_sucrose_root: float = 0.
     initial_C_hexose_root: float = 0.
     input_file_path: str = "C:/Users/frees/rhizodep/src/rhizodep/"
     forcing_seminal_roots_events: bool = True
@@ -130,7 +129,6 @@ class RootGrowthModel:
 
     # Initialization of the root system:
     def initiate_mtg(self):
-
         """
         This functions generates a root MTG from nothing, containing only one segment of a specific length,
         terminated by an apex (preferably of length 0).
@@ -186,7 +184,6 @@ class RootGrowthModel:
         base_segment.all_root_hairs_formed = False
         base_segment.root_hairs_lifespan = self.root_hairs_lifespan
 
-
         base_segment.root_hairs_struct_mass = 0.
         base_segment.root_hairs_struct_mass_produced = 0.
         base_segment.living_root_hairs_struct_mass = 0.
@@ -196,101 +193,27 @@ class RootGrowthModel:
         base_segment.actual_elongation = base_segment.length
         base_segment.actual_elongation_rate = 0
 
-        # TODO INPUT FROM ANATOMY MODEL (who is used)
-        # NOT USED, just report to other module
-        # base_segment.living_root_hairs_external_surface = 0.
-        # base_segment.initial_living_root_hairs_external_surface = 0.
-        # base_segment.root_hairs_external_surface = 0.
-        # base_segment.root_hairs_volume = 0.
-        # base_segment.external_surface = self.external_surface
-        # base_segment.initial_external_surface = base_segment.external_surface
-        # USED
-        base_segment.volume = self.volume  # FOR STRUCT MASS, to inputs
-        #
+        base_segment.volume = self.volume
 
         base_segment.struct_mass = base_segment.volume * self.root_tissue_density
         base_segment.initial_struct_mass = base_segment.struct_mass
         base_segment.initial_living_root_hairs_struct_mass = base_segment.living_root_hairs_struct_mass
 
-        # TODO INPUTS FROM CARBON MODEL (who is used)
         # We define the initial concentrations:
-        # NOT USED
-        base_segment.C_sucrose_root = self.initial_C_sucrose_root
-        base_segment.C_hexose_reserve = 0.
-        base_segment.C_hexose_soil = 0.
-        base_segment.Cs_mucilage_soil = 0.
-        base_segment.Cs_cells_soil = 0.
-
-        # USED
         base_segment.C_hexose_root = self.initial_C_hexose_root
-
-        # We calculate the possible deficits:
-        # NOT USED
-        base_segment.Deficit_sucrose_root = 0.
-        base_segment.Deficit_hexose_root = 0.
-        base_segment.Deficit_hexose_reserve = 0.
-        base_segment.Deficit_hexose_soil = 0.
-        base_segment.Deficit_mucilage_soil = 0.
-        base_segment.Deficit_cells_soil = 0.
-        base_segment.Deficit_sucrose_root_rate = 0.
-        base_segment.Deficit_hexose_root_rate = 0.
-        base_segment.Deficit_hexose_reserve_rate = 0.
-        base_segment.Deficit_hexose_soil_rate = 0.
-        base_segment.Deficit_mucilage_soil_rate = 0.
-        base_segment.Deficit_cells_soil_rate = 0.
-        # USED
 
         # Fluxes:
         # --------
-        # NOT USED
-        base_segment.resp_maintenance = 0.
-        base_segment.hexose_production_from_phloem = 0.
-        base_segment.sucrose_loading_in_phloem = 0.
-        base_segment.hexose_mobilization_from_reserve = 0.
-        base_segment.hexose_immobilization_as_reserve = 0.
-        base_segment.hexose_exudation = 0.
-        base_segment.hexose_uptake_from_soil = 0.
-        base_segment.phloem_hexose_exudation = 0.
-        base_segment.phloem_hexose_uptake_from_soil = 0.
-        base_segment.mucilage_secretion = 0.
-        base_segment.cells_release = 0.
-        base_segment.total_net_rhizodeposition = 0.
-        base_segment.hexose_degradation = 0.
-        base_segment.mucilage_degradation = 0.
-        base_segment.cells_degradation = 0.
-        base_segment.specific_net_exudation = 0.
-        # USED
         base_segment.resp_growth = 0.
         base_segment.hexose_growth_demand = 0.
         base_segment.hexose_possibly_required_for_elongation = 0.
         base_segment.hexose_consumption_by_growth = 0.
 
-
         # Rates:
         # -------
-        # NOT USED
-        base_segment.resp_maintenance_rate = 0.
-        base_segment.hexose_production_from_phloem_rate = 0.
-        base_segment.sucrose_loading_in_phloem_rate = 0.
-        base_segment.hexose_mobilization_from_reserve_rate = 0.
-        base_segment.hexose_immobilization_as_reserve_rate = 0.
-        base_segment.hexose_exudation_rate = 0.
-        base_segment.hexose_uptake_from_soil_rate = 0.
-        base_segment.phloem_hexose_exudation_rate = 0.
-        base_segment.phloem_hexose_uptake_from_soil_rate = 0.
-        base_segment.mucilage_secretion_rate = 0.
-        base_segment.cells_release_rate = 0.
-        base_segment.hexose_degradation_rate = 0.
-        base_segment.mucilage_degradation_rate = 0.
-        base_segment.cells_degradation_rate = 0.
-
-        # USED
         base_segment.resp_growth_rate = 0.
         base_segment.hexose_growth_demand_rate = 0.
         base_segment.hexose_consumption_by_growth_rate = 0.
-
-
-        #
 
         # Time indications:
         # ------------------
@@ -486,21 +409,14 @@ class RootGrowthModel:
         apex.life_duration = self.LDs * (2. * base_radius) * self.root_tissue_density
 
         if self.initial_apex_length <= 0.:
-            apex.C_sucrose_root = 0.
             apex.C_hexose_root = 0.
         else:
-            apex.C_sucrose_root = self.initial_C_sucrose_root
             apex.C_hexose_root = self.initial_C_hexose_root
-        apex.C_hexose_soil = 0.
-        apex.Cs_mucilage_soil = 0.
-        apex.Cs_cells_soil = 0.
 
         apex.volume = self.volume
         apex.struct_mass = apex.volume * self.root_tissue_density
         apex.initial_struct_mass = apex.struct_mass
         apex.initial_living_root_hairs_struct_mass = apex.living_root_hairs_struct_mass
-        apex.initial_external_surface = apex.external_surface
-        apex.initial_living_root_hairs_external_surface = apex.living_root_hairs_external_surface
 
         return g
 
@@ -562,8 +478,6 @@ class RootGrowthModel:
             n.theoretical_radius = n.radius
             n.initial_struct_mass = n.struct_mass
             n.initial_living_root_hairs_struct_mass = n.living_root_hairs_struct_mass
-            n.initial_external_surface = n.external_surface
-            n.initial_living_root_hairs_external_surface = n.living_root_hairs_external_surface
 
         return
 
@@ -1468,26 +1382,318 @@ class RootGrowthModel:
         :return:
         """
         # We simulate the segmentation of all apices:
-        simulator = self.Simulate_segmentation_and_primordia_formation(self.g)
-        simulator.step(self.time_step_in_seconds, soil_temperature_in_Celsius=self.soil_temperature_in_Celsius,
-                       ArchiSimple=self.ArchiSimple, random=self.random, nodules=self.nodules,
-                       root_order_limitation=self.root_order_limitation,
-                       root_order_treshold=self.root_order_treshold)
+        # We define the list of apices for all vertices labelled as "Apex":
+        self._apices = [self.g.node(v) for v in self.g.vertices_iter(scale=1) if self.g.label(v) == 'Apex']
+        # We define "apices_list" as the list of all apices in g:
+        apices_list = list(self._apices)
+        # For each apex in the list of apices that have emerged with a positive length:
+        for apex in apices_list:
+            if apex.type == "Normal_root_after_emergence" and apex.length > 0.:
+                # We define the new list of apices with the function apex_development:
+                new_apex = self.segmentation_and_primordium_formation(apex)
+                # We add these new apices to apex:
+                self._apices.extend(new_apex)
 
-        return
+    def segmentation_and_primordium_formation(self, apex):
+        """
+        This function transforms an elongated root apex into a list of segments and a terminal, smaller apex. A primordium
+        of a lateral root can be formed on the new segment in some cases, depending on the distance to tip and the root orders.
+        :param apex: the root apex to be segmented
+        :return:
+        """
 
+        # TODO: Simplify the readability of this function by looping on two sets of variables, the ones that remain identical
+        #  within the segments, and those that are divided.
 
+        # TODO FOR TRISTAN: When working with a dynamic root structure, you will need to specify in this function "segmentation"
+        #  the new quantitative variables that would need to be recalculated when segmenting a long root apex
+        #  (ex: N amount will need to be divided, while N concentration will remain identical among the segments)
 
-    ########################################################################################################################
+        # CALCULATING AN EQUIVALENT OF THERMAL TIME:
+        # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
+        # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
+        temperature_time_adjustment = self.temperature_modification()
 
-    ########################################################################################################################
-    ########################################################################################################################
-    # MODULE "POTENTIAL GROWTH"
-    ########################################################################################################################
-    ########################################################################################################################
+        # ADJUSTING ROOT ANGLES FOR THE FUTURE NEW SEGMENTS:
+        # Optional - We can add random geometry, or not:
+        if random:
+            # The seed used to generate random values is defined according to a parameter random_choice and the index of the apex:
+            np.random.seed(self.random_choice * apex.index())
+            angle_mean = 0
+            angle_var = 5
+            segment_angle_down = np.random.normal(angle_mean, angle_var)
+            segment_angle_roll = np.random.normal(angle_mean, angle_var)
+            apex_angle_down = np.random.normal(angle_mean, angle_var)
+            apex_angle_roll = np.random.normal(angle_mean, angle_var)
+        else:
+            segment_angle_down = 0
+            segment_angle_roll = 0
+            apex_angle_down = 0
+            apex_angle_roll = 0
 
-    # Formation of a root primordium at the apex of the mother root:
-    # ---------------------------------------------------------------
+        # RECORDING THE VALUES OF THE APEX BEFORE SEGMENTATION (e.g. the values that will be altered by the segmentation!):
+        # We initialize the new_apex that will be returned by the function:
+        new_apex = []
+        # We record the initial geometrical features and total amounts,
+        # knowing that the concentrations will not be changed by the segmentation:
+        initial_root_order = apex.root_order
+        initial_length = apex.length
+        initial_dist_to_ramif = apex.dist_to_ramif
+        initial_elongation = apex.actual_elongation
+        initial_elongation_rate = apex.actual_elongation_rate
+        initial_struct_mass = apex.struct_mass
+        initial_struct_mass_produced = apex.struct_mass_produced
+        initial_resp_growth = apex.resp_growth
+
+        initial_root_hairs_struct_mass = apex.root_hairs_struct_mass
+        initial_root_hairs_struct_mass_produced = apex.root_hairs_struct_mass_produced
+        initial_living_root_hairs_struct_mass = apex.living_root_hairs_struct_mass
+        initial_living_root_hairs_number = apex.living_root_hairs_number
+        initial_dead_root_hairs_number = apex.dead_root_hairs_number
+        initial_total_root_hairs_number = apex.total_root_hairs_number
+        # TODO: the time-related variables associated to root hairs will not be changed here, but rather in the function 'root_hairs_dynamics' - check whether this is OK!
+
+        # NOTE: The following is not an error, we also need to record the "initial" structural mass and surfaces before growth!
+        initial_initial_struct_mass = apex.initial_struct_mass
+        initial_initial_living_root_hairs_struct_mass = apex.initial_living_root_hairs_struct_mass
+        initial_hexose_growth_demand = apex.hexose_growth_demand
+        initial_hexose_consumption_by_growth = apex.hexose_consumption_by_growth
+        initial_hexose_consumption_by_growth_rate = apex.hexose_consumption_by_growth_rate
+        # TODO deficits old = new or * mass fraction when segmentation (Deficits, rates, fluxes)
+
+        # We record the type of the apex, as it may correspond to an apex that has stopped (or even died):
+        initial_type = apex.type
+        initial_lateral_root_emergence_possibility = apex.lateral_root_emergence_possibility
+
+        # CASE 1: NO SEGMENTATION IS NECESSARY
+        # -------------------------------------
+        # If the length of the apex is smaller than the defined length of a root segment:
+        if apex.length <= self.segment_length:
+
+            # CONSIDERING POSSIBLE PRIMORDIUM FORMATION:
+            # We simply call the function primordium_formation to check whether a primordium should have been formed
+            # (Note: we assume that the segment length is always smaller than the inter-branching distance IBD,
+            # so that in this case, only 0 or 1 primordium may have been formed - the function is called only once):
+            new_apex.append(self.primordium_formation(apex, elongation_rate=initial_elongation_rate))
+
+            # If there has been an actual elongation of the root apex:
+            if apex.actual_elongation_rate > 0.:
+                # # RECALCULATING DIMENSIONS:
+                # # We assume that the growth functions that may have been called previously have only modified radius and length,
+                # # but not the struct_mass and the total amounts present in the root element.
+                # # We modify the geometrical features of the present element according to the new length and radius:
+                # apex.volume = volume_from_radius_and_length(g, apex, apex.radius, apex.length)["volume"]
+                # apex.struct_mass = apex.volume * param.root_tissue_density
+
+                # CALCULATING THE AVERAGE TIME SINCE ROOT CELLS FORMED:
+                # We update the time since root cells have formed, based on the elongation rate and on the principle that
+                # cells appear at the very end of the root tip, and then age. In this case, the average age of the element is
+                # calculated as the mean value between the incremented age of the part that was already formed and has not
+                # elongated, and the average age of the new part formed.
+                # The age of the initially-existing part is simply incremented by the time step:
+                Age_of_non_elongated_part = apex.actual_time_since_cells_formation + self.time_step_in_seconds
+                # The age of the cells at the top of the elongated part is by definition equal to:
+                Age_of_elongated_part_up = apex.actual_elongation / apex.actual_elongation_rate
+                # The age of the cells at the root tip is by definition 0:
+                Age_of_elongated_part_down = 0
+                # The average age of the elongated part is calculated as the mean value between both extremities:
+                Age_of_elongated_part = 0.5 * (Age_of_elongated_part_down + Age_of_elongated_part_up)
+                # Eventually, the average age of the whole new element is calculated from the age of both parts:
+                apex.actual_time_since_cells_formation = (apex.initial_length * Age_of_non_elongated_part \
+                                                          + (
+                                                                  apex.length - apex.initial_length) * Age_of_elongated_part) \
+                                                         / apex.length
+                # We also calculate the thermal age of root cells according to the previous thermal time of
+                # initially-exisiting cells:
+                Thermal_age_of_non_elongated_part = apex.thermal_time_since_cells_formation + self.time_step_in_seconds * \
+                                                    temperature_time_adjustment
+                Thermal_age_of_elongated_part = Age_of_elongated_part * temperature_time_adjustment
+                apex.thermal_time_since_cells_formation = (
+                                                                      apex.initial_length * Thermal_age_of_non_elongated_part \
+                                                                      + (
+                                                                              apex.length - apex.initial_length) * Thermal_age_of_elongated_part) / apex.length
+
+        # CASE 2: THE APEX HAS TO BE SEGMENTED
+        # -------------------------------------
+        # Otherwise, we have to calculate the number of entire segments within the apex.
+        else:
+
+            # CALCULATION OF THE NUMBER OF ROOT SEGMENTS TO BE FORMED:
+            # If the final length of the apex does not correspond to an entire number of segments:
+            if apex.length / self.segment_length - floor(apex.length / self.segment_length) > 0.:
+                # Then the total number of segments to be formed is:
+                n_segments = floor(apex.length / self.segment_length)
+            else:
+                # Otherwise, the number of segments to be formed is decreased by 1,
+                # so that the last element corresponds to an apex with a positive length:
+                n_segments = floor(apex.length / self.segment_length) - 1
+            n_segments = int(n_segments)
+
+            # We need to calculate the final length of the terminal apex:
+            final_apex_length = initial_length - n_segments * self.segment_length
+
+            # FORMATION OF THE NEW SEGMENTS
+            # We develop each new segment, except the last one, by transforming the current apex into a segment
+            # and by adding a new apex after it, in an iterative way for (n-1) segments:
+            for i in range(1, n_segments + 1):
+
+                # We define the length of the present element (still called "apex") as the constant length of a segment:
+                apex.length = self.segment_length
+                # We define the new dist_to_ramif, which is smaller than the one of the initial apex:
+                apex.dist_to_ramif = initial_dist_to_ramif - (initial_length - self.segment_length * i)
+                # We modify the geometrical features of the present element according to the new length:
+                apex.volume = self.volume_from_radius_and_length(apex, apex.radius, apex.length)
+                apex.struct_mass = apex.volume * self.root_tissue_density
+
+                # We calculate the mass fraction that the segment represents compared to the whole element prior to segmentation:
+                mass_fraction = apex.struct_mass / initial_struct_mass
+
+                # We modify the variables representing total amounts according to this mass fraction:
+                apex.resp_growth = initial_resp_growth * mass_fraction
+
+                apex.initial_struct_mass = initial_initial_struct_mass * mass_fraction
+                apex.initial_living_root_hairs_struct_mass = initial_initial_living_root_hairs_struct_mass * mass_fraction
+                apex.struct_mass_produced = initial_struct_mass_produced * mass_fraction
+
+                apex.root_hairs_struct_mass = initial_root_hairs_struct_mass * mass_fraction
+                apex.root_hairs_struct_mass_produced = initial_root_hairs_struct_mass_produced * mass_fraction
+                apex.living_root_hairs_struct_mass = initial_living_root_hairs_struct_mass * mass_fraction
+                apex.living_root_hairs_number = initial_living_root_hairs_number * mass_fraction
+                apex.dead_root_hairs_number = initial_dead_root_hairs_number * mass_fraction
+                apex.total_root_hairs_number = initial_total_root_hairs_number * mass_fraction
+                apex.hexose_growth_demand = initial_hexose_growth_demand * mass_fraction
+                apex.hexose_consumption_by_growth = initial_hexose_consumption_by_growth * mass_fraction
+                apex.hexose_consumption_by_growth_rate = initial_hexose_consumption_by_growth_rate * mass_fraction
+
+                # CALCULATING THE TIME SINCE ROOT CELLS FORMATION IN THE NEW SEGMENT:
+                # We update the time since root cells have formed, based on the elongation rate and on the principle that
+                # cells appear at the very end of the root tip, and then age.
+
+                # CASE 1: The first new segment contains a part that was already formed at the previous time step
+                if i == 1:
+                    # In this case, the average age of the element is calculated as the mean value between the incremented
+                    # age of the part that was already formed and has not elongated, and the average age of the new part to
+                    # complete the length of the segment.
+                    # The age of the initially-existing part is simply incremented by the time step:
+                    Age_of_non_elongated_part = apex.actual_time_since_cells_formation + self.time_step_in_seconds
+                    # The age of the cells at the top of the elongated part is by definition equal to:
+                    Age_of_elongated_part_up = apex.actual_elongation / apex.actual_elongation_rate
+                    # The age of the cells at the bottom of the new segment is defined according to the length below it:
+                    Age_of_elongated_part_down = (final_apex_length + (n_segments - 1) * self.segment_length) \
+                                                 / apex.actual_elongation_rate
+                    # The age of the elongated part of the new segment is calculated as the mean value between both extremities:
+                    Age_of_elongated_part = 0.5 * (Age_of_elongated_part_down + Age_of_elongated_part_up)
+                    # Eventually, the average age of the whole new segment is calculated from the age of both parts:
+                    apex.actual_time_since_cells_formation = (apex.initial_length * Age_of_non_elongated_part \
+                                                              + (
+                                                                      apex.length - apex.initial_length) * Age_of_elongated_part) \
+                                                             / apex.length
+                    # We also calculate the thermal age of root cells according to the previous thermal time of initially-exisiting cells:
+                    Thermal_age_of_non_elongated_part = apex.thermal_time_since_cells_formation + self.time_step_in_seconds * temperature_time_adjustment
+                    Thermal_age_of_elongated_part = Age_of_elongated_part * temperature_time_adjustment
+                    apex.thermal_time_since_cells_formation = (
+                                                                      apex.initial_length * Thermal_age_of_non_elongated_part \
+                                                                      + (
+                                                                              apex.length - apex.initial_length) * Thermal_age_of_elongated_part) / apex.length
+
+                # CASE 2: The new segment is only made of new root cells formed during this time step
+                else:
+                    # The age of the cells at the top of the segment is defined according to the elongated length up to it:
+                    Age_up = (final_apex_length + (
+                            n_segments - i) * self.segment_length) / apex.actual_elongation_rate
+                    # The age of the cells at the bottom of the segment is defined according to the elongated length up to it:
+                    Age_down = (final_apex_length + (
+                            n_segments - 1 - i) * self.segment_length) / apex.actual_elongation_rate
+                    apex.actual_time_since_cells_formation = 0.5 * (Age_down + Age_up)
+                    apex.thermal_time_since_cells_formation = apex.actual_time_since_cells_formation * temperature_time_adjustment
+
+                # CONSIDERING POSSIBLE PRIMORDIUM FORMATION:
+                # We call the function that can add a primordium on the current apex depending on the new dist_to_ramif:
+                new_apex.append(self.primordium_formation(apex, elongation_rate=initial_elongation_rate))
+
+                # The current element that has been elongated up to segment_length is now considered as a segment:
+                apex.label = 'Segment'
+
+                # If the segment is not the last one on the elongated axis:
+                if i < n_segments:
+                    # Then we also add a new element, initially of length 0, which we call "apex" and which will correspond
+                    # to the next segment to be defined in the loop:
+                    apex = self.ADDING_A_CHILD(mother_element=apex, edge_type='<', label='Apex',
+                                               type=apex.type,
+                                               root_order=initial_root_order,
+                                               angle_down=segment_angle_down,
+                                               angle_roll=segment_angle_roll,
+                                               length=0.,
+                                               radius=apex.radius,
+                                               identical_properties=True,
+                                               nil_properties=False)
+                    apex.actual_elongation = self.segment_length * i
+                else:
+                    # Otherwise, the loop will stop now, and we will add the terminal apex hereafter.
+                    # NODULE OPTION:
+                    # We add the possibility of a nodule formation on the segment that is closest to the apex:
+                    if self.nodules and len(
+                            apex.children()) < 2 and np.random.random() < self.nodule_formation_probability:
+                        self.nodule_formation(self.g,
+                                              mother_element=apex)  # WATCH OUT: here, "apex" still corresponds to the last segment!
+
+            # FORMATION OF THE TERMINAL APEX:
+            # And we define the new, final apex after the last defined segment, with a new length defined as:
+            new_length = initial_length - n_segments * self.segment_length
+            apex = self.ADDING_A_CHILD(mother_element=apex, edge_type='<', label='Apex',
+                                       type=apex.type,
+                                       root_order=initial_root_order,
+                                       angle_down=segment_angle_down,
+                                       angle_roll=segment_angle_roll,
+                                       length=new_length,
+                                       radius=apex.radius,
+                                       identical_properties=True,
+                                       nil_properties=False)
+            apex.potential_length = new_length
+            apex.initial_length = new_length
+            apex.dist_to_ramif = initial_dist_to_ramif
+            apex.actual_elongation = initial_elongation
+
+            # We modify the geometrical features of the new apex according to the defined length:
+            apex.volume = self.volume_from_radius_and_length(apex, apex.radius, apex.length)
+            apex.struct_mass = apex.volume * self.root_tissue_density
+            # We modify the variables representing total amounts according to the new struct_mass:
+            mass_fraction = apex.struct_mass / initial_struct_mass
+
+            apex.resp_growth = initial_resp_growth * mass_fraction
+
+            apex.initial_struct_mass = initial_initial_struct_mass * mass_fraction
+            apex.initial_living_root_hairs_struct_mass = initial_initial_living_root_hairs_struct_mass * mass_fraction
+
+            apex.struct_mass_produced = initial_struct_mass_produced * mass_fraction
+
+            apex.root_hairs_struct_mass = initial_root_hairs_struct_mass * mass_fraction
+            apex.root_hairs_struct_mass_produced = initial_root_hairs_struct_mass_produced * mass_fraction
+            apex.living_root_hairs_struct_mass = initial_living_root_hairs_struct_mass * mass_fraction
+            apex.living_root_hairs_number = initial_living_root_hairs_number * mass_fraction
+            apex.dead_root_hairs_number = initial_dead_root_hairs_number * mass_fraction
+            apex.total_root_hairs_number = initial_total_root_hairs_number * mass_fraction
+            apex.hexose_growth_demand = initial_hexose_growth_demand * mass_fraction
+            apex.hexose_consumption_by_growth = initial_hexose_consumption_by_growth * mass_fraction
+            apex.hexose_consumption_by_growth_rate = initial_hexose_consumption_by_growth_rate * mass_fraction
+
+            # CALCULATING THE TIME SINCE ROOT CELLS FORMATION IN THE NEW SEGMENT:
+            # We update the time since root cells have formed, based on the elongation rate:
+            Age_up = final_apex_length / apex.actual_elongation_rate
+            Age_down = 0
+            apex.actual_time_since_cells_formation = 0.5 * (Age_down + Age_up)
+            apex.thermal_time_since_cells_formation = apex.actual_time_since_cells_formation * temperature_time_adjustment
+
+            # And we call the function primordium_formation to check whether a primordium should have been formed:
+            new_apex.append(self.primordium_formation(apex, elongation_rate=initial_elongation_rate))
+
+            # Finally, we add the last apex present at the end of the elongated axis:
+            new_apex.append(apex)
+
+        return new_apex
+
+        # Formation of a root primordium at the apex of the mother root:
+        # ---------------------------------------------------------------
 
     def primordium_formation(self, apex, elongation_rate=0.):
         """
@@ -1534,10 +1740,10 @@ class RootGrowthModel:
         # We also set the root angles depending on random:
         if random:
             # The seed used to generate random values is defined according to a parameter random_choice and the index of the apex:
-            np.random.seed(param.random_choice * apex.index())
-            potential_radius = np.random.normal((apex.radius - param.Dmin / 2.) * param.RMD + param.Dmin / 2.,
+            np.random.seed(self.random_choice * apex.index())
+            potential_radius = np.random.normal((apex.radius - self.Dmin / 2.) * self.RMD + self.Dmin / 2.,
                                                 ((
-                                                         apex.radius - param.Dmin / 2.) * param.RMD + param.Dmin / 2.) * param.CVDD)
+                                                         apex.radius - self.Dmin / 2.) * self.RMD + self.Dmin / 2.) * self.CVDD)
             apex_angle_roll = abs(np.random.normal(120, 10))
             if apex.root_order == 1:
                 primordium_angle_down = abs(np.random.normal(45, 10))
@@ -1545,7 +1751,7 @@ class RootGrowthModel:
                 primordium_angle_down = abs(np.random.normal(70, 10))
             primordium_angle_roll = abs(np.random.normal(5, 5))
         else:
-            potential_radius = (apex.radius - param.Dmin / 2) * param.RMD + param.Dmin / 2.
+            potential_radius = (apex.radius - self.Dmin / 2) * self.RMD + self.Dmin / 2.
             apex_angle_roll = 120
             if apex.root_order == 1:
                 primordium_angle_down = 45
@@ -1559,9 +1765,9 @@ class RootGrowthModel:
 
         # If the distance between the apex and the last emerged root is higher than the inter-primordia distance
         # AND if the potential radius is higher than the minimum diameter:
-        if apex.dist_to_ramif > param.IPD and potential_radius >= param.Dmin and potential_radius <= apex.radius:
+        if apex.dist_to_ramif > self.IPD and potential_radius >= self.Dmin and potential_radius <= apex.radius:
             # The distance that the tip of the apex has covered since the actual primordium formation is calculated:
-            elongation_since_last_ramif = apex.dist_to_ramif - param.IPD
+            elongation_since_last_ramif = apex.dist_to_ramif - self.IPD
             # TODO: Is the third condition really relevant?
 
             # A specific rolling angle is attributed to the parent apex:
@@ -1604,440 +1810,8 @@ class RootGrowthModel:
 
         return new_apex
 
-    # Function that divides a root into segment and generates root primordia:
-    # ------------------------------------------------------------------------
 
-    # Simulation of segmentation and primordia formation for all root elements:
-    # --------------------------------------------------------------------------
-    # We define a class "Simulate_segmentation_and_primordia_formation" which is used to simulate the segmentation of apices
-    # and the apparition of primordium for a given MTG:
-    class Simulate_segmentation_and_primordia_formation(object):
-
-        # We initiate the object with a list of root apices:
-        def __init__(self, g):
-            self.g = g
-            # We define the list of apices for all vertices labelled as "Apex":
-            self._apices = [g.node(v) for v in g.vertices_iter(scale=1) if g.label(v) == 'Apex']
-
-        def step(self, time_step_in_seconds, soil_temperature_in_Celsius=20., ArchiSimple=False, random=True,
-                 nodules=False,
-                 root_order_limitation=False, root_order_treshold=2):
-            # We define "apices_list" as the list of all apices in g:
-            apices_list = list(self._apices)
-            # For each apex in the list of apices that have emerged with a positive length:
-            for apex in apices_list:
-                if apex.type == "Normal_root_after_emergence" and apex.length > 0.:
-                    # We define the new list of apices with the function apex_development:
-                    new_apex = self.segmentation_and_primordium_formation(apex)
-                    # We add these new apices to apex:
-                    self._apices.extend(new_apex)
-
-        def segmentation_and_primordium_formation(self, apex):
-            # NOTE: This function is supposed to be called AFTER the actual elongation of the apex has been done and the distance
-            # between the tip of the apex and the last ramification (dist_to_ramif) has been increased!
-
-            """
-            This function transforms an elongated root apex into a list of segments and a terminal, smaller apex. A primordium
-            of a lateral root can be formed on the new segment in some cases, depending on the distance to tip and the root orders.
-            :param apex: the root apex to be segmented
-            :return:
-            """
-
-            # TODO: Simplify the readability of this function by looping on two sets of variables, the ones that remain identical
-            #  within the segments, and those that are divided.
-
-            # TODO FOR TRISTAN: When working with a dynamic root structure, you will need to specify in this function "segmentation"
-            #  the new quantitative variables that would need to be recalculated when segmenting a long root apex
-            #  (ex: N amount will need to be divided, while N concentration will remain identical among the segments)
-
-            # CALCULATING AN EQUIVALENT OF THERMAL TIME:
-            # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
-            # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-            temperature_time_adjustment = self.temperature_modification()
-
-            # ADJUSTING ROOT ANGLES FOR THE FUTURE NEW SEGMENTS:
-            # Optional - We can add random geometry, or not:
-            if random:
-                # The seed used to generate random values is defined according to a parameter random_choice and the index of the apex:
-                np.random.seed(param.random_choice * apex.index())
-                angle_mean = 0
-                angle_var = 5
-                segment_angle_down = np.random.normal(angle_mean, angle_var)
-                segment_angle_roll = np.random.normal(angle_mean, angle_var)
-                apex_angle_down = np.random.normal(angle_mean, angle_var)
-                apex_angle_roll = np.random.normal(angle_mean, angle_var)
-            else:
-                segment_angle_down = 0
-                segment_angle_roll = 0
-                apex_angle_down = 0
-                apex_angle_roll = 0
-
-            # RECORDING THE VALUES OF THE APEX BEFORE SEGMENTATION (e.g. the values that will be altered by the segmentation!):
-            # We initialize the new_apex that will be returned by the function:
-            new_apex = []
-            # We record the initial geometrical features and total amounts,
-            # knowing that the concentrations will not be changed by the segmentation:
-            initial_root_order = apex.root_order
-            initial_length = apex.length
-            initial_dist_to_ramif = apex.dist_to_ramif
-            initial_elongation = apex.actual_elongation
-            initial_elongation_rate = apex.actual_elongation_rate
-            initial_struct_mass = apex.struct_mass
-            initial_struct_mass_produced = apex.struct_mass_produced
-            initial_resp_maintenance = apex.resp_maintenance
-            initial_resp_growth = apex.resp_growth
-
-            initial_root_hairs_struct_mass = apex.root_hairs_struct_mass
-            initial_root_hairs_struct_mass_produced = apex.root_hairs_struct_mass_produced
-            initial_living_root_hairs_struct_mass = apex.living_root_hairs_struct_mass
-            initial_living_root_hairs_number = apex.living_root_hairs_number
-            initial_dead_root_hairs_number = apex.dead_root_hairs_number
-            initial_total_root_hairs_number = apex.total_root_hairs_number
-            initial_living_root_hairs_external_surface = apex.living_root_hairs_external_surface
-            # TODO: the time-related variables associated to root hairs will not be changed here, but rather in the function 'root_hairs_dynamics' - check whether this is OK!
-
-            # NOTE: The following is not an error, we also need to record the "initial" structural mass and surfaces before growth!
-            initial_initial_struct_mass = apex.initial_struct_mass
-            initial_initial_living_root_hairs_struct_mass = apex.initial_living_root_hairs_struct_mass
-            initial_initial_external_surface = apex.initial_external_surface
-            initial_initial_living_root_hairs_external_surface = apex.initial_living_root_hairs_external_surface
-
-            initial_hexose_exudation = apex.hexose_exudation
-            initial_hexose_uptake_from_soil = apex.hexose_uptake_from_soil
-            initial_phloem_hexose_exudation = apex.phloem_hexose_exudation
-            initial_phloem_hexose_uptake_from_soil = apex.phloem_hexose_uptake_from_soil
-            initial_mucilage_secretion = apex.mucilage_secretion
-            initial_cells_release = apex.cells_release
-            initial_total_net_rhizodeposition = apex.total_net_rhizodeposition
-            initial_hexose_degradation = apex.hexose_degradation
-            initial_mucilage_degradation = apex.mucilage_degradation
-            initial_cells_degradation = apex.cells_degradation
-            initial_hexose_growth_demand = apex.hexose_growth_demand
-            initial_hexose_consumption_by_growth = apex.hexose_consumption_by_growth
-            initial_hexose_consumption_by_growth_rate = apex.hexose_consumption_by_growth_rate
-            initial_hexose_production_from_phloem = apex.hexose_production_from_phloem
-            initial_sucrose_loading_in_phloem = apex.sucrose_loading_in_phloem
-            initial_hexose_mobilization_from_reserve = apex.hexose_mobilization_from_reserve
-            initial_hexose_immobilization_as_reserve = apex.hexose_immobilization_as_reserve
-            initial_Deficit_sucrose_root = apex.Deficit_sucrose_root
-            initial_Deficit_hexose_root = apex.Deficit_hexose_root
-            initial_Deficit_hexose_reserve = apex.Deficit_hexose_reserve
-            initial_Deficit_hexose_soil = apex.Deficit_hexose_soil
-            initial_Deficit_mucilage_soil = apex.Deficit_mucilage_soil
-            initial_Deficit_cells_soil = apex.Deficit_cells_soil
-
-            initial_Deficit_sucrose_root_rate = apex.Deficit_sucrose_root_rate
-            initial_Deficit_hexose_root_rate = apex.Deficit_hexose_root_rate
-            initial_Deficit_hexose_reserve_rate = apex.Deficit_hexose_reserve_rate
-            initial_Deficit_hexose_soil_rate = apex.Deficit_hexose_soil_rate
-            initial_Deficit_mucilage_soil_rate = apex.Deficit_mucilage_soil_rate
-            initial_Deficit_cells_soil_rate = apex.Deficit_cells_soil_rate
-
-            # We record the type of the apex, as it may correspond to an apex that has stopped (or even died):
-            initial_type = apex.type
-            initial_lateral_root_emergence_possibility = apex.lateral_root_emergence_possibility
-
-            # CASE 1: NO SEGMENTATION IS NECESSARY
-            # -------------------------------------
-            # If the length of the apex is smaller than the defined length of a root segment:
-            if apex.length <= param.segment_length:
-
-                # CONSIDERING POSSIBLE PRIMORDIUM FORMATION:
-                # We simply call the function primordium_formation to check whether a primordium should have been formed
-                # (Note: we assume that the segment length is always smaller than the inter-branching distance IBD,
-                # so that in this case, only 0 or 1 primordium may have been formed - the function is called only once):
-                new_apex.append(self.primordium_formation(apex, elongation_rate=initial_elongation_rate))
-
-                # If there has been an actual elongation of the root apex:
-                if apex.actual_elongation_rate > 0.:
-                    # # RECALCULATING DIMENSIONS:
-                    # # We assume that the growth functions that may have been called previously have only modified radius and length,
-                    # # but not the struct_mass and the total amounts present in the root element.
-                    # # We modify the geometrical features of the present element according to the new length and radius:
-                    # apex.volume = volume_and_external_surface_from_radius_and_length(g, apex, apex.radius, apex.length)["volume"]
-                    # apex.struct_mass = apex.volume * param.root_tissue_density
-
-                    # CALCULATING THE AVERAGE TIME SINCE ROOT CELLS FORMED:
-                    # We update the time since root cells have formed, based on the elongation rate and on the principle that
-                    # cells appear at the very end of the root tip, and then age. In this case, the average age of the element is
-                    # calculated as the mean value between the incremented age of the part that was already formed and has not
-                    # elongated, and the average age of the new part formed.
-                    # The age of the initially-existing part is simply incremented by the time step:
-                    Age_of_non_elongated_part = apex.actual_time_since_cells_formation + self.time_step_in_seconds
-                    # The age of the cells at the top of the elongated part is by definition equal to:
-                    Age_of_elongated_part_up = apex.actual_elongation / apex.actual_elongation_rate
-                    # The age of the cells at the root tip is by definition 0:
-                    Age_of_elongated_part_down = 0
-                    # The average age of the elongated part is calculated as the mean value between both extremities:
-                    Age_of_elongated_part = 0.5 * (Age_of_elongated_part_down + Age_of_elongated_part_up)
-                    # Eventually, the average age of the whole new element is calculated from the age of both parts:
-                    apex.actual_time_since_cells_formation = (apex.initial_length * Age_of_non_elongated_part \
-                                                              + (
-                                                                      apex.length - apex.initial_length) * Age_of_elongated_part) \
-                                                             / apex.length
-                    # We also calculate the thermal age of root cells according to the previous thermal time of
-                    # initially-exisiting cells:
-                    Thermal_age_of_non_elongated_part = apex.thermal_time_since_cells_formation + self.time_step_in_seconds * \
-                                                        temperature_time_adjustment
-                    Thermal_age_of_elongated_part = Age_of_elongated_part * temperature_time_adjustment
-                    apex.thermal_time_since_cells_formation = (
-                                                                          apex.initial_length * Thermal_age_of_non_elongated_part \
-                                                                          + (
-                                                                                  apex.length - apex.initial_length) * Thermal_age_of_elongated_part) / apex.length
-
-            # CASE 2: THE APEX HAS TO BE SEGMENTED
-            # -------------------------------------
-            # Otherwise, we have to calculate the number of entire segments within the apex.
-            else:
-
-                # CALCULATION OF THE NUMBER OF ROOT SEGMENTS TO BE FORMED:
-                # If the final length of the apex does not correspond to an entire number of segments:
-                if apex.length / param.segment_length - floor(apex.length / param.segment_length) > 0.:
-                    # Then the total number of segments to be formed is:
-                    n_segments = floor(apex.length / param.segment_length)
-                else:
-                    # Otherwise, the number of segments to be formed is decreased by 1,
-                    # so that the last element corresponds to an apex with a positive length:
-                    n_segments = floor(apex.length / param.segment_length) - 1
-                n_segments = int(n_segments)
-
-                # We need to calculate the final length of the terminal apex:
-                final_apex_length = initial_length - n_segments * param.segment_length
-
-                # FORMATION OF THE NEW SEGMENTS
-                # We develop each new segment, except the last one, by transforming the current apex into a segment
-                # and by adding a new apex after it, in an iterative way for (n-1) segments:
-                for i in range(1, n_segments + 1):
-
-                    # We define the length of the present element (still called "apex") as the constant length of a segment:
-                    apex.length = param.segment_length
-                    # We define the new dist_to_ramif, which is smaller than the one of the initial apex:
-                    apex.dist_to_ramif = initial_dist_to_ramif - (initial_length - param.segment_length * i)
-                    # We modify the geometrical features of the present element according to the new length:
-                    apex.volume = \
-                        TODOvolume_and_external_surface_from_radius_and_length(self.g, apex, apex.radius, apex.length)[
-                            "volume"]
-                    apex.struct_mass = apex.volume * param.root_tissue_density
-
-                    # We calculate the mass fraction that the segment represents compared to the whole element prior to segmentation:
-                    mass_fraction = apex.struct_mass / initial_struct_mass
-
-                    # We modify the variables representing total amounts according to this mass fraction:
-                    apex.resp_maintenance = initial_resp_maintenance * mass_fraction
-                    apex.resp_growth = initial_resp_growth * mass_fraction
-
-                    apex.initial_struct_mass = initial_initial_struct_mass * mass_fraction
-                    apex.initial_living_root_hairs_struct_mass = initial_initial_living_root_hairs_struct_mass * mass_fraction
-                    apex.struct_mass_produced = initial_struct_mass_produced * mass_fraction
-                    apex.initial_external_surface = initial_initial_external_surface * mass_fraction
-                    apex.initial_living_root_hairs_external_surface = initial_initial_living_root_hairs_external_surface \
-                                                                      * mass_fraction
-
-                    apex.root_hairs_struct_mass = initial_root_hairs_struct_mass * mass_fraction
-                    apex.root_hairs_struct_mass_produced = initial_root_hairs_struct_mass_produced * mass_fraction
-                    apex.living_root_hairs_struct_mass = initial_living_root_hairs_struct_mass * mass_fraction
-                    apex.living_root_hairs_number = initial_living_root_hairs_number * mass_fraction
-                    apex.dead_root_hairs_number = initial_dead_root_hairs_number * mass_fraction
-                    apex.total_root_hairs_number = initial_total_root_hairs_number * mass_fraction
-                    apex.living_root_hairs_external_surface = initial_living_root_hairs_external_surface * mass_fraction
-
-                    apex.hexose_exudation = initial_hexose_exudation * mass_fraction
-                    apex.hexose_uptake_from_soil = initial_hexose_uptake_from_soil * mass_fraction
-                    apex.phloem_hexose_exudation = initial_phloem_hexose_exudation * mass_fraction
-                    apex.phloem_hexose_uptake_from_soil = initial_phloem_hexose_uptake_from_soil * mass_fraction
-                    apex.mucilage_secretion = initial_mucilage_secretion * mass_fraction
-                    apex.cells_release = initial_cells_release * mass_fraction
-                    apex.total_net_rhizodeposition = initial_total_net_rhizodeposition * mass_fraction
-                    apex.hexose_degradation = initial_hexose_degradation * mass_fraction
-                    apex.mucilage_degradation = initial_mucilage_degradation * mass_fraction
-                    apex.cells_degradation = initial_cells_degradation * mass_fraction
-                    apex.hexose_growth_demand = initial_hexose_growth_demand * mass_fraction
-                    apex.hexose_consumption_by_growth = initial_hexose_consumption_by_growth * mass_fraction
-                    apex.hexose_consumption_by_growth_rate = initial_hexose_consumption_by_growth_rate * mass_fraction
-
-                    apex.hexose_production_from_phloem = initial_hexose_production_from_phloem * mass_fraction
-                    apex.sucrose_loading_in_phloem = initial_sucrose_loading_in_phloem * mass_fraction
-                    apex.hexose_mobilization_from_reserve = initial_hexose_mobilization_from_reserve * mass_fraction
-                    apex.hexose_immobilization_as_reserve = initial_hexose_immobilization_as_reserve * mass_fraction
-
-                    apex.Deficit_sucrose_root = initial_Deficit_sucrose_root * mass_fraction
-                    apex.Deficit_hexose_root = initial_Deficit_hexose_root * mass_fraction
-                    apex.Deficit_hexose_reserve = initial_Deficit_hexose_reserve * mass_fraction
-                    apex.Deficit_hexose_soil = initial_Deficit_hexose_soil * mass_fraction
-                    apex.Deficit_mucilage_soil = initial_Deficit_mucilage_soil * mass_fraction
-                    apex.Deficit_cells_soil = initial_Deficit_cells_soil * mass_fraction
-
-                    apex.Deficit_sucrose_root_rate = initial_Deficit_sucrose_root_rate * mass_fraction
-                    apex.Deficit_hexose_root_rate = initial_Deficit_hexose_root_rate * mass_fraction
-                    apex.Deficit_hexose_reserve_rate = initial_Deficit_hexose_reserve_rate * mass_fraction
-                    apex.Deficit_hexose_soil_rate = initial_Deficit_hexose_soil_rate * mass_fraction
-                    apex.Deficit_mucilage_soil_rate = initial_Deficit_mucilage_soil_rate * mass_fraction
-                    apex.Deficit_cells_soil_rate = initial_Deficit_cells_soil_rate * mass_fraction
-
-                    # CALCULATING THE TIME SINCE ROOT CELLS FORMATION IN THE NEW SEGMENT:
-                    # We update the time since root cells have formed, based on the elongation rate and on the principle that
-                    # cells appear at the very end of the root tip, and then age.
-
-                    # CASE 1: The first new segment contains a part that was already formed at the previous time step
-                    if i == 1:
-                        # In this case, the average age of the element is calculated as the mean value between the incremented
-                        # age of the part that was already formed and has not elongated, and the average age of the new part to
-                        # complete the length of the segment.
-                        # The age of the initially-existing part is simply incremented by the time step:
-                        Age_of_non_elongated_part = apex.actual_time_since_cells_formation + self.time_step_in_seconds
-                        # The age of the cells at the top of the elongated part is by definition equal to:
-                        Age_of_elongated_part_up = apex.actual_elongation / apex.actual_elongation_rate
-                        # The age of the cells at the bottom of the new segment is defined according to the length below it:
-                        Age_of_elongated_part_down = (final_apex_length + (n_segments - 1) * param.segment_length) \
-                                                     / apex.actual_elongation_rate
-                        # The age of the elongated part of the new segment is calculated as the mean value between both extremities:
-                        Age_of_elongated_part = 0.5 * (Age_of_elongated_part_down + Age_of_elongated_part_up)
-                        # Eventually, the average age of the whole new segment is calculated from the age of both parts:
-                        apex.actual_time_since_cells_formation = (apex.initial_length * Age_of_non_elongated_part \
-                                                                  + (
-                                                                          apex.length - apex.initial_length) * Age_of_elongated_part) \
-                                                                 / apex.length
-                        # We also calculate the thermal age of root cells according to the previous thermal time of initially-exisiting cells:
-                        Thermal_age_of_non_elongated_part = apex.thermal_time_since_cells_formation + self.time_step_in_seconds * temperature_time_adjustment
-                        Thermal_age_of_elongated_part = Age_of_elongated_part * temperature_time_adjustment
-                        apex.thermal_time_since_cells_formation = (
-                                                                          apex.initial_length * Thermal_age_of_non_elongated_part \
-                                                                          + (
-                                                                                  apex.length - apex.initial_length) * Thermal_age_of_elongated_part) / apex.length
-
-                    # CASE 2: The new segment is only made of new root cells formed during this time step
-                    else:
-                        # The age of the cells at the top of the segment is defined according to the elongated length up to it:
-                        Age_up = (final_apex_length + (
-                                n_segments - i) * param.segment_length) / apex.actual_elongation_rate
-                        # The age of the cells at the bottom of the segment is defined according to the elongated length up to it:
-                        Age_down = (final_apex_length + (
-                                n_segments - 1 - i) * param.segment_length) / apex.actual_elongation_rate
-                        apex.actual_time_since_cells_formation = 0.5 * (Age_down + Age_up)
-                        apex.thermal_time_since_cells_formation = apex.actual_time_since_cells_formation * temperature_time_adjustment
-
-                    # CONSIDERING POSSIBLE PRIMORDIUM FORMATION:
-                    # We call the function that can add a primordium on the current apex depending on the new dist_to_ramif:
-                    new_apex.append(self.primordium_formation(apex, elongation_rate=initial_elongation_rate))
-
-                    # The current element that has been elongated up to segment_length is now considered as a segment:
-                    apex.label = 'Segment'
-
-                    # If the segment is not the last one on the elongated axis:
-                    if i < n_segments:
-                        # Then we also add a new element, initially of length 0, which we call "apex" and which will correspond
-                        # to the next segment to be defined in the loop:
-                        apex = self.ADDING_A_CHILD(mother_element=apex, edge_type='<', label='Apex',
-                                                   type=apex.type,
-                                                   root_order=initial_root_order,
-                                                   angle_down=segment_angle_down,
-                                                   angle_roll=segment_angle_roll,
-                                                   length=0.,
-                                                   radius=apex.radius,
-                                                   identical_properties=True,
-                                                   nil_properties=False)
-                        apex.actual_elongation = param.segment_length * i
-                    else:
-                        # Otherwise, the loop will stop now, and we will add the terminal apex hereafter.
-                        # NODULE OPTION:
-                        # We add the possibility of a nodule formation on the segment that is closest to the apex:
-                        if self.nodules and len(
-                                apex.children()) < 2 and np.random.random() < param.nodule_formation_probability:
-                            self.nodule_formation(self.g,
-                                                  mother_element=apex)  # WATCH OUT: here, "apex" still corresponds to the last segment!
-
-                # FORMATION OF THE TERMINAL APEX:
-                # And we define the new, final apex after the last defined segment, with a new length defined as:
-                new_length = initial_length - n_segments * param.segment_length
-                apex = self.ADDING_A_CHILD(mother_element=apex, edge_type='<', label='Apex',
-                                           type=apex.type,
-                                           root_order=initial_root_order,
-                                           angle_down=segment_angle_down,
-                                           angle_roll=segment_angle_roll,
-                                           length=new_length,
-                                           radius=apex.radius,
-                                           identical_properties=True,
-                                           nil_properties=False)
-                apex.potential_length = new_length
-                apex.initial_length = new_length
-                apex.dist_to_ramif = initial_dist_to_ramif
-                apex.actual_elongation = initial_elongation
-
-                # We modify the geometrical features of the new apex according to the defined length:
-                apex.volume = \
-                    TODOvolume_and_external_surface_from_radius_and_length(self.g, apex, apex.radius, apex.length)[
-                        "volume"]
-                apex.struct_mass = apex.volume * param.root_tissue_density
-                # We modify the variables representing total amounts according to the new struct_mass:
-                mass_fraction = apex.struct_mass / initial_struct_mass
-
-                apex.resp_maintenance = initial_resp_maintenance * mass_fraction
-                apex.resp_growth = initial_resp_growth * mass_fraction
-
-                apex.initial_struct_mass = initial_initial_struct_mass * mass_fraction
-                apex.initial_living_root_hairs_struct_mass = initial_initial_living_root_hairs_struct_mass * mass_fraction
-                apex.initial_external_surface = initial_initial_external_surface * mass_fraction
-                apex.initial_living_root_hairs_external_surface = initial_initial_living_root_hairs_external_surface * mass_fraction
-
-                apex.struct_mass_produced = initial_struct_mass_produced * mass_fraction
-
-                apex.root_hairs_struct_mass = initial_root_hairs_struct_mass * mass_fraction
-                apex.root_hairs_struct_mass_produced = initial_root_hairs_struct_mass_produced * mass_fraction
-                apex.living_root_hairs_struct_mass = initial_living_root_hairs_struct_mass * mass_fraction
-                apex.living_root_hairs_number = initial_living_root_hairs_number * mass_fraction
-                apex.dead_root_hairs_number = initial_dead_root_hairs_number * mass_fraction
-                apex.total_root_hairs_number = initial_total_root_hairs_number * mass_fraction
-                apex.living_root_hairs_external_surface = initial_living_root_hairs_external_surface * mass_fraction
-
-                apex.hexose_exudation = initial_hexose_exudation * mass_fraction
-                apex.hexose_uptake_from_soil = initial_hexose_uptake_from_soil * mass_fraction
-                apex.phloem_hexose_exudation = initial_phloem_hexose_exudation * mass_fraction
-                apex.phloem_hexose_uptake_from_soil = initial_phloem_hexose_uptake_from_soil * mass_fraction
-                apex.mucilage_secretion = initial_mucilage_secretion * mass_fraction
-                apex.cells_release = initial_cells_release * mass_fraction
-                apex.total_net_rhizodeposition = initial_total_net_rhizodeposition * mass_fraction
-                apex.hexose_degradation = initial_hexose_degradation * mass_fraction
-                apex.mucilage_degradation = initial_mucilage_degradation * mass_fraction
-                apex.cells_degradation = initial_cells_degradation * mass_fraction
-                apex.hexose_growth_demand = initial_hexose_growth_demand * mass_fraction
-                apex.hexose_consumption_by_growth = initial_hexose_consumption_by_growth * mass_fraction
-                apex.hexose_consumption_by_growth_rate = initial_hexose_consumption_by_growth_rate * mass_fraction
-                apex.hexose_production_from_phloem = initial_hexose_production_from_phloem * mass_fraction
-                apex.sucrose_loading_in_phloem = initial_sucrose_loading_in_phloem * mass_fraction
-                apex.hexose_mobilization_from_reserve = initial_hexose_mobilization_from_reserve * mass_fraction
-                apex.hexose_immobilization_as_reserve = initial_hexose_immobilization_as_reserve * mass_fraction
-
-                apex.Deficit_sucrose_root = initial_Deficit_sucrose_root * mass_fraction
-                apex.Deficit_hexose_root = initial_Deficit_hexose_root * mass_fraction
-                apex.Deficit_hexose_reserve = initial_Deficit_hexose_reserve * mass_fraction
-                apex.Deficit_hexose_soil = initial_Deficit_hexose_soil * mass_fraction
-                apex.Deficit_mucilage_soil = initial_Deficit_mucilage_soil * mass_fraction
-                apex.Deficit_cells_soil = initial_Deficit_cells_soil * mass_fraction
-
-                apex.Deficit_sucrose_root_rate = initial_Deficit_sucrose_root_rate * mass_fraction
-                apex.Deficit_hexose_root_rate = initial_Deficit_hexose_root_rate * mass_fraction
-                apex.Deficit_hexose_reserve_rate = initial_Deficit_hexose_reserve_rate * mass_fraction
-                apex.Deficit_hexose_soil_rate = initial_Deficit_hexose_soil_rate * mass_fraction
-                apex.Deficit_mucilage_soil_rate = initial_Deficit_mucilage_soil_rate * mass_fraction
-                apex.Deficit_cells_soil_rate = initial_Deficit_cells_soil_rate * mass_fraction
-
-                # CALCULATING THE TIME SINCE ROOT CELLS FORMATION IN THE NEW SEGMENT:
-                # We update the time since root cells have formed, based on the elongation rate:
-                Age_up = final_apex_length / apex.actual_elongation_rate
-                Age_down = 0
-                apex.actual_time_since_cells_formation = 0.5 * (Age_down + Age_up)
-                apex.thermal_time_since_cells_formation = apex.actual_time_since_cells_formation * temperature_time_adjustment
-
-                # And we call the function primordium_formation to check whether a primordium should have been formed:
-                new_apex.append(self.primordium_formation(apex, elongation_rate=initial_elongation_rate))
-
-                # Finally, we add the last apex present at the end of the elongated axis:
-                new_apex.append(apex)
-
-            return new_apex
-
-
-
+    # TODO UNUSED
     # Function calculating a satisfaction coefficient for the growth of the whole root system:
     # -----------------------------------------------------------------------------------------
     def satisfaction_coefficient(self, g, struct_mass_input):
@@ -2064,16 +1838,12 @@ class RootGrowthModel:
             n = g.node(vid)
 
             # We calculate the initial volume of the element:
-            initial_volume = \
-                TODOvolume_and_external_surface_from_radius_and_length(g, n, n.initial_radius, n.initial_length)[
-                    "volume"]
+            initial_volume = self.volume_from_radius_and_length(n, n.initial_radius, n.initial_length)
             # We calculate the potential volume of the element based on the potential radius and potential length:
-            potential_volume = \
-                TODOvolume_and_external_surface_from_radius_and_length(g, n, n.potential_radius,
-                                                                        n.potential_length)["volume"]
+            potential_volume = self.volume_from_radius_and_length(n, n.potential_radius, n.potential_length)
 
             # The growth demand of the element in struct_mass is calculated:
-            n.growth_demand_in_struct_mass = (potential_volume - initial_volume) * param.root_tissue_density
+            n.growth_demand_in_struct_mass = (potential_volume - initial_volume) * self.root_tissue_density
             sum_struct_mass_demand += n.growth_demand_in_struct_mass
 
         # We make sure that the structural mass input is not negative, as this case does not work with ArchiSimple:
@@ -2089,7 +1859,8 @@ class RootGrowthModel:
             SC = struct_mass_input / sum_struct_mass_demand
 
         return SC
-
+    
+    # TODO UNUSED
     # Function performing the growth of each element based on the potential growth and the satisfaction coefficient SC:
     # ------------------------------------------------------------------------------------------------------------------
     def ArchiSimple_growth(self, g, SC, time_step_in_seconds, soil_temperature_in_Celsius=20,
@@ -2159,9 +1930,9 @@ class RootGrowthModel:
 
             n.radius += (n.potential_radius - n.initial_radius) * relative_growth_increase
             # The volume of the element is automatically calculated:
-            n.volume = TODOvolume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["volume"]
+            n.volume = self.volume_from_radius_and_length(n, n.radius, n.length)
             # The new dry structural struct_mass of the element is calculated from its new volume:
-            n.struct_mass = n.volume * param.root_tissue_density
+            n.struct_mass = n.volume * self.root_tissue_density
 
             # In case where the root element corresponds to an apex, the distance to the last ramification is increased:
             if n.label == "Apex":
@@ -2174,203 +1945,16 @@ class RootGrowthModel:
 
         return g
 
-    # Root hairs dynamics:
-    # --------------------
-    def root_hairs_dynamics(self, g, time_step_in_seconds=1. * (60. * 60. * 24.),
-                            soil_temperature_in_Celsius=20, printing_warnings=False):
-        """
-        This function computes the evolution of the density and average length of root hairs along each root,
-        and specifies which hairs are alive or dead.
-        :param g: the root MTG to be considered
-        :param time_step_in_seconds: the time step over which growth is considered
-        :param soil_temperature_in_Celsius: the same, homogeneous temperature experienced by the whole root system
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
-        :return:
-        """
-
-        # TODO FOR TRISTAN: Consider adding a limitation of growth for root hairs associated to the availability of N in the root.
-        #  In a second step, consider playing on the density / max. length of root hairs depending on the availability of N in the soil (if relevant)?
-
-        # We cover all the vertices in the MTG:
-        for vid in g.vertices_iter(scale=1):
-            # n represents the vertex:
-            n = g.node(vid)
-
-            # First, we ensure that the element has a positive length:
-            if n.length <= 0:
-                continue
-
-            # We also exclude nodules and dead elements from this computation:
-            if n.type == "Just_dead" or n.type == "Dead" or n.type == "Nodule":
-                continue
-
-            # # TODO: Check the consequences of avoiding apex in root hairs dynamics!
-            # # WE ALSO AVOID ROOT APICES - EVEN IF IN THEORY ROOT HAIRS MAY ALSO APPEAR ON THEM:
-            # if n.label == "Apex":
-            #     continue
-            # # Even if root hairs should have already emerge on that root apex, they will appear in the next step (or in a few steps)
-            # # when the element becomes a segment.
-
-            # We calculate the equivalent of a thermal time for the current time step:
-            temperature_time_adjustment = self.temperature_modification()
-            elapsed_thermal_time = time_step_in_seconds * temperature_time_adjustment
-
-            # We keep in memory the initial total mass of root hairs (possibly including dead hairs):
-            initial_root_hairs_struct_mass = n.root_hairs_struct_mass
-
-            # We calculate the total number of (newly formed) root hairs (if any) and update their age:
-            # ------------------------------------------------------------------------------------------
-            # CASE 1 - If the current element is completely included within the actual growing zone of the root at the root
-            # tip, the root hairs cannot have formed yet:
-            if n.distance_from_tip <= param.growing_zone_factor * n.radius:
-                # We stop here with the calculations and move to the next element:
-                continue
-            # CASE 2 - If all root hairs have already been formed:
-            if n.all_root_hairs_formed:
-                # Then we simply increase the time since root hairs emergence started:
-                n.actual_time_since_root_hairs_emergence_started += time_step_in_seconds
-                n.thermal_time_since_root_hairs_emergence_started += elapsed_thermal_time
-                n.actual_time_since_root_hairs_emergence_stopped += time_step_in_seconds
-                n.thermal_time_since_root_hairs_emergence_stopped += elapsed_thermal_time
-            # CASE 3 - If the theoretical growing zone limit is located somewhere within the root element:
-            elif n.distance_from_tip - n.length < param.growing_zone_factor * n.radius:
-                # We first record the previous length of the root hair zone within the element:
-                initial_length_with_hairs = n.actual_length_with_hairs
-                # Then the new length of the root hair zone is calculated:
-                n.actual_length_with_hairs = n.distance_from_tip - param.growing_zone_factor * n.radius
-                net_increase_in_root_hairs_length = n.actual_length_with_hairs - initial_length_with_hairs
-                # The corresponding number of root hairs is calculated:
-                n.total_root_hairs_number = param.root_hairs_density * n.radius * n.actual_length_with_hairs
-                # The time since root hair formation started is then calculated, using the recent increase in the length
-                # of the current root hair zone and the elongation rate of the corresponding root tip. The latter is
-                # calculated using the difference between the new distance_from_tip of the element and the previous one:
-                elongation_rate_in_actual_time = (
-                                                         n.distance_from_tip - n.former_distance_from_tip) / time_step_in_seconds
-                elongation_rate_in_thermal_time = (
-                                                          n.distance_from_tip - n.former_distance_from_tip) / elapsed_thermal_time
-                # SUBCASE 3.1 - If root hairs had not emerged at the previous time step:
-                if elongation_rate_in_actual_time > 0. and initial_length_with_hairs <= 0.:
-                    # We increase the time since root hairs emerged by only the fraction of the time step corresponding to the growth of hairs:
-                    n.actual_time_since_root_hairs_emergence_started += \
-                        time_step_in_seconds - net_increase_in_root_hairs_length / elongation_rate_in_actual_time
-                    n.thermal_time_since_root_hairs_emergence_started += \
-                        elapsed_thermal_time - net_increase_in_root_hairs_length / elongation_rate_in_thermal_time
-                # SUBCASE 3.2 - the hairs had already started to grow:
-                else:
-                    # Consequently, the full time elapsed during this time step can be added to the age:
-                    n.actual_time_since_root_hairs_emergence_started += time_step_in_seconds
-                    n.thermal_time_since_root_hairs_emergence_started += elapsed_thermal_time
-            # CASE 4 - the element is now "full" with root hairs as the limit of root elongation is located further down:
-            else:
-                # The actual time since root hairs emergence started is first increased:
-                n.actual_time_since_root_hairs_emergence_started += time_step_in_seconds
-                n.thermal_time_since_root_hairs_emergence_started += elapsed_thermal_time
-                # We then record the previous length of the root hair zone within the root element:
-                initial_length_with_hairs = n.actual_length_with_hairs
-                # And the new length of the root hair zone is necessarily the full length of the root element:
-                n.actual_length_with_hairs = n.length
-                net_increase_in_root_hairs_length = n.actual_length_with_hairs - initial_length_with_hairs
-                # The total number of hairs is defined according to the radius and total length of the element:
-                n.total_root_hairs_number = param.root_hairs_density * n.radius * n.length
-                # The elongation of the corresponding root tip is calculated as the difference between the new
-                # distance_from_tip of the element and the previous one:
-                elongation_rate_in_actual_time = (
-                                                         n.distance_from_tip - n.former_distance_from_tip) / time_step_in_seconds
-                elongation_rate_in_thermal_time = (
-                                                          n.distance_from_tip - n.former_distance_from_tip) / elapsed_thermal_time
-                # The actual time since root hairs emergence has stopped is then calculated:
-                if elongation_rate_in_actual_time > 0.:
-                    n.actual_time_since_root_hairs_emergence_stopped += \
-                        time_step_in_seconds - net_increase_in_root_hairs_length / elongation_rate_in_actual_time
-                    n.thermal_time_since_root_hairs_emergence_stopped += \
-                        elapsed_thermal_time - net_increase_in_root_hairs_length / elongation_rate_in_thermal_time
-                else:
-                    n.actual_time_since_root_hairs_emergence_stopped += time_step_in_seconds
-                    n.thermal_time_since_root_hairs_emergence_stopped += elapsed_thermal_time
-                # At this stage, all root hairs that could be formed have been formed, so we record this:
-                n.all_root_hairs_formed = True
-
-            # We now calculate the number of living and dead root hairs:
-            # -----------------------------------------------------------
-            # Root hairs are dying when the time since they emerged is higher than their lifespan.
-            # If the time since root hairs emergence started is lower than the lifespan,
-            # no root hair should be dead:
-            if n.thermal_time_since_root_hairs_emergence_started <= n.root_hairs_lifespan:
-                n.dead_root_hairs_number = 0.
-            # Otherwise, if the time since root hairs emergence stopped is higher than the lifespan:
-            elif n.thermal_time_since_root_hairs_emergence_stopped > n.root_hairs_lifespan:
-                # Then all the root hairs of the root element must now be dead:
-                n.dead_root_hairs_number = n.total_root_hairs_number
-            # In the intermediate case, there are currently both dead and living root hairs on the root element:
-            else:
-                # We assume that there is a linear decrease of root hair age between the first hair that has emerged
-                # and the last one that has emerged:
-                time_since_first_death = n.thermal_time_since_root_hairs_emergence_started - n.root_hairs_lifespan
-                dead_fraction = time_since_first_death / (n.thermal_time_since_root_hairs_emergence_started
-                                                          - n.thermal_time_since_root_hairs_emergence_stopped)
-                n.dead_root_hairs_number = n.total_root_hairs_number * dead_fraction
-
-            # In all cases, the number of the living root hairs is then calculated by difference with the total hair number:
-            n.living_root_hairs_number = n.total_root_hairs_number - n.dead_root_hairs_number
-
-            # We calculate the new average root hairs length, if needed:
-            # ----------------------------------------------------------
-            # If the root hairs had not reached their maximal length:
-            if n.root_hair_length < param.root_hair_max_length:
-                # The new potential root hairs length is calculated according to the elongation rate,
-                # corrected by temperature and modulated by the concentration of hexose (in the same way as for root
-                # elongation) available in the root hair zone on the root element:
-                new_length = n.root_hair_length + param.root_hairs_elongation_rate * param.root_hair_radius \
-                             * n.C_hexose_root * (n.actual_length_with_hairs / n.length) \
-                             / (self.Km_elongation + n.C_hexose_root) * elapsed_thermal_time
-                # If the new calculated length is higher than the maximal length:
-                if new_length > param.root_hair_max_length:
-                    # We set the root hairs length to the maximal length:
-                    n.root_hair_length = param.root_hair_max_length
-                else:
-                    # Otherwise, we record the new calculated length:
-                    n.root_hair_length = new_length
-
-            # We finally calculate the total external surface (m2), volume (m3) and mass (g) of root hairs:
-            # ----------------------------------------------------------------------------------------------
-            # In the calculation of surface, we consider the root hair to be a cylinder, and include the lateral section,
-            # but exclude the section of the cylinder at the tip:
-            n.root_hairs_external_surface = ((param.root_hair_radius * 2 * pi) * n.root_hair_length) \
-                                            * n.total_root_hairs_number
-            n.root_hairs_volume = (
-                                              param.root_hair_radius ** 2 * pi) * n.root_hair_length * n.total_root_hairs_number
-            n.root_hairs_struct_mass = n.root_hairs_volume * param.root_tissue_density
-            if n.total_root_hairs_number > 0.:
-                n.living_root_hairs_external_surface = n.root_hairs_external_surface * n.living_root_hairs_number \
-                                                       / n.total_root_hairs_number
-                n.living_root_hairs_struct_mass = n.root_hairs_struct_mass * n.living_root_hairs_number \
-                                                  / n.total_root_hairs_number
-            else:
-                n.living_root_hairs_external_surface = 0.
-                n.living_root_hairs_struct_mass = 0.
-
-            # We calculate the mass of hairs that has been effectively produced, including from root hairs that may have died since then:
-            # ----------------------------------------------------------------------------------------------------------------------------
-            # We calculate the new production as the difference between initial and final mass:
-            n.root_hairs_struct_mass_produced = n.root_hairs_struct_mass - initial_root_hairs_struct_mass
-
-            # We add the cost of producing the new living root hairs (if any) to the hexose consumption by growth:
-            hexose_consumption = n.root_hairs_struct_mass_produced * param.struct_mass_C_content / param.yield_growth / 6.
-            n.hexose_consumption_by_growth += hexose_consumption
-            n.hexose_consumption_by_growth_rate += hexose_consumption / time_step_in_seconds
-            n.resp_growth += hexose_consumption * 6. * (1 - param.yield_growth)
-
-        return
-
     # Formation of root nodules:
     # ---------------------------
-    def nodule_formation(self, g, mother_element):
+    def nodule_formation(self, mother_element):
         """
         This function simulates the formation of one nodule on a root mother element. The nodule is considered as a special
         lateral root segment that has no apex connected and which cannot generate root primordium.
         :param g: the root MTG to be considered
         :param mother_element: the mother element on which a new nodule element will be formed
         :return:
+        checked
         """
 
         # We add a lateral root element called "nodule" on the mother element:
@@ -2384,11 +1968,8 @@ class RootGrowthModel:
         nodule.length = mother_element.radius
         nodule.radius = mother_element.radius
         nodule.original_radius = nodule.radius
-        dict = TODO(g, element=nodule, radius=nodule.radius,
-                                                                       length=nodule.length)
-        nodule.external_surface = dict['external_surface']
-        nodule.volume = dict['volume']
-        nodule.struct_mass = nodule.volume * param.root_tissue_density * param.struct_mass_C_content
+        nodule.volume = self.volume_from_radius_and_length(nodule, nodule.radius, nodule.length)
+        nodule.struct_mass = nodule.volume * self.root_tissue_density * self.struct_mass_C_content
 
         # print("Nodule", nodule.index(), "has been formed!")
 
@@ -2502,7 +2083,7 @@ class RootGrowthModel:
         :param identical_properties: if True, the main properties of the child will be identical to those of the mother
         :param nil_properties: if True, the main properties of the child will be 0
         :return: the new child element
-
+        Checked
         """
 
         # TODO FOR TRISTAN: When working with a dynamic root structure, you will need to specify in this function
@@ -2511,7 +2092,6 @@ class RootGrowthModel:
 
         # If nil_properties = True, then we set most of the properties of the new element to 0:
         if nil_properties:
-
             new_child = mother_element.add_child(edge_type=edge_type,
                                                  # Characteristics:
                                                  # -----------------
@@ -2535,7 +2115,6 @@ class RootGrowthModel:
                                                  potential_radius=radius,
                                                  initial_length=0.,
                                                  initial_radius=radius,
-                                                 external_surface=0.,
                                                  volume=0.,
                                                  dist_to_ramif=0.,
                                                  distance_from_tip=0.,
@@ -2547,26 +2126,9 @@ class RootGrowthModel:
                                                  struct_mass=0.,
                                                  initial_struct_mass=0.,
                                                  C_hexose_root=0.,
-                                                 C_hexose_reserve=0.,
-                                                 C_hexose_soil=0.,
-                                                 Cs_mucilage_soil=0.,
-                                                 Cs_cells_soil=0.,
-                                                 C_sucrose_root=0.,
-                                                 Deficit_sucrose_root=0.,
-                                                 Deficit_hexose_root=0.,
-                                                 Deficit_hexose_reserve=0.,
-                                                 Deficit_hexose_soil=0.,
-                                                 Deficit_mucilage_soil=0.,
-                                                 Deficit_cells_soil=0.,
-                                                 Deficit_sucrose_root_rate=0.,
-                                                 Deficit_hexose_root_rate=0.,
-                                                 Deficit_hexose_reserve_rate=0.,
-                                                 Deficit_hexose_soil_rate=0.,
-                                                 Deficit_mucilage_soil_rate=0.,
-                                                 Deficit_cells_soil_rate=0.,
                                                  # Root hairs:
                                                  # ------------
-                                                 root_hair_radius=param.root_hair_radius,
+                                                 root_hair_radius=self.root_hair_radius,
                                                  root_hair_length=0.,
                                                  actual_length_with_hairs=0.,
                                                  living_root_hairs_number=0.,
@@ -2577,42 +2139,23 @@ class RootGrowthModel:
                                                  actual_time_since_root_hairs_emergence_stopped=0.,
                                                  thermal_time_since_root_hairs_emergence_stopped=0.,
                                                  all_root_hairs_formed=False,
-                                                 root_hairs_lifespan=param.root_hairs_lifespan,
-                                                 root_hairs_external_surface=0.,
-                                                 living_root_hairs_external_surface=0.,
-                                                 root_hairs_volume=0.,
+                                                 root_hairs_lifespan=self.root_hairs_lifespan,
                                                  root_hairs_struct_mass=0.,
                                                  root_hairs_struct_mass_produced=0.,
                                                  initial_living_root_hairs_struct_mass=0.,
                                                  living_root_hairs_struct_mass=0.,
                                                  # Fluxes:
                                                  # --------
-                                                 resp_maintenance=0.,
                                                  resp_growth=0.,
                                                  struct_mass_produced=0.,
                                                  hexose_growth_demand=0.,
                                                  hexose_consumption_by_growth=0.,
                                                  hexose_consumption_by_growth_rate=0.,
                                                  hexose_possibly_required_for_elongation=0.,
-                                                 hexose_production_from_phloem=0.,
-                                                 sucrose_loading_in_phloem=0.,
-                                                 hexose_mobilization_from_reserve=0.,
-                                                 hexose_immobilization_as_reserve=0.,
-                                                 hexose_exudation=0.,
-                                                 hexose_uptake_from_soil=0.,
-                                                 phloem_hexose_exudation=0.,
-                                                 phloem_hexose_uptake_from_soil=0.,
-                                                 mucilage_secretion=0.,
-                                                 cells_release=0.,
-                                                 total_net_rhizodeposition=0.,
-                                                 hexose_degradation=0.,
-                                                 mucilage_degradation=0.,
-                                                 cells_degradation=0.,
-                                                 specific_net_exudation=0.,
                                                  # Time indications:
                                                  # ------------------
-                                                 growth_duration=param.GDs * (2 * radius) ** 2,
-                                                 life_duration=param.LDs * 2. * radius * param.root_tissue_density,
+                                                 growth_duration=self.GDs * (2 * radius) ** 2,
+                                                 life_duration=self.LDs * 2. * radius * self.root_tissue_density,
                                                  actual_time_since_primordium_formation=0.,
                                                  actual_time_since_emergence=0.,
                                                  actual_time_since_cells_formation=0.,
@@ -2626,10 +2169,10 @@ class RootGrowthModel:
                                                  thermal_time_since_growth_stopped=0.,
                                                  thermal_time_since_death=0.
                                                  )
+            return new_child
 
         # Otherwise, if identical_properties=True, then we copy most of the properties of the mother element in the new element:
         elif identical_properties:
-
             new_child = mother_element.add_child(edge_type=edge_type,
                                                  # Characteristics:
                                                  # -----------------
@@ -2653,7 +2196,6 @@ class RootGrowthModel:
                                                  potential_radius=mother_element.potential_radius,
                                                  initial_length=length,
                                                  initial_radius=mother_element.radius,
-                                                 external_surface=0.,
                                                  volume=0.,
                                                  dist_to_ramif=mother_element.dist_to_ramif,
                                                  distance_from_tip=mother_element.distance_from_tip,
@@ -2665,24 +2207,6 @@ class RootGrowthModel:
                                                  struct_mass=mother_element.struct_mass,
                                                  initial_struct_mass=mother_element.initial_struct_mass,
                                                  C_hexose_root=mother_element.C_hexose_root,
-                                                 C_hexose_reserve=mother_element.C_hexose_reserve,
-                                                 C_hexose_soil=mother_element.C_hexose_soil,
-                                                 Cs_mucilage_soil=mother_element.Cs_mucilage_soil,
-                                                 Cs_cells_soil=mother_element.Cs_cells_soil,
-                                                 C_sucrose_root=mother_element.C_sucrose_root,
-                                                 Deficit_sucrose_root=mother_element.Deficit_sucrose_root,
-                                                 Deficit_hexose_root=mother_element.Deficit_hexose_root,
-                                                 Deficit_hexose_reserve=mother_element.Deficit_hexose_reserve,
-                                                 Deficit_hexose_soil=mother_element.Deficit_hexose_soil,
-                                                 Deficit_mucilage_soil=mother_element.Deficit_mucilage_soil,
-                                                 Deficit_cells_soil=mother_element.Deficit_cells_soil,
-                                                 Deficit_sucrose_root_rate=mother_element.Deficit_sucrose_root_rate,
-                                                 Deficit_hexose_root_rate=mother_element.Deficit_hexose_root_rate,
-                                                 Deficit_hexose_reserve_rate=mother_element.Deficit_hexose_reserve_rate,
-                                                 Deficit_hexose_soil_rate=mother_element.Deficit_hexose_soil_rate,
-                                                 Deficit_mucilage_soil_rate=mother_element.Deficit_mucilage_soil_rate,
-                                                 Deficit_cells_soil_rate=mother_element.Deficit_cells_soil_rate,
-
                                                  # Root hairs:
                                                  # ------------
                                                  root_hair_radius=mother_element.root_hair_radius,
@@ -2697,37 +2221,18 @@ class RootGrowthModel:
                                                  thermal_time_since_root_hairs_emergence_stopped=mother_element.thermal_time_since_root_hairs_emergence_stopped,
                                                  all_root_hairs_formed=mother_element.all_root_hairs_formed,
                                                  root_hairs_lifespan=mother_element.root_hairs_lifespan,
-                                                 root_hairs_external_surface=mother_element.root_hairs_external_surface,
-                                                 living_root_hairs_external_surface=mother_element.living_root_hairs_external_surface,
-                                                 root_hairs_volume=mother_element.root_hairs_volume,
                                                  root_hairs_struct_mass=mother_element.root_hairs_struct_mass,
                                                  root_hairs_struct_mass_produced=mother_element.root_hairs_struct_mass_produced,
                                                  living_root_hairs_struct_mass=mother_element.living_root_hairs_struct_mass,
                                                  initial_living_root_hairs_struct_mass=mother_element.initial_living_root_hairs_struct_mass,
                                                  # Fluxes:
                                                  # -------
-                                                 resp_maintenance=mother_element.resp_maintenance,
                                                  resp_growth=mother_element.resp_growth,
                                                  struct_mass_produced=mother_element.struct_mass_produced,
                                                  hexose_growth_demand=mother_element.hexose_growth_demand,
                                                  hexose_possibly_required_for_elongation=mother_element.hexose_possibly_required_for_elongation,
-                                                 hexose_production_from_phloem=mother_element.hexose_production_from_phloem,
-                                                 sucrose_loading_in_phloem=mother_element.sucrose_loading_in_phloem,
-                                                 hexose_mobilization_from_reserve=mother_element.hexose_mobilization_from_reserve,
-                                                 hexose_immobilization_as_reserve=mother_element.hexose_immobilization_as_reserve,
-                                                 hexose_exudation=mother_element.hexose_exudation,
-                                                 hexose_uptake_from_soil=mother_element.hexose_uptake_from_soil,
-                                                 phloem_hexose_exudation=mother_element.phloem_hexose_exudation,
-                                                 phloem_hexose_uptake_from_soil=mother_element.phloem_hexose_uptake_from_soil,
-                                                 mucilage_secretion=mother_element.mucilage_secretion,
-                                                 cells_release=mother_element.cells_release,
-                                                 total_net_rhizodeposition=mother_element.total_net_rhizodeposition,
-                                                 hexose_degradation=mother_element.hexose_degradation,
-                                                 mucilage_degradation=mother_element.mucilage_degradation,
-                                                 cells_degradation=mother_element.cells_degradation,
                                                  hexose_consumption_by_growth=mother_element.hexose_consumption_by_growth,
                                                  hexose_consumption_by_growth_rate=mother_element.hexose_consumption_by_growth_rate,
-                                                 specific_net_exudation=mother_element.specific_net_exudation,
                                                  # Time indications:
                                                  # ------------------
                                                  growth_duration=mother_element.growth_duration,
@@ -2745,8 +2250,7 @@ class RootGrowthModel:
                                                  thermal_time_since_growth_stopped=mother_element.thermal_time_since_growth_stopped,
                                                  thermal_time_since_death=mother_element.thermal_time_since_death
                                                  )
-
-        return new_child
+            return new_child
 
     def volume_from_radius_and_length(self, element, radius: float, length: float):
         """
@@ -2794,35 +2298,35 @@ class RootGrowthModel:
             random_result = np.random.random_sample()
             # CASE 1: The apex corresponds to a seminal or adventitious root
             if root_order == 1:
-                growth_duration = param.GD_highest
+                growth_duration = self.GD_highest
             else:
                 # If we select random zoning, then the growth duration will be drawn from a range, for three different cases
                 # (from most likely to less likely):
-                if param.GD_by_frequency:
+                if self.GD_by_frequency:
                     # CASE 2: Most likely, the growth duration will be low for a lateral root
-                    if random_result < param.GD_prob_low:
+                    if random_result < self.GD_prob_low:
                         # We draw a random growth-duration in the lower range:
-                        growth_duration = np.random.uniform(0., param.GD_low)
+                        growth_duration = np.random.uniform(0., self.GD_low)
                     # CASE 3: Occasionnaly, the growth duration may be a bit higher for a lateral root
-                    if random_result < param.GD_prob_medium:
+                    if random_result < self.GD_prob_medium:
                         # We draw a random growth-duration in the lower range:
-                        growth_duration = np.random.uniform(param.GD_low, param.GD_medium)
+                        growth_duration = np.random.uniform(self.GD_low, self.GD_medium)
                     # CASE 3: Occasionnaly, the growth duration may be a bit higher for a lateral root
                     else:
                         # We draw a random growth-duration in the lower range:
-                        growth_duration = np.random.uniform(param.GD_medium, param.GD_high)
+                        growth_duration = np.random.uniform(self.GD_medium, self.GD_high)
                 # If random zoning has not been selected, a constant duration is selected for each probabibility range:
                 else:
                     # CASE 2: Most likely, the growth duration will be low for a lateral root
-                    if random_result < param.GD_prob_low:
-                        growth_duration = param.GD_low
+                    if random_result < self.GD_prob_low:
+                        growth_duration = self.GD_low
                     # CASE 3: Occasionally, the growth duration of the lateral root may be significantly higher
-                    elif random_result < param.GD_prob_medium:
-                        growth_duration = param.GD_medium
+                    elif random_result < self.GD_prob_medium:
+                        growth_duration = self.GD_medium
                     # CASE 4: Exceptionally, the growth duration of the lateral root is as high as that from a seminal root,
                     # as long as the radius of the lateral root is high enough (i.e. twice as high as the minimal possible radius)
-                    elif radius > 2 * param.Dmin / 2.:
-                        growth_duration = param.GD_highest
+                    elif radius > 2 * self.Dmin / 2.:
+                        growth_duration = self.GD_highest
 
         # We return a modified version of the MTG "g" with the updated property "distance_from_tip":
         return growth_duration

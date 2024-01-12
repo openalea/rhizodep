@@ -469,6 +469,195 @@ class RootAnatomy:
 
         return g
 
+    # Root hairs dynamics:
+    # --------------------
+    def root_hairs_dynamics(self, g, time_step_in_seconds=1. * (60. * 60. * 24.),
+                            soil_temperature_in_Celsius=20, printing_warnings=False):
+        """
+        This function computes the evolution of the density and average length of root hairs along each root,
+        and specifies which hairs are alive or dead.
+        :param g: the root MTG to be considered
+        :param time_step_in_seconds: the time step over which growth is considered
+        :param soil_temperature_in_Celsius: the same, homogeneous temperature experienced by the whole root system
+        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
+        :return:
+        """
+
+        # TODO FOR TRISTAN: Consider adding a limitation of growth for root hairs associated to the availability of N in the root.
+        #  In a second step, consider playing on the density / max. length of root hairs depending on the availability of N in the soil (if relevant)?
+
+        # We cover all the vertices in the MTG:
+        for vid in g.vertices_iter(scale=1):
+            # n represents the vertex:
+            n = g.node(vid)
+
+            # First, we ensure that the element has a positive length:
+            if n.length <= 0:
+                continue
+
+            # We also exclude nodules and dead elements from this computation:
+            if n.type == "Just_dead" or n.type == "Dead" or n.type == "Nodule":
+                continue
+
+            # # TODO: Check the consequences of avoiding apex in root hairs dynamics!
+            # # WE ALSO AVOID ROOT APICES - EVEN IF IN THEORY ROOT HAIRS MAY ALSO APPEAR ON THEM:
+            # if n.label == "Apex":
+            #     continue
+            # # Even if root hairs should have already emerge on that root apex, they will appear in the next step (or in a few steps)
+            # # when the element becomes a segment.
+
+            # We calculate the equivalent of a thermal time for the current time step:
+            temperature_time_adjustment = self.temperature_modification()
+            elapsed_thermal_time = time_step_in_seconds * temperature_time_adjustment
+
+            # We keep in memory the initial total mass of root hairs (possibly including dead hairs):
+            initial_root_hairs_struct_mass = n.root_hairs_struct_mass
+
+            # We calculate the total number of (newly formed) root hairs (if any) and update their age:
+            # ------------------------------------------------------------------------------------------
+            # CASE 1 - If the current element is completely included within the actual growing zone of the root at the root
+            # tip, the root hairs cannot have formed yet:
+            if n.distance_from_tip <= self.growing_zone_factor * n.radius:
+                # We stop here with the calculations and move to the next element:
+                continue
+            # CASE 2 - If all root hairs have already been formed:
+            if n.all_root_hairs_formed:
+                # Then we simply increase the time since root hairs emergence started:
+                n.actual_time_since_root_hairs_emergence_started += time_step_in_seconds
+                n.thermal_time_since_root_hairs_emergence_started += elapsed_thermal_time
+                n.actual_time_since_root_hairs_emergence_stopped += time_step_in_seconds
+                n.thermal_time_since_root_hairs_emergence_stopped += elapsed_thermal_time
+            # CASE 3 - If the theoretical growing zone limit is located somewhere within the root element:
+            elif n.distance_from_tip - n.length < self.growing_zone_factor * n.radius:
+                # We first record the previous length of the root hair zone within the element:
+                initial_length_with_hairs = n.actual_length_with_hairs
+                # Then the new length of the root hair zone is calculated:
+                n.actual_length_with_hairs = n.distance_from_tip - self.growing_zone_factor * n.radius
+                net_increase_in_root_hairs_length = n.actual_length_with_hairs - initial_length_with_hairs
+                # The corresponding number of root hairs is calculated:
+                n.total_root_hairs_number = self.root_hairs_density * n.radius * n.actual_length_with_hairs
+                # The time since root hair formation started is then calculated, using the recent increase in the length
+                # of the current root hair zone and the elongation rate of the corresponding root tip. The latter is
+                # calculated using the difference between the new distance_from_tip of the element and the previous one:
+                elongation_rate_in_actual_time = (
+                                                         n.distance_from_tip - n.former_distance_from_tip) / time_step_in_seconds
+                elongation_rate_in_thermal_time = (
+                                                          n.distance_from_tip - n.former_distance_from_tip) / elapsed_thermal_time
+                # SUBCASE 3.1 - If root hairs had not emerged at the previous time step:
+                if elongation_rate_in_actual_time > 0. and initial_length_with_hairs <= 0.:
+                    # We increase the time since root hairs emerged by only the fraction of the time step corresponding to the growth of hairs:
+                    n.actual_time_since_root_hairs_emergence_started += \
+                        time_step_in_seconds - net_increase_in_root_hairs_length / elongation_rate_in_actual_time
+                    n.thermal_time_since_root_hairs_emergence_started += \
+                        elapsed_thermal_time - net_increase_in_root_hairs_length / elongation_rate_in_thermal_time
+                # SUBCASE 3.2 - the hairs had already started to grow:
+                else:
+                    # Consequently, the full time elapsed during this time step can be added to the age:
+                    n.actual_time_since_root_hairs_emergence_started += time_step_in_seconds
+                    n.thermal_time_since_root_hairs_emergence_started += elapsed_thermal_time
+            # CASE 4 - the element is now "full" with root hairs as the limit of root elongation is located further down:
+            else:
+                # The actual time since root hairs emergence started is first increased:
+                n.actual_time_since_root_hairs_emergence_started += time_step_in_seconds
+                n.thermal_time_since_root_hairs_emergence_started += elapsed_thermal_time
+                # We then record the previous length of the root hair zone within the root element:
+                initial_length_with_hairs = n.actual_length_with_hairs
+                # And the new length of the root hair zone is necessarily the full length of the root element:
+                n.actual_length_with_hairs = n.length
+                net_increase_in_root_hairs_length = n.actual_length_with_hairs - initial_length_with_hairs
+                # The total number of hairs is defined according to the radius and total length of the element:
+                n.total_root_hairs_number = self.root_hairs_density * n.radius * n.length
+                # The elongation of the corresponding root tip is calculated as the difference between the new
+                # distance_from_tip of the element and the previous one:
+                elongation_rate_in_actual_time = (
+                                                         n.distance_from_tip - n.former_distance_from_tip) / time_step_in_seconds
+                elongation_rate_in_thermal_time = (
+                                                          n.distance_from_tip - n.former_distance_from_tip) / elapsed_thermal_time
+                # The actual time since root hairs emergence has stopped is then calculated:
+                if elongation_rate_in_actual_time > 0.:
+                    n.actual_time_since_root_hairs_emergence_stopped += \
+                        time_step_in_seconds - net_increase_in_root_hairs_length / elongation_rate_in_actual_time
+                    n.thermal_time_since_root_hairs_emergence_stopped += \
+                        elapsed_thermal_time - net_increase_in_root_hairs_length / elongation_rate_in_thermal_time
+                else:
+                    n.actual_time_since_root_hairs_emergence_stopped += time_step_in_seconds
+                    n.thermal_time_since_root_hairs_emergence_stopped += elapsed_thermal_time
+                # At this stage, all root hairs that could be formed have been formed, so we record this:
+                n.all_root_hairs_formed = True
+
+            # We now calculate the number of living and dead root hairs:
+            # -----------------------------------------------------------
+            # Root hairs are dying when the time since they emerged is higher than their lifespan.
+            # If the time since root hairs emergence started is lower than the lifespan,
+            # no root hair should be dead:
+            if n.thermal_time_since_root_hairs_emergence_started <= n.root_hairs_lifespan:
+                n.dead_root_hairs_number = 0.
+            # Otherwise, if the time since root hairs emergence stopped is higher than the lifespan:
+            elif n.thermal_time_since_root_hairs_emergence_stopped > n.root_hairs_lifespan:
+                # Then all the root hairs of the root element must now be dead:
+                n.dead_root_hairs_number = n.total_root_hairs_number
+            # In the intermediate case, there are currently both dead and living root hairs on the root element:
+            else:
+                # We assume that there is a linear decrease of root hair age between the first hair that has emerged
+                # and the last one that has emerged:
+                time_since_first_death = n.thermal_time_since_root_hairs_emergence_started - n.root_hairs_lifespan
+                dead_fraction = time_since_first_death / (n.thermal_time_since_root_hairs_emergence_started
+                                                          - n.thermal_time_since_root_hairs_emergence_stopped)
+                n.dead_root_hairs_number = n.total_root_hairs_number * dead_fraction
+
+            # In all cases, the number of the living root hairs is then calculated by difference with the total hair number:
+            n.living_root_hairs_number = n.total_root_hairs_number - n.dead_root_hairs_number
+
+            # We calculate the new average root hairs length, if needed:
+            # ----------------------------------------------------------
+            # If the root hairs had not reached their maximal length:
+            if n.root_hair_length < self.root_hair_max_length:
+                # The new potential root hairs length is calculated according to the elongation rate,
+                # corrected by temperature and modulated by the concentration of hexose (in the same way as for root
+                # elongation) available in the root hair zone on the root element:
+                new_length = n.root_hair_length + self.root_hairs_elongation_rate * self.root_hair_radius \
+                             * n.C_hexose_root * (n.actual_length_with_hairs / n.length) \
+                             / (self.Km_elongation + n.C_hexose_root) * elapsed_thermal_time
+                # If the new calculated length is higher than the maximal length:
+                if new_length > self.root_hair_max_length:
+                    # We set the root hairs length to the maximal length:
+                    n.root_hair_length = self.root_hair_max_length
+                else:
+                    # Otherwise, we record the new calculated length:
+                    n.root_hair_length = new_length
+
+            # We finally calculate the total external surface (m2), volume (m3) and mass (g) of root hairs:
+            # ----------------------------------------------------------------------------------------------
+            # In the calculation of surface, we consider the root hair to be a cylinder, and include the lateral section,
+            # but exclude the section of the cylinder at the tip:
+            n.root_hairs_external_surface = ((self.root_hair_radius * 2 * pi) * n.root_hair_length) \
+                                            * n.total_root_hairs_number
+            n.root_hairs_volume = (
+                                              self.root_hair_radius ** 2 * pi) * n.root_hair_length * n.total_root_hairs_number
+            n.root_hairs_struct_mass = n.root_hairs_volume * self.root_tissue_density
+            if n.total_root_hairs_number > 0.:
+                n.living_root_hairs_external_surface = n.root_hairs_external_surface * n.living_root_hairs_number \
+                                                       / n.total_root_hairs_number
+                n.living_root_hairs_struct_mass = n.root_hairs_struct_mass * n.living_root_hairs_number \
+                                                  / n.total_root_hairs_number
+            else:
+                n.living_root_hairs_external_surface = 0.
+                n.living_root_hairs_struct_mass = 0.
+
+            # We calculate the mass of hairs that has been effectively produced, including from root hairs that may have died since then:
+            # ----------------------------------------------------------------------------------------------------------------------------
+            # We calculate the new production as the difference between initial and final mass:
+            n.root_hairs_struct_mass_produced = n.root_hairs_struct_mass - initial_root_hairs_struct_mass
+
+            # We add the cost of producing the new living root hairs (if any) to the hexose consumption by growth:
+            hexose_consumption = n.root_hairs_struct_mass_produced * self.struct_mass_C_content / self.yield_growth / 6.
+            n.hexose_consumption_by_growth += hexose_consumption
+            n.hexose_consumption_by_growth_rate += hexose_consumption / time_step_in_seconds
+            n.resp_growth += hexose_consumption * 6. * (1 - self.yield_growth)
+
+        return
+
+
     # Defining the distance of a vertex from the tip for the whole root system:
     # -------------------------------------------------------------------------
 
@@ -482,3 +671,4 @@ class RootAnatomy:
         # We modifiy root hairs characteristics according to their specific dynamics:
         self.root_hairs_dynamics(soil_temperature_in_Celsius=soil_temperature,
                                   printing_warnings=printing_warnings)
+
