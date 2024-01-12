@@ -63,19 +63,8 @@ from functools import partial
 
 import rhizodep.parameters as param
 
-@dataclass
-class Initialization:
-    pass
 
 @dataclass
-class ProcessCarbon:
-    pass
-
-@dataclass
-class UpdateCarbon:
-    pass
-
-
 class RootCarbonModel:
     def __init__(self, g, time_step_in_seconds):
         self.g = g

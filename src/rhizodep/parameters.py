@@ -565,7 +565,7 @@ Km_cells_degradation = Km_hexose_degradation
 
 # Proportionality factor between the radius and the length of the root apical zone in which C can sustain root elongation:
 # #-----------------------------------------------------------------------------------------------------------------------
-growing_zone_factor = 8 *2.  # m m-1
+growing_zone_factor = 8 * 2.  # m m-1
 # => According to illustrations by Kozlova et al. (2020), the length of the growing zone corresponding to the root cap,
 # meristem and elongation zones is about 8 times the diameter of the tip.
 
