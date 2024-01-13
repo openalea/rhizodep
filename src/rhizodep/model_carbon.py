@@ -91,7 +91,7 @@ class RootCarbonModel:
     distance_from_tip: float = field(default=3.e-3, metadata=dict(unit="m", unit_comment="", description="Example distance from tip", value_comment="", references="", variable_type="input", by="model_growth", state_variable_type=""))
 
     # FROM SHOOT MODEL
-    sucrose_input_rate: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", value_comment="", references="", variable_type="input", by="model_shoot", state_variable_type=""))
+    sucrose_input_rate: float = field(default=1e-6, metadata=dict(unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", value_comment="", references="", variable_type="input", by="model_shoot", state_variable_type=""))
 
     # FROM ANATOMY MODEL
     root_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface between soil and symplasmic parenchyma.", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="extensive"))

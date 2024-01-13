@@ -58,7 +58,7 @@ class Model(ModelWrapper):
     def run(self):
         # Update environment boundary conditions
         # Update soil state
-        self.soil.run_update_patches()
+        self.soil.run_exchanges_and_balance()
 
         # Compute state variations for water and then nitrogen
         self.root_carbon.run_exchanges_and_balance()

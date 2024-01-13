@@ -30,7 +30,7 @@ class SoilModel:
     # We create a class containing the system of differential equations to be solved with a solver:
     # ----------------------------------------------------------------------------------------------
 
-    def exchanges_and_balance(self):
+    def run_exchanges_and_balance(self):
         pass
 
     def hexose_degradation_rate(self, n, soil_temperature_in_Celsius=20, printing_warnings=False):
