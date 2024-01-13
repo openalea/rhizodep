@@ -62,8 +62,6 @@ import inspect as ins
 from functools import partial
 from math import pi
 
-import rhizodep.parameters as param
-
 
 @dataclass
 class RootCarbonModel:
@@ -87,6 +85,7 @@ class RootCarbonModel:
     radius: float = field(default=3.5e-4, metadata=dict(unit="m", unit_comment="", description="Example root segment radius", value_comment="", references="", variable_type="input", by="model_growth", state_variable_type=""))
     length: float = field(default=3.e-3, metadata=dict(unit="m", unit_comment="", description="Example root segment length", value_comment="", references="", variable_type="input", by="model_growth", state_variable_type=""))
     struct_mass: float = field(default=1.35e-4, metadata=dict(unit="g", unit_comment="", description="Example root segment structural mass", value_comment="", references="", variable_type="input", by="model_growth", state_variable_type=""))
+    initial_struct_mass: float = field(default=1.35e-4, metadata=dict(unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", value_comment="", references="", variable_type="input", by="model_growth", state_variable_type=""))
     living_root_hairs_struct_mass: float = field(default=0., metadata=dict(unit="g", unit_comment="", description="Example root segment living root hairs structural mass", value_comment="", references="", variable_type="input", by="model_growth", state_variable_type=""))
     hexose_consumption_by_growth: float = field(default=0., metadata=dict(unit="g", unit_comment="", description="Hexose consumption by growth is coupled to a root growth model", value_comment="", references="", variable_type="input", by="model_growth", state_variable_type=""))
     distance_from_tip: float = field(default=3.e-3, metadata=dict(unit="m", unit_comment="", description="Example distance from tip", value_comment="", references="", variable_type="input", by="model_growth", state_variable_type=""))
@@ -310,7 +309,7 @@ class RootCarbonModel:
         """
         Groups and order carbon exchange processes and balance for the provided time step
         """
-        # TODO How to get old structural mass?
+        # TODO print(self.struct_mass, self.initial_struct_mass to check is they are indeed different here)
         self.add_new_segments_and_update_concentrations()
 
         self.props.update(self.prc_resolution())
