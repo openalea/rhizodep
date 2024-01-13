@@ -661,7 +661,7 @@ class RootAnatomy:
     # Defining the distance of a vertex from the tip for the whole root system:
     # -------------------------------------------------------------------------
 
-    def update_local_anatomy(self):
+    def run_anatomy_update(self):
         # We update the surfaces and the volume for each root element in each root axis:
         self.update_surfaces_and_volumes()
 

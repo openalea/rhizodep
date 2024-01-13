@@ -305,7 +305,7 @@ class RootCarbonModel:
                 # link mtg dict to self dict
                 setattr(self, inpt, self.props[inpt])
 
-    def exchanges_and_balance(self):
+    def run_exchanges_and_balance(self):
         """
         Groups and order carbon exchange processes and balance for the provided time step
         """

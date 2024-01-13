@@ -126,6 +126,8 @@ class RootGrowthModel:
         :return:
         """
         self.g = field(default=self.initiate_mtg(), metadata=dict(description="the root MTG"))
+        self.props = self.g.properties()
+        self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_step_in_seconds = time_step_in_seconds
 
         # We define the list of apices for all vertices labelled as "Apex" or "Segment", from the tip to the base:
@@ -426,9 +428,27 @@ class RootGrowthModel:
 
         return g
 
+    def post_coupling_init(self):
+        self.reinitializing_growth_variables()
+        self.check_if_coupled()
+
+    def check_if_coupled(self):
+        # For all expected input...
+        input_variables = [name for name, value in self.__dataclass_fields__ if value.metadata["variable_type"] == "input"]
+        for inpt in input_variables:
+            # If variable type has not gone to dictionary as it is part of the coupling process
+            # we use provided default value to create the dictionnary used in the rest of the model
+            if type(getattr(self, inpt)) != dict:
+                if inpt not in self.props.keys():
+                    self.props.setdefault(inpt, {})
+                # set default in mtg
+                self.props[inpt].update({key: getattr(self, inpt) for key in self.vertices})
+                # link mtg dict to self dict
+                setattr(self, inpt, self.props[inpt])
+
     # ACTUAL CALLABLE SCHEDULING LOOP TODO: metadata?
     # -------------------------------
-    def time_step_growth(self):
+    def run_time_step_growth(self):
         """
         Method to run the initiated model on defined time step.
         """
