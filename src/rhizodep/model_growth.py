@@ -10,8 +10,6 @@
     :license: see LICENSE for details.
 """
 
-# TODO : report / split TODO from model_carbon
-
 import os
 import numpy as np
 import pandas as pd
@@ -34,18 +32,17 @@ class RootGrowthModel:
     base_commit :
         92a6f7ad927ffa0acf01aef645f9297a4531878c
     """
+    # --- INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
+    # FROM SOIL MODEL
+    soil_temperature_in_Celsius: float = field(default=15, metadata=dict(unit="°C", unit_comment="", description="soil temperature in contact with roots", value_comment="", references="", variable_type="input", by="model_soil"))
 
-    # Inputs
-    soil_temperature_in_Celsius: float = 20
+    # FROM ANATOMY MODEL
     root_tissue_density: float = field(default=0.10 * 1e6, metadata=dict(unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", value_comment="", references="", variable_type="input", by="model_anatomy"))
 
-    # Local state variables
+    # --- INITIALIZE MODEL STATE VARIABLES ---
     volume: float = field(default=1e-7, metadata=dict(unit="m3", unit_comment="", description="Initial volume of the collar element", value_comment="", references="", variable_type="input", by="model_growth"))
 
-    # Globals
-    global_sucrose_deficit: float = 0
-
-    # Model parameters
+    # --- INITIALIZES MODEL PARAMETERS ---
     # Segment initialization
     D_ini: float = field(default=0.8e-3, metadata=dict(unit="m", unit_comment="", description="Initial tip diameter of the primary root", value_comment="", references="", variable_type="parameter", by="model_growth"))
     root_hair_radius: float = field(default=12 * 1e-6 /2., metadata=dict(unit="m", unit_comment="", description="Average radius of root hair", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair diameter is relatively constant for different genotypes of wheat and barley, i.e. 12 microns", variable_type="parameter", by="model_growth"))
@@ -59,7 +56,6 @@ class RootGrowthModel:
     CVDD: float = field(default=0.2, metadata=dict(unit="adim", unit_comment="", description="Relative variation of the daughter root diameter", value_comment="", references="", variable_type="parameter", by="model_growth"))
     starting_time_for_adventitious_roots_emergence: float = field(default=(60. * 60. * 24.) * 9., metadata=dict(unit="s", unit_comment="time equivalent at temperature of T_ref", description="Time when adventitious roots start to successively emerge", value_comment="", references="", variable_type="parameter", by="model_growth"))
     D_adv_to_D_ini_ratio: float = field(default=0.8, metadata=dict(unit="adim", unit_comment="", description="Proportionality coefficient between the tip diameter of an adventitious root and D_ini ", value_comment="", references="", variable_type="parameter", by="model_growth"))
-
 
     # Temperature
     process_at_T_ref: float = 1.
@@ -103,13 +99,12 @@ class RootGrowthModel:
     GD_prob_low: float = field(default=0.50, metadata=dict(unit="adim", unit_comment="", description="Probability for low growth duration", value_comment="", references="Estimated from the shortest lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", variable_type="parameter", by="model_growth"))
     GD_prob_medium: float = field(default=0.85, metadata=dict(unit="adim", unit_comment="Probability for medium growth duration", description="Coefficient of growth duration", value_comment="", references="Estimated from the medium lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", variable_type="parameter", by="model_growth"))
 
-    # Simulation parameters
+    # --- USER ORIENTED PARAMETERS FOR SIMULATION ---
     # initiate MTG
     random: bool = True
     ArchiSimple: bool = True
     initial_segment_length: float = 1e-3
     initial_apex_length: float = 0.
-    #initial_C_sucrose_root: float = 0.
     initial_C_hexose_root: float = 0.
     input_file_path: str = "C:/Users/frees/rhizodep/src/rhizodep/"
     forcing_seminal_roots_events: bool = True
@@ -121,9 +116,6 @@ class RootGrowthModel:
     root_order_limitation: bool = False  # a Boolean expliciting whether lateral roots should be prevented above a certain root order
     root_order_treshold: int = 2  # the root order above which new lateral roots cannot be formed
 
-
-    # INIT METHODS
-    # ------------
     def __init__(self, time_step_in_seconds: int):
         """
         DESCRIPTION
@@ -221,13 +213,13 @@ class RootGrowthModel:
         base_segment.resp_growth = 0.
         base_segment.hexose_growth_demand = 0.
         base_segment.hexose_possibly_required_for_elongation = 0.
-        base_segment.hexose_consumption_by_growth = 0.
+        base_segment.hexose_consumption_by_growth_amount = 0.
 
         # Rates:
         # -------
         base_segment.resp_growth_rate = 0.
         base_segment.hexose_growth_demand_rate = 0.
-        base_segment.hexose_consumption_by_growth_rate = 0.
+        base_segment.hexose_consumption_by_growth = 0.
 
         # Time indications:
         # ------------------
@@ -437,6 +429,9 @@ class RootGrowthModel:
     # ACTUAL CALLABLE SCHEDULING LOOP TODO: metadata?
     # -------------------------------
     def time_step_growth(self):
+        """
+        Method to run the initiated model on defined time step.
+        """
         # We reset to 0 all growth-associated C costs and initialize the initial dimensions or masses:
         self.reinitializing_growth_variables()
 
@@ -474,8 +469,8 @@ class RootGrowthModel:
             n = self.g.node(vid)
 
             # We set to 0 the growth-related variables:
+            n.hexose_consumption_by_growth_amount = 0.
             n.hexose_consumption_by_growth = 0.
-            n.hexose_consumption_by_growth_rate = 0.
             n.hexose_possibly_required_for_elongation = 0.
             n.resp_growth = 0.
             n.struct_mass_produced = 0.
@@ -1244,8 +1239,8 @@ class RootGrowthModel:
                                                                    * list_of_elongation_supporting_elements_hexose[
                                                                        i] / hexose_possibly_required_for_elongation
                         # The amount of hexose used for growth in this element is increased:
-                        supplying_element.hexose_consumption_by_growth += hexose_actual_contribution_to_elongation
-                        supplying_element.hexose_consumption_by_growth_rate += hexose_actual_contribution_to_elongation / self.time_step_in_seconds
+                        supplying_element.hexose_consumption_by_growth_amount += hexose_actual_contribution_to_elongation
+                        supplying_element.hexose_consumption_by_growth += hexose_actual_contribution_to_elongation / self.time_step_in_seconds
                         # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
                         supplying_element.resp_growth += hexose_actual_contribution_to_elongation * (1 - self.yield_growth) * 6.
 
@@ -1298,9 +1293,9 @@ class RootGrowthModel:
                 fraction_of_available_hexose_in_the_element = \
                     (n.C_hexose_root * n.initial_struct_mass) / hexose_available_for_thickening
                 # The amount of hexose used for growth in this element is increased:
-                n.hexose_consumption_by_growth += \
+                n.hexose_consumption_by_growth_amount += \
                     (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
-                n.hexose_consumption_by_growth_rate += \
+                n.hexose_consumption_by_growth += \
                     (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) / self.time_step_in_seconds
                 # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
                 n.resp_growth += \
@@ -1312,9 +1307,9 @@ class RootGrowthModel:
                     fraction_of_available_hexose_in_the_element = \
                         (parent.C_hexose_root * parent.initial_struct_mass) / hexose_available_for_thickening
                     # The amount of hexose used for growth in this element is increased:
-                    parent.hexose_consumption_by_growth += \
+                    parent.hexose_consumption_by_growth_amount += \
                         (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element)
-                    parent.hexose_consumption_by_growth_rate += \
+                    parent.hexose_consumption_by_growth += \
                         (
                                 hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) / self.time_step_in_seconds
                     # And the amount of hexose that has been used for growth respiration is calculated and transformed into moles of CO2:
@@ -1463,8 +1458,8 @@ class RootGrowthModel:
         initial_initial_struct_mass = apex.initial_struct_mass
         initial_initial_living_root_hairs_struct_mass = apex.initial_living_root_hairs_struct_mass
         initial_hexose_growth_demand = apex.hexose_growth_demand
+        initial_hexose_consumption_by_growth_amount = apex.hexose_consumption_by_growth_amount
         initial_hexose_consumption_by_growth = apex.hexose_consumption_by_growth
-        initial_hexose_consumption_by_growth_rate = apex.hexose_consumption_by_growth_rate
         # TODO deficits old = new or * mass fraction when segmentation (Deficits, rates, fluxes)
 
         # We record the type of the apex, as it may correspond to an apex that has stopped (or even died):
@@ -1568,8 +1563,8 @@ class RootGrowthModel:
                 apex.dead_root_hairs_number = initial_dead_root_hairs_number * mass_fraction
                 apex.total_root_hairs_number = initial_total_root_hairs_number * mass_fraction
                 apex.hexose_growth_demand = initial_hexose_growth_demand * mass_fraction
+                apex.hexose_consumption_by_growth_amount = initial_hexose_consumption_by_growth_amount * mass_fraction
                 apex.hexose_consumption_by_growth = initial_hexose_consumption_by_growth * mass_fraction
-                apex.hexose_consumption_by_growth_rate = initial_hexose_consumption_by_growth_rate * mass_fraction
 
                 # CALCULATING THE TIME SINCE ROOT CELLS FORMATION IN THE NEW SEGMENT:
                 # We update the time since root cells have formed, based on the elongation rate and on the principle that
@@ -1676,8 +1671,8 @@ class RootGrowthModel:
             apex.dead_root_hairs_number = initial_dead_root_hairs_number * mass_fraction
             apex.total_root_hairs_number = initial_total_root_hairs_number * mass_fraction
             apex.hexose_growth_demand = initial_hexose_growth_demand * mass_fraction
+            apex.hexose_consumption_by_growth_amount = initial_hexose_consumption_by_growth_amount * mass_fraction
             apex.hexose_consumption_by_growth = initial_hexose_consumption_by_growth * mass_fraction
-            apex.hexose_consumption_by_growth_rate = initial_hexose_consumption_by_growth_rate * mass_fraction
 
             # CALCULATING THE TIME SINCE ROOT CELLS FORMATION IN THE NEW SEGMENT:
             # We update the time since root cells have formed, based on the elongation rate:
@@ -1694,9 +1689,8 @@ class RootGrowthModel:
 
         return new_apex
 
-        # Formation of a root primordium at the apex of the mother root:
-        # ---------------------------------------------------------------
-
+    # Formation of a root primordium at the apex of the mother root:
+    # ---------------------------------------------------------------
     def primordium_formation(self, apex, elongation_rate=0.):
         """
         This function considers the formation of a primordium on a root apex, and, if possible, creates this new element
@@ -2135,8 +2129,8 @@ class RootGrowthModel:
                                                  resp_growth=0.,
                                                  struct_mass_produced=0.,
                                                  hexose_growth_demand=0.,
+                                                 hexose_consumption_by_growth_amount=0.,
                                                  hexose_consumption_by_growth=0.,
-                                                 hexose_consumption_by_growth_rate=0.,
                                                  hexose_possibly_required_for_elongation=0.,
                                                  # Time indications:
                                                  # ------------------
@@ -2217,8 +2211,8 @@ class RootGrowthModel:
                                                  struct_mass_produced=mother_element.struct_mass_produced,
                                                  hexose_growth_demand=mother_element.hexose_growth_demand,
                                                  hexose_possibly_required_for_elongation=mother_element.hexose_possibly_required_for_elongation,
+                                                 hexose_consumption_by_growth_amount=mother_element.hexose_consumption_by_growth_amount,
                                                  hexose_consumption_by_growth=mother_element.hexose_consumption_by_growth,
-                                                 hexose_consumption_by_growth_rate=mother_element.hexose_consumption_by_growth_rate,
                                                  # Time indications:
                                                  # ------------------
                                                  growth_duration=mother_element.growth_duration,

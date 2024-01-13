@@ -211,6 +211,7 @@ resp_maintenance_max = 5e-8
 # => According to Gifford (1995): the total maintenance respiration rate of the whole plant of wheat is about
 # 0.024 gC gC-1 day-1, i.e. 5.28 e-8 assuming that the C to which this rate is related represents 44% of the dry
 # structural biomass.
+
 # Temperature dependence for this parameter:
 #"""""""""""""""""""""""""""""""""""""""""""
 resp_maintenance_max_T_ref = 20
@@ -350,6 +351,7 @@ max_immobilization_rate = 1.8e-9
 # incorporation in disks of starch, the immobilization rate is about 1.8e-9 at the temperature of 20 degree Celsius,
 # assuming that the potatoe starch content is 65.6% of dry matter and that the structural mass is 28.5% (data taken from
 # the data of Jansen et al. (2001)).
+
 # Temperature dependence for this parameter:
 #"""""""""""""""""""""""""""""""""""""""""""
 max_immobilization_rate_T_ref = 20
