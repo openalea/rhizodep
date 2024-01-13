@@ -21,8 +21,6 @@ from dataclasses import dataclass, field
 from openalea.mtg import *
 from openalea.mtg.traversal import pre_order, post_order
 
-import rhizodep.parameters as param
-
 
 @dataclass
 class RootGrowthModel:
@@ -88,6 +86,23 @@ class RootGrowthModel:
     struct_mass_C_content: float = field(default=0.44 / 12.01, metadata=dict(unit="mol.g-1", unit_comment="of carbon", description="C content of structural mass", value_comment="", references="We assume that the structural mass contains 44% of C. (??)", variable_type="parameter", by="model_growth"))
     yield_growth: float = field(default=0.8, metadata=dict(unit="adim", unit_comment="mol of CO2 per mol of C used for structural mass", description="Growth yield", value_comment="", references="We use the range value (0.75-0.85) proposed by Thornley and Cannell (2000)", variable_type="parameter", by="model_growth"))
 
+    # Segmentation and primordium formation
+    segment_length: float = field(default=3. / 1000., metadata=dict(unit="m", unit_comment="", description="Length of a segment", value_comment="", references="", variable_type="parameter", by="model_growth"))
+    nodule_formation_probability: float = field(default=0.5, metadata=dict(unit="m", unit_comment="", description="Probability (between 0 and 1) of nodule formation for each apex that elongates", value_comment="", references="", variable_type="parameter", by="model_growth"))
+    Dmin: float = field(default=0.1 / 1000., metadata=dict(unit="m", unit_comment="", description="Minimal threshold tip diameter (i.e. the diameter of the finest observable roots)", value_comment="", references="Dmin=0.05 mm (??)", variable_type="parameter", by="model_growth"))
+    RMD: float = field(default=0.3, metadata=dict(unit="adim", unit_comment="", description="Average ratio of the diameter of the daughter root to that of the mother root", value_comment="", references="", variable_type="parameter", by="model_growth"))
+    IPD: float = field(default=5. / 1000., metadata=dict(unit="m", unit_comment="", description="Inter-primordia distance", value_comment="", references="IPD = 7.6 mm (??)", variable_type="parameter", by="model_growth"))
+
+    # Growth durations
+    GDs: float = field(default=800 * (60. * 60. * 24.) * 1000. ** 2., metadata=dict(unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="Coefficient of growth duration", value_comment="", references="Reference: GDs=400. day mm-2 (??)", variable_type="parameter", by="model_growth"))
+    GD_highest: float = field(default=60 * (60. * 60. * 24.), metadata=dict(unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="For seminal and adventitious roots, a longer growth duration is applied", value_comment="Expected growth duration of a seminal root", references="", variable_type="parameter", by="model_growth"))
+    GD_high: float = field(default=6 * (60. * 60. * 24.), metadata=dict(unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="The growth duration has a probability of [1-GD_prob_medium] to equal GD_high", value_comment="", references="Estimated the longest observed lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", variable_type="parameter", by="model_growth"))
+    GD_medium: float = field(default=0.70 * (60. * 60. * 24.), metadata=dict(unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="The growth duration has a probability of [GD_prob_medium - GD_prob_low] to equal GD_medium", value_comment="", references="Estimated from the medium lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", variable_type="parameter", by="model_growth"))
+    GD_low: float = field(default=0.25 * (60. * 60. * 24.), metadata=dict(unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="The growth duration has a probability of [GD_prob_low] to equal GD_low", value_comment="", references="Estimated from the shortest lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", variable_type="parameter", by="model_growth"))
+    GD_by_frequency: bool = field(default=False, metadata=dict(unit="adim", unit_comment="", description="As an alternative to using a single value of growth duration depending on diameter, we offer the possibility to rather define the growth duration as a random choice between three values (low, medium and high), depending on their respective probability", value_comment="", references="", variable_type="parameter", by="model_growth"))
+    GD_prob_low: float = field(default=0.50, metadata=dict(unit="adim", unit_comment="", description="Probability for low growth duration", value_comment="", references="Estimated from the shortest lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", variable_type="parameter", by="model_growth"))
+    GD_prob_medium: float = field(default=0.85, metadata=dict(unit="adim", unit_comment="Probability for medium growth duration", description="Coefficient of growth duration", value_comment="", references="Estimated from the medium lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", variable_type="parameter", by="model_growth"))
+
     # Simulation parameters
     # initiate MTG
     random: bool = True
@@ -133,7 +148,6 @@ class RootGrowthModel:
         This functions generates a root MTG from nothing, containing only one segment of a specific length,
         terminated by an apex (preferably of length 0).
         :return: g: an initiated root MTG
-        Checked
         """
 
         # TODO FOR TRISTAN: Add all initial N-related variables that need to be explicited before N fluxes computation.
@@ -420,7 +434,6 @@ class RootGrowthModel:
 
         return g
 
-
     # ACTUAL CALLABLE SCHEDULING LOOP TODO: metadata?
     # -------------------------------
     def time_step_growth(self):
@@ -478,7 +491,6 @@ class RootGrowthModel:
             n.theoretical_radius = n.radius
             n.initial_struct_mass = n.struct_mass
             n.initial_living_root_hairs_struct_mass = n.living_root_hairs_struct_mass
-
         return
 
     # Function that calculates the potential growth of the whole MTG at a given time step:
@@ -486,7 +498,6 @@ class RootGrowthModel:
         """
         This function covers the whole root MTG and computes the potential growth of segments and apices.
         :return:
-        Checked
         """
         # We simulate the development of all apices and segments in the MTG:
         list_of_apices = list(self.apices_list)
@@ -514,7 +525,6 @@ class RootGrowthModel:
         apex is also considered.
         :param apex: the apex to be considered
         :return: the updated apex
-        Checked
         """
 
         # We initialize an empty list in which the modified apex will be added:
@@ -751,7 +761,6 @@ class RootGrowthModel:
         :param C_hexose_root: the concentration of hexose available for elongation (mol of hexose per gram of strctural mass)
         :param elongation_time_in_seconds: the period of elongation (s)
         :return: the new elongated length
-        Checked
         """
 
         # TODO FOR TRISTAN: Consider including a control of potential elongation by N availability (only the regulation by hexose concentration has been considered so far).
@@ -783,7 +792,6 @@ class RootGrowthModel:
         of a given element, as well as their structural mass and their amount of available hexose.
         :param element: the element for which we calculate the possible supply of C for its elongation
         :return: three lists containing the indices of elements, their hexose amount (mol of hexose) and their structural mass (g).
-        Checked
         """
         # TODO FOR TRISTAN: Consider using a similar approach for sustaining the need for N when a root apex should elongate.
         n = element
@@ -890,7 +898,6 @@ class RootGrowthModel:
         potential increase in radius according to the pipe model (possibly regulated by C availability), and its possible death.
         :param segment: the segment to be considered
         :return: the updated segment
-        Checked
         """
 
         # TODO FOR TRISTAN: Consider adding a regulation of root thickening with the availability of N in the root segment (only the limitation by hexose has been considered so far).
@@ -1102,7 +1109,6 @@ class RootGrowthModel:
         emergence of lateral roots, and the cost of growth in terms of hexose consumption.
 
         :return:
-        Checked
         """
 
         # TODO FOR TRISTAN: Here you would need to explicit at least a cost of N associated to the actual growth,
@@ -1499,7 +1505,7 @@ class RootGrowthModel:
                 # The average age of the elongated part is calculated as the mean value between both extremities:
                 Age_of_elongated_part = 0.5 * (Age_of_elongated_part_down + Age_of_elongated_part_up)
                 # Eventually, the average age of the whole new element is calculated from the age of both parts:
-                apex.actual_time_since_cells_formation = (apex.initial_length * Age_of_non_elongated_part \
+                apex.actual_time_since_cells_formation = (apex.initial_length * Age_of_non_elongated_part
                                                           + (
                                                                   apex.length - apex.initial_length) * Age_of_elongated_part) \
                                                          / apex.length
@@ -1509,7 +1515,7 @@ class RootGrowthModel:
                                                     temperature_time_adjustment
                 Thermal_age_of_elongated_part = Age_of_elongated_part * temperature_time_adjustment
                 apex.thermal_time_since_cells_formation = (
-                                                                      apex.initial_length * Thermal_age_of_non_elongated_part \
+                                                                      apex.initial_length * Thermal_age_of_non_elongated_part
                                                                       + (
                                                                               apex.length - apex.initial_length) * Thermal_age_of_elongated_part) / apex.length
 
@@ -1584,16 +1590,13 @@ class RootGrowthModel:
                     # The age of the elongated part of the new segment is calculated as the mean value between both extremities:
                     Age_of_elongated_part = 0.5 * (Age_of_elongated_part_down + Age_of_elongated_part_up)
                     # Eventually, the average age of the whole new segment is calculated from the age of both parts:
-                    apex.actual_time_since_cells_formation = (apex.initial_length * Age_of_non_elongated_part \
-                                                              + (
+                    apex.actual_time_since_cells_formation = (apex.initial_length * Age_of_non_elongated_part + (
                                                                       apex.length - apex.initial_length) * Age_of_elongated_part) \
                                                              / apex.length
                     # We also calculate the thermal age of root cells according to the previous thermal time of initially-exisiting cells:
                     Thermal_age_of_non_elongated_part = apex.thermal_time_since_cells_formation + self.time_step_in_seconds * temperature_time_adjustment
                     Thermal_age_of_elongated_part = Age_of_elongated_part * temperature_time_adjustment
-                    apex.thermal_time_since_cells_formation = (
-                                                                      apex.initial_length * Thermal_age_of_non_elongated_part \
-                                                                      + (
+                    apex.thermal_time_since_cells_formation = (apex.initial_length * Thermal_age_of_non_elongated_part + (
                                                                               apex.length - apex.initial_length) * Thermal_age_of_elongated_part) / apex.length
 
                 # CASE 2: The new segment is only made of new root cells formed during this time step
@@ -1634,8 +1637,7 @@ class RootGrowthModel:
                     # We add the possibility of a nodule formation on the segment that is closest to the apex:
                     if self.nodules and len(
                             apex.children()) < 2 and np.random.random() < self.nodule_formation_probability:
-                        self.nodule_formation(self.g,
-                                              mother_element=apex)  # WATCH OUT: here, "apex" still corresponds to the last segment!
+                        self.nodule_formation(mother_element=apex)  # WATCH OUT: here, "apex" still corresponds to the last segment!
 
             # FORMATION OF THE TERMINAL APEX:
             # And we define the new, final apex after the last defined segment, with a new length defined as:
@@ -1738,12 +1740,11 @@ class RootGrowthModel:
         # whose mean is the value of the mother root diameter multiplied by RMD, and whose standard deviation is
         # the product of this mean and the coefficient of variation CVDD (Pages et al. 2014).
         # We also set the root angles depending on random:
-        if random:
+        if self.random:
             # The seed used to generate random values is defined according to a parameter random_choice and the index of the apex:
             np.random.seed(self.random_choice * apex.index())
             potential_radius = np.random.normal((apex.radius - self.Dmin / 2.) * self.RMD + self.Dmin / 2.,
-                                                ((
-                                                         apex.radius - self.Dmin / 2.) * self.RMD + self.Dmin / 2.) * self.CVDD)
+                                                ((apex.radius - self.Dmin / 2.) * self.RMD + self.Dmin / 2.) * self.CVDD)
             apex_angle_roll = abs(np.random.normal(120, 10))
             if apex.root_order == 1:
                 primordium_angle_down = abs(np.random.normal(45, 10))
@@ -1810,17 +1811,15 @@ class RootGrowthModel:
 
         return new_apex
 
-
     # TODO UNUSED
     # Function calculating a satisfaction coefficient for the growth of the whole root system:
     # -----------------------------------------------------------------------------------------
-    def satisfaction_coefficient(self, g, struct_mass_input):
+    def satisfaction_coefficient(self, struct_mass_input):
         """
         This function computes a general "satisfaction coefficient" SC for the whole root system according to ArchiSimple
         rules, i.e. it compares the available C for root growth and the need for C associated to the potential growth of all
         root elements. If SC >1, there won't be any growth limitation by C, otherwise, the growth of each element will be
         reduced proportionally to SC.
-        :param g: the root MTG to be considered
         :param struct_mass_input: the available input of "biomass" to be used for growth
         :return: the satisfaction coefficient SC
         """
@@ -1829,13 +1828,13 @@ class RootGrowthModel:
         SC = 0.
 
         # We have to cover each vertex from the apices up to the base one time:
-        root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
+        root_gen = self.g.component_roots_at_scale_iter(self.g.root, scale=1)
         root = next(root_gen)
 
         # We cover all the vertices in the MTG:
-        for vid in post_order(g, root):
+        for vid in post_order(self.g, root):
             # n represents the current root element:
-            n = g.node(vid)
+            n = self.g.node(vid)
 
             # We calculate the initial volume of the element:
             initial_volume = self.volume_from_radius_and_length(n, n.initial_radius, n.initial_length)
@@ -1863,22 +1862,17 @@ class RootGrowthModel:
     # TODO UNUSED
     # Function performing the growth of each element based on the potential growth and the satisfaction coefficient SC:
     # ------------------------------------------------------------------------------------------------------------------
-    def ArchiSimple_growth(self, g, SC, time_step_in_seconds, soil_temperature_in_Celsius=20,
-                           printing_warnings=False):
+    def ArchiSimple_growth(self, SC):
         """
         This function computes the growth of the root system according to ArchiSimple's rules.
-        :param g: the root MTG to be considered
         :param SC: the satisfaction coefficient (i.e. the ratio of C offer and C demand)
-        :param time_step_in_seconds: the time step over which growth is considered
-        :param soil_temperature_in_Celsius: the same, homogeneous temperature experienced by the whole root system
-        :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
         :return: g, the updated root MTG
         """
 
         # TODO FOR TRISTAN: If one day you have time to lose, you may see whether you want to add an equivalent limitation of the elongation of all apices with the amount of N available in the root - knowing that this does not exist in ArchiSimple anyway.
 
         # We have to cover each vertex from the apices up to the base one time:
-        root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
+        root_gen = self.g.component_roots_at_scale_iter(self.g.root, scale=1)
         root = next(root_gen)
 
         # CALCULATING AN EQUIVALENT OF THERMAL TIME:
@@ -1892,10 +1886,10 @@ class RootGrowthModel:
         # -------------------------------
 
         # We cover all the vertices in the MTG:
-        for vid in post_order(g, root):
+        for vid in post_order(self.g, root):
 
             # n represents the current root element:
-            n = g.node(vid)
+            n = self.g.node(vid)
 
             # We make sure that the element is not dead and has not already been stopped at the previous time step:
             if n.type == "Dead" or n.type == "Just_dead" or n.type == "Stopped":
@@ -1922,11 +1916,11 @@ class RootGrowthModel:
 
             # We calculate the actual elongation rate of this element:
             if (n.thermal_potential_time_since_emergence > 0) and (
-                    n.thermal_potential_time_since_emergence < time_step_in_seconds):
+                    n.thermal_potential_time_since_emergence < self.time_step_in_seconds):
                 n.actual_elongation_rate = n.actual_elongation / (
                         n.thermal_potential_time_since_emergence / temperature_time_adjustment)
             else:
-                n.actual_elongation_rate = n.actual_elongation / time_step_in_seconds
+                n.actual_elongation_rate = n.actual_elongation / self.time_step_in_seconds
 
             n.radius += (n.potential_radius - n.initial_radius) * relative_growth_increase
             # The volume of the element is automatically calculated:
@@ -1943,18 +1937,14 @@ class RootGrowthModel:
                 print("!!! ERROR: the element", n.index(), "of class", n.label, "has a length of", n.length,
                       "and a mass of", n.struct_mass)
 
-        return g
-
     # Formation of root nodules:
     # ---------------------------
     def nodule_formation(self, mother_element):
         """
         This function simulates the formation of one nodule on a root mother element. The nodule is considered as a special
         lateral root segment that has no apex connected and which cannot generate root primordium.
-        :param g: the root MTG to be considered
         :param mother_element: the mother element on which a new nodule element will be formed
         :return:
-        checked
         """
 
         # We add a lateral root element called "nodule" on the mother element:
@@ -1980,9 +1970,7 @@ class RootGrowthModel:
         The function "distance_from_tip" computes the distance (in meter) of a given vertex from the apex
         of the corresponding root axis in the MTG "g" based on the properties "length" of all vertices.
         Note that the dist-to-tip of an apex is defined as its length (and not as 0).
-        :param g: the investigated MTG
         :return: the MTG with an updated property 'distance_from_tip'
-        Checked
         """
 
         # We initialize an empty dictionary for to_tips:
@@ -2028,7 +2016,6 @@ class RootGrowthModel:
         If C=1, A=0 and B>1, then the relationship corresponds to a classical exponential increase with temperature (Q10).
         If C=1, A<0 and B>0, then the relationship corresponds to bell-shaped curve, close to the one from Parent et al. (2010).
         :return: the new value of the process
-        Checked
         """
 
         # We initialize the value of the temperature-modified process:
@@ -2083,7 +2070,6 @@ class RootGrowthModel:
         :param identical_properties: if True, the main properties of the child will be identical to those of the mother
         :param nil_properties: if True, the main properties of the child will be 0
         :return: the new child element
-        Checked
         """
 
         # TODO FOR TRISTAN: When working with a dynamic root structure, you will need to specify in this function
@@ -2260,7 +2246,6 @@ class RootGrowthModel:
         :param radius: radius of the element
         :param length: length of the element
         :return: the volume of the element
-        Checked
         """
 
         # If this is a regular root segment
