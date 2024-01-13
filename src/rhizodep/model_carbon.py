@@ -94,9 +94,9 @@ class RootCarbonModel:
     sucrose_input_rate: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", value_comment="", references="", variable_type="input", by="model_shoot", state_variable_type=""))
 
     # FROM ANATOMY MODEL
-    exchange_surface: float = field(default=1.e-5, metadata=dict(unit="m2", unit_comment="", description="Root external exchange surface", value_comment="", references="", variable_type="input", by="model_anatomy", state_variable_type=""))
-    vascular_exchange_surface: float = field(default=exchange_surface / 10, metadata=dict(unit="m2", unit_comment="", description="Root vascular exchange surface in contact with root segment vessels", value_comment="", references="", variable_type="input", by="model_anatomy", state_variable_type=""))
-    non_vascular_exchange_surface: float = field(default=exchange_surface / 10, metadata=dict(unit="m2", unit_comment="", description="??", value_comment="", references="", variable_type="input", by="model_anatomy", state_variable_type=""))
+    root_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface between soil and symplasmic parenchyma.", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="extensive"))
+    phloem_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface between root parenchyma and apoplasmic xylem vessels.", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="extensive"))
+    apoplasmic_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface to account for exchanges between xylem + stele apoplasm and soil. We account for it through cylindrical surface, a pathway closing as soon as endodermis differentiates", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="extensive"))
 
     # --- INITIALIZE MODEL STATE VARIABLES ---
 
@@ -509,10 +509,10 @@ class RootCarbonModel:
     # parenchyma and from the epidermis. The function also simulates the opposite process of sucrose loading,
     # considering that 2 mol of hexose are produced for 1 mol of sucrose.
 
-    def process_hexose_diffusion_from_phloem(self, length, exchange_surface, C_sucrose_root, C_hexose_root,
+    def process_hexose_diffusion_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
                                              hexose_consumption_by_growth):
         # We consider all the cases where no net exchange should be allowed:
-        if length <= 0. or exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
+        if length <= 0. or phloem_exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
             return 0
 
         else:
@@ -525,12 +525,12 @@ class RootCarbonModel:
                                                                      A=self.phloem_unloading_A,
                                                                      B=self.phloem_unloading_B,
                                                                      C=self.phloem_unloading_C)
-                return max(2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) * exchange_surface, 0)
+                return max(2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) * phloem_exchange_surface, 0)
 
-    def process_hexose_active_production_from_phloem(self, length, exchange_surface, C_sucrose_root, C_hexose_root,
+    def process_hexose_active_production_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
                                                      hexose_consumption_by_growth):
         # We consider all the cases where no net exchange should be allowed:
-        if length <= 0. or exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
+        if length <= 0. or phloem_exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
             return 0
 
         else:
@@ -543,10 +543,10 @@ class RootCarbonModel:
                                                                     A=self.phloem_unloading_A,
                                                                     B=self.phloem_unloading_B,
                                                                     C=self.phloem_unloading_C)
-                return max(2. * max_unloading_rate * C_sucrose_root * exchange_surface / (
+                return max(2. * max_unloading_rate * C_sucrose_root * phloem_exchange_surface / (
                             self.Km_unloading + C_sucrose_root), 0)
 
-    def process_sucrose_loading_in_phloem(self, exchange_surface, C_hexose_root):
+    def process_sucrose_loading_in_phloem(self, phloem_exchange_surface, C_hexose_root):
         # # We correct the max loading rate according to the distance from the tip in the middle of the segment.
         # max_loading_rate = param.surfacic_loading_rate_reference \
         #     * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
@@ -560,7 +560,7 @@ class RootCarbonModel:
         if C_hexose_root <= 0.:
             return 0.
         else:
-            return max(0.5 * max_loading_rate * exchange_surface * C_hexose_root / (self.Km_loading + C_hexose_root), 0.)
+            return max(0.5 * max_loading_rate * phloem_exchange_surface * C_hexose_root / (self.Km_loading + C_hexose_root), 0.)
 
     def process_mobilization_from_reserve(self, length, C_hexose_root, C_hexose_reserve, type, struct_mass,
                                          living_root_hairs_struct_mass):
@@ -647,8 +647,8 @@ class RootCarbonModel:
     # non_vascular_exchange_surface = (S_epid + S_hairs) + cond_walls * (cond_exo * S_cortex + cond_endo * S_stele)
     # vascular_exchange_surface = cond_walls * cond_exo * cond_endo * S_vessels
 
-    def process_hexose_exudation(self, length, non_vascular_exchange_surface, C_hexose_root, C_hexose_soil):
-        if length <= 0 or non_vascular_exchange_surface <= 0. or C_hexose_root <= 0.:
+    def process_hexose_exudation(self, length, root_exchange_surface, C_hexose_root, C_hexose_soil):
+        if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
             return 0.
         else:
             corrected_P_max_apex = self.Pmax_apex * self.temperature_modification(
@@ -663,12 +663,12 @@ class RootCarbonModel:
             #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
             corrected_permeability_coeff = corrected_P_max_apex
 
-            return max(corrected_permeability_coeff * (C_hexose_root - C_hexose_soil) * non_vascular_exchange_surface,
+            return max(corrected_permeability_coeff * (C_hexose_root - C_hexose_soil) * root_exchange_surface,
                        0)
 
-    def process_phloem_hexose_exudation(self, length, non_vascular_exchange_surface, C_hexose_root, C_sucrose_root,
-                                        C_hexose_soil, vascular_exchange_surface):
-        if length <= 0 or non_vascular_exchange_surface <= 0. or C_hexose_root <= 0.:
+    def process_phloem_hexose_exudation(self, length, root_exchange_surface, C_hexose_root, C_sucrose_root,
+                                        C_hexose_soil, apoplasmic_exchange_surface):
+        if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
             return 0.
         else:
             corrected_P_max_apex = self.Pmax_apex * self.temperature_modification(T_ref=self.permeability_coeff_T_ref,
@@ -681,7 +681,7 @@ class RootCarbonModel:
             #     corrected_permeability_coeff = corrected_P_max_apex \
             #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
             corrected_permeability_coeff = corrected_P_max_apex
-            return corrected_permeability_coeff * (2 * C_sucrose_root - C_hexose_soil) * vascular_exchange_surface
+            return corrected_permeability_coeff * (2 * C_sucrose_root - C_hexose_soil) * apoplasmic_exchange_surface
 
     # Uptake of hexose from the soil by the root:
     # -------------------------------------------
@@ -689,8 +689,8 @@ class RootCarbonModel:
     # as an active process with a substrate-limited relationship (Michaelis-Menten function) depending on the hexose
     # concentration in the soil.
 
-    def process_hexose_uptake_from_soil(self, length, non_vascular_exchange_surface, C_hexose_soil, type):
-        if length <= 0 or non_vascular_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
+    def process_hexose_uptake_from_soil(self, length, root_exchange_surface, C_hexose_soil, type):
+        if length <= 0 or root_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
             return 0.
         else:
             corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
@@ -699,11 +699,11 @@ class RootCarbonModel:
                                                                                 B=self.uptake_rate_max_B,
                                                                                 C=self.uptake_rate_max_C)
 
-            return corrected_uptake_rate_max * non_vascular_exchange_surface \
+            return corrected_uptake_rate_max * root_exchange_surface \
                 * C_hexose_soil / (self.Km_uptake + C_hexose_soil)
 
-    def process_phloem_hexose_uptake_from_soil(self, length, vascular_exchange_surface, C_hexose_soil, type):
-        if length <= 0 or vascular_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
+    def process_phloem_hexose_uptake_from_soil(self, length, apoplasmic_exchange_surface, C_hexose_soil, type):
+        if length <= 0 or apoplasmic_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
             return 0.
         else:
             corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
@@ -712,15 +712,15 @@ class RootCarbonModel:
                                                                                     B=self.uptake_rate_max_B,
                                                                                     C=self.uptake_rate_max_C)
 
-            return corrected_uptake_rate_max * vascular_exchange_surface * C_hexose_soil / (
+            return corrected_uptake_rate_max * apoplasmic_exchange_surface * C_hexose_soil / (
                     self.Km_uptake + C_hexose_soil)
 
     # Mucilage secretion:
     # ------------------
     # This function computes the rate of mucilage secretion (in mol of equivalent hexose per second) for a given root element n.
-    def process_mucilage_secretion(self, length, exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_mucilage_soil):
+    def process_mucilage_secretion(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_mucilage_soil):
         # First, we ensure that the element has a positive length and surface of exchange:
-        if length <= 0 or exchange_surface <= 0. or C_hexose_root <= 0. or type == "Dead" or type == "Stopped" or distance_from_tip < length:
+        if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0. or type == "Dead" or type == "Stopped" or distance_from_tip < length:
             return 0.
         else:
             # We correct the maximal secretion rate according to soil temperature
@@ -742,7 +742,7 @@ class RootCarbonModel:
                                                    self.Cs_mucilage_soil_max - Cs_mucilage_soil) / self.Cs_mucilage_soil_max
             # TODO: Validate this linear decrease until reaching the max surfacic density.
 
-            return max(corrected_secretion_rate_max * exchange_surface * C_hexose_root / (
+            return max(corrected_secretion_rate_max * root_exchange_surface * C_hexose_root / (
                     self.Km_secretion + C_hexose_root), 0.)
 
     # Release of root cells:
@@ -752,9 +752,9 @@ class RootCarbonModel:
     # until reaching 0 at the end of the elongation zone. The external concentration of root cells (mol of equivalent-
     # hexose per m2) is also linearily decreasing the release of cells at the interface.
 
-    def process_cells_release(self, length, exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_cells_soil):
+    def process_cells_release(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_cells_soil):
         # First, we ensure that the element has a positive length and surface of exchange:
-        if length <= 0 or exchange_surface <= 0. or C_hexose_root <= 0. or type == "Just_dead" or type == "Dead" or type == "Stopped":
+        if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0. or type == "Just_dead" or type == "Dead" or type == "Stopped":
             return 0.
         else:
             # We modify the maximal surfacic release rate according to the mean distance to the tip (in the middle of the
@@ -793,7 +793,7 @@ class RootCarbonModel:
 
             # The release of cells by the root is then calculated according to this surface:
             # TODO: Are we sure that cells release is not dependent on C availability?
-            return max(exchange_surface * corrected_cells_surfacic_release, 0.)
+            return max(root_exchange_surface * corrected_cells_surfacic_release, 0.)
 
     # These methods calculate the time derivative (dQ/dt) of the amount in each pool, for a given root element, based on
     # a C balance.
