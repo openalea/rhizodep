@@ -15,7 +15,7 @@ import os
 import time
 
 import pickle
-from rhizodep.rhizodep import Model
+from rhizodep import Model
 from statistical_tools.main import launch_analysis
 
 # We define the main simulation program:

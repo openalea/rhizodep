@@ -4,7 +4,7 @@ import pickle
 from model_growth import RootGrowthModel
 from model_carbon import RootCarbonModel
 from model_anatomy import RootAnatomy
-from model_soil import SoilModel
+# from model_soil import SoilModel
 
 from root_cynaps.wrapper import ModelWrapper
 
@@ -39,10 +39,10 @@ class Model(ModelWrapper):
         self.g = self.root_growth.g
         self.root_anatomy = RootAnatomy(self.g, time_step)
         self.root_carbon = RootCarbonModel(self.g, time_step)
-        self.soil = SoilModel(self.g, time_step)
+        #self.soil = SoilModel(self.g, time_step)
 
         # Voir initialiser dedans
-        self.models = (self.root_growth, self.root_anatomy, self.root_carbon, self.soil)
+        self.models = (self.root_growth, self.root_anatomy, self.root_carbon)
 
         # LINKING MODULES
         if not os.path.isfile("translator.pckl"):
@@ -58,7 +58,7 @@ class Model(ModelWrapper):
     def run(self):
         # Update environment boundary conditions
         # Update soil state
-        self.soil.run_exchanges_and_balance()
+        # self.soil.run_exchanges_and_balance()
 
         # Compute state variations for water and then nitrogen
         self.root_carbon.run_exchanges_and_balance()
