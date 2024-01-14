@@ -55,6 +55,7 @@ class Model(ModelWrapper):
         self.link_around_mtg(translator)
 
         # Some initialization must be performed AFTER linking modules
+        self.soil.post_coupling_init()
         self.root_carbon.post_coupling_init()
         self.root_growth.post_coupling_init()
         self.root_anatomy.post_coupling_init()
