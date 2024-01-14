@@ -137,8 +137,8 @@ class RootCarbonModel:
     # Temperature
     process_at_T_ref: float = field(default=1., metadata=dict(unit="adim", unit_comment="", description="Proportion of maximal process intensity occuring at T_ref", value_comment="", references="", variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user"))
 
-    phloem_unloading_T_ref: float = field(default=10, metadata=dict(unit="°C", unit_comment="of sucrose", description="the reference temperature", value_comment="", references="We reuse the observed evolution of Frankenberger and Johanson (1983) on invertase activity in different soils with temperature from 10 to 100 degree Celsius which show an increase of about 5 times between 20 degrees and 50 degrees (maximum), assuming that the activity of invertase outside the phloem tissues is correlated to the unloading rate of sucrose from phloem.", variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user"))
-    phloem_unloading_A: float = field(default=-0.04, metadata=dict(unit="adim", unit_comment="of sucrose", description="parameter A (may be equivalent to the coefficient of linear increase)", value_comment="", references="Frankenberger and Johanson (1983), see T_ref", variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user"))
+    phloem_unloading_T_ref: float = field(default=10, metadata=dict(unit="°C", unit_comment="", description="the reference temperature", value_comment="", references="We reuse the observed evolution of Frankenberger and Johanson (1983) on invertase activity in different soils with temperature from 10 to 100 degree Celsius which show an increase of about 5 times between 20 degrees and 50 degrees (maximum), assuming that the activity of invertase outside the phloem tissues is correlated to the unloading rate of sucrose from phloem.", variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user"))
+    phloem_unloading_A: float = field(default=-0.04, metadata=dict(unit="adim", unit_comment="", description="parameter A (may be equivalent to the coefficient of linear increase)", value_comment="", references="Frankenberger and Johanson (1983), see T_ref", variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user"))
     phloem_unloading_B: float = field(default=2.9, metadata=dict(unit="adim", unit_comment="", description="parameter B (may be equivalent to the Q10 value)", value_comment="", references="Frankenberger and Johanson (1983), see T_ref", variable_type="parametyer", by="model_carbon", state_variable_type="", edit_by="user"))
     phloem_unloading_C: float = field(default=1, metadata=dict(unit="adim", unit_comment="", description="parameter C (either 0 or 1)", value_comment="", references="Frankenberger and Johanson (1983), see T_ref", variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user"))
 
@@ -291,7 +291,7 @@ class RootCarbonModel:
 
     def check_if_coupled(self):
         # For all expected input...
-        input_variables = [name for name, value in self.__dataclass_fields__ if value.metadata["variable_type"] == "input"]
+        input_variables = [f.name for f in fields(self) if f.metadata["variable_type"] == "input"]
         for inpt in input_variables:
             # If variable type has not gone to dictionary as it is part of the coupling process
             # we use provided default value to create the dictionnary used in the rest of the model
