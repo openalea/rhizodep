@@ -23,7 +23,7 @@ class Model(ModelWrapper):
     4. Use Model.run() in a for loop to perform the computations of a time step on the passed MTG File
     """
 
-    def __init__(self, time_step: int):
+    def __init__(self, time_step: int, **scenario):
         """
         DESCRIPTION
         ----------
@@ -33,24 +33,24 @@ class Model(ModelWrapper):
         :param time_step: the resolution time_step of the model in seconds.
         """
 
-
         # INIT INDIVIDUAL MODULES
-        self.root_growth = RootGrowthModel(time_step)
+        self.root_growth = RootGrowthModel(time_step, **scenario)
         self.g = self.root_growth.g
-        self.root_anatomy = RootAnatomy(self.g, time_step)
-        self.root_carbon = RootCarbonModel(self.g, time_step)
-        self.soil = SoilModel(self.g, time_step)
+        self.root_anatomy = RootAnatomy(self.g, time_step, **scenario)
+        self.root_carbon = RootCarbonModel(self.g, time_step, **scenario)
+        self.soil = SoilModel(self.g, time_step, **scenario)
 
-        # Voir initialiser dedans
+        #
         self.models = (self.root_growth, self.root_anatomy, self.root_carbon, self.soil)
 
         # LINKING MODULES
         # Get or build translator matrix
         if not os.path.isfile("translator.pckl"):
+            print("NOTE : You will now have to provide information about shared variables between the modules composing this model :\n")
             self.translator_matrix_builder()
         with open("translator.pckl", "rb") as f:
             translator = pickle.load(f)
-        print(translator)
+
         # Actually link modules together
         self.link_around_mtg(translator)
 
@@ -59,6 +59,7 @@ class Model(ModelWrapper):
         self.root_carbon.post_coupling_init()
         self.root_growth.post_coupling_init()
         self.root_anatomy.post_coupling_init()
+
 
     def run(self):
         # Update environment boundary conditions
@@ -71,4 +72,4 @@ class Model(ModelWrapper):
         # Compute root growth from resulting states
         self.root_growth.run_time_step_growth()
         # Update topological surfaces and volumes based on other evolved structural properties
-        self.root_anatomy.run_anatomy_update()
+        self.root_anatomy.run_actualize_anatomy()

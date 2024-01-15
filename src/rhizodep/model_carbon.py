@@ -118,8 +118,8 @@ class RootCarbonModel:
     cells_release: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="of equivalent hexose", description="", value_comment="", references="", variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user"))
 
     # Metabolic Processes
-    mobilization_from_reserve: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="of hexose", description="", value_comment="", references="", variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user"))
-    immobilization_as_reserve: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="of hexose", description="", value_comment="", references="", variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user"))
+    hexose_mobilization_from_reserve: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="of hexose", description="", value_comment="", references="", variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user"))
+    hexose_immobilization_as_reserve: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="of hexose", description="", value_comment="", references="", variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user"))
     maintenance_respiration: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="of hexose", description="", value_comment="", references="", variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user"))
 
     # Deficits
@@ -217,7 +217,7 @@ class RootCarbonModel:
     surfacic_cells_release_rate: float = field(default=1279/6476*(33.9*1e6*1e-18)*0.1*1000000*0.44/12.01/6/(24*60*60)/(0.8*0.001*pi*0.8*0.001), metadata=dict(unit="mol.m-2.s-1", unit_comment="mol of equivalent-hexose per m2 of lateral external surface per second", description="Average release of root cells", value_comment="", references="We used the measurements by Clowes and Wadekar 1988 on Zea mays root cap cells obtained at 20 degree Celsius, i.e. 1279 cells per day. We recalculated the amount of equivalent hexose by relating the number of cap cells produced per day to a volume knowing that the whole cap was made of 6476 cells and had a volume of 33.9 *10^6 micrometer^3. The volume was later converted into a mass assuming a density of 0.1 g cm-3. We then assumed that the surface of root cap was equivalent to the lateral surface of a cylinder of radius 0.8 mm and height 0.8 mm (meristem size = 0.79-0.81 mm).", variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user"))
     Cs_cells_soil_max: float = field(default=10., metadata=dict(unit="mol.m-2", unit_comment="of equivalent hexose", description="Maximal surfacic concentration of root cells in soil, above which no release of cells is possible", value_comment="DO A REAL ESTIMATION!", references="", variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user"))
 
-    def __init__(self, g, time_step_in_seconds: int):
+    def __init__(self, g, time_step_in_seconds: int, **scenario: dict):
         """
         DESCRIPTION
         -----------
@@ -225,12 +225,16 @@ class RootCarbonModel:
 
         :param g: the root MTG
         :param time_step_in_seconds: time step of the simulation (s)
+        :param scenario: mapping of existing variable initialization and parameters to superimpose.
         :return:
         """
         self.g = g
         self.props = self.g.properties()
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_steps_in_seconds = time_step_in_seconds
+
+        # Before any other operation, we apply the provided scenario by changing default parameters and initialization
+        self.apply_scenario(**scenario)
 
         self.state_variables = [f.name for f in fields(self) if f.metadata["variable_type"] == "state_variable"]
 
@@ -254,6 +258,16 @@ class RootCarbonModel:
             self.props[name].update({1: getattr(self, name)})
             # link mtg dict to self dict
             setattr(self, name, self.props[name])
+
+    def apply_scenario(self, **kwargs):
+        """
+        Method to superimpose default parameters in order to create a scenario.
+        Use Model.documentation to discover model parameters and state variables.
+        :param kwargs: mapping of existing variable to superimpose.
+        """
+        for changed_parameter, value in kwargs.items():
+            if changed_parameter in dir(self):
+                setattr(self, changed_parameter, value)
 
     def post_coupling_init(self):
         self.store_functions_call()
@@ -303,12 +317,26 @@ class RootCarbonModel:
                 # link mtg dict to self dict
                 setattr(self, inpt, self.props[inpt])
 
+    def get_available_inputs(self):
+        for inputs in self.available_inputs:
+            source_model = inputs["applier"]
+            linker = inputs["linker"]
+            for name, source_variables in linker.items():
+                # if variables have to be summed
+                if len(source_variables.keys()) > 1:
+                    return setattr(self, name, dict(zip(getattr(source_model, "vertices"), [sum([getattr(source_model, source_name)[vid] * unit_conversion for source_name, unit_conversion in source_variables.items()]) for vid in getattr(source_model, "vertices")])))
+                else:
+                    return setattr(self, name, getattr(source_model, list(source_variables.keys())[0]))
+
     def run_exchanges_and_balance(self):
         """
         Groups and order carbon exchange processes and balance for the provided time step
         """
+        # We have to renew this call at each time step to ensure model inputs are well updated
+        self.get_available_inputs()
+
         # TODO print(self.struct_mass, self.initial_struct_mass to check is they are indeed different here)
-        self.add_new_segments_and_update_concentrations()
+        self.add_new_segments_and_reevaluate_concentrations()
 
         self.props.update(self.prc_resolution())
         self.props.update(self.upd_resolution())
@@ -337,7 +365,9 @@ class RootCarbonModel:
     def forbid_negatives(self):
         return dict(zip(["C_hexose_root", "C_hexose_reserve", "C_sucrose_root"],
                         map(self.dict_mapper,
-                            *([partial(max, 0.)] * 3, [self.C_hexose_root, self.C_hexose_reserve, self.C_sucrose_root]))))
+                            *([partial(max, 0.)] * 3, [[partial(self.get_up_to_date, "C_hexose_root")],
+                                                       [partial(self.get_up_to_date, "C_hexose_reserve")],
+                                                       [partial(self.get_up_to_date, "C_sucrose_root")]]))))
 
     def dict_mapper(self, fcn, args):
         return dict(zip(args[0](), map(fcn, *(d().values() for d in args))))
@@ -345,7 +375,7 @@ class RootCarbonModel:
     def get_up_to_date(self, prop):
         return getattr(self, prop)
 
-    def add_new_segments_and_update_concentrations(self):
+    def add_new_segments_and_reevaluate_concentrations(self):
         """
         Description :
             Extend property dictionnary uppon new element partionning and updates concentrations uppon structural_mass change
@@ -372,7 +402,7 @@ class RootCarbonModel:
 
     # Modification of a process according to soil temperature:
     # --------------------------------------------------------
-    def temperature_modification(self, T_ref=0., A=-0.05, B=3., C=1.):
+    def temperature_modification(self, soil_temperature=15, T_ref=0., A=-0.05, B=3., C=1.):
         """
         This function calculates how the value of a process should be modified according to soil temperature (in degrees Celsius).
         Parameters correspond to the value of the process at reference temperature T_ref (process_at_T_ref),
@@ -392,13 +422,13 @@ class RootCarbonModel:
 
         # We avoid unwanted cases:
         if C != 0 and C != 1:
-            print("The modification of the process at T =", self.soil_temperature_in_Celsius, "only works for C=0 or C=1!")
+            print("The modification of the process at T =", soil_temperature, "only works for C=0 or C=1!")
             print("The modified process has been set to 0.")
             modified_process = 0.
             return 0.
         elif C == 1:
-            if (A * (self.soil_temperature_in_Celsius - T_ref) + B) < 0.:
-                print("The modification of the process at T =", self.soil_temperature_in_Celsius,
+            if (A * (soil_temperature - T_ref) + B) < 0.:
+                print("The modification of the process at T =", soil_temperature,
                       "is unstable with this set of parameters!")
                 print("The modified process has been set to 0.")
                 modified_process = 0.
@@ -406,8 +436,8 @@ class RootCarbonModel:
 
         # We compute a temperature-modified process, correspond to a Q10-modified relationship,
         # based on the work of Tjoelker et al. (2001):
-        modified_process = self.process_at_T_ref * (A * (self.soil_temperature_in_Celsius - T_ref) + B) ** (1 - C) \
-                           * (A * (self.soil_temperature_in_Celsius - T_ref) + B) ** (C * (self.soil_temperature_in_Celsius - T_ref) / 10.)
+        modified_process = self.process_at_T_ref * (A * (soil_temperature - T_ref) + B) ** (1 - C) \
+                           * (A * (soil_temperature - T_ref) + B) ** (C * (soil_temperature - T_ref) / 10.)
 
         if modified_process < 0.:
             modified_process = 0.
@@ -430,11 +460,11 @@ class RootCarbonModel:
 
         # We cover all the vertices in the MTG, whether they are dead or not:
         for vid in self.g.vertices_iter(scale=1):
-            if self.length <= 0.:
+            if self.length[vid] <= 0.:
                 continue
             else:
                 # We increment the total amount of sucrose in the root system, including dead root elements (if any):
-                self.total_sucrose_root += self.C_sucrose_root[vid] * (
+                self.total_sucrose_root[1] += self.C_sucrose_root[vid] * (
                             self.struct_mass[vid] + self.living_root_hairs_struct_mass[vid]) \
                                            - self.deficit_sucrose_root[vid]
 
@@ -442,7 +472,7 @@ class RootCarbonModel:
                 # (if they have just died, we still include them in the balance):
                 if self.struct_mass[vid] > 0. and self.type[vid] != "Dead" and self.type[vid] != "Just_dead":
                     # We calculate the total living struct_mass by summing all the local struct_masses:
-                    self.total_living_struct_mass += self.struct_mass + self.living_root_hairs_struct_mass
+                    self.total_living_struct_mass[1] += self.struct_mass[vid] + self.living_root_hairs_struct_mass[vid]
 
     # Calculating the net input of sucrose by the aerial parts into the root system:
     # ------------------------------------------------------------------------------
@@ -468,7 +498,7 @@ class RootCarbonModel:
                   self.global_sucrose_deficit[1])
         # The new average sucrose concentration in the root system is calculated as:
         C_sucrose_root_after_supply = (self.total_sucrose_root[1] + (
-                    self.sucrose_input_rate * self.time_steps_in_seconds) - self.global_sucrose_deficit[1]) \
+                    self.sucrose_input_rate[1] * self.time_steps_in_seconds) - self.global_sucrose_deficit[1]) \
                                       / self.total_living_struct_mass[1]
         # This new concentration includes the amount of sucrose from element that have just died,
         # but excludes the mass of these dead elements!
@@ -508,7 +538,7 @@ class RootCarbonModel:
     # considering that 2 mol of hexose are produced for 1 mol of sucrose.
 
     def process_hexose_diffusion_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
-                                             hexose_consumption_by_growth):
+                                             hexose_consumption_by_growth, soil_temperature_in_Celsius):
         # We consider all the cases where no net exchange should be allowed:
         if length <= 0. or phloem_exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
             return 0
@@ -519,14 +549,15 @@ class RootCarbonModel:
             else:
                 phloem_permeability = self.phloem_permeability * (1 + hexose_consumption_by_growth /
                                                                   self.reference_rate_of_hexose_consumption_by_growth)
-                phloem_permeability *= self.temperature_modification(T_ref=self.phloem_unloading_T_ref,
+                phloem_permeability *= self.temperature_modification(soil_temperature=soil_temperature_in_Celsius,
+                                                                     T_ref=self.phloem_unloading_T_ref,
                                                                      A=self.phloem_unloading_A,
                                                                      B=self.phloem_unloading_B,
                                                                      C=self.phloem_unloading_C)
                 return max(2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) * phloem_exchange_surface, 0)
 
     def process_hexose_active_production_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
-                                                     hexose_consumption_by_growth):
+                                                     hexose_consumption_by_growth, soil_temperature_in_Celsius):
         # We consider all the cases where no net exchange should be allowed:
         if length <= 0. or phloem_exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
             return 0
@@ -537,21 +568,23 @@ class RootCarbonModel:
             else:
                 max_unloading_rate = self.max_unloading_rate * (1 + hexose_consumption_by_growth /
                                                                 self.reference_rate_of_hexose_consumption_by_growth)
-                max_unloading_rate *= self.temperature_modification(T_ref=self.phloem_unloading_T_ref,
+                max_unloading_rate *= self.temperature_modification(soil_temperature=soil_temperature_in_Celsius,
+                                                                    T_ref=self.phloem_unloading_T_ref,
                                                                     A=self.phloem_unloading_A,
                                                                     B=self.phloem_unloading_B,
                                                                     C=self.phloem_unloading_C)
                 return max(2. * max_unloading_rate * C_sucrose_root * phloem_exchange_surface / (
                             self.Km_unloading + C_sucrose_root), 0)
 
-    def process_sucrose_loading_in_phloem(self, phloem_exchange_surface, C_hexose_root):
+    def process_sucrose_loading_in_phloem(self, phloem_exchange_surface, C_hexose_root, soil_temperature_in_Celsius):
         # # We correct the max loading rate according to the distance from the tip in the middle of the segment.
         # max_loading_rate = param.surfacic_loading_rate_reference \
         #     * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
         # TODO: Reconsider the way the variation of the max loading rate along the root axis has been described!
 
         # We correct loading according to soil temperature:
-        max_loading_rate = self.max_loading_rate * self.temperature_modification(T_ref=self.max_loading_rate_T_ref,
+        max_loading_rate = self.max_loading_rate * self.temperature_modification(soil_temperature=soil_temperature_in_Celsius,
+                                                                                 T_ref=self.max_loading_rate_T_ref,
                                                                                  A=self.max_loading_rate_A,
                                                                                  B=self.max_loading_rate_B,
                                                                                  C=self.max_loading_rate_C)
@@ -560,8 +593,8 @@ class RootCarbonModel:
         else:
             return max(0.5 * max_loading_rate * phloem_exchange_surface * C_hexose_root / (self.Km_loading + C_hexose_root), 0.)
 
-    def process_mobilization_from_reserve(self, length, C_hexose_root, C_hexose_reserve, type, struct_mass,
-                                         living_root_hairs_struct_mass):
+    def process_hexose_mobilization_from_reserve(self, length, C_hexose_root, C_hexose_reserve, type, struct_mass,
+                                         living_root_hairs_struct_mass, soil_temperature_in_Celsius):
         """
         TODO not used??
         CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE
@@ -572,18 +605,19 @@ class RootCarbonModel:
         else:
             # We correct maximum rates according to soil temperature:
             corrected_max_mobilization_rate = self.max_mobilization_rate * self.temperature_modification(
-                T_ref=self.max_mobilization_rate_T_ref,
-                A=self.max_mobilization_rate_A,
-                B=self.max_mobilization_rate_B,
-                C=self.max_mobilization_rate_C)
+                                                                        soil_temperature=soil_temperature_in_Celsius,
+                                                                        T_ref=self.max_mobilization_rate_T_ref,
+                                                                        A=self.max_mobilization_rate_A,
+                                                                        B=self.max_mobilization_rate_B,
+                                                                        C=self.max_mobilization_rate_C)
             if C_hexose_reserve <= self.C_hexose_reserve_min:
                 return 0.
             else:
                 return corrected_max_mobilization_rate * C_hexose_reserve / (
                         self.Km_mobilization + C_hexose_reserve) * (struct_mass + living_root_hairs_struct_mass)
 
-    def process_immobilization_as_reserve(self, C_hexose_root, C_hexose_reserve, type,
-                                          struct_mass, living_root_hairs_struct_mass):
+    def process_hexose_immobilization_as_reserve(self, C_hexose_root, C_hexose_reserve, type,
+                                          struct_mass, living_root_hairs_struct_mass, soil_temperature_in_Celsius):
         # CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE:
         if C_hexose_root <= self.C_hexose_root_min_for_reserve or C_hexose_reserve >= self.C_hexose_reserve_max \
                 or type == "Just_dead" or type == "Dead":
@@ -591,6 +625,7 @@ class RootCarbonModel:
         else:
             corrected_max_immobilization_rate = self.max_immobilization_rate \
                                                 * self.temperature_modification(
+                                                                        soil_temperature=soil_temperature_in_Celsius,
                                                                         T_ref=self.max_immobilization_rate_T_ref,
                                                                         A=self.max_immobilization_rate_A,
                                                                         B=self.max_immobilization_rate_B,
@@ -610,7 +645,7 @@ class RootCarbonModel:
     # to the structural dry mass of the element n and is regulated by a Michaelis-Menten function of the local
     # concentration of hexose.
 
-    def process_maintenance_respiration(self, type, C_hexose_root, struct_mass, living_root_hairs_struct_mass):
+    def process_maintenance_respiration(self, type, C_hexose_root, struct_mass, living_root_hairs_struct_mass, soil_temperature_in_Celsius):
 
         # TODO FOR TRISTAN: Consider expliciting a respiration cost associated to the exchange of N in the root (e.g. cost for uptake, xylem loading)?
 
@@ -622,6 +657,7 @@ class RootCarbonModel:
         else:
             # We correct the maximal respiration rate according to soil temperature:
             corrected_resp_maintenance_max = self.resp_maintenance_max * self.temperature_modification(
+                                                                    soil_temperature=soil_temperature_in_Celsius,
                                                                     T_ref=self.resp_maintenance_max_T_ref,
                                                                     A=self.resp_maintenance_max_A,
                                                                     B=self.resp_maintenance_max_B,
@@ -645,11 +681,12 @@ class RootCarbonModel:
     # non_vascular_exchange_surface = (S_epid + S_hairs) + cond_walls * (cond_exo * S_cortex + cond_endo * S_stele)
     # vascular_exchange_surface = cond_walls * cond_exo * cond_endo * S_vessels
 
-    def process_hexose_exudation(self, length, root_exchange_surface, C_hexose_root, C_hexose_soil):
+    def process_hexose_exudation(self, length, root_exchange_surface, C_hexose_root, C_hexose_soil, soil_temperature_in_Celsius):
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
             return 0.
         else:
             corrected_P_max_apex = self.Pmax_apex * self.temperature_modification(
+                                                                   soil_temperature=soil_temperature_in_Celsius,
                                                                    T_ref=self.permeability_coeff_T_ref,
                                                                    A=self.permeability_coeff_A,
                                                                    B=self.permeability_coeff_B,
@@ -665,11 +702,13 @@ class RootCarbonModel:
                        0)
 
     def process_phloem_hexose_exudation(self, length, root_exchange_surface, C_hexose_root, C_sucrose_root,
-                                        C_hexose_soil, apoplasmic_exchange_surface):
+                                        C_hexose_soil, apoplasmic_exchange_surface, soil_temperature_in_Celsius):
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
             return 0.
         else:
-            corrected_P_max_apex = self.Pmax_apex * self.temperature_modification(T_ref=self.permeability_coeff_T_ref,
+            corrected_P_max_apex = self.Pmax_apex * self.temperature_modification(
+                                                                   soil_temperature=soil_temperature_in_Celsius,
+                                                                   T_ref=self.permeability_coeff_T_ref,
                                                                    A=self.permeability_coeff_A,
                                                                    B=self.permeability_coeff_B,
                                                                    C=self.permeability_coeff_C)
@@ -687,11 +726,12 @@ class RootCarbonModel:
     # as an active process with a substrate-limited relationship (Michaelis-Menten function) depending on the hexose
     # concentration in the soil.
 
-    def process_hexose_uptake_from_soil(self, length, root_exchange_surface, C_hexose_soil, type):
+    def process_hexose_uptake_from_soil(self, length, root_exchange_surface, C_hexose_soil, type, soil_temperature_in_Celsius):
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
             return 0.
         else:
             corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
+                                                                                soil_temperature=soil_temperature_in_Celsius,
                                                                                 T_ref=self.uptake_rate_max_T_ref,
                                                                                 A=self.uptake_rate_max_A,
                                                                                 B=self.uptake_rate_max_B,
@@ -700,11 +740,12 @@ class RootCarbonModel:
             return corrected_uptake_rate_max * root_exchange_surface \
                 * C_hexose_soil / (self.Km_uptake + C_hexose_soil)
 
-    def process_phloem_hexose_uptake_from_soil(self, length, apoplasmic_exchange_surface, C_hexose_soil, type):
+    def process_phloem_hexose_uptake_from_soil(self, length, apoplasmic_exchange_surface, C_hexose_soil, type, soil_temperature_in_Celsius):
         if length <= 0 or apoplasmic_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
             return 0.
         else:
             corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
+                                                                                    soil_temperature=soil_temperature_in_Celsius,
                                                                                     T_ref=self.uptake_rate_max_T_ref,
                                                                                     A=self.uptake_rate_max_A,
                                                                                     B=self.uptake_rate_max_B,
@@ -716,7 +757,7 @@ class RootCarbonModel:
     # Mucilage secretion:
     # ------------------
     # This function computes the rate of mucilage secretion (in mol of equivalent hexose per second) for a given root element n.
-    def process_mucilage_secretion(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_mucilage_soil):
+    def process_mucilage_secretion(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_mucilage_soil, soil_temperature_in_Celsius):
         # First, we ensure that the element has a positive length and surface of exchange:
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0. or type == "Dead" or type == "Stopped" or distance_from_tip < length:
             return 0.
@@ -725,6 +766,7 @@ class RootCarbonModel:
             # (This could to a bell-shape where the maximum is obtained at 27 degree Celsius,
             # as suggested by Morré et al. (1967) for maize mucilage secretion):
             corrected_secretion_rate_max = self.secretion_rate_max * self.temperature_modification(
+                                                                                    soil_temperature=soil_temperature_in_Celsius,
                                                                                     T_ref=self.secretion_rate_max_T_ref,
                                                                                     A=self.secretion_rate_max_A,
                                                                                     B=self.secretion_rate_max_B,
@@ -750,7 +792,7 @@ class RootCarbonModel:
     # until reaching 0 at the end of the elongation zone. The external concentration of root cells (mol of equivalent-
     # hexose per m2) is also linearily decreasing the release of cells at the interface.
 
-    def process_cells_release(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_cells_soil):
+    def process_cells_release(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_cells_soil, soil_temperature_in_Celsius):
         # First, we ensure that the element has a positive length and surface of exchange:
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0. or type == "Just_dead" or type == "Dead" or type == "Stopped":
             return 0.
@@ -776,6 +818,7 @@ class RootCarbonModel:
 
             # We correct the release rate according to soil temperature:
             corrected_cells_surfacic_release = cells_surfacic_release * self.temperature_modification(
+                                                                    soil_temperature=soil_temperature_in_Celsius,
                                                                     T_ref=self.surfacic_cells_release_rate_T_ref,
                                                                     A=self.surfacic_cells_release_rate_A,
                                                                     B=self.surfacic_cells_release_rate_B,
@@ -816,7 +859,7 @@ class RootCarbonModel:
                 - deficit_hexose_reserve)
 
     def update_hexose_root(self, C_hexose_root, struct_mass, hexose_exudation, hexose_uptake_from_soil,
-                           mucilage_secretion, cells_release, resp_maintenance,
+                           mucilage_secretion, cells_release, maintenance_respiration,
                            hexose_consumption_by_growth, hexose_diffusion_from_phloem,
                            hexose_active_production_from_phloem, sucrose_loading_in_phloem,
                            hexose_mobilization_from_reserve, hexose_immobilization_as_reserve, deficit_hexose_root):
@@ -825,7 +868,7 @@ class RootCarbonModel:
                 + hexose_uptake_from_soil
                 - mucilage_secretion
                 - cells_release
-                - resp_maintenance / 6.
+                - maintenance_respiration / 6.
                 - hexose_consumption_by_growth
                 + hexose_diffusion_from_phloem
                 + hexose_active_production_from_phloem

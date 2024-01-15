@@ -14,7 +14,7 @@ import os
 import numpy as np
 import pandas as pd
 from math import sqrt, pi, floor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 
 from openalea.mtg import *
 from openalea.mtg.traversal import pre_order, post_order
@@ -40,7 +40,19 @@ class RootGrowthModel:
     root_tissue_density: float = field(default=0.10 * 1e6, metadata=dict(unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", value_comment="", references="", variable_type="input", by="model_anatomy", state_variable_type="", edit_by="user"))
 
     # --- INITIALIZE MODEL STATE VARIABLES ---
+    type: str = field(default="Normal_root_after_emergence", metadata=dict(unit="", unit_comment="", description="Example segment type provided by root growth model", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
+    radius: float = field(default=3.5e-4, metadata=dict(unit="m", unit_comment="", description="Example root segment radius", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
+    length: float = field(default=3.e-3, metadata=dict(unit="m", unit_comment="", description="Example root segment length", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
+    struct_mass: float = field(default=1.35e-4, metadata=dict(unit="g", unit_comment="", description="Example root segment structural mass", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
+    initial_struct_mass: float = field(default=1.35e-4, metadata=dict(unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
+    living_root_hairs_struct_mass: float = field(default=0., metadata=dict(unit="g", unit_comment="", description="Example root segment living root hairs structural mass", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
+    root_hair_length: float = field(default=1.e-3, metadata=dict(unit="m", unit_comment="", description="Example root hair length", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair maximal length for wheat and barley evolves between 0.5 and 1.3 mm.", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
+    total_root_hairs_number: float = field(default=30 * (1.6e-4 / 3.5e-4) * 3.e-3 * 1e3, metadata=dict(unit="adim", unit_comment="", description="Example root hairs number on segment external surface", value_comment="30 * (1.6e-4 / radius) * length * 1e3", references=" According to the work of Gahoonia et al. (1997), the root hair density is about 30 hairs per mm for winter wheat, for a root radius of about 0.16 mm.", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
+    hexose_consumption_by_growth: float = field(default=0., metadata=dict(unit="g", unit_comment="", description="Hexose consumption by growth is coupled to a root growth model", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
+    distance_from_tip: float = field(default=3.e-3, metadata=dict(unit="m", unit_comment="", description="Example distance from tip", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
     volume: float = field(default=1e-7, metadata=dict(unit="m3", unit_comment="", description="Initial volume of the collar element", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
+    struct_mass_produced: float = field(default=0, metadata=dict(unit="g", unit_comment="of dry weight", description="", value_comment="", references="", variable_type="state_variable", by="model_growth"))
+    thermal_time_since_emergence: float = field(default=0, metadata=dict(unit="°C", unit_comment="", description="", value_comment="", references="", variable_type="state_variable", by="model_growth"))
 
     # --- INITIALIZES MODEL PARAMETERS ---
     # Segment initialization
@@ -116,19 +128,30 @@ class RootGrowthModel:
     root_order_limitation: bool = field(default=False, metadata=dict(unit="adim", unit_comment="", description="a Boolean expliciting whether lateral roots should be prevented above a certain root order", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
     root_order_treshold: int = field(default=2, metadata=dict(unit="adim", unit_comment="", description="the root order above which new lateral roots cannot be formed", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
 
-    def __init__(self, time_step_in_seconds: int):
+    def __init__(self, time_step_in_seconds: int, **scenario: dict):
         """
         DESCRIPTION
         -----------
         __init__ method
 
         :param time_step_in_seconds: time step of the simulation (s)
+        :param scenario: mapping of existing variable initialization and parameters to superimpose.
         :return:
         """
         self.g = self.initiate_mtg()
         self.props = self.g.properties()
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_step_in_seconds = time_step_in_seconds
+
+        # Before any other operation, we apply the provided scenario by changing default parameters and initialization
+        self.apply_scenario(**scenario)
+
+        self.state_variables = [f.name for f in fields(self) if f.metadata["variable_type"] == "state_variable"]
+
+        for name in self.state_variables:
+            # Note unlike other modules, there is another initialization of state_variables by the initiate_mtg method
+            # Thus, we just link mtg dict to self dict for it to be readable by other modules during coupling
+            setattr(self, name, self.props[name])
 
         # We define the list of apices for all vertices labelled as "Apex" or "Segment", from the tip to the base:
         root_gen = self.g.component_roots_at_scale_iter(self.g.root, scale=1)
@@ -428,13 +451,23 @@ class RootGrowthModel:
 
         return g
 
+    def apply_scenario(self, **kwargs):
+        """
+        Method to superimpose default parameters in order to create a scenario.
+        Use Model.documentation to discover model parameters and state variables.
+        :param kwargs: mapping of existing variable to superimpose.
+        """
+        for changed_parameter, value in kwargs.items():
+            if changed_parameter in dir(self):
+                setattr(self, changed_parameter, value)
+
     def post_coupling_init(self):
         self.reinitializing_growth_variables()
         self.check_if_coupled()
 
     def check_if_coupled(self):
         # For all expected input...
-        input_variables = [name for name, value in self.__dataclass_fields__ if value.metadata["variable_type"] == "input"]
+        input_variables = [f.name for f in fields(self) if f.metadata["variable_type"] == "input"]
         for inpt in input_variables:
             # If variable type has not gone to dictionary as it is part of the coupling process
             # we use provided default value to create the dictionnary used in the rest of the model
@@ -446,12 +479,26 @@ class RootGrowthModel:
                 # link mtg dict to self dict
                 setattr(self, inpt, self.props[inpt])
 
+    def get_available_inputs(self):
+        for inputs in self.available_inputs:
+            source_model = inputs["applier"]
+            linker = inputs["linker"]
+            for name, source_variables in linker.items():
+                # if variables have to be summed
+                if len(source_variables.keys()) > 1:
+                    return setattr(self, name, dict(zip(getattr(source_model, "vertices"), [sum([getattr(source_model, source_name)[vid] * unit_conversion for source_name, unit_conversion in source_variables.items()]) for vid in getattr(source_model, "vertices")])))
+                else:
+                    return setattr(self, name, getattr(source_model, list(source_variables.keys())[0]))
+
     # ACTUAL CALLABLE SCHEDULING LOOP TODO: metadata?
     # -------------------------------
     def run_time_step_growth(self):
         """
         Method to run the initiated model on defined time step.
         """
+        # We have to renew this call at each time step to ensure model inputs are well updated
+        self.get_available_inputs()
+
         # We reset to 0 all growth-associated C costs and initialize the initial dimensions or masses:
         self.reinitializing_growth_variables()
 
@@ -559,7 +606,7 @@ class RootGrowthModel:
 
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = self.temperature_modification()
+        temperature_time_adjustment = self.temperature_modification(soil_temperature=apex.soil_temperature_in_Celsius)
 
         # CASE 1: THE APEX CORRESPONDS TO THE PRIMORDIUM OF A POTENTIALLY EMERGING SEMINAL OR ADVENTITIOUS ROOT
         # -----------------------------------------------------------------------------------------------------
@@ -952,7 +999,7 @@ class RootGrowthModel:
                               / (self.Km_nodule_thickening + C_hexose_regulating_nodule_growth)
             # We calculate a coefficient that will modify the rate of thickening according to soil temperature
             # assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-            thickening_rate = thickening_rate * self.temperature_modification()
+            thickening_rate = thickening_rate * self.temperature_modification(soil_temperature=segment.soil_temperature_in_Celsius)
             segment.theoretical_radius = segment.radius * (1 + thickening_rate * self.time_step_in_seconds)
             if segment.theoretical_radius > self.nodule_max_radius:
                 segment.potential_radius = self.nodule_max_radius
@@ -982,7 +1029,7 @@ class RootGrowthModel:
 
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = self.temperature_modification()
+        temperature_time_adjustment = self.temperature_modification(soil_temperature=segment.soil_temperature_in_Celsius)
 
         # CHECKING WHETHER THE APEX OF THE ROOT AXIS HAS STOPPED GROWING:
         # ---------------------------------------------------------------
@@ -1066,7 +1113,7 @@ class RootGrowthModel:
                                   * segment.C_hexose_root / (self.Km_thickening + segment.C_hexose_root)
                 # We calculate a coefficient that will modify the rate of thickening according to soil temperature
                 # assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-                thickening_rate = thickening_rate * self.temperature_modification()
+                thickening_rate = thickening_rate * self.temperature_modification(soil_temperature=segment.soil_temperature_in_Celsius)
                 # The maximal possible new radius according to this regulation is therefore:
                 new_radius_max = (1 + thickening_rate * self.time_step_in_seconds) * segment.initial_radius
                 # If the potential new radius is higher than the maximal new radius:
@@ -1133,13 +1180,6 @@ class RootGrowthModel:
         #  and consider how to limit the actual growth when not enough N is available.
         #  In a second step, you may consider how the emergence of primordia may depend on N availability in the root or in the soil.
 
-        # CALCULATING AN EQUIVALENT OF THERMAL TIME:
-        # -------------------------------------------
-
-        # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
-        # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = self.temperature_modification()
-
         # PROCEEDING TO ACTUAL GROWTH:
         # -----------------------------
 
@@ -1151,6 +1191,10 @@ class RootGrowthModel:
 
             # n represents the current root element:
             n = self.g.node(vid)
+
+            # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
+            # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
+            temperature_time_adjustment = self.temperature_modification(soil_temperature=n.soil_temperature_in_Celsius)
 
             # AVOIDANCE OF UNWANTED CASES:
             # -----------------------------
@@ -1177,7 +1221,7 @@ class RootGrowthModel:
             # the yield growth included in the model of Thornley and Cannell (2000), where root_tissue_density is the dry structural
             # weight per volume (g m-3) and struct_mass_C_content is the amount of C per gram of dry structural mass (mol_C g-1):
             n.hexose_growth_demand = (potential_volume - initial_volume) \
-                                     * self.root_tissue_density * self.struct_mass_C_content / self.yield_growth * 1 / 6.
+                                     * n.root_tissue_density * self.struct_mass_C_content / self.yield_growth * 1 / 6.
             # We verify that this potential growth demand is positive:
             if n.hexose_growth_demand < 0.:
                 print("!!! ERROR: a negative growth demand of", n.hexose_growth_demand,
@@ -1226,7 +1270,7 @@ class RootGrowthModel:
 
             # We calculate the maximal possible length of the root element according to all the hexose available for elongation:
             volume_max = initial_volume + hexose_possibly_required_for_elongation * 6. \
-                         / (self.root_tissue_density * self.struct_mass_C_content) * self.yield_growth
+                         / (n.root_tissue_density * self.struct_mass_C_content) * self.yield_growth
             length_max = volume_max / (pi * n.initial_radius ** 2)
 
             # If the element can elongate:
@@ -1246,7 +1290,7 @@ class RootGrowthModel:
                 # The overall cost of elongation is calculated as:
                 hexose_consumption_by_elongation = \
                     1. / 6. * (volume_after_elongation - initial_volume) \
-                    * self.root_tissue_density * self.struct_mass_C_content / self.yield_growth
+                    * n.root_tissue_density * self.struct_mass_C_content / self.yield_growth
 
                 # If there has been an actual elongation:
                 if n.length > n.initial_length:
@@ -1345,8 +1389,8 @@ class RootGrowthModel:
             # The new volume of the element is automatically calculated
             n.volume = self.volume_from_radius_and_length(n, n.radius, n.length)
             # The new dry structural struct_mass of the element is calculated from its new volume:
-            n.struct_mass = n.volume * self.root_tissue_density
-            n.struct_mass_produced = (n.volume - initial_volume) * self.root_tissue_density
+            n.struct_mass = n.volume * n.root_tissue_density
+            n.struct_mass_produced = (n.volume - initial_volume) * n.root_tissue_density
 
             # Verification: we check that no negative length or struct_mass have been generated!
             if n.volume < 0:
@@ -1436,7 +1480,7 @@ class RootGrowthModel:
         # CALCULATING AN EQUIVALENT OF THERMAL TIME:
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = self.temperature_modification()
+        temperature_time_adjustment = self.temperature_modification(soil_temperature=apex.soil_temperature_in_Celsius)
 
         # ADJUSTING ROOT ANGLES FOR THE FUTURE NEW SEGMENTS:
         # Optional - We can add random geometry, or not:
@@ -1731,7 +1775,7 @@ class RootGrowthModel:
 
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = self.temperature_modification()
+        temperature_time_adjustment = self.temperature_modification(soil_temperature=apex.soil_temperature_in_Celsius)
 
         # OPERATING PRIMORDIUM FORMATION:
         # --------------------------------
@@ -1859,7 +1903,7 @@ class RootGrowthModel:
             # # when the element becomes a segment.
 
             # We calculate the equivalent of a thermal time for the current time step:
-            temperature_time_adjustment = self.temperature_modification()
+            temperature_time_adjustment = self.temperature_modification(soil_temperature=n.soil_temperature_in_Celsius)
             elapsed_thermal_time = self.time_step_in_seconds * temperature_time_adjustment
 
             # We keep in memory the initial total mass of root hairs (possibly including dead hairs):
@@ -2063,13 +2107,6 @@ class RootGrowthModel:
         root_gen = self.g.component_roots_at_scale_iter(self.g.root, scale=1)
         root = next(root_gen)
 
-        # CALCULATING AN EQUIVALENT OF THERMAL TIME:
-        # -------------------------------------------
-
-        # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
-        # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = self.temperature_modification()
-
         # PERFORMING ARCHISIMPLE GROWTH:
         # -------------------------------
 
@@ -2078,6 +2115,13 @@ class RootGrowthModel:
 
             # n represents the current root element:
             n = self.g.node(vid)
+
+            # CALCULATING AN EQUIVALENT OF THERMAL TIME:
+            # -------------------------------------------
+
+            # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
+            # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
+            temperature_time_adjustment = self.temperature_modification(soil_temperature=n.soil_temperature_in_Celsius)
 
             # We make sure that the element is not dead and has not already been stopped at the previous time step:
             if n.type == "Dead" or n.type == "Just_dead" or n.type == "Stopped":
@@ -2194,7 +2238,7 @@ class RootGrowthModel:
     # -----------------------------------------------
 
     # Modification of a process according to soil temperature:
-    def temperature_modification(self):
+    def temperature_modification(self, soil_temperature=15.):
         """
         # TODO : make modular and avoid repetitions with the root Carbon model, method needs to be accesses by nearly every root module
         This function calculates how the value of a process should be modified according to soil temperature (in degrees Celsius).
@@ -2211,14 +2255,14 @@ class RootGrowthModel:
 
         # We avoid unwanted cases:
         if self.C != 0 and self.C != 1:
-            print("The modification of the process at T =", self.soil_temperature_in_Celsius,
+            print("The modification of the process at T =", soil_temperature,
                   "only works for C=0 or C=1!")
             print("The modified process has been set to 0.")
             modified_process = 0.
             return 0.
         elif self.C == 1:
-            if (self.A * (self.soil_temperature_in_Celsius - self.T_ref) + self.B) < 0.:
-                print("The modification of the process at T =", self.soil_temperature_in_Celsius,
+            if (self.A * (soil_temperature - self.T_ref) + self.B) < 0.:
+                print("The modification of the process at T =", soil_temperature,
                       "is unstable with this set of parameters!")
                 print("The modified process has been set to 0.")
                 modified_process = 0.
@@ -2227,9 +2271,9 @@ class RootGrowthModel:
         # We compute a temperature-modified process, correspond to a Q10-modified relationship,
         # based on the work of Tjoelker et al. (2001):
         modified_process = self.process_at_T_ref * (
-                self.A * (self.soil_temperature_in_Celsius - self.T_ref) + self.B) ** (1 - self.C) \
-                           * (self.A * (self.soil_temperature_in_Celsius - self.T_ref) + self.B) ** (
-                                   self.C * (self.soil_temperature_in_Celsius - self.T_ref) / 10.)
+                self.A * (soil_temperature - self.T_ref) + self.B) ** (1 - self.C) \
+                           * (self.A * (soil_temperature - self.T_ref) + self.B) ** (
+                                   self.C * (soil_temperature - self.T_ref) / 10.)
 
         if modified_process < 0.:
             modified_process = 0.

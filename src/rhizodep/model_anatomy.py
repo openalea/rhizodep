@@ -33,7 +33,6 @@ class RootAnatomy:
     xylem_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface between root parenchyma and apoplasmic xylem vessels.", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="extensive", edit_by="user"))
     phloem_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface between root parenchyma and apoplasmic xylem vessels.", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="extensive", edit_by="user"))
 
-
     # Volumes
     xylem_volume: float = field(default=0., metadata=dict(unit="m3", unit_comment="", description="xylem volume for water transport between elements", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="extensive", edit_by="user"))
 
@@ -41,6 +40,9 @@ class RootAnatomy:
     endodermis_conductance_factor: float = field(default=1., metadata=dict(unit="adim", unit_comment="", description="The endodermis barrier differentiation factor", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="intensive", edit_by="user"))
     epidermis_conductance_factor: float = field(default=0.5, metadata=dict(unit="adim", unit_comment="", description="The epidermis barrier differentiation factor", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="intensive", edit_by="user"))
     xylem_differentiation_factor: float = field(default=1., metadata=dict(unit="adim", unit_comment="", description="Xylem differentiation, i.e. apoplasmic opening, from 0 to 1", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="instensive", edit_by="user"))
+
+    # Tissue density
+    root_tissue_density: float = field(default=0.10 * 1e6, metadata=dict(unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="", edit_by="user"))
 
     # --- INITIALIZES MODEL PARAMETERS ---
 
@@ -65,7 +67,7 @@ class RootAnatomy:
     xylem_cross_area_surfacic_fraction: float = field(default=0.84 * (0.36 ** 2), metadata=dict(unit="adim", unit_comment="apoplasmic cross-section area ratio * stele radius ratio^2", description="apoplasmic cross-section ratio over root segment's sectional surface", value_comment="", references="report", variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user"))
     root_hair_radius: float = field(default=12 * 1e-6 / 2., metadata=dict(unit="m", unit_comment="", description="Average radius of root hair", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair diameter is relatively constant for different genotypes of wheat and barley, i.e. 12 microns.", variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user"))
 
-    def __init__(self, g, time_step_in_seconds: int):
+    def __init__(self, g, time_step_in_seconds: int, **scenario: dict):
         """
         DESCRIPTION
         -----------
@@ -73,6 +75,7 @@ class RootAnatomy:
 
         :param g: the root MTG
         :param time_step_in_seconds: time step of the simulation (s)
+        :param scenario: mapping of existing variable initialization and parameters to superimpose.
         :return:
         """
 
@@ -80,6 +83,9 @@ class RootAnatomy:
         self.props = self.g.properties()
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_step_in_seconds = time_step_in_seconds
+
+        # Before any other operation, we apply the provided scenario by changing default parameters and initialization
+        self.apply_scenario(**scenario)
 
         self.state_variables = [f.name for f in fields(self) if f.metadata["variable_type"] == "state_variable"]
 
@@ -90,6 +96,16 @@ class RootAnatomy:
             self.props[name].update({key: getattr(self, name) for key in self.vertices})
             # link mtg dict to self dict
             setattr(self, name, self.props[name])
+
+    def apply_scenario(self, **kwargs):
+        """
+        Method to superimpose default parameters in order to create a scenario.
+        Use Model.documentation to discover model parameters and state variables.
+        :param kwargs: mapping of existing variable to superimpose.
+        """
+        for changed_parameter, value in kwargs.items():
+            if changed_parameter in dir(self):
+                setattr(self, changed_parameter, value)
 
     def post_coupling_init(self):
         self.store_functions_call()
@@ -123,12 +139,26 @@ class RootAnatomy:
                 # link mtg dict to self dict
                 setattr(self, inpt, self.props[inpt])
 
-    def run_anatomy_update(self):
+    def get_available_inputs(self):
+        for inputs in self.available_inputs:
+            source_model = inputs["applier"]
+            linker = inputs["linker"]
+            for name, source_variables in linker.items():
+                # if variables have to be summed
+                if len(source_variables.keys()) > 1:
+                    return setattr(self, name, dict(zip(getattr(source_model, "vertices"), [sum([getattr(source_model, source_name)[vid] * unit_conversion for source_name, unit_conversion in source_variables.items()]) for vid in getattr(source_model, "vertices")])))
+                else:
+                    return setattr(self, name, getattr(source_model, list(source_variables.keys())[0]))
+
+    def run_actualize_anatomy(self):
+        # We have to renew this call at each time step to ensure model inputs are well updated
+        self.get_available_inputs()
+
         # 1- Update data structure according to structure change
         self.add_new_segments()
 
         # 2- We update the conductance of tissues
-        map(self.transport_barriers, *self.vertices)
+        map(self.transport_barriers, self.vertices)
 
         # 3- Finally update surfaces, volumes and pathway indicators
         self.props.update(self.upd_resolution())

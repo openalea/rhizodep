@@ -3,6 +3,7 @@ import inspect as ins
 from functools import partial
 import numpy as np
 
+
 @dataclass
 class SoilModel:
     # --- INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
@@ -30,8 +31,13 @@ class SoilModel:
     C_AA_soil: float = field(default=1e-4, metadata=dict(unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", value_comment="", references="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user"))
 
     # Water
-    water_potential_soil: float = field(default=-0.1e6, metadata=dict(unit="Pa", unit_comment="", description="Mean soil water potential", value_comment="", references="", variable_type="state_variable", by="model_soil", state_variable_type="", edit_by="user"))
-    volume_soil: float = field(default=1e-7, metadata=dict(unit="m3", unit_comment="", description="Volume of the soil element in contact with a the root segment", value_comment="", references="", variable_type="state_variable", by="model_soil", state_variable_type="", edit_by="user"))
+    water_potential_soil: float = field(default=-0.1e6, metadata=dict(unit="Pa", unit_comment="", description="Mean soil water potential", value_comment="", references="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user"))
+    volume_soil: float = field(default=1e-7, metadata=dict(unit="m3", unit_comment="", description="Volume of the soil element in contact with a the root segment", value_comment="", references="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user"))
+
+    # Degradation processes
+    hexose_degradation: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="", description="Rate of hexose consumption  at the soil-root interface", value_comment="", references="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user"))
+    mucilage_degradation: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="", description="Rate of mucilage degradation outside the root", value_comment="", references="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user"))
+    cells_degradation: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="", description="Rate of root cells degradation outside the root", value_comment="", references="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user"))
 
     # --- INITIALIZES MODEL PARAMETERS ---
 
@@ -61,7 +67,7 @@ class SoilModel:
     cells_degradation_rate_max: float = field(default=277 * 0.000000001 / (60 * 60 * 24) * 1000 * 1 / (0.5 * 1) * 10 / 2, metadata=dict(unit="mol.m-2.s-1", unit_comment="of equivalent hexose", description="Maximum degradation rate of root cells at the soil/root interface", value_comment="", references="We assume that the maximum degradation rate for cells is equivalent to the half of the one defined for hexose.", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user"))
     Km_cells_degradation: float = field(default=1000 * 1e-6 / 12., metadata=dict(unit="mol.g-1", unit_comment="of equivalent hexose", description="Affinity constant for soil cells degradation", value_comment="", references="We assume that Km for cells degradation is identical to the one for hexose degradation.", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user"))
 
-    def __init__(self, g, time_step_in_seconds):
+    def __init__(self, g, time_step_in_seconds, **scenario: dict):
         """
         DESCRIPTION
         -----------
@@ -69,13 +75,17 @@ class SoilModel:
 
         :param g: the root MTG
         :param time_step_in_seconds: time step of the simulation (s)
+        :param scenario: mapping of existing variable initialization and parameters to superimpose.
         :return:
         """
         self.g = g
         self.props = self.g.properties()
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_steps_in_seconds = time_step_in_seconds
-        self.voxels = self.initiate_voxel_soil()
+        #self.voxels = self.initiate_voxel_soil() # TODO Not tested for now
+
+        # Before any other operation, we apply the provided scenario by changing default parameters and initialization
+        self.apply_scenario(**scenario)
 
         self.state_variables = [f.name for f in fields(self) if f.metadata["variable_type"] == "state_variable"]
 
@@ -117,8 +127,18 @@ class SoilModel:
 
         return voxels
 
+    def apply_scenario(self, **kwargs):
+        """
+        Method to superimpose default parameters in order to create a scenario.
+        Use Model.documentation to discover model parameters and state variables.
+        :param kwargs: mapping of existing variable to superimpose.
+        """
+        for changed_parameter, value in kwargs.items():
+            if changed_parameter in dir(self):
+                setattr(self, changed_parameter, value)
 
     def post_coupling_init(self):
+        self.get_available_inputs()
         self.store_functions_call()
         self.check_if_coupled()
 
@@ -157,12 +177,24 @@ class SoilModel:
                 # link mtg dict to self dict
                 setattr(self, inpt, self.props[inpt])
 
+    def get_available_inputs(self):
+        for inputs in self.available_inputs:
+            source_model = inputs["applier"]
+            linker = inputs["linker"]
+            for name, source_variables in linker.items():
+                # if variables have to be summed
+                if len(source_variables.keys()) > 1:
+                    return setattr(self, name, dict(zip(getattr(source_model, "vertices"), [sum([getattr(source_model, source_name)[vid] * unit_conversion for source_name, unit_conversion in source_variables.items()]) for vid in getattr(source_model, "vertices")])))
+                else:
+                    return setattr(self, name, getattr(source_model, list(source_variables.keys())[0]))
+
     def run_exchanges_and_balance(self):
         """
         Groups and order carbon exchange processes and balance in the rhizo-soil for the provided time step.
         Note : for now, every proposition about soil voxels in not working yet. This is just a proposition to support discussions.
         """
-        # TODO print(self.struct_mass, self.initial_struct_mass to check is they are indeed different here)
+        # We have to renew this call at each time step to ensure model inputs are well updated
+        self.get_available_inputs()
         self.add_new_segments()
 
         # # We apply to voxels flows from the roots
@@ -262,7 +294,7 @@ class SoilModel:
 
     # Modification of a process according to soil temperature:
     # --------------------------------------------------------
-    def temperature_modification(self, T_ref=0., A=-0.05, B=3., C=1.):
+    def temperature_modification(self, soil_temperature=15, T_ref=0., A=-0.05, B=3., C=1.):
         """
         This function calculates how the value of a process should be modified according to soil temperature (in degrees Celsius).
         Parameters correspond to the value of the process at reference temperature T_ref (process_at_T_ref),
@@ -282,14 +314,14 @@ class SoilModel:
 
         # We avoid unwanted cases:
         if C != 0 and C != 1:
-            print("The modification of the process at T =", self.soil_temperature_in_Celsius,
+            print("The modification of the process at T =", soil_temperature,
                   "only works for C=0 or C=1!")
             print("The modified process has been set to 0.")
             modified_process = 0.
             return 0.
         elif C == 1:
-            if (A * (self.soil_temperature_in_Celsius - T_ref) + B) < 0.:
-                print("The modification of the process at T =", self.soil_temperature_in_Celsius,
+            if (A * (soil_temperature - T_ref) + B) < 0.:
+                print("The modification of the process at T =", soil_temperature,
                       "is unstable with this set of parameters!")
                 print("The modified process has been set to 0.")
                 modified_process = 0.
@@ -297,16 +329,16 @@ class SoilModel:
 
         # We compute a temperature-modified process, correspond to a Q10-modified relationship,
         # based on the work of Tjoelker et al. (2001):
-        modified_process = self.process_at_T_ref * (A * (self.soil_temperature_in_Celsius - T_ref) + B) ** (1 - C) \
-                           * (A * (self.soil_temperature_in_Celsius - T_ref) + B) ** (
-                                       C * (self.soil_temperature_in_Celsius - T_ref) / 10.)
+        modified_process = self.process_at_T_ref * (A * (soil_temperature - T_ref) + B) ** (1 - C) \
+                           * (A * (soil_temperature - T_ref) + B) ** (
+                                       C * (soil_temperature - T_ref) / 10.)
 
         if modified_process < 0.:
             modified_process = 0.
 
         return modified_process
 
-    def process_hexose_degradation(self, C_hexose_soil, root_exchange_surface):
+    def process_hexose_degradation(self, C_hexose_soil, root_exchange_surface, soil_temperature_in_Celsius):
         """
         This function computes the rate of hexose "consumption" (in mol of hexose per seconds) at the soil-root interface
         for a given root element. It mimics the uptake of hexose by rhizosphere microorganisms, and is therefore described
@@ -315,8 +347,10 @@ class SoilModel:
         :param root_exchange_surface: external root exchange surface in contact with soil solution (m2)
         :return: the updated root element n
         """
+
         # We correct the maximal degradation rate according to soil temperature:
         corrected_hexose_degradation_rate_max = self.hexose_degradation_rate_max * self.temperature_modification(
+                                                                        soil_temperature=soil_temperature_in_Celsius,
                                                                         T_ref=self.hexose_degradation_rate_max_T_ref,
                                                                         A=self.hexose_degradation_rate_max_A,
                                                                         B=self.hexose_degradation_rate_max_B,
@@ -326,7 +360,7 @@ class SoilModel:
         return max(corrected_hexose_degradation_rate_max * root_exchange_surface * C_hexose_soil / (
                                                                             self.Km_hexose_degradation + C_hexose_soil), 0.)
 
-    def process_mucilage_degradation(self, Cs_mucilage_soil, root_exchange_surface):
+    def process_mucilage_degradation(self, Cs_mucilage_soil, root_exchange_surface, soil_temperature_in_Celsius):
         """
         This function computes the rate of mucilage degradation outside the root (in mol of equivalent-hexose per second)
         for a given root element. Only the external surface of the root element is taken into account here, similarly to
@@ -335,8 +369,10 @@ class SoilModel:
         :param root_exchange_surface: external root exchange surface in contact with soil solution (m2)
         :return: the updated root element n
         """
+
         # We correct the maximal degradation rate according to soil temperature:
         corrected_mucilage_degradation_rate_max = self.mucilage_degradation_rate_max * self.temperature_modification(
+                                                                    soil_temperature=soil_temperature_in_Celsius,
                                                                     T_ref=self.mucilage_degradation_rate_max_T_ref,
                                                                     A=self.mucilage_degradation_rate_max_A,
                                                                     B=self.mucilage_degradation_rate_max_B,
@@ -347,7 +383,7 @@ class SoilModel:
         return max(corrected_mucilage_degradation_rate_max * root_exchange_surface * Cs_mucilage_soil / (
                 self.Km_mucilage_degradation + Cs_mucilage_soil), 0.)
 
-    def process_cells_degradation(self, Cs_cells_soil, root_exchange_surface):
+    def process_cells_degradation(self, Cs_cells_soil, root_exchange_surface, soil_temperature_in_Celsius):
         """
         This function computes the rate of root cells degradation outside the root (in mol of equivalent-hexose per second)
         for a given root element. Only the external surface of the root element is taken into account as the exchange
@@ -359,6 +395,7 @@ class SoilModel:
 
         # We correct the maximal degradation rate according to soil temperature:
         corrected_cells_degradation_rate_max = self.cells_degradation_rate_max * self.temperature_modification(
+                                                                        soil_temperature=soil_temperature_in_Celsius,
                                                                         T_ref=self.cells_degradation_rate_max_T_ref,
                                                                         A=self.cells_degradation_rate_max_A,
                                                                         B=self.cells_degradation_rate_max_B,

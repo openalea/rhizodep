@@ -20,21 +20,19 @@ from statistical_tools.main import launch_analysis
 
 # We define the main simulation program:
 def main_simulation(time_step_in_seconds=3600, simulation_period_in_days=20., **scenario):
-    # Initializes the model
-    rhizodep = Model(time_step=time_step_in_seconds)
+    # Initializes the model and provide a scenario to superimpose default parameters
+    rhizodep = Model(time_step=time_step_in_seconds, **scenario)
 
-    # print documentation if necessary
-    print(rhizodep.documentation)
-    print(rhizodep.inputs)
+    # Print documentation if necessary to build a scenario
+    #print(rhizodep.documentation)
 
-    # Provide a scenario to superimpose default parameters
-    rhizodep.scenario(**scenario)
     g = rhizodep.g
 
     # Computational loop
-    steps = int(simulation_period_in_days / (time_step_in_seconds / 24))
+    steps = int(simulation_period_in_days / (time_step_in_seconds / 3600 / 24))
     for step in range(steps):
         rhizodep.run()
+        print(step)
 
         # Here : MTG logging method
 
@@ -43,7 +41,7 @@ def main_simulation(time_step_in_seconds=3600, simulation_period_in_days=20., **
         pickle.dump(g, f)
 
     # Here : display / analysis method
-    launch_analysis(g)
+    #launch_analysis(g)
 
 if __name__ == "__main__":
     main_simulation(time_step_in_seconds=3600, simulation_period_in_days=20.,
