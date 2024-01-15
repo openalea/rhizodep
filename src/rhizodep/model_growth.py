@@ -25,7 +25,7 @@ class RootGrowthModel:
     """
     DESCRIPTION
     -----------
-    Root growth model originating from Rhizodep model.py
+    Root growth model originating from Rhizodep model_shoot.py
 
     forked :
         https://forgemia.inra.fr/tristan.gerault/rhizodep/-/commits/rhizodep_2022?ref_type=heads
@@ -462,6 +462,7 @@ class RootGrowthModel:
                 setattr(self, changed_parameter, value)
 
     def post_coupling_init(self):
+        self.get_available_inputs()
         self.reinitializing_growth_variables()
         self.check_if_coupled()
 

@@ -8,7 +8,7 @@ from functools import partial
 @dataclass
 class RootAnatomy:
     """
-    Root anatomy model originating from both Rhizodep model.py and Root_CyNAPS model_topology.py
+    Root anatomy model originating from both Rhizodep model_shoot.py and Root_CyNAPS model_topology.py
 
     Rhizodep forked :
         https://forgemia.inra.fr/tristan.gerault/rhizodep/-/commits/rhizodep_2022?ref_type=heads
@@ -108,6 +108,7 @@ class RootAnatomy:
                 setattr(self, changed_parameter, value)
 
     def post_coupling_init(self):
+        self.get_available_inputs()
         self.store_functions_call()
         self.check_if_coupled()
 

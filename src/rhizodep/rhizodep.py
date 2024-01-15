@@ -40,7 +40,6 @@ class Model(ModelWrapper):
         self.root_carbon = RootCarbonModel(self.g, time_step, **scenario)
         self.soil = SoilModel(self.g, time_step, **scenario)
 
-        #
         self.models = (self.root_growth, self.root_anatomy, self.root_carbon, self.soil)
 
         # LINKING MODULES
@@ -60,10 +59,8 @@ class Model(ModelWrapper):
         self.root_growth.post_coupling_init()
         self.root_anatomy.post_coupling_init()
 
-
     def run(self):
         # Update environment boundary conditions
-        # Update soil state
         self.soil.run_exchanges_and_balance()
 
         # Compute state variations for water and then nitrogen
