@@ -8,7 +8,7 @@ from functools import partial
 @dataclass
 class RootAnatomy:
     """
-    Root anatomy model originating from both Rhizodep model_shoot.py and Root_CyNAPS model_topology.py
+    Root anatomy model originating from both Rhizodep shoot.py and Root_CyNAPS model_topology.py
 
     Rhizodep forked :
         https://forgemia.inra.fr/tristan.gerault/rhizodep/-/commits/rhizodep_2022?ref_type=heads
@@ -83,6 +83,7 @@ class RootAnatomy:
         self.props = self.g.properties()
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_step_in_seconds = time_step_in_seconds
+        self.available_inputs = []
 
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
         self.apply_scenario(**scenario)

@@ -66,7 +66,7 @@ from math import pi
 @dataclass
 class RootCarbonModel:
     """
-    Root carbon balance model originating from Rhizodep model_shoot.py
+    Root carbon balance model originating from Rhizodep shoot.py
     TODO adapt differential equation system
     forked :
         https://forgemia.inra.fr/tristan.gerault/rhizodep/-/commits/rhizodep_2022?ref_type=heads
@@ -94,9 +94,9 @@ class RootCarbonModel:
     sucrose_input_rate: float = field(default=1e-6, metadata=dict(unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", value_comment="", references="", variable_type="input", by="model_shoot", state_variable_type="", edit_by="user"))
 
     # FROM ANATOMY MODEL
-    root_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface between soil and symplasmic parenchyma.", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="extensive", edit_by="user"))
-    phloem_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface between root parenchyma and apoplasmic xylem vessels.", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="extensive", edit_by="user"))
-    apoplasmic_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface to account for exchanges between xylem + stele apoplasm and soil. We account for it through cylindrical surface, a pathway closing as soon as endodermis differentiates", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="extensive", edit_by="user"))
+    root_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface between soil and symplasmic parenchyma.", value_comment="", references="", variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user"))
+    phloem_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface between root parenchyma and apoplasmic xylem vessels.", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="input", edit_by="user"))
+    apoplasmic_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface to account for exchanges between xylem + stele apoplasm and soil. We account for it through cylindrical surface, a pathway closing as soon as endodermis differentiates", value_comment="", references="", variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user"))
 
     # --- INITIALIZE MODEL STATE VARIABLES ---
 
@@ -128,9 +128,9 @@ class RootCarbonModel:
     deficit_hexose_root: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="of hexose", description="Hexose deficit rate in root", value_comment="", references="Hypothesis of no initial deficit", variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user"))
 
     # SUMMED STATE VARIABLES
-    total_sucrose_root: float = field(default=0., metadata=dict(unit="mol", unit_comment="of sucrose", description="Summed sucrose root at root system level", value_comment="", references="", variable_type="summed_variable", by="model_carbon", state_variable_type="extensive", edit_by="user"))
-    total_living_struct_mass: float = field(default=0., metadata=dict(unit="g", unit_comment="", description="Summed structural mass at root system level", value_comment="", references="", variable_type="summed_variable", by="model_carbon", state_variable_type="extensive", edit_by="user"))
-    global_sucrose_deficit: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="of sucrose", description="Summed sucrose deficit at root system level", value_comment="", references="", variable_type="summed_variable", by="model_carbon", state_variable_type="extensive", edit_by="user"))
+    total_sucrose_root: float = field(default=0., metadata=dict(unit="mol", unit_comment="of sucrose", description="Summed sucrose root at root system level", value_comment="", references="", variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user"))
+    total_living_struct_mass: float = field(default=0., metadata=dict(unit="g", unit_comment="", description="Summed structural mass at root system level", value_comment="", references="", variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user"))
+    global_sucrose_deficit: float = field(default=0., metadata=dict(unit="mol.s-1", unit_comment="of sucrose", description="Summed sucrose deficit at root system level", value_comment="", references="", variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user"))
 
     # --- INITIALIZES MODEL PARAMETERS ---
 
@@ -232,6 +232,7 @@ class RootCarbonModel:
         self.props = self.g.properties()
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_steps_in_seconds = time_step_in_seconds
+        self.available_inputs = []
 
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
         self.apply_scenario(**scenario)
@@ -245,13 +246,11 @@ class RootCarbonModel:
             self.props[name].update({key: getattr(self, name) for key in self.vertices})
             # link mtg dict to self dict
             setattr(self, name, self.props[name])
-        # We remove it from variables that will be extended uppon growth in the add_properties_to_new_segments property
-        self.state_variables.remove("C_hexose_root")
 
         # Repeat the same process for total root system properties
-        self.summed_variables = [f.name for f in fields(self) if f.metadata["variable_type"] == "summed_variable"]
+        self.plant_scale_states = [f.name for f in fields(self) if f.metadata["variable_type"] == "plant_scale_state"]
 
-        for name in self.summed_variables:
+        for name in self.plant_scale_states:
             if name not in self.props.keys():
                 self.props.setdefault(name, {})
             # set default in mtg
@@ -337,7 +336,7 @@ class RootCarbonModel:
         self.get_available_inputs()
 
         # TODO print(self.struct_mass, self.initial_struct_mass to check is they are indeed different here)
-        self.add_new_segments_and_reevaluate_concentrations()
+        self.post_growth_updating()
 
         self.props.update(self.prc_resolution())
         self.props.update(self.upd_resolution())
@@ -376,7 +375,7 @@ class RootCarbonModel:
     def get_up_to_date(self, prop):
         return getattr(self, prop)
 
-    def add_new_segments_and_reevaluate_concentrations(self):
+    def post_growth_updating(self):
         """
         Description :
             Extend property dictionnary uppon new element partionning and updates concentrations uppon structural_mass change
@@ -403,7 +402,7 @@ class RootCarbonModel:
 
     # Modification of a process according to soil temperature:
     # --------------------------------------------------------
-    def temperature_modification(self, soil_temperature=15, T_ref=0., A=-0.05, B=3., C=1.):
+    def temperature_modification(self, process_at_T_ref=1., soil_temperature=15, T_ref=0., A=-0.05, B=3., C=1.):
         """
         This function calculates how the value of a process should be modified according to soil temperature (in degrees Celsius).
         Parameters correspond to the value of the process at reference temperature T_ref (process_at_T_ref),
@@ -437,7 +436,7 @@ class RootCarbonModel:
 
         # We compute a temperature-modified process, correspond to a Q10-modified relationship,
         # based on the work of Tjoelker et al. (2001):
-        modified_process = self.process_at_T_ref * (A * (soil_temperature - T_ref) + B) ** (1 - C) \
+        modified_process = process_at_T_ref * (A * (soil_temperature - T_ref) + B) ** (1 - C) \
                            * (A * (soil_temperature - T_ref) + B) ** (C * (soil_temperature - T_ref) / 10.)
 
         if modified_process < 0.:
