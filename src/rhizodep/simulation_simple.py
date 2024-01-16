@@ -32,7 +32,7 @@ def main_simulation(time_step_in_seconds=3600, simulation_period_in_days=20., **
     steps = int(simulation_period_in_days / (time_step_in_seconds / 3600 / 24))
     for step in range(steps):
         rhizodep.run()
-        print(step)
+        print(step+1)
 
         # Here : MTG logging method
 
@@ -43,6 +43,7 @@ def main_simulation(time_step_in_seconds=3600, simulation_period_in_days=20., **
     # Here : display / analysis method
     #launch_analysis(g)
 
+
 if __name__ == "__main__":
     main_simulation(time_step_in_seconds=3600, simulation_period_in_days=20.,
                     radial_growth="Impossible", ArchiSimple=False, sucrose_input_rate=1.e-6,
@@ -51,4 +52,8 @@ if __name__ == "__main__":
                     root_order_limitation=False,
                     root_order_treshold=2,
                     using_solver=False,
-                    random=True)
+                    random=True,
+                    forcing_adventitious_roots_events=True,
+                    n_adventitious_roots=0,
+                    forcing_seminal_roots_events=True,
+                    n_seminal_roots=1)

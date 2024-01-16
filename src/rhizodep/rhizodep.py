@@ -1,10 +1,10 @@
 import os
 import pickle
 
-from model_growth import RootGrowthModel
-from model_carbon import RootCarbonModel
-from model_anatomy import RootAnatomy
-from model_soil import SoilModel
+from root_growth import RootGrowthModel
+from root_carbon import RootCarbonModel
+from root_anatomy import RootAnatomy
+from rhizo_soil import SoilModel
 
 from root_cynaps.wrapper import ModelWrapper
 
@@ -44,11 +44,13 @@ class Model(ModelWrapper):
 
         # LINKING MODULES
         # Get or build translator matrix
-        if not os.path.isfile("translator.pckl"):
+        try:
+            from coupling_translator import translator
+        except ImportError:
             print("NOTE : You will now have to provide information about shared variables between the modules composing this model :\n")
-            self.translator_matrix_builder()
-        with open("translator.pckl", "rb") as f:
-            translator = pickle.load(f)
+            translator = self.translator_matrix_builder()
+            print(translator)
+
 
         # Actually link modules together
         self.link_around_mtg(translator)

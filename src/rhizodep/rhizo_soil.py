@@ -19,6 +19,9 @@ class SoilModel:
     # FROM ANATOMY MODEL
     root_exchange_surface: float = field(default=0., metadata=dict(unit="m2", unit_comment="", description="Exchange surface between soil and symplasmic parenchyma.", value_comment="", references="", variable_type="input", by="model_anatomy", state_variable_type="", edit_by="user"))
 
+    # FROM GROWTH MODEL
+    struct_mass: float = field(default=1.35e-4, metadata=dict(unit="g", unit_comment="", description="Example root segment structural mass", value_comment="", references="", variable_type="input", by="model_growth", state_variable_type="", edit_by="user"))
+
     # --- INITIALIZE MODEL STATE VARIABLES ---
     # Temperature
     soil_temperature_in_Celsius: float = field(default=15., metadata=dict(unit="°C", unit_comment="", description="soil temperature in contact with roots", value_comment="", references="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user"))
@@ -82,6 +85,7 @@ class SoilModel:
         self.props = self.g.properties()
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_steps_in_seconds = time_step_in_seconds
+        self.available_inputs = []
         #self.voxels = self.initiate_voxel_soil() # TODO Not tested for now
 
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
@@ -294,7 +298,7 @@ class SoilModel:
 
     # Modification of a process according to soil temperature:
     # --------------------------------------------------------
-    def temperature_modification(self, soil_temperature=15, T_ref=0., A=-0.05, B=3., C=1.):
+    def temperature_modification(self, process_at_T_ref=1., soil_temperature=15, T_ref=0., A=-0.05, B=3., C=1.):
         """
         This function calculates how the value of a process should be modified according to soil temperature (in degrees Celsius).
         Parameters correspond to the value of the process at reference temperature T_ref (process_at_T_ref),
@@ -317,7 +321,6 @@ class SoilModel:
             print("The modification of the process at T =", soil_temperature,
                   "only works for C=0 or C=1!")
             print("The modified process has been set to 0.")
-            modified_process = 0.
             return 0.
         elif C == 1:
             if (A * (soil_temperature - T_ref) + B) < 0.:
@@ -329,7 +332,7 @@ class SoilModel:
 
         # We compute a temperature-modified process, correspond to a Q10-modified relationship,
         # based on the work of Tjoelker et al. (2001):
-        modified_process = self.process_at_T_ref * (A * (soil_temperature - T_ref) + B) ** (1 - C) \
+        modified_process = process_at_T_ref * (A * (soil_temperature - T_ref) + B) ** (1 - C) \
                            * (A * (soil_temperature - T_ref) + B) ** (
                                        C * (soil_temperature - T_ref) / 10.)
 
