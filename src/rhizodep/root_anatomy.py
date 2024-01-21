@@ -43,7 +43,7 @@ class RootAnatomy:
 
     # Tissue density
     root_tissue_density: float = field(default=0.10 * 1e6, metadata=dict(unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", value_comment="", references="", variable_type="state_variable", by="model_anatomy", state_variable_type="", edit_by="user"))
-
+    
     # --- INITIALIZES MODEL PARAMETERS ---
 
     # Differentiation parameters
@@ -286,7 +286,7 @@ class RootAnatomy:
 
         self.endodermis_conductance_factor[vid] = endodermis_conductance_factor
         self.epidermis_conductance_factor[vid] = epidermis_conductance_factor
-
+    
         # Logistic xylem differentiation
         logistic_precision = 0.99
         self.xylem_differentiation_factor[vid] = 1 / (1 + (logistic_precision / ((1 - logistic_precision) * np.exp(

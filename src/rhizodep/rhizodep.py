@@ -1,15 +1,12 @@
-import os
-import pickle
+from rhizodep.root_growth import RootGrowthModel
+from rhizodep.root_carbon import RootCarbonModel
+from rhizodep.root_anatomy import RootAnatomy
+from rhizodep.rhizo_soil import SoilModel
 
-from root_growth import RootGrowthModel
-from root_carbon import RootCarbonModel
-from root_anatomy import RootAnatomy
-from rhizo_soil import SoilModel
-
-from root_cynaps.wrapper import ModelWrapper
+from generic_fspm.composite_wrapper import CompositeModel
 
 
-class Model(ModelWrapper):
+class Model(CompositeModel):
     """
     Rhizodep model
 
@@ -45,7 +42,7 @@ class Model(ModelWrapper):
         # LINKING MODULES
         # Get or build translator matrix
         try:
-            from coupling_translator import translator
+            from rhizodep.coupling_translator import translator
         except ImportError:
             print("NOTE : You will now have to provide information about shared variables between the modules composing this model :\n")
             translator = self.translator_matrix_builder()
@@ -56,19 +53,16 @@ class Model(ModelWrapper):
         self.link_around_mtg(translator)
 
         # Some initialization must be performed AFTER linking modules
-        self.soil.post_coupling_init()
-        self.root_carbon.post_coupling_init()
-        self.root_growth.post_coupling_init()
-        self.root_anatomy.post_coupling_init()
+        (m.post_coupling_init() for m in self.models)
 
     def run(self):
         # Update environment boundary conditions
         self.soil.run_exchanges_and_balance()
 
-        # Compute state variations for water and then nitrogen
-        self.root_carbon.run_exchanges_and_balance()
-
         # Compute root growth from resulting states
         self.root_growth.run_time_step_growth()
         # Update topological surfaces and volumes based on other evolved structural properties
         self.root_anatomy.run_actualize_anatomy()
+
+        # OR : 
+        (m() for m in self.models)

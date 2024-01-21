@@ -16,7 +16,6 @@ import time
 
 import pickle
 from rhizodep import Model
-from statistical_tools.main import launch_analysis
 
 # We define the main simulation program:
 def main_simulation(time_step_in_seconds=3600, simulation_period_in_days=20., **scenario):
