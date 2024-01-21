@@ -59,8 +59,6 @@ class Model(CompositeModel):
         # Update environment boundary conditions
         self.soil.run_exchanges_and_balance()
 
-        # Compute root growth from resulting states
-        self.root_growth.run_time_step_growth()
         # Update topological surfaces and volumes based on other evolved structural properties
         self.root_anatomy.run_actualize_anatomy()
 

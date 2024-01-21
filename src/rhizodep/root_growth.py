@@ -14,14 +14,15 @@ import os
 import numpy as np
 import pandas as pd
 from math import sqrt, pi, floor
-from dataclasses import dataclass, field, fields
 
 from openalea.mtg import *
-from openalea.mtg.traversal import pre_order, post_order
+from openalea.mtg.traversal import post_order
+
+from generic_fspm.component import Model, declare
+from generic_fspm.component_factory import *
 
 
-@dataclass
-class RootGrowthModel:
+class RootGrowthModel(Model):
     """
     DESCRIPTION
     -----------
@@ -34,100 +35,244 @@ class RootGrowthModel:
     """
     # --- INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
     # FROM SOIL MODEL
-    soil_temperature_in_Celsius: float = field(default=15, metadata=dict(unit="°C", unit_comment="", description="soil temperature in contact with roots", value_comment="", references="", variable_type="input", by="model_soil", state_variable_type="", edit_by="user"))
+    soil_temperature_in_Celsius: float = declare(default=15, unit="°C", unit_comment="", description="soil temperature in contact with roots", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
 
     # FROM ANATOMY MODEL
-    root_tissue_density: float = field(default=0.10 * 1e6, metadata=dict(unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", value_comment="", references="", variable_type="input", by="model_anatomy", state_variable_type="", edit_by="user"))
+    root_tissue_density: float = declare(default=0.10 * 1e6, unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="input", by="model_anatomy", state_variable_type="", edit_by="user")
 
     # --- INITIALIZE MODEL STATE VARIABLES ---
-    type: str = field(default="Normal_root_after_emergence", metadata=dict(unit="", unit_comment="", description="Example segment type provided by root growth model", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
-    radius: float = field(default=3.5e-4, metadata=dict(unit="m", unit_comment="", description="Example root segment radius", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
-    length: float = field(default=3.e-3, metadata=dict(unit="m", unit_comment="", description="Example root segment length", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
-    struct_mass: float = field(default=1.35e-4, metadata=dict(unit="g", unit_comment="", description="Example root segment structural mass", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
-    initial_struct_mass: float = field(default=1.35e-4, metadata=dict(unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
-    living_root_hairs_struct_mass: float = field(default=0., metadata=dict(unit="g", unit_comment="", description="Example root segment living root hairs structural mass", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
-    root_hair_length: float = field(default=1.e-3, metadata=dict(unit="m", unit_comment="", description="Example root hair length", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair maximal length for wheat and barley evolves between 0.5 and 1.3 mm.", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
-    total_root_hairs_number: float = field(default=30 * (1.6e-4 / 3.5e-4) * 3.e-3 * 1e3, metadata=dict(unit="adim", unit_comment="", description="Example root hairs number on segment external surface", value_comment="30 * (1.6e-4 / radius) * length * 1e3", references=" According to the work of Gahoonia et al. (1997), the root hair density is about 30 hairs per mm for winter wheat, for a root radius of about 0.16 mm.", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
-    hexose_consumption_by_growth: float = field(default=0., metadata=dict(unit="g", unit_comment="", description="Hexose consumption by growth is coupled to a root growth model", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
-    distance_from_tip: float = field(default=3.e-3, metadata=dict(unit="m", unit_comment="", description="Example distance from tip", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
-    volume: float = field(default=1e-7, metadata=dict(unit="m3", unit_comment="", description="Initial volume of the collar element", value_comment="", references="", variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user"))
-    struct_mass_produced: float = field(default=0, metadata=dict(unit="g", unit_comment="of dry weight", description="", value_comment="", references="", variable_type="state_variable", by="model_growth"))
-    thermal_time_since_emergence: float = field(default=0, metadata=dict(unit="°C", unit_comment="", description="", value_comment="", references="", variable_type="state_variable", by="model_growth"))
+    type: str = declare(default="Normal_root_after_emergence", unit="", unit_comment="", description="Example segment type provided by root growth model", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    radius: float = declare(default=3.5e-4, unit="m", unit_comment="", description="Example root segment radius", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    length: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example root segment length", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Example root segment structural mass", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    initial_struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    living_root_hairs_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Example root segment living root hairs structural mass", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    root_hair_length: float = declare(default=1.e-3, unit="m", unit_comment="", description="Example root hair length", 
+                                                    min_value="", max_value="", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair maximal length for wheat and barley evolves between 0.5 and 1.3 mm.", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    total_root_hairs_number: float = declare(default=30 * (1.6e-4 / 3.5e-4) * 3.e-3 * 1e3, unit="adim", unit_comment="", description="Example root hairs number on segment external surface", 
+                                                    min_value="", max_value="", value_comment="30 * (1.6e-4 / radius) * length * 1e3", references=" According to the work of Gahoonia et al. (1997), the root hair density is about 30 hairs per mm for winter wheat, for a root radius of about 0.16 mm.", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    hexose_consumption_by_growth: float = declare(default=0., unit="g", unit_comment="", description="Hexose consumption by growth is coupled to a root growth model", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    volume: float = declare(default=1e-7, unit="m3", unit_comment="", description="Initial volume of the collar element", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth")
+    thermal_time_since_emergence: float = declare(default=0, unit="°C", unit_comment="", description="", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth")
 
     # --- INITIALIZES MODEL PARAMETERS ---
     # Segment initialization
-    D_ini: float = field(default=0.8e-3, metadata=dict(unit="m", unit_comment="", description="Initial tip diameter of the primary root", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    root_hair_radius: float = field(default=12 * 1e-6 /2., metadata=dict(unit="m", unit_comment="", description="Average radius of root hair", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair diameter is relatively constant for different genotypes of wheat and barley, i.e. 12 microns", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    root_hairs_lifespan: float = field(default=46 * (60. * 60.), metadata=dict(unit="s", unit_comment="time equivalent at temperature of T_ref", description="Average lifespan of a root hair", value_comment="", references="According to the data from McElgunn and Harrison (1969), the lifespan of wheat root hairs is 40-55h, depending on the temperature. For a temperature of 20 degree Celsius, the linear regression from this data gives 46h.", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    LDs: float = field(default=4000. * (60. * 60. * 24.) * 1000 * 1e-6, metadata=dict(unit="s.m-1..g-1.m-3", unit_comment="time equivalent at temperature of T_ref", description="Average lifespan of a root hair", value_comment="", references="5000 day mm-1 g-1 cm3 (??)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    ER: float = field(default=0.2 / (60. * 60. * 24.), metadata=dict(unit=".s-1", unit_comment="time equivalent at temperature of T_ref", description="Emission rate of adventitious roots", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    n_seminal_roots: int = field(default=5, metadata=dict(unit="adim", unit_comment="", description="Maximal number of roots emerging from the base (including primary and seminal roots)", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    n_adventitious_roots: int = field(default=10, metadata=dict(unit="adim", unit_comment="", description="Maximal number of roots emerging from the base (including primary and seminal roots)", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    random_choice: float = field(default=8, metadata=dict(unit="adim", unit_comment="", description="We set the random seed, so that the same simulation can be repeted with the same seed:", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    D_sem_to_D_ini_ratio: float = field(default=0.95, metadata=dict(unit="adim", unit_comment="", description="Proportionality coefficient between the tip diameter of a seminal root and D_ini", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    CVDD: float = field(default=0.2, metadata=dict(unit="adim", unit_comment="", description="Relative variation of the daughter root diameter", value_comment="", references="", variable_type="parameter", by="model_growth"))
-    starting_time_for_adventitious_roots_emergence: float = field(default=(60. * 60. * 24.) * 9., metadata=dict(unit="s", unit_comment="time equivalent at temperature of T_ref", description="Time when adventitious roots start to successively emerge", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    D_adv_to_D_ini_ratio: float = field(default=0.8, metadata=dict(unit="adim", unit_comment="", description="Proportionality coefficient between the tip diameter of an adventitious root and D_ini ", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
+    D_ini: float = declare(default=0.8e-3, unit="m", unit_comment="", description="Initial tip diameter of the primary root", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    root_hair_radius: float = declare(default=12 * 1e-6 /2., unit="m", unit_comment="", description="Average radius of root hair", 
+                                                    min_value="", max_value="", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair diameter is relatively constant for different genotypes of wheat and barley, i.e. 12 microns", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    root_hairs_lifespan: float = declare(default=46 * (60. * 60.), unit="s", unit_comment="time equivalent at temperature of T_ref", description="Average lifespan of a root hair", 
+                                                    min_value="", max_value="", value_comment="", references="According to the data from McElgunn and Harrison (1969), the lifespan of wheat root hairs is 40-55h, depending on the temperature. For a temperature of 20 degree Celsius, the linear regression from this data gives 46h.", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    LDs: float = declare(default=4000. * (60. * 60. * 24.) * 1000 * 1e-6, unit="s.m-1..g-1.m-3", unit_comment="time equivalent at temperature of T_ref", description="Average lifespan of a root hair", 
+                                                    min_value="", max_value="", value_comment="", references="5000 day mm-1 g-1 cm3 (??)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    ER: float = declare(default=0.2 / (60. * 60. * 24.), unit=".s-1", unit_comment="time equivalent at temperature of T_ref", description="Emission rate of adventitious roots", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    n_seminal_roots: int = declare(default=5, unit="adim", unit_comment="", description="Maximal number of roots emerging from the base (including primary and seminal roots)", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    n_adventitious_roots: int = declare(default=10, unit="adim", unit_comment="", description="Maximal number of roots emerging from the base (including primary and seminal roots)", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    random_choice: float = declare(default=8, unit="adim", unit_comment="", description="We set the random seed, so that the same simulation can be repeted with the same seed:", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    D_sem_to_D_ini_ratio: float = declare(default=0.95, unit="adim", unit_comment="", description="Proportionality coefficient between the tip diameter of a seminal root and D_ini", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    CVDD: float = declare(default=0.2, unit="adim", unit_comment="", description="Relative variation of the daughter root diameter", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth")
+    starting_time_for_adventitious_roots_emergence: float = declare(default=(60. * 60. * 24.) * 9., unit="s", unit_comment="time equivalent at temperature of T_ref", description="Time when adventitious roots start to successively emerge", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    D_adv_to_D_ini_ratio: float = declare(default=0.8, unit="adim", unit_comment="", description="Proportionality coefficient between the tip diameter of an adventitious root and D_ini ", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
     # Temperature
-    process_at_T_ref: float = field(default=1., metadata=dict(unit="adim", unit_comment="", description="Proportion of maximal process intensity occuring at T_ref", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    T_ref: float = field(default=0., metadata=dict(unit="°C", unit_comment="", description="the reference temperature", value_comment="", references="We assume that relative growth is 0 at T_ref=0 degree Celsius, and linearily increases to reach 1 at 20 degree.", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    A: float = field(default=1/20, metadata=dict(unit="adim", unit_comment="", description="parameter A (may be equivalent to the coefficient of linear increase)", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    B: float = field(default=0, metadata=dict(unit="adim", unit_comment="", description="parameter B (may be equivalent to the Q10 value)", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    C: float = field(default=0, metadata=dict(unit="adim", unit_comment="", description="parameter C (either 0 or 1)", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
+    process_at_T_ref: float = declare(default=1., unit="adim", unit_comment="", description="Proportion of maximal process intensity occuring at T_ref", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    T_ref: float = declare(default=0., unit="°C", unit_comment="", description="the reference temperature", 
+                                                    min_value="", max_value="", value_comment="", references="We assume that relative growth is 0 at T_ref=0 degree Celsius, and linearily increases to reach 1 at 20 degree.", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    A: float = declare(default=1/20, unit="adim", unit_comment="", description="parameter A (may be equivalent to the coefficient of linear increase)", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    B: float = declare(default=0, unit="adim", unit_comment="", description="parameter B (may be equivalent to the Q10 value)", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    C: float = declare(default=0, unit="adim", unit_comment="", description="parameter C (either 0 or 1)", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
     # C supply for elongation
-    growing_zone_factor: float = field(default=8 * 2., metadata=dict(unit="adim", unit_comment="", description="Proportionality factor between the radius and the length of the root apical zone in which C can sustain root elongation", value_comment="", references="According to illustrations by Kozlova et al. (2020), the length of the growing zone corresponding to the root cap, meristem and elongation zones is about 8 times the diameter of the tip.", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
+    growing_zone_factor: float = declare(default=8 * 2., unit="adim", unit_comment="", description="Proportionality factor between the radius and the length of the root apical zone in which C can sustain root elongation", 
+                                                    min_value="", max_value="", value_comment="", references="According to illustrations by Kozlova et al. (2020), the length of the growing zone corresponding to the root cap, meristem and elongation zones is about 8 times the diameter of the tip.", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
     # potential development
-    emergence_delay: float = field(default=3. * (60. * 60. * 24.), metadata=dict(unit="s", unit_comment="time equivalent at temperature of T_ref", description="Delay of emergence of the primordium", value_comment="", references="emergence_delay = 3 days (??)", variable_type="parameter", by="model_growth"))
-    EL: float = field(default=1.39 * 20 / (60. * 60. * 24.), metadata=dict(unit="s-1", unit_comment="meters of root per meter of radius per second equivalent to T_ref_growth", description="Slope of the elongation rate = f(tip diameter) ", value_comment="", references="EL = 5 mm mm-1 day-1 (??)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    Km_elongation: float = field(default=1250 * 1e-6 / 6., metadata=dict(unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for root elongation", value_comment="", references="According to Barillot et al. (2016b): Km for root growth is 1250 umol C g-1 for sucrose. According to Gauthier et al (2020): Km for regulation of the RER by sucrose concentration in hz = 100-150 umol C g-1", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    relative_nodule_thickening_rate_max: float = field(default=20. / 100. / (24. * 60. * 60.), metadata=dict(unit="s-1", unit_comment="", description="Maximal rate of relative increase in nodule radius", value_comment="", references="We consider that the radius can't increase by more than 20% every day (??)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    Km_nodule_thickening: float = field(default=1250 * 1e-6 / 6. * 100, metadata=dict(unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for nodule thickening", value_comment="Km_elongation * 100", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    nodule_max_radius: float = field(default=0.8e-3 * 20., metadata=dict(unit="m", unit_comment="", description="Maximal radius of nodule", value_comment="Dini * 10", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    SGC: float = field(default=0.0, metadata=dict(unit="adim", unit_comment="", description="Proportionality coefficient between the section area of the segment and the sum of distal section areas", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    relative_root_thickening_rate_max: float = field(default=5. / 100. / (24. * 60. * 60.), metadata=dict(unit="s-1", unit_comment="", description="Maximal rate of relative increase in root radius", value_comment="", references="We consider that the radius can't increase by more than 5% every day (??)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    Km_thickening: float = field(default=1250 * 1e-6 / 6., metadata=dict(unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for root thickening", value_comment="Km_elongation", references="We assume that the Michaelis-Menten constant for thickening is the same as for root elongation. (??)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
+    emergence_delay: float = declare(default=3. * (60. * 60. * 24.), unit="s", unit_comment="time equivalent at temperature of T_ref", description="Delay of emergence of the primordium", 
+                                                    min_value="", max_value="", value_comment="", references="emergence_delay = 3 days (??)", DOI="",
+                                                    variable_type="parameter", by="model_growth")
+    EL: float = declare(default=1.39 * 20 / (60. * 60. * 24.), unit="s-1", unit_comment="meters of root per meter of radius per second equivalent to T_ref_growth", description="Slope of the elongation rate = f(tip diameter) ", 
+                                                    min_value="", max_value="", value_comment="", references="EL = 5 mm mm-1 day-1 (??)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    Km_elongation: float = declare(default=1250 * 1e-6 / 6., unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for root elongation", 
+                                                    min_value="", max_value="", value_comment="", references="According to Barillot et al. (2016b): Km for root growth is 1250 umol C g-1 for sucrose. According to Gauthier et al (2020): Km for regulation of the RER by sucrose concentration in hz = 100-150 umol C g-1", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    relative_nodule_thickening_rate_max: float = declare(default=20. / 100. / (24. * 60. * 60.), unit="s-1", unit_comment="", description="Maximal rate of relative increase in nodule radius", 
+                                                    min_value="", max_value="", value_comment="", references="We consider that the radius can't increase by more than 20% every day (??)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    Km_nodule_thickening: float = declare(default=1250 * 1e-6 / 6. * 100, unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for nodule thickening", 
+                                                    min_value="", max_value="", value_comment="Km_elongation * 100", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    nodule_max_radius: float = declare(default=0.8e-3 * 20., unit="m", unit_comment="", description="Maximal radius of nodule", 
+                                                    min_value="", max_value="", value_comment="Dini * 10", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    SGC: float = declare(default=0.0, unit="adim", unit_comment="", description="Proportionality coefficient between the section area of the segment and the sum of distal section areas", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    relative_root_thickening_rate_max: float = declare(default=5. / 100. / (24. * 60. * 60.), unit="s-1", unit_comment="", description="Maximal rate of relative increase in root radius", 
+                                                    min_value="", max_value="", value_comment="", references="We consider that the radius can't increase by more than 5% every day (??)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    Km_thickening: float = declare(default=1250 * 1e-6 / 6., unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for root thickening", 
+                                                    min_value="", max_value="", value_comment="Km_elongation", references="We assume that the Michaelis-Menten constant for thickening is the same as for root elongation. (??)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
     # actual growth
-    struct_mass_C_content: float = field(default=0.44 / 12.01, metadata=dict(unit="mol.g-1", unit_comment="of carbon", description="C content of structural mass", value_comment="", references="We assume that the structural mass contains 44% of C. (??)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    yield_growth: float = field(default=0.8, metadata=dict(unit="adim", unit_comment="mol of CO2 per mol of C used for structural mass", description="Growth yield", value_comment="", references="We use the range value (0.75-0.85) proposed by Thornley and Cannell (2000)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
+    struct_mass_C_content: float = declare(default=0.44 / 12.01, unit="mol.g-1", unit_comment="of carbon", description="C content of structural mass", 
+                                                    min_value="", max_value="", value_comment="", references="We assume that the structural mass contains 44% of C. (??)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    yield_growth: float = declare(default=0.8, unit="adim", unit_comment="mol of CO2 per mol of C used for structural mass", description="Growth yield", 
+                                                    min_value="", max_value="", value_comment="", references="We use the range value (0.75-0.85) proposed by Thornley and Cannell (2000)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
     # Segmentation and primordium formation
-    segment_length: float = field(default=3. / 1000., metadata=dict(unit="m", unit_comment="", description="Length of a segment", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    nodule_formation_probability: float = field(default=0.5, metadata=dict(unit="m", unit_comment="", description="Probability (between 0 and 1) of nodule formation for each apex that elongates", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    Dmin: float = field(default=0.1 / 1000., metadata=dict(unit="m", unit_comment="", description="Minimal threshold tip diameter (i.e. the diameter of the finest observable roots)", value_comment="", references="Dmin=0.05 mm (??)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    RMD: float = field(default=0.3, metadata=dict(unit="adim", unit_comment="", description="Average ratio of the diameter of the daughter root to that of the mother root", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    IPD: float = field(default=5. / 1000., metadata=dict(unit="m", unit_comment="", description="Inter-primordia distance", value_comment="", references="IPD = 7.6 mm (??)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    new_root_tissue_density: float = field(default=0.10 * 1e6, metadata=dict(unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
+    segment_length: float = declare(default=3. / 1000., unit="m", unit_comment="", description="Length of a segment", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    nodule_formation_probability: float = declare(default=0.5, unit="m", unit_comment="", description="Probability (between 0 and 1) of nodule formation for each apex that elongates", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    Dmin: float = declare(default=0.1 / 1000., unit="m", unit_comment="", description="Minimal threshold tip diameter (i.e. the diameter of the finest observable roots)", 
+                                                    min_value="", max_value="", value_comment="", references="Dmin=0.05 mm (??)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    RMD: float = declare(default=0.3, unit="adim", unit_comment="", description="Average ratio of the diameter of the daughter root to that of the mother root", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    IPD: float = declare(default=5. / 1000., unit="m", unit_comment="", description="Inter-primordia distance", 
+                                                    min_value="", max_value="", value_comment="", references="IPD = 7.6 mm (??)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    new_root_tissue_density: float = declare(default=0.10 * 1e6, unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
     # Growth durations
-    GDs: float = field(default=800 * (60. * 60. * 24.) * 1000. ** 2., metadata=dict(unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="Coefficient of growth duration", value_comment="", references="Reference: GDs=400. day mm-2 (??)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    GD_highest: float = field(default=60 * (60. * 60. * 24.), metadata=dict(unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="For seminal and adventitious roots, a longer growth duration is applied", value_comment="Expected growth duration of a seminal root", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    GD_high: float = field(default=6 * (60. * 60. * 24.), metadata=dict(unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="The growth duration has a probability of [1-GD_prob_medium] to equal GD_high", value_comment="", references="Estimated the longest observed lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    GD_medium: float = field(default=0.70 * (60. * 60. * 24.), metadata=dict(unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="The growth duration has a probability of [GD_prob_medium - GD_prob_low] to equal GD_medium", value_comment="", references="Estimated from the medium lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    GD_low: float = field(default=0.25 * (60. * 60. * 24.), metadata=dict(unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="The growth duration has a probability of [GD_prob_low] to equal GD_low", value_comment="", references="Estimated from the shortest lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    GD_by_frequency: bool = field(default=False, metadata=dict(unit="adim", unit_comment="", description="As an alternative to using a single value of growth duration depending on diameter, we offer the possibility to rather define the growth duration as a random choice between three values (low, medium and high), depending on their respective probability", value_comment="", references="", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    GD_prob_low: float = field(default=0.50, metadata=dict(unit="adim", unit_comment="", description="Probability for low growth duration", value_comment="", references="Estimated from the shortest lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    GD_prob_medium: float = field(default=0.85, metadata=dict(unit="adim", unit_comment="Probability for medium growth duration", description="Coefficient of growth duration", value_comment="", references="Estimated from the medium lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user"))
+    GDs: float = declare(default=800 * (60. * 60. * 24.) * 1000. ** 2., unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="Coefficient of growth duration", 
+                                                    min_value="", max_value="", value_comment="", references="Reference: GDs=400. day mm-2 (??)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    GD_highest: float = declare(default=60 * (60. * 60. * 24.), unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="For seminal and adventitious roots, a longer growth duration is applied", 
+                                                    min_value="", max_value="", value_comment="Expected growth duration of a seminal root", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    GD_high: float = declare(default=6 * (60. * 60. * 24.), unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="The growth duration has a probability of [1-GD_prob_medium] to equal GD_high", 
+                                                    min_value="", max_value="", value_comment="", references="Estimated the longest observed lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    GD_medium: float = declare(default=0.70 * (60. * 60. * 24.), unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="The growth duration has a probability of [GD_prob_medium - GD_prob_low] to equal GD_medium", 
+                                                    min_value="", max_value="", value_comment="", references="Estimated from the medium lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    GD_low: float = declare(default=0.25 * (60. * 60. * 24.), unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="The growth duration has a probability of [GD_prob_low] to equal GD_low", 
+                                                    min_value="", max_value="", value_comment="", references="Estimated from the shortest lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    GD_by_frequency: bool = declare(default=False, unit="adim", unit_comment="", description="As an alternative to using a single value of growth duration depending on diameter, we offer the possibility to rather define the growth duration as a random choice between three values (low, medium and high), depending on their respective probability", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    GD_prob_low: float = declare(default=0.50, unit="adim", unit_comment="", description="Probability for low growth duration", 
+                                                    min_value="", max_value="", value_comment="", references="Estimated from the shortest lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    GD_prob_medium: float = declare(default=0.85, unit="adim", unit_comment="Probability for medium growth duration", description="Coefficient of growth duration", 
+                                                    min_value="", max_value="", value_comment="", references="Estimated from the medium lateral wheat roots observed in rhizoboxes (Rees et al., unpublished)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
     # --- USER ORIENTED PARAMETERS FOR SIMULATION ---
     # initiate MTG
-    random: bool = field(default=True, metadata=dict(unit="adim", unit_comment="", description="Allow random processes in growth", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    ArchiSimple: bool = field(default=False, metadata=dict(unit="adim", unit_comment="", description="Allow growth according to the original Archisimple model", value_comment="", references="(Pagès et al., 2014)", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    initial_segment_length: float = field(default=1e-3, metadata=dict(unit="m", unit_comment="", description="Initial segment length", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    initial_apex_length: float = field(default=0., metadata=dict(unit="m", unit_comment="", description="Initial apex length", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    initial_C_hexose_root: float = field(default=0., metadata=dict(unit="m", unit_comment="", description="Initial hexose concentration of root segments", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    input_file_path: str = field(default="C:/Users/frees/rhizodep/src/rhizodep/", metadata=dict(unit="m", unit_comment="", description="Filepath for input files", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    forcing_seminal_roots_events: bool = field(default=True, metadata=dict(unit="m", unit_comment="", description="a Boolean expliciting if seminal root events should be forced", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    seminal_roots_events_file: str = field(default="seminal_roots_inputs.csv", metadata=dict(unit="m", unit_comment="", description="Filepath pointing to input table to plan seminal root emergence event", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    forcing_adventitious_roots_events: bool = field(default=True, metadata=dict(unit="m", unit_comment="", description="a Boolean expliciting if adventicious root events should be forced", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    adventitious_roots_events_file: str = field(default="adventitious_roots_inputs.csv", metadata=dict(unit="adim", unit_comment="", description="Filepath pointing to input table to plan adventitious root emergence event", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    radial_growth: str = field(default="Possible", metadata=dict(unit="adim", unit_comment="", description="equivalent to a Boolean expliciting whether radial growth should be considered or not", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    nodules: bool = field(default=False, metadata=dict(unit="adim", unit_comment="", description="a Boolean expliciting whether nodules could be formed or not", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    root_order_limitation: bool = field(default=False, metadata=dict(unit="adim", unit_comment="", description="a Boolean expliciting whether lateral roots should be prevented above a certain root order", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
-    root_order_treshold: int = field(default=2, metadata=dict(unit="adim", unit_comment="", description="the root order above which new lateral roots cannot be formed", value_comment="", references="", variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user"))
+    random: bool = declare(default=True, unit="adim", unit_comment="", description="Allow random processes in growth", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    ArchiSimple: bool = declare(default=False, unit="adim", unit_comment="", description="Allow growth according to the original Archisimple model", 
+                                                    min_value="", max_value="", value_comment="", references="(Pagès et al., 2014)", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    initial_segment_length: float = declare(default=1e-3, unit="m", unit_comment="", description="Initial segment length", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    initial_apex_length: float = declare(default=0., unit="m", unit_comment="", description="Initial apex length", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    initial_C_hexose_root: float = declare(default=0., unit="m", unit_comment="", description="Initial hexose concentration of root segments", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    input_file_path: str = declare(default="C:/Users/frees/rhizodep/src/rhizodep/", unit="m", unit_comment="", description="Filepath for input files", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    forcing_seminal_roots_events: bool = declare(default=True, unit="m", unit_comment="", description="a Boolean expliciting if seminal root events should be forced", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    seminal_roots_events_file: str = declare(default="seminal_roots_inputs.csv", unit="m", unit_comment="", description="Filepath pointing to input table to plan seminal root emergence event", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    forcing_adventitious_roots_events: bool = declare(default=True, unit="m", unit_comment="", description="a Boolean expliciting if adventicious root events should be forced", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    adventitious_roots_events_file: str = declare(default="adventitious_roots_inputs.csv", unit="adim", unit_comment="", description="Filepath pointing to input table to plan adventitious root emergence event", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    radial_growth: str = declare(default="Possible", unit="adim", unit_comment="", description="equivalent to a Boolean expliciting whether radial growth should be considered or not", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    nodules: bool = declare(default=False, unit="adim", unit_comment="", description="a Boolean expliciting whether nodules could be formed or not", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    root_order_limitation: bool = declare(default=False, unit="adim", unit_comment="", description="a Boolean expliciting whether lateral roots should be prevented above a certain root order", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+    root_order_treshold: int = declare(default=2, unit="adim", unit_comment="", description="the root order above which new lateral roots cannot be formed", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
 
     def __init__(self, time_step_in_seconds: int, **scenario: dict):
         """
@@ -144,20 +289,10 @@ class RootGrowthModel:
 
         self.g = self.initiate_mtg()
         self.props = self.g.properties()
+        self.choregrapher.add_data(data=self.props)
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_step_in_seconds = time_step_in_seconds
-        self.available_inputs = []
-
-        self.state_variables = [f.name for f in fields(self) if f.metadata["variable_type"] == "state_variable"]
-
-        for name in self.state_variables:
-            # Note unlike other modules, there is another initialization of state_variables by the initiate_mtg method
-            # Thus, we just link mtg dict to self dict for it to be readable by other modules during coupling
-            setattr(self, name, self.props[name])
-
-        # We define the list of apices for all vertices labelled as "Apex" or "Segment", from the tip to the base:
-        root_gen = self.g.component_roots_at_scale_iter(self.g.root, scale=1)
-        root = next(root_gen)
+        
 
     # Initialization of the root system:
     def initiate_mtg(self):
@@ -451,80 +586,9 @@ class RootGrowthModel:
 
         return g
 
-    def apply_scenario(self, **kwargs):
-        """
-        Method to superimpose default parameters in order to create a scenario.
-        Use Model.documentation to discover model parameters and state variables.
-        :param kwargs: mapping of existing variable to superimpose.
-        """
-        for changed_parameter, value in kwargs.items():
-            if changed_parameter in dir(self):
-                setattr(self, changed_parameter, value)
-
-    def post_coupling_init(self):
-        self.get_available_inputs()
-        self.reinitializing_growth_variables()
-        self.check_if_coupled()
-
-    def check_if_coupled(self):
-        # For all expected input...
-        input_variables = [f.name for f in fields(self) if f.metadata["variable_type"] == "input"]
-        for inpt in input_variables:
-            # If variable type has not gone to dictionary as it is part of the coupling process
-            # we use provided default value to create the dictionnary used in the rest of the model
-            if type(getattr(self, inpt)) != dict:
-                if inpt not in self.props.keys():
-                    self.props.setdefault(inpt, {})
-                # set default in mtg
-                self.props[inpt].update({key: getattr(self, inpt) for key in self.g.vertices_iter(scale=1)})
-                # link mtg dict to self dict
-                setattr(self, inpt, self.props[inpt])
-
-    def get_available_inputs(self):
-        for inputs in self.available_inputs:
-            source_model = inputs["applier"]
-            linker = inputs["linker"]
-            for name, source_variables in linker.items():
-                # if variables have to be summed
-                if len(source_variables.keys()) > 1:
-                    return setattr(self, name, dict(zip(getattr(source_model, "vertices"), [sum([getattr(source_model, source_name)[vid] * unit_conversion for source_name, unit_conversion in source_variables.items()]) for vid in getattr(source_model, "vertices")])))
-                else:
-                    return setattr(self, name, getattr(source_model, list(source_variables.keys())[0]))
-
-    # ACTUAL CALLABLE SCHEDULING LOOP TODO: metadata?
-    # -------------------------------
-    def run_time_step_growth(self):
-        """
-        Method to run the initiated model on defined time step.
-        """
-        # We have to renew this call at each time step to ensure model inputs are well updated
-        self.get_available_inputs()
-
-        # We reset to 0 all growth-associated C costs and initialize the initial dimensions or masses:
-        self.reinitializing_growth_variables()
-
-        # We calculate the potential growth of the root system without consideration of the amount of available hexose:
-        self.potential_growth()
-
-        # We calculate the actual growth based on the amount of hexose remaining in the roots, and we record
-        # the corresponding consumption of hexose in the root:
-        self.actual_growth_and_corresponding_respiration()
-
-        # NEW GEOMETRY
-        # =================
-
-        # We proceed to the segmentation of the whole root system
-        # (NOTE: segmentation should always occur AFTER actual growth):
-        self.segmentation_and_primordia_formation()
-
-        # Finally we account for root hairs dynamic on the actualized MTG
-        self.root_hairs_dynamics()
-
-        # We update the distance from tip for each root element in each root axis:
-        self.update_distance_from_tip()
-
     # SUBDIVISIONS OF THE SCHEDULING LOOP
     # -----------------------------------
+    @stepinit
     def reinitializing_growth_variables(self):
         """
         This function re-initializes different growth-related variables (e.g. potential growth variables).
@@ -560,6 +624,8 @@ class RootGrowthModel:
         return
 
     # Function that calculates the potential growth of the whole MTG at a given time step:
+    @potential
+    @state
     def potential_growth(self):
         """
         This function covers the whole root MTG and computes the potential growth of segments and apices.
@@ -1164,6 +1230,8 @@ class RootGrowthModel:
         return new_segment
 
     # Actual elongation, radial growth and growth respiration of root elements:
+    @actual
+    @state
     def actual_growth_and_corresponding_respiration(self):
         """
         This function defines how a segment, an apex and possibly an emerging root primordium will grow according to the amount
@@ -1446,6 +1514,8 @@ class RootGrowthModel:
 
     # Function that creates new segments and priomordia in "g":
     # ----------------------------------------------------------
+    @segmentation
+    @state
     def segmentation_and_primordia_formation(self):
         """
         This function considers segmentation and primordia formation across the whole root MTG.
@@ -1875,6 +1945,7 @@ class RootGrowthModel:
 
         return new_apex
 
+    @postsegmentation
     def root_hairs_dynamics(self):
         """
         This function computes the evolution of the density and average length of root hairs along each root,
@@ -2205,6 +2276,7 @@ class RootGrowthModel:
 
         return nodule
 
+    @postsegmentation
     def update_distance_from_tip(self):
         """
         The function "distance_from_tip" computes the distance (in meter) of a given vertex from the apex
@@ -2241,52 +2313,6 @@ class RootGrowthModel:
                 # If there is no successor because the element is an apex or a root nodule:
                 # Then we simply define the distance to the tip as the length of the element:
                 n.distance_from_tip = n.length
-
-    # GENERIC METHODS USED IN MANY PARTS OF THE MODEL
-    # -----------------------------------------------
-
-    # Modification of a process according to soil temperature:
-    def temperature_modification(self, process_at_T_ref=1., soil_temperature=15, T_ref=0., A=-0.05, B=3., C=1.):
-        """
-        This function calculates how the value of a process should be modified according to soil temperature (in degrees Celsius).
-        Parameters correspond to the value of the process at reference temperature T_ref (process_at_T_ref),
-        to two empirical coefficients A and B, and to a coefficient C used to switch between different formalisms.
-        If C=0 and B=1, then the relationship corresponds to a classical linear increase with temperature (thermal time).
-        If C=1, A=0 and B>1, then the relationship corresponds to a classical exponential increase with temperature (Q10).
-        If C=1, A<0 and B>0, then the relationship corresponds to bell-shaped curve, close to the one from Parent et al. (2010).
-        :param T_ref: the reference temperature
-        :param A: parameter A (may be equivalent to the coefficient of linear increase)
-        :param B: parameter B (may be equivalent to the Q10 value)
-        :param C: parameter C (either 0 or 1)
-        :return: the new value of the process
-        """
-
-        # We initialize the value of the temperature-modified process:
-        modified_process = 0.
-
-        # We avoid unwanted cases:
-        if C != 0 and C != 1:
-            print("The modification of the process at T =", soil_temperature, "only works for C=0 or C=1!")
-            print("The modified process has been set to 0.")
-            modified_process = 0.
-            return 0.
-        elif C == 1:
-            if (A * (soil_temperature - T_ref) + B) < 0.:
-                print("The modification of the process at T =", soil_temperature,
-                      "is unstable with this set of parameters!")
-                print("The modified process has been set to 0.")
-                modified_process = 0.
-                return modified_process
-
-        # We compute a temperature-modified process, correspond to a Q10-modified relationship,
-        # based on the work of Tjoelker et al. (2001):
-        modified_process = process_at_T_ref * (A * (soil_temperature - T_ref) + B) ** (1 - C) \
-                           * (A * (soil_temperature - T_ref) + B) ** (C * (soil_temperature - T_ref) / 10.)
-
-        if modified_process < 0.:
-            modified_process = 0.
-
-        return modified_process
 
     # Adding a new root element with pre-defined properties:
     def ADDING_A_CHILD(self, mother_element, edge_type='+', label='Apex', type='Normal_root_before_emergence',
