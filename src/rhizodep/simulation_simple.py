@@ -44,15 +44,5 @@ def main_simulation(time_step_in_seconds=3600, simulation_period_in_days=20., **
 
 
 if __name__ == "__main__":
-    main_simulation(time_step_in_seconds=3600, simulation_period_in_days=20.,
-                    radial_growth="Impossible", ArchiSimple=False, sucrose_input_rate=1.e-6,
-                    constant_soil_temperature_in_Celsius=20,
-                    nodules=False,
-                    root_order_limitation=False,
-                    root_order_treshold=2,
-                    using_solver=False,
-                    random=True,
-                    forcing_adventitious_roots_events=True,
-                    n_adventitious_roots=0,
-                    forcing_seminal_roots_events=True,
-                    n_seminal_roots=1)
+    scenarios = [{}]
+    main_simulation(time_step_in_seconds=3600, **scenarios[0])

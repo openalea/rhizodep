@@ -1,12 +1,11 @@
-from dataclasses import dataclass, field, fields
-import inspect as ins
-from functools import partial
 import numpy as np
+from dataclasses import dataclass
 
-from generic_fspm.component import Model, declare
-from generic_fspm.component_factory import *
+from genericmodel.component import Model, declare
+from genericmodel.component_factory import *
 
 
+@dataclass
 class SoilModel(Model):
     # --- INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
 
@@ -56,7 +55,7 @@ class SoilModel(Model):
     Cs_cells_soil: float = declare(default=1e-5, unit="mol.g-1", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-    C_mineralN_soil: float = declare(default=5, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", 
+    C_mineralN_soil: float = declare(default=1e-3, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
     C_AA_soil: float = declare(default=1e-4, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", 
@@ -161,7 +160,7 @@ class SoilModel(Model):
         """
         self.g = g
         self.props = self.g.properties()
-        self.choregrapher.add_data(data=self.props)
+        self.choregrapher.add_data(instance=self, data_name="props", filter={"label": ["Segment", "Apex"], "type":["Base_of_the_root_system", "Normal_root_after_emergence", "Stopped", "Just_Stopped", "Root_nodule"]})
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_steps_in_seconds = time_step_in_seconds
         #self.voxels = self.initiate_voxel_soil() # TODO Not tested for now
@@ -201,8 +200,7 @@ class SoilModel(Model):
 
         return voxels
 
-    @postgrowth
-    def add_new_segments(self):
+    def post_growth_updating(self):
         """
         Description :
             Extend property dictionary upon new element partitioning.

@@ -62,10 +62,11 @@ import inspect as ins
 from functools import partial
 from math import pi
 
-from generic_fspm.component import Model, declare
-from generic_fspm.component_factory import *
+from genericmodel.component import Model, declare
+from genericmodel.component_factory import *
 
 
+@dataclass
 class RootCarbonModel(Model):
     """
     Root carbon balance model originating from Rhizodep shoot.py
@@ -78,58 +79,58 @@ class RootCarbonModel(Model):
     # --- INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
     # FROM SOIL MODEL
     soil_temperature_in_Celsius: float = declare(default=15, unit="°C", unit_comment="", description="soil temperature in contact with roots", 
-                                                min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                min_value="", max_value="", value_comment="", references="", DOI="",
                                                  variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
     C_hexose_soil: float = declare(default=1e-5, unit="mol.g-1", unit_comment="of hexose", description="Hexose concentration in soil", 
-                                  min_value="", max_value="",  value_coment="", references="", DOI="",
+                                  min_value="", max_value="", value_comment="", references="", DOI="",
                                    variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
     Cs_mucilage_soil: float = declare(default=1e-5, unit="mol.g-1", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
-                                     min_value="", max_value="",  value_coment="", references="", DOI="",
+                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                       variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
     Cs_cells_soil: float = declare(default=1e-5, unit="mol.g-1", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
-                                  min_value="", max_value="",  value_coment="", references="", DOI="",
+                                  min_value="", max_value="", value_comment="", references="", DOI="",
                                    variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
 
     # FROM GROWTH MODEL
     type: str = declare(default="Normal_root_after_emergence", unit="", unit_comment="", description="Example segment type provided by root growth model", 
-                       min_value="", max_value="",  value_coment="", references="", DOI="",
+                       min_value="", max_value="", value_comment="", references="", DOI="",
                         variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     radius: float = declare(default=3.5e-4, unit="m", unit_comment="", description="Example root segment radius", 
-                           min_value="", max_value="",  value_coment="", references="", DOI="",
+                           min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     length: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example root segment length", 
-                           min_value="", max_value="",  value_coment="", references="", DOI="",
+                           min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Example root segment structural mass", 
-                                min_value="", max_value="",  value_coment="", references="", DOI="",
+                                min_value="", max_value="", value_comment="", references="", DOI="",
                                  variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     initial_struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", 
-                                        min_value="", max_value="",  value_coment="", references="", DOI="",
+                                        min_value="", max_value="", value_comment="", references="", DOI="",
                                          variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     living_root_hairs_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Example root segment living root hairs structural mass", 
-                                                  min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                  min_value="", max_value="", value_comment="", references="", DOI="",
                                                    variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     hexose_consumption_by_growth: float = declare(default=0., unit="g", unit_comment="", description="Hexose consumption by growth is coupled to a root growth model", 
-                                                 min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                 min_value="", max_value="", value_comment="", references="", DOI="",
                                                   variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
-                                      min_value="", max_value="",  value_coment="", references="", DOI="",
+                                      min_value="", max_value="", value_comment="", references="", DOI="",
                                        variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
 
     # FROM SHOOT MODEL
     sucrose_input_rate: float = declare(default=1e-6, unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", 
-                                       min_value="", max_value="",  value_coment="", references="", DOI="",
+                                       min_value="", max_value="", value_comment="", references="", DOI="",
                                         variable_type="input", by="model_shoot", state_variable_type="", edit_by="user")
 
     # FROM ANATOMY MODEL
     root_exchange_surface: float = declare(default=0., unit="m2", unit_comment="", description="Exchange surface between soil and symplasmic parenchyma.", 
-                                          min_value="", max_value="",  value_coment="", references="", DOI="",
+                                          min_value="", max_value="", value_comment="", references="", DOI="",
                                            variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user")
     phloem_exchange_surface: float = declare(default=0., unit="m2", unit_comment="", description="Exchange surface between root parenchyma and apoplasmic xylem vessels.", 
-                                            min_value="", max_value="",  value_coment="", references="", DOI="",
+                                            min_value="", max_value="", value_comment="", references="", DOI="",
                                              variable_type="state_variable", by="model_anatomy", state_variable_type="input", edit_by="user")
     apoplasmic_exchange_surface: float = declare(default=0., unit="m2", unit_comment="", description="Exchange surface to account for exchanges between xylem + stele apoplasm and soil. We account for it through cylindrical surface, a pathway closing as soon as endodermis differentiates", 
-                                                min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                min_value="", max_value="", value_comment="", references="", DOI="",
                                                  variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user")
 
     # --- INITIALIZE MODEL STATE VARIABLES ---
@@ -140,289 +141,289 @@ class RootCarbonModel(Model):
                                     min_value="", max_value="", value_comment="", references="0.0025 is a plausible value according to the results of Gauthier (2019, pers. communication), but here, we use a plausible sucrose concentration (10 mgC g-1) in roots according to various experimental results.", DOI="",
                                     variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
     C_hexose_root: float = declare(default=1e-3, unit="mol.g-1", unit_comment="of sucrose", description="Hexose concentration in root", 
-                                  min_value="", max_value="",  value_coment="", references="", DOI="",
+                                  min_value="", max_value="", value_comment="", references="", DOI="",
                                    variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
     C_hexose_reserve: float = declare(default=1e-3 * 2., unit="mol.g-1", unit_comment="of sucrose", description="Hexose reserve concentration in root", 
-                                     min_value="", max_value="",  value_coment="C_hexose_root * 2",  references="We expect the reserve pool to be two times higher than the mobile one.", DOI="",
+                                     min_value="", max_value="", value_comment="C_hexose_root * 2",  references="We expect the reserve pool to be two times higher than the mobile one.", DOI="",
                                       variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
 
     # Transport Processes
     hexose_diffusion_from_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
-                                                 min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                 min_value="", max_value="", value_comment="", references="", DOI="",
                                                   variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
     hexose_active_production_from_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
-                                                         min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                         min_value="", max_value="", value_comment="", references="", DOI="",
                                                           variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
     sucrose_loading_in_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
-                                              min_value="", max_value="",  value_coment="", references="", DOI="",
+                                              min_value="", max_value="", value_comment="", references="", DOI="",
                                                variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
     hexose_exudation: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
-                                     min_value="", max_value="",  value_coment="", references="", DOI="",
+                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                       variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
     phloem_hexose_exudation: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
-                                            min_value="", max_value="",  value_coment="", references="", DOI="",
+                                            min_value="", max_value="", value_comment="", references="", DOI="",
                                              variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
     hexose_uptake_from_soil: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
-                                            min_value="", max_value="",  value_coment="", references="", DOI="",
+                                            min_value="", max_value="", value_comment="", references="", DOI="",
                                              variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
     phloem_hexose_uptake_from_soil: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
-                                                   min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                   min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
     mucilage_secretion: float = declare(default=0., unit="mol.s-1", unit_comment="of equivalent hexose", description="", 
-                                       min_value="", max_value="",  value_coment="", references="", DOI="",
+                                       min_value="", max_value="", value_comment="", references="", DOI="",
                                         variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
     cells_release: float = declare(default=0., unit="mol.s-1", unit_comment="of equivalent hexose", description="", 
-                                  min_value="", max_value="",  value_coment="", references="", DOI="",
+                                  min_value="", max_value="", value_comment="", references="", DOI="",
                                    variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
 
     # Metabolic Processes
     hexose_mobilization_from_reserve: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
-                                                     min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                       variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
     hexose_immobilization_as_reserve: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
-                                                     min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                       variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
     maintenance_respiration: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
-                                            min_value="", max_value="",  value_coment="", references="", DOI="",
+                                            min_value="", max_value="", value_comment="", references="", DOI="",
                                              variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
 
     # Deficits
     deficit_sucrose_root: float = declare(default=0., unit="mol.s-1", unit_comment="of sucrose", description="Sucrose deficit rate in root", 
-                                         min_value="", max_value="",  value_coment="", references="Hypothesis of no initial deficit", DOI="",
+                                         min_value="", max_value="", value_comment="", references="Hypothesis of no initial deficit", DOI="",
                                           variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
     deficit_hexose_reserve: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose reserve", description="Hexose reserve deficit rate in root", 
-                                           min_value="", max_value="",  value_coment="", references="Hypothesis of no initial deficit", DOI="",
+                                           min_value="", max_value="", value_comment="", references="Hypothesis of no initial deficit", DOI="",
                                             variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
     deficit_hexose_root: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="Hexose deficit rate in root", 
-                                        min_value="", max_value="",  value_coment="", references="Hypothesis of no initial deficit", DOI="",
+                                        min_value="", max_value="", value_comment="", references="Hypothesis of no initial deficit", DOI="",
                                          variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
 
     # SUMMED STATE VARIABLES
     total_sucrose_root: float = declare(default=0., unit="mol", unit_comment="of sucrose", description="Summed sucrose root at root system level", 
-                                       min_value="", max_value="",  value_coment="", references="", DOI="",
+                                       min_value="", max_value="", value_comment="", references="", DOI="",
                                         variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user")
     total_living_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Summed structural mass at root system level", 
-                                             min_value="", max_value="",  value_coment="", references="", DOI="",
+                                             min_value="", max_value="", value_comment="", references="", DOI="",
                                               variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user")
     global_sucrose_deficit: float = declare(default=0., unit="mol.s-1", unit_comment="of sucrose", description="Summed sucrose deficit at root system level", 
-                                           min_value="", max_value="",  value_coment="", references="", DOI="",
+                                           min_value="", max_value="", value_comment="", references="", DOI="",
                                             variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user")
 
     # --- INITIALIZES MODEL PARAMETERS ---
 
     # Temperature
     process_at_T_ref: float = declare(default=1., unit="adim", unit_comment="", description="Proportion of maximal process intensity occuring at T_ref", 
-                                     min_value="", max_value="",  value_coment="", references="", DOI="",
+                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                       variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
     phloem_unloading_T_ref: float = declare(default=10, unit="°C", unit_comment="", description="the reference temperature", 
-                                           min_value="", max_value="",  value_coment="", references="We reuse the observed evolution of Frankenberger and Johanson (1983) on invertase activity in different soils with temperature from 10 to 100 degree Celsius which show an increase of about 5 times between 20 degrees and 50 degrees (maximum), assuming that the activity of invertase outside the phloem tissues is correlated to the unloading rate of sucrose from phloem.", DOI="",
+                                           min_value="", max_value="", value_comment="", references="We reuse the observed evolution of Frankenberger and Johanson (1983) on invertase activity in different soils with temperature from 10 to 100 degree Celsius which show an increase of about 5 times between 20 degrees and 50 degrees (maximum), assuming that the activity of invertase outside the phloem tissues is correlated to the unloading rate of sucrose from phloem.", DOI="",
                                             variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     phloem_unloading_A: float = declare(default=-0.04, unit="adim", unit_comment="", description="parameter A (may be equivalent to the coefficient of linear increase)", 
-                                       min_value="", max_value="",  value_coment="", references="Frankenberger and Johanson (1983), see T_ref", DOI="",
+                                       min_value="", max_value="", value_comment="", references="Frankenberger and Johanson (1983), see T_ref", DOI="",
                                         variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     phloem_unloading_B: float = declare(default=2.9, unit="adim", unit_comment="", description="parameter B (may be equivalent to the Q10 value)", 
-                                       min_value="", max_value="",  value_coment="", references="Frankenberger and Johanson (1983), see T_ref", DOI="",
+                                       min_value="", max_value="", value_comment="", references="Frankenberger and Johanson (1983), see T_ref", DOI="",
                                         variable_type="parametyer", by="model_carbon", state_variable_type="", edit_by="user")
     phloem_unloading_C: float = declare(default=1, unit="adim", unit_comment="", description="parameter C (either 0 or 1)", 
-                                       min_value="", max_value="",  value_coment="", references="Frankenberger and Johanson (1983), see T_ref", DOI="",
+                                       min_value="", max_value="", value_comment="", references="Frankenberger and Johanson (1983), see T_ref", DOI="",
                                         variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
     max_loading_rate_T_ref: float = declare(default=10, unit="°C", unit_comment="", description="the reference temperature", 
-                                           min_value="", max_value="",  value_coment="", references="We reuse the temperature-evolution used for phloem unloading, based on the work of Frankenberger and Johanson (1983) (phloem_unloading_T_ref)", DOI="",
+                                           min_value="", max_value="", value_comment="", references="We reuse the temperature-evolution used for phloem unloading, based on the work of Frankenberger and Johanson (1983) (phloem_unloading_T_ref)", DOI="",
                                             variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     max_loading_rate_A: float = declare(default=-0.04, unit="adim", unit_comment="", description="parameter A (may be equivalent to the coefficient of linear increase)", 
-                                       min_value="", max_value="",  value_coment="", references="Frankenberger and Johanson (1983), see T_ref", DOI="",
+                                       min_value="", max_value="", value_comment="", references="Frankenberger and Johanson (1983), see T_ref", DOI="",
                                         variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     max_loading_rate_B: float = declare(default=2.9, unit="adim", unit_comment="", description="parameter B (may be equivalent to the Q10 value)", 
-                                       min_value="", max_value="",  value_coment="", references="Frankenberger and Johanson (1983), see T_ref", DOI="",
+                                       min_value="", max_value="", value_comment="", references="Frankenberger and Johanson (1983), see T_ref", DOI="",
                                         variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     max_loading_rate_C: float = declare(default=1, unit="adim", unit_comment="", description="parameter C (either 0 or 1)", 
-                                       min_value="", max_value="",  value_coment="", references="Frankenberger and Johanson (1983), see T_ref", DOI="",
+                                       min_value="", max_value="", value_comment="", references="Frankenberger and Johanson (1983), see T_ref", DOI="",
                                         variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
     max_immobilization_rate_T_ref: float = declare(default=20, unit="°C", unit_comment="", description="the reference temperature", 
-                                                  min_value="", max_value="",  value_coment="", references="According to the work of Mohabir and John (1988) on starch synthesis in potatoe tubers based on labelled sucrose incorporation in disks of starch, the immobilization increased until 21.5 degree Celsius and then decreases again. We fitted the evolution of starch synthesis with temperature (8-30 degrees) to get the parameters estimation.", DOI="",
+                                                  min_value="", max_value="", value_comment="", references="According to the work of Mohabir and John (1988) on starch synthesis in potatoe tubers based on labelled sucrose incorporation in disks of starch, the immobilization increased until 21.5 degree Celsius and then decreases again. We fitted the evolution of starch synthesis with temperature (8-30 degrees) to get the parameters estimation.", DOI="",
                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     max_immobilization_rate_A: float = declare(default=-0.0521, unit="adim", unit_comment="", description="parameter A (may be equivalent to the coefficient of linear increase)", 
-                                              min_value="", max_value="",  value_coment="", references="Mohabir and John (1988), see T_ref", DOI="",
+                                              min_value="", max_value="", value_comment="", references="Mohabir and John (1988), see T_ref", DOI="",
                                                variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     max_immobilization_rate_B: float = declare(default=0.861, unit="adim", unit_comment="", description="parameter B (may be equivalent to the Q10 value)", 
-                                              min_value="", max_value="",  value_coment="", references="Mohabir and John (1988), see T_ref", DOI="",
+                                              min_value="", max_value="", value_comment="", references="Mohabir and John (1988), see T_ref", DOI="",
                                                variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     max_immobilization_rate_C: float = declare(default=1, unit="adim", unit_comment="", description="parameter C (either 0 or 1)", 
-                                              min_value="", max_value="",  value_coment="", references="Mohabir and John (1988), see T_ref", DOI="",
+                                              min_value="", max_value="", value_comment="", references="Mohabir and John (1988), see T_ref", DOI="",
                                                variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
     max_mobilization_rate_T_ref: float = declare(default=20, unit="°C", unit_comment="", description="the reference temperature", 
-                                                min_value="", max_value="",  value_coment="max_immobilization_rate_T_ref", references="We assume that the mobilization obeys to the same evolution with temperature as the immobilization process.", DOI="",
+                                                min_value="", max_value="", value_comment="max_immobilization_rate_T_ref", references="We assume that the mobilization obeys to the same evolution with temperature as the immobilization process.", DOI="",
                                                  variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     max_mobilization_rate_A: float = declare(default=-0.0521, unit="adim", unit_comment="", description="parameter A (may be equivalent to the coefficient of linear increase)", 
-                                            min_value="", max_value="",  value_coment="max_immobilization_rate_A", references="We assume that the mobilization obeys to the same evolution with temperature as the immobilization process.", DOI="",
+                                            min_value="", max_value="", value_comment="max_immobilization_rate_A", references="We assume that the mobilization obeys to the same evolution with temperature as the immobilization process.", DOI="",
                                              variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     max_mobilization_rate_B: float = declare(default=0.861, unit="adim", unit_comment="", description="parameter B (may be equivalent to the Q10 value)", 
-                                            min_value="", max_value="",  value_coment="max_immobilization_rate_B", references="We assume that the mobilization obeys to the same evolution with temperature as the immobilization process.", DOI="",
+                                            min_value="", max_value="", value_comment="max_immobilization_rate_B", references="We assume that the mobilization obeys to the same evolution with temperature as the immobilization process.", DOI="",
                                              variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     max_mobilization_rate_C: float = declare(default=1, unit="adim", unit_comment="", description="parameter C (either 0 or 1)", 
-                                            min_value="", max_value="",  value_coment="max_immobilization_rate_C", references="We assume that the mobilization obeys to the same evolution with temperature as the immobilization process.", DOI="",
+                                            min_value="", max_value="", value_comment="max_immobilization_rate_C", references="We assume that the mobilization obeys to the same evolution with temperature as the immobilization process.", DOI="",
                                              variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
     resp_maintenance_max_T_ref: float = declare(default=20, unit="°C", unit_comment="", description="the reference temperature", 
-                                               min_value="", max_value="",  value_coment="", references="We fitted the parameters on the mean curve of maintenance respiration of whole-plant wheat obtained from Gifford (1995).", DOI="",
+                                               min_value="", max_value="", value_comment="", references="We fitted the parameters on the mean curve of maintenance respiration of whole-plant wheat obtained from Gifford (1995).", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     resp_maintenance_max_A: float = declare(default=-0.0442, unit="adim", unit_comment="", description="parameter A (may be equivalent to the coefficient of linear increase)", 
-                                           min_value="", max_value="",  value_coment="", references="Gifford (1995), see T_ref", DOI="",
+                                           min_value="", max_value="", value_comment="", references="Gifford (1995), see T_ref", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     resp_maintenance_max_B: float = declare(default=1.55, unit="adim", unit_comment="", description="parameter B (may be equivalent to the Q10 value)", 
-                                           min_value="", max_value="",  value_coment="", references="Gifford (1995), see T_ref", DOI="",
+                                           min_value="", max_value="", value_comment="", references="Gifford (1995), see T_ref", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     resp_maintenance_max_C: float = declare(default=1, unit="adim", unit_comment="", description="parameter C (either 0 or 1)", 
-                                           min_value="", max_value="",  value_coment="", references="Gifford (1995), see T_ref", DOI="",
+                                           min_value="", max_value="", value_comment="", references="Gifford (1995), see T_ref", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
     permeability_coeff_T_ref: float = declare(default=20, unit="°C", unit_comment="", description="the reference temperature", 
-                                             min_value="", max_value="",  value_coment="", references="We assume that the permeability does not directly depend on temperature, according to the contrasted results obtained by Wan et al. (2001) on poplar, Shen and Yan (2002) on crotalaria, Hill et al. (2007) on wheat, or Kaldy (2012) on a sea grass.", DOI="",
+                                             min_value="", max_value="", value_comment="", references="We assume that the permeability does not directly depend on temperature, according to the contrasted results obtained by Wan et al. (2001) on poplar, Shen and Yan (2002) on crotalaria, Hill et al. (2007) on wheat, or Kaldy (2012) on a sea grass.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     permeability_coeff_A: float = declare(default=0., unit="adim", unit_comment="", description="parameter A (may be equivalent to the coefficient of linear increase)", 
-                                         min_value="", max_value="",  value_coment="", references="see T_ref", DOI="",
+                                         min_value="", max_value="", value_comment="", references="see T_ref", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     permeability_coeff_B: float = declare(default=1., unit="adim", unit_comment="", description="parameter B (may be equivalent to the Q10 value)", 
-                                         min_value="", max_value="",  value_coment="", references="see T_ref", DOI="",
+                                         min_value="", max_value="", value_comment="", references="see T_ref", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     permeability_coeff_C: float = declare(default=0., unit="adim", unit_comment="", description="parameter C (either 0 or 1)", 
-                                         min_value="", max_value="",  value_coment="", references="see T_ref", DOI="",
+                                         min_value="", max_value="", value_comment="", references="see T_ref", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
     uptake_rate_max_T_ref: float = declare(default=20, unit="°C", unit_comment="", description="the reference temperature", 
-                                          min_value="", max_value="",  value_coment="", references="", DOI="",
+                                          min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     uptake_rate_max_A: float = declare(default=0., unit="adim", unit_comment="", description="parameter A (may be equivalent to the coefficient of linear increase)", 
-                                      min_value="", max_value="",  value_coment="", references="", DOI="",
+                                      min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     uptake_rate_max_B: float = declare(default=3.82, unit="adim", unit_comment="", description="parameter B (may be equivalent to the Q10 value)", 
-                                      min_value="", max_value="",  value_coment="", references="The value for B (Q10) is adapted from the work of Coody et al. (1986, SBB), who provided the evolution of the maximal uptake of glucose by soil microorganisms at 4, 12 and 25 degree C.", DOI="",
+                                      min_value="", max_value="", value_comment="", references="The value for B (Q10) is adapted from the work of Coody et al. (1986, SBB), who provided the evolution of the maximal uptake of glucose by soil microorganisms at 4, 12 and 25 degree C.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     uptake_rate_max_C: float = declare(default=1, unit="adim", unit_comment="", description="parameter C (either 0 or 1)", 
-                                      min_value="", max_value="",  value_coment="", references="", DOI="",
+                                      min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
     secretion_rate_max_T_ref: float = declare(default=20, unit="°C", unit_comment="", description="the rvaeference temperature", 
-                                                min_value="", max_value="",  value_coment="", references="We arbitrarily assume that the secretion of mucilage exponentially increases with soil temperature with a Q10 of 2, although we could not find any experimental evidence for this.", DOI="",
+                                                min_value="", max_value="", value_comment="", references="We arbitrarily assume that the secretion of mucilage exponentially increases with soil temperature with a Q10 of 2, although we could not find any experimental evidence for this.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     secretion_rate_max_A: float = declare(default=-0., unit="adim", unit_comment="", description="parameter A (may be equivalent to the coefficient of linear increase)", 
-                                                min_value="", max_value="",  value_coment="", references="see T_ref", DOI="",
+                                                min_value="", max_value="", value_comment="", references="see T_ref", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     secretion_rate_max_B: float = declare(default=2., unit="adim", unit_comment="", description="parameter B (may be equivalent to the Q10 value)", 
-                                                min_value="", max_value="",  value_coment="", references="see T_ref", DOI="",
+                                                min_value="", max_value="", value_comment="", references="see T_ref", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     secretion_rate_max_C: float = declare(default=1., unit="adim", unit_comment="", description="parameter C (either 0 or 1)", 
-                                                min_value="", max_value="",  value_coment="", references="see T_ref", DOI="",
+                                                min_value="", max_value="", value_comment="", references="see T_ref", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
     surfacic_cells_release_rate_T_ref: float = declare(default=20, unit="°C", unit_comment="", description="the reference temperature", 
-                                                min_value="", max_value="",  value_coment="", references="This corresponds to a bell-shape where the maximum is obtained at 31 degree Celsius, obtained by fitting the data from Clowes and Wadekar (1988) on Zea mays roots between 15 and 35 degree.", DOI="",
+                                                min_value="", max_value="", value_comment="", references="This corresponds to a bell-shape where the maximum is obtained at 31 degree Celsius, obtained by fitting the data from Clowes and Wadekar (1988) on Zea mays roots between 15 and 35 degree.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     surfacic_cells_release_rate_A: float = declare(default=-0.187, unit="adim", unit_comment="", description="parameter A (may be equivalent to the coefficient of linear increase)", 
-                                                min_value="", max_value="",  value_coment="", references="see T_ref", DOI="",
+                                                min_value="", max_value="", value_comment="", references="see T_ref", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     surfacic_cells_release_rate_B: float = declare(default=2.48, unit="adim", unit_comment="", description="parameter B (may be equivalent to the Q10 value)", 
-                                                min_value="", max_value="",  value_coment="", references="see T_ref", DOI="",
+                                                min_value="", max_value="", value_comment="", references="see T_ref", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     surfacic_cells_release_rate_C: float = declare(default=1, unit="adim", unit_comment="", description="parameter C (either 0 or 1)", 
-                                                min_value="", max_value="",  value_coment="", references="see T_ref", DOI="",
+                                                min_value="", max_value="", value_comment="", references="see T_ref", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
     # C METABOLIC PROCESSES
     # kinetic parameters
     max_immobilization_rate: float = declare(default=1.8e-9, unit="mol.g-1.s-1", unit_comment="", description="Maximum immobilization rate of hexose in the reserve pool", 
-                                                min_value="", max_value="",  value_coment="overwrite 8 * 1e-6 / 6. from According to Gauthier et al. (2020): the new maximum rate of starch synthesis for vegetative growth in the shoot", references="According to the work of Mohabir and John (1988) on starch synthesis in potatoe tubers based on labelled sucrose incorporation in disks of starch, the immobilization rate is about 1.8e-9 at the temperature of 20 degree Celsius, assuming that the potatoe starch content is 65.6% of dry matter and that the structural mass is 28.5% (data taken from the data of Jansen et al. (2001).", DOI="",
+                                                min_value="", max_value="", value_comment="overwrite 8 * 1e-6 / 6. from According to Gauthier et al. (2020): the new maximum rate of starch synthesis for vegetative growth in the shoot", references="According to the work of Mohabir and John (1988) on starch synthesis in potatoe tubers based on labelled sucrose incorporation in disks of starch, the immobilization rate is about 1.8e-9 at the temperature of 20 degree Celsius, assuming that the potatoe starch content is 65.6% of dry matter and that the structural mass is 28.5% (data taken from the data of Jansen et al. (2001).", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     max_mobilization_rate: float = declare(default=1.8e-9, unit="mol.g-1.s-1", unit_comment="", description="Maximum mobilization rate of hexose from the reserve pool", 
-                                                min_value="", max_value="",  value_coment="", references="max_immobilization_rate", DOI="",
+                                                min_value="", max_value="", value_comment="", references="max_immobilization_rate", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     C_hexose_reserve_min: float = declare(default=0., unit="mol.g-1", unit_comment="", description="Minimum concentration of hexose in the reserve pool", 
-                                                min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     expected_C_hexose_root: float = declare(default=1.3, unit="mol.g-1", unit_comment="of hexose", description="Expected hexose concentration in root", 
-                                                min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     expected_C_hexose_soil: float = declare(default=1.3 / 100., unit="mol.g-1", unit_comment="of hexose", description="Expected hexose concentration in soil", 
-                                                min_value="", max_value="",  value_coment="expected_C_hexose_root / 100", references="We expect the soil concentration to be 2 orders of magnitude lower than the root concentration. (??)", DOI="",
+                                                min_value="", max_value="", value_comment="expected_C_hexose_root / 100", references="We expect the soil concentration to be 2 orders of magnitude lower than the root concentration. (??)", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     expected_C_hexose_reserve: float = declare(default=1.3 * 2., unit="mol.g-1", unit_comment="of hexose", description="Expected hexose concentration in the reserve pool", 
-                                                min_value="", max_value="",  value_coment="expected_C_hexose_root", references="We expect the reserve pool to be two times higher than the mobile one. (??)", DOI="",
+                                                min_value="", max_value="", value_comment="expected_C_hexose_root", references="We expect the reserve pool to be two times higher than the mobile one. (??)", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     Km_mobilization: float = declare(default=1.3 * 2. * 5., unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for hexose remobilization from the reserve", 
-                                                min_value="", max_value="",  value_coment="expected_C_hexose_reserve", references="", DOI="",
+                                                min_value="", max_value="", value_comment="expected_C_hexose_reserve", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     C_hexose_root_min_for_reserve: float = declare(default=5e-3, unit="mol.g-1", unit_comment="of hexose", description="Minimum concentration of hexose in the mobile pool for immobilization", 
-                                                min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     C_hexose_reserve_max: float = declare(default=5e-3, unit="mol.g-1", unit_comment="of hexose", description="Maximum concentration of hexose in the reserve pool", 
-                                                min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     Km_immobilization: float = declare(default=1.3, unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for hexose immobilization in the reserve pool", 
-                                                min_value="", max_value="",  value_coment="expected_C_hexose_root", references="", DOI="",
+                                                min_value="", max_value="", value_comment="expected_C_hexose_root", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     resp_maintenance_max: float = declare(default=5e-8, unit="mol.g-1.s-1", unit_comment="of CO2", description="Maximal maintenance respiration rate", 
-                                                min_value="", max_value="",  value_coment="overwritting 4.1e-6 / 6. * (0.44 / 60. / 14.01) * 5 from => According to Barillot et al. (2016): max. residual maintenance respiration rate is 4.1e-6 umol_C umol_N-1 s-1, i.e. 4.1e-6/60*0.44 mol_C g-1 s-1 assuming an average struct_C:N_tot molar ratio of root of 60 [cf simulations by CN-Wheat 47 in 2020] and a C content of struct_mass of 44%. According to the same simulations, total maintenance respiration is about 5 times more than residual maintenance respiration.", references="According to Gifford (1995): the total maintenance respiration rate of the whole plant of wheat is about 0.024 gC gC-1 day-1, i.e. 5.28 e-8 assuming that the C to which this rate is related represents 44% of the dry structural biomass.", DOI="",
+                                                min_value="", max_value="", value_comment="overwritting 4.1e-6 / 6. * (0.44 / 60. / 14.01) * 5 from => According to Barillot et al. (2016): max. residual maintenance respiration rate is 4.1e-6 umol_C umol_N-1 s-1, i.e. 4.1e-6/60*0.44 mol_C g-1 s-1 assuming an average struct_C:N_tot molar ratio of root of 60 [cf simulations by CN-Wheat 47 in 2020] and a C content of struct_mass of 44%. According to the same simulations, total maintenance respiration is about 5 times more than residual maintenance respiration.", references="According to Gifford (1995): the total maintenance respiration rate of the whole plant of wheat is about 0.024 gC gC-1 day-1, i.e. 5.28 e-8 assuming that the C to which this rate is related represents 44% of the dry structural biomass.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     Km_maintenance: float = declare(default=1.67e3 * 1e-6 / 6., unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for maintenance respiration", 
-                                                min_value="", max_value="",  value_coment="", references="According to Barillot et al. (2016): Km=1670 umol of C per gram for residual maintenance respiration (based on sucrose concentration!).",  DOI="",
+                                                min_value="", max_value="", value_comment="", references="According to Barillot et al. (2016): Km=1670 umol of C per gram for residual maintenance respiration (based on sucrose concentration!).",  DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
     # C TRANSPORT PROCESSES
     # kinetic parameters
     phloem_permeability: float = declare(default=2e-4, unit="g.m-2.s-1", unit_comment="", description="Coefficient of permeability of unloading phloem", 
-                                                min_value="", max_value="",  value_coment="cheating, 5.76 override", references="According to Ross-Eliott et al. (2017), an unloading flow of sucrose of 1.2e-13 mol of sucrose per second can be calculated for a sieve element of 3.6 µm and the length of the unloading zone of 350 µm, # assuming a phloem concentration of 0.5 mol/l. We calculated that this concentration corresponded to 5.3 e-6 mol/gDW, considering that the sieve element was filled with phloem sap, that the root diameter was 111 µm, and that root tissue density was 0.1 g cm-3. Calculating an exchange surface of the sieve tube of 4e-9 m2, we obtained a permeability coefficient of 5.76 gDW m-2 s-1 using the values of the flow, of the gradient of sugar concentration (assuming hexose concentration was 0) and of the exchange surface.", DOI="",
+                                                min_value="", max_value="", value_comment="cheating, 5.76 override", references="According to Ross-Eliott et al. (2017), an unloading flow of sucrose of 1.2e-13 mol of sucrose per second can be calculated for a sieve element of 3.6 µm and the length of the unloading zone of 350 µm, # assuming a phloem concentration of 0.5 mol/l. We calculated that this concentration corresponded to 5.3 e-6 mol/gDW, considering that the sieve element was filled with phloem sap, that the root diameter was 111 µm, and that root tissue density was 0.1 g cm-3. Calculating an exchange surface of the sieve tube of 4e-9 m2, we obtained a permeability coefficient of 5.76 gDW m-2 s-1 using the values of the flow, of the gradient of sugar concentration (assuming hexose concentration was 0) and of the exchange surface.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     reference_rate_of_hexose_consumption_by_growth: float = declare(default=3e-14, unit="mol.s-1", unit_comment="of hexose", description="Coefficient of permeability of unloading phloem", 
-                                                min_value="", max_value="",  value_coment="", references="Reference consumption rate of hexose for growth for a given root element (used to multiply the reference unloading rate when growth has consumed hexose)", DOI="",
+                                                min_value="", max_value="", value_comment="", references="Reference consumption rate of hexose for growth for a given root element (used to multiply the reference unloading rate when growth has consumed hexose)", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     max_unloading_rate: float = declare(default=2e-7, unit="mol.g-1.s-1", unit_comment="", description="", 
-                                                min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     Km_unloading: float = declare(default=1000 * 1e-6 / 12., unit="mol.g-1", unit_comment="of sucrose", description="Affinity constant for sucrose unloading", 
-                                                min_value="", max_value="",  value_coment="", references="According to Barillot et al. (2016b), this value is 1000 umol C g-1", DOI="",
+                                                min_value="", max_value="", value_comment="", references="According to Barillot et al. (2016b), this value is 1000 umol C g-1", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     max_loading_rate: float = declare(default=2e-7, unit="mol.g-1.s-1", unit_comment="", description="", 
-                                                min_value="", max_value="",  value_coment="", references="", DOI="",
+                                                min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     Km_loading: float = declare(default=1000 * 1e-6 / 12. * 2, unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for sucrose loading", 
-                                                min_value="", max_value="",  value_coment="Km_unloading", references="We expect the Km of loading to be equivalent as the Km of unloading, as it may correspond to the same transporter.", DOI="",
+                                                min_value="", max_value="", value_comment="Km_unloading", references="We expect the Km of loading to be equivalent as the Km of unloading, as it may correspond to the same transporter.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     expected_exudation_efflux: float = declare(default=608 * 0.000001 / 12.01 / 6 / 3600 * 1 / (0.5 * 10), unit="mol.m-2.s-1", unit_comment="of hexose", description="Expected exudation rate", 
-                                                min_value="", max_value="",  value_coment="", references="According to Jones and Darrah (1992): the net efflux of C for a root of maize is 608 ug C g-1 root DW h-1, and we assume that 1 gram of dry root mass is equivalent to 0.5 m2 of external surface. OR: expected_exudation_efflux = 5.2 / 12.01 / 6. * 1e-6 * 100. ** 2. / 3600. Explanation: According to Personeni et al. (2007), we expect a flux of 5.2 ugC per cm2 per hour", DOI="",
+                                                min_value="", max_value="", value_comment="", references="According to Jones and Darrah (1992): the net efflux of C for a root of maize is 608 ug C g-1 root DW h-1, and we assume that 1 gram of dry root mass is equivalent to 0.5 m2 of external surface. OR: expected_exudation_efflux = 5.2 / 12.01 / 6. * 1e-6 * 100. ** 2. / 3600. Explanation: According to Personeni et al. (2007), we expect a flux of 5.2 ugC per cm2 per hour", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     Pmax_apex: float = declare(default=608 * 0.000001 / 12.01 / 6 / 3600 * 1 / (0.5 * 10) / (1.3 + 1.3 / 100), unit="g.m-2.s-1", unit_comment="", description="Permeability coefficient", 
-                                                min_value="", max_value="",  value_coment="expected_exudation_efflux / (expected_C_hexose_root - expected_C_hexose_soil)", references="We calculate the permeability according to the expected exudation flux and expected concentration gradient between cytosol and soil.", DOI="",
+                                                min_value="", max_value="", value_comment="expected_exudation_efflux / (expected_C_hexose_root - expected_C_hexose_soil)", references="We calculate the permeability according to the expected exudation flux and expected concentration gradient between cytosol and soil.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     uptake_rate_max: float = declare(default=277 * 0.000000001 / (60 * 60 * 24) * 1000 * 1 / (0.5 * 1), unit="mol.m-2.s-1", unit_comment="of hexose", description="Maximum rate of influx of hexose from soil to roots", 
-                                                min_value="", max_value="",  value_coment="", references="According to Jones and Darrah (1996), the uptake rate measured for all sugars tested with an individual external concentration of 100 uM is equivalent to 277 nmol hexose mg-1 day-1, and we assume that 1 gram of dry root mass is equivalent to 0.5 m2 of external surface.", DOI="",
+                                                min_value="", max_value="", value_comment="", references="According to Jones and Darrah (1996), the uptake rate measured for all sugars tested with an individual external concentration of 100 uM is equivalent to 277 nmol hexose mg-1 day-1, and we assume that 1 gram of dry root mass is equivalent to 0.5 m2 of external surface.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     Km_uptake: float = declare(default=1000 * 1e-6 / 12. * 2, unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for hexose uptake", 
-                                                min_value="", max_value="",  value_coment="Km_loading", references="We assume that the transporters able to reload sugars in the phloem and to take up sugars from the soil behave in a similar manner.", DOI="",
+                                                min_value="", max_value="", value_comment="Km_loading", references="We assume that the transporters able to reload sugars in the phloem and to take up sugars from the soil behave in a similar manner.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     secretion_rate_max: float = declare(default=1e-5/(12.01*6)/(0.1*pi)*1e4/(60.*60.*24.), unit="mol.m-2.s-1", unit_comment="of hexose", description="Maximum rate of mucilage secretion", 
-                                                min_value="", max_value="",  value_coment="", references="According to the measurements of Paull et al. (1975) and Chaboud (1983) on maize and of Horst et al. (1982) on cowpea, the mucilage secretion rate at root tip evolves within 5 to 10 ugC per cm of root per day. We therefore chose 10 gC per cm per day as the maximal rate, and convert it in mol of hexose per m2 per second, assuming that the root tip is a cylinder of 1 mm diameter.", DOI="",
+                                                min_value="", max_value="", value_comment="", references="According to the measurements of Paull et al. (1975) and Chaboud (1983) on maize and of Horst et al. (1982) on cowpea, the mucilage secretion rate at root tip evolves within 5 to 10 ugC per cm of root per day. We therefore chose 10 gC per cm per day as the maximal rate, and convert it in mol of hexose per m2 per second, assuming that the root tip is a cylinder of 1 mm diameter.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     gamma_secretion: float = declare(default=1., unit="adim", unit_comment="", description="Coefficient affecting the decrease of mucilage secretion with distance from the apex", 
-                                                min_value="", max_value="",  value_coment="", references="We assume that the mucilage secretion rapidly decreases when moving away from the apex.", DOI="",
+                                                min_value="", max_value="", value_comment="", references="We assume that the mucilage secretion rapidly decreases when moving away from the apex.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     Cs_mucilage_soil_max: float = declare(default=10., unit="mol.m-2", unit_comment="of equivalent hexose", description="Maximal surfacic concentration of mucilage at the soil-root interface, above which no mucilage secretion is possible", 
-                                                min_value="", max_value="",  value_coment="DO A REAL ESTIMATION!", references="", DOI="",
+                                                min_value="", max_value="", value_comment="DO A REAL ESTIMATION!", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     Km_secretion: float = declare(default=1000 * 1e-6 / 12. * 2 / 2, unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for hexose uptake", 
-                                                min_value="", max_value="",  value_coment="Km_loading", references="We assume that the concentration of root hexose for which mucilage secretion is half of the maximal rate is two-times lower than the one for which phloem reloading is half of the maximal rate.", DOI="",
+                                                min_value="", max_value="", value_comment="Km_loading", references="We assume that the concentration of root hexose for which mucilage secretion is half of the maximal rate is two-times lower than the one for which phloem reloading is half of the maximal rate.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     growing_zone_factor: float = declare(default=8 * 2., unit="adim", unit_comment="", description="Proportionality factor between the radius and the length of the root apical zone in which C can sustain root elongation", 
-                                                min_value="", max_value="",  value_coment="", references="According to illustrations by Kozlova et al. (2020), the length of the growing zone corresponding to the root cap, meristem and elongation zones is about 8 times the diameter of the tip.", DOI="",
+                                                min_value="", max_value="", value_comment="", references="According to illustrations by Kozlova et al. (2020), the length of the growing zone corresponding to the root cap, meristem and elongation zones is about 8 times the diameter of the tip.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     surfacic_cells_release_rate: float = declare(default=1279/6476*(33.9*1e6*1e-18)*0.1*1000000*0.44/12.01/6/(24*60*60)/(0.8*0.001*pi*0.8*0.001), unit="mol.m-2.s-1", unit_comment="mol of equivalent-hexose per m2 of lateral external surface per second", description="Average release of root cells", 
-                                                min_value="", max_value="",  value_coment="", references="We used the measurements by Clowes and Wadekar 1988 on Zea mays root cap cells obtained at 20 degree Celsius, i.e. 1279 cells per day. We recalculated the amount of equivalent hexose by relating the number of cap cells produced per day to a volume knowing that the whole cap was made of 6476 cells and had a volume of 33.9 *10^6 micrometer^3. The volume was later converted into a mass assuming a density of 0.1 g cm-3. We then assumed that the surface of root cap was equivalent to the lateral surface of a cylinder of radius 0.8 mm and height 0.8 mm (meristem size = 0.79-0.81 mm).", DOI="",
+                                                min_value="", max_value="", value_comment="", references="We used the measurements by Clowes and Wadekar 1988 on Zea mays root cap cells obtained at 20 degree Celsius, i.e. 1279 cells per day. We recalculated the amount of equivalent hexose by relating the number of cap cells produced per day to a volume knowing that the whole cap was made of 6476 cells and had a volume of 33.9 *10^6 micrometer^3. The volume was later converted into a mass assuming a density of 0.1 g cm-3. We then assumed that the surface of root cap was equivalent to the lateral surface of a cylinder of radius 0.8 mm and height 0.8 mm (meristem size = 0.79-0.81 mm).", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     Cs_cells_soil_max: float = declare(default=10., unit="mol.m-2", unit_comment="of equivalent hexose", description="Maximal surfacic concentration of root cells in soil, above which no release of cells is possible", 
-                                                min_value="", max_value="",  value_coment="DO A REAL ESTIMATION!", references="", DOI="",
+                                                min_value="", max_value="", value_comment="DO A REAL ESTIMATION!", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
     def __init__(self, g, time_step_in_seconds: int, **scenario: dict):
@@ -438,7 +439,7 @@ class RootCarbonModel(Model):
         """
         self.g = g
         self.props = self.g.properties()
-        self.choregrapher.add_data(data=self.props)
+        self.choregrapher.add_data(instance=self, data_name="props", filter={"label": ["Segment", "Apex"], "type":["Base_of_the_root_system", "Normal_root_after_emergence", "Stopped", "Just_Stopped", "Root_nodule"]})
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_steps_in_seconds = time_step_in_seconds
 
@@ -453,7 +454,6 @@ class RootCarbonModel(Model):
         # Supply of sucrose from the shoots to the roots and spreading into the whole phloem:
         self.shoot_sucrose_supply_and_spreading()
 
-    @postgrowth
     def post_growth_updating(self):
         """
         Description :
@@ -473,11 +473,12 @@ class RootCarbonModel(Model):
                         getattr(self, prop).update({vid: getattr(self, prop)[parent] * mass_fraction,
                                                     parent: getattr(self, prop)[parent] * (1-mass_fraction)})
             else:
-                for prop in self.state_variables:
-                    # if intensive, concentrations have to be updated based on new structural mass
-                    if self.__dataclass_fields__[prop].metadata["state_variable_type"] == "intensive":
-                        getattr(self, prop).update({vid: getattr(self, prop)[vid] * (
-                            self.initial_struct_mass[vid] / self.struct_mass[vid])})
+                if self.struct_mass[vid] > 0:
+                    for prop in self.state_variables:
+                        # if intensive, concentrations have to be updated based on new structural mass
+                        if self.__dataclass_fields__[prop].metadata["state_variable_type"] == "intensive":
+                            getattr(self, prop).update({vid: getattr(self, prop)[vid] * (
+                                self.initial_struct_mass[vid] / self.struct_mass[vid])})
 
     # Calculation of the total amount of sucrose and structural struct_mass in the root system:
     # -----------------------------------------------------------------------------------------
@@ -888,7 +889,7 @@ class RootCarbonModel(Model):
     # TODO FOR TRISTAN: Consider adding N balance here (to be possibly used in the solver).
     @potential
     @state
-    def _sucrose_root(self, C_sucrose_root, struct_mass, living_root_hairs_struct_mass, hexose_diffusion_from_phloem,
+    def _C_sucrose_root(self, C_sucrose_root, struct_mass, living_root_hairs_struct_mass, hexose_diffusion_from_phloem,
                             hexose_active_production_from_phloem, phloem_hexose_exudation, sucrose_loading_in_phloem,
                             phloem_hexose_uptake_from_soil, deficit_sucrose_root):
         return C_sucrose_root + (self.time_steps_in_seconds / (struct_mass + living_root_hairs_struct_mass)) * (
@@ -901,7 +902,7 @@ class RootCarbonModel(Model):
     
     @potential
     @state
-    def _hexose_reserve(self, C_hexose_reserve, struct_mass, living_root_hairs_struct_mass, hexose_immobilization_as_reserve,
+    def _C_hexose_reserve(self, C_hexose_reserve, struct_mass, living_root_hairs_struct_mass, hexose_immobilization_as_reserve,
                               hexose_mobilization_from_reserve, deficit_hexose_reserve):
         return C_hexose_reserve + (self.time_steps_in_seconds / (struct_mass + living_root_hairs_struct_mass)) * (
                 hexose_immobilization_as_reserve
@@ -910,7 +911,7 @@ class RootCarbonModel(Model):
 
     @potential
     @state
-    def _hexose_root(self, C_hexose_root, struct_mass, living_root_hairs_struct_mass, hexose_exudation, hexose_uptake_from_soil,
+    def _C_hexose_root(self, C_hexose_root, struct_mass, living_root_hairs_struct_mass, hexose_exudation, hexose_uptake_from_soil,
                            mucilage_secretion, cells_release, maintenance_respiration,
                            hexose_consumption_by_growth, hexose_diffusion_from_phloem,
                            hexose_active_production_from_phloem, sucrose_loading_in_phloem,
@@ -959,17 +960,17 @@ class RootCarbonModel(Model):
     # TODO : check possibility of doubled names
     @actual
     @state
-    def _sucrose_root(self, C_sucrose_root):
+    def _C_sucrose_root(self, C_sucrose_root):
         return max(C_sucrose_root, 0.)
     
     @actual
     @state
-    def _hexose_reserve(self, C_hexose_reserve):
+    def _C_hexose_reserve(self, C_hexose_reserve):
         return max(C_hexose_reserve, 0.)
 
     @actual
     @state
-    def _hexose_root(self, C_hexose_root):
+    def _C_hexose_root(self, C_hexose_root):
         return max(C_hexose_root, 0.)
     
 

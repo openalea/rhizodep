@@ -14,14 +14,16 @@ import os
 import numpy as np
 import pandas as pd
 from math import sqrt, pi, floor
+from dataclasses import dataclass
 
 from openalea.mtg import *
 from openalea.mtg.traversal import post_order
 
-from generic_fspm.component import Model, declare
-from generic_fspm.component_factory import *
+from genericmodel.component import Model, declare
+from genericmodel.component_factory import *
 
 
+@dataclass
 class RootGrowthModel(Model):
     """
     DESCRIPTION
@@ -80,10 +82,10 @@ class RootGrowthModel(Model):
                                                     variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
     struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
     thermal_time_since_emergence: float = declare(default=0, unit="°C", unit_comment="", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
 
     # --- INITIALIZES MODEL PARAMETERS ---
     # Segment initialization
@@ -95,6 +97,15 @@ class RootGrowthModel(Model):
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     root_hairs_lifespan: float = declare(default=46 * (60. * 60.), unit="s", unit_comment="time equivalent at temperature of T_ref", description="Average lifespan of a root hair", 
                                                     min_value="", max_value="", value_comment="", references="According to the data from McElgunn and Harrison (1969), the lifespan of wheat root hairs is 40-55h, depending on the temperature. For a temperature of 20 degree Celsius, the linear regression from this data gives 46h.", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    root_hairs_density: float = declare(default=30 * 1e3 / (0.16 / 2. * 1e-3), unit=".m-2", unit_comment="number of hairs par meter of root per meter of root radius", description="Average density of root hairs", 
+                                                    min_value="", max_value="", value_comment="", references="According to the data from McElgunn and Harrison (1969), the elongation rate for wheat root hairs is about 0.080 mm h-1.", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    root_hair_max_length: float = declare(default=1 * 1e-3, unit="m", unit_comment="", description="Average maximal length of a root hair", 
+                                                    min_value="", max_value="", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair maximal length for wheat and barley evolves between 0.5 and 1.3 mm.", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    root_hairs_elongation_rate: float = declare(default=0.080 * 1e-3 / (60. * 60.) /(12 * 1e-6 /2.), unit=".s-1", unit_comment="in meter per second per meter of root radius", description="Average elongation rate of root hairs", 
+                                                    min_value="", max_value="", value_comment="", references="According to the data from McElgunn and Harrison (1969), the elongation rate for wheat root hairs is about 0.080 mm h-1.", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     LDs: float = declare(default=4000. * (60. * 60. * 24.) * 1000 * 1e-6, unit="s.m-1..g-1.m-3", unit_comment="time equivalent at temperature of T_ref", description="Average lifespan of a root hair", 
                                                     min_value="", max_value="", value_comment="", references="5000 day mm-1 g-1 cm3 (??)", DOI="",
@@ -116,7 +127,7 @@ class RootGrowthModel(Model):
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     CVDD: float = declare(default=0.2, unit="adim", unit_comment="", description="Relative variation of the daughter root diameter", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="parameter", by="model_growth")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     starting_time_for_adventitious_roots_emergence: float = declare(default=(60. * 60. * 24.) * 9., unit="s", unit_comment="time equivalent at temperature of T_ref", description="Time when adventitious roots start to successively emerge", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
@@ -149,7 +160,7 @@ class RootGrowthModel(Model):
     # potential development
     emergence_delay: float = declare(default=3. * (60. * 60. * 24.), unit="s", unit_comment="time equivalent at temperature of T_ref", description="Delay of emergence of the primordium", 
                                                     min_value="", max_value="", value_comment="", references="emergence_delay = 3 days (??)", DOI="",
-                                                    variable_type="parameter", by="model_growth")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     EL: float = declare(default=1.39 * 20 / (60. * 60. * 24.), unit="s-1", unit_comment="meters of root per meter of radius per second equivalent to T_ref_growth", description="Slope of the elongation rate = f(tip diameter) ", 
                                                     min_value="", max_value="", value_comment="", references="EL = 5 mm mm-1 day-1 (??)", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
@@ -289,7 +300,7 @@ class RootGrowthModel(Model):
 
         self.g = self.initiate_mtg()
         self.props = self.g.properties()
-        self.choregrapher.add_data(data=self.props)
+        self.choregrapher.add_data(instance=self, data_name="props", filter={"label": ["Segment", "Apex"], "type":["Base_of_the_root_system", "Normal_root_after_emergence", "Stopped", "Just_Stopped", "Root_nodule"]})
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_step_in_seconds = time_step_in_seconds
         
@@ -361,7 +372,7 @@ class RootGrowthModel(Model):
 
         base_segment.volume = self.volume
 
-        base_segment.struct_mass = base_segment.volume * self.root_tissue_density
+        base_segment.struct_mass = base_segment.volume * self.new_root_tissue_density
         base_segment.initial_struct_mass = base_segment.struct_mass
         base_segment.initial_living_root_hairs_struct_mass = base_segment.living_root_hairs_struct_mass
 
@@ -386,7 +397,7 @@ class RootGrowthModel(Model):
         # USED
         # base_segment.growth_duration = GDs * (2. * base_radius) ** 2 * main_roots_growth_extender #WATCH OUT!!! we artificially multiply growth duration for seminal and adventious roots!!!!!!!!!!!!!!!!!!!!!!
         base_segment.growth_duration = self.calculate_growth_duration(radius=base_radius, index=id_segment, root_order=1)
-        base_segment.life_duration = self.LDs * (2. * base_radius) * self.root_tissue_density
+        base_segment.life_duration = self.LDs * (2. * base_radius) * self.new_root_tissue_density
         base_segment.actual_time_since_primordium_formation = 0.
         base_segment.actual_time_since_emergence = 0.
         base_segment.actual_time_since_cells_formation = 0.
@@ -470,7 +481,7 @@ class RootGrowthModel(Model):
                     apex_seminal.growth_duration = self.calculate_growth_duration(radius=radius_seminal,
                                                                                                index=apex_seminal.index(),
                                                                                                root_order=1)
-                    apex_seminal.life_duration = self.LDs * (2. * radius_seminal) * self.root_tissue_density
+                    apex_seminal.life_duration = self.LDs * (2. * radius_seminal) * apex_seminal.root_tissue_density
 
                     # We defined the delay of emergence for the new primordium:
                     apex_seminal.emergence_delay_in_thermal_time = seminal_inputs_file.emergence_delay_in_thermal_time[
@@ -549,7 +560,7 @@ class RootGrowthModel(Model):
                         radius=radius_adventitious,
                         index=apex_adventitious.index(),
                         root_order=1)
-                    apex_adventitious.life_duration = self.LDs * (2. * radius_adventitious) * self.root_tissue_density
+                    apex_adventitious.life_duration = self.LDs * (2. * radius_adventitious) * apex_adventitious.root_tissue_density
 
                     # We defined the delay of emergence for the new primordium:
                     apex_adventitious.emergence_delay_in_thermal_time \
@@ -572,7 +583,7 @@ class RootGrowthModel(Model):
         apex.growth_duration = self.calculate_growth_duration(radius=base_radius,
                                                                            index=apex.index(),
                                                                            root_order=1)
-        apex.life_duration = self.LDs * (2. * base_radius) * self.root_tissue_density
+        apex.life_duration = self.LDs * (2. * base_radius) * apex.root_tissue_density
 
         if self.initial_apex_length <= 0.:
             apex.C_hexose_root = 0.
@@ -580,7 +591,7 @@ class RootGrowthModel(Model):
             apex.C_hexose_root = self.initial_C_hexose_root
 
         apex.volume = self.volume
-        apex.struct_mass = apex.volume * self.root_tissue_density
+        apex.struct_mass = apex.volume * apex.root_tissue_density
         apex.initial_struct_mass = apex.struct_mass
         apex.initial_living_root_hairs_struct_mass = apex.living_root_hairs_struct_mass
 
@@ -952,7 +963,6 @@ class RootGrowthModel(Model):
                     # We add to the amount of hexose available all the hexose in the current element
                     # (EXCLUDING sugars in the living root hairs):
                     # TODO: Should the C from root hairs be used for helping roots to grow?
-                    print(current_element.C_hexose_root)
                     hexose_contribution = current_element.C_hexose_root * current_element.struct_mass
                     n.hexose_possibly_required_for_elongation += hexose_contribution
                     n.struct_mass_contributing_to_elongation += current_element.struct_mass
@@ -1120,14 +1130,14 @@ class RootGrowthModel(Model):
             if child.radius < 0. or child.potential_radius < 0.:
                 print("!!! ERROR: the radius of the element", child.index(), "is negative!")
             # If the child belongs to the same axis:
-            if child.properties()['edge_type'] == '<':
+            if child.edge_type == '<':
                 # Then we record the THEORETICAL section of this child:
                 son_section = child.theoretical_radius ** 2 * pi
                 # # Then we record the section of this child:
                 # son_section = child.radius * child.radius * pi
             # Otherwise if the child is the element of a lateral root AND if this lateral root has already emerged
             # AND the lateral element is not a nodule:
-            elif child.properties()['edge_type'] == '+' and child.length > 0. and child.type != "Root_nodule":
+            elif child.edge_type == '+' and child.length > 0. and child.type != "Root_nodule":
                 # We add the POTENTIAL section of this child to a sum of lateral sections:
                 sum_of_lateral_sections += child.theoretical_radius ** 2 * pi
                 # # We add the section of this child to a sum of lateral sections:
@@ -1391,7 +1401,7 @@ class RootGrowthModel(Model):
                 # We calculate the increase in volume that can be achieved with the amount of hexose available:
                 possible_radial_increase_in_volume = \
                     remaining_hexose_for_thickening * 6. * self.yield_growth \
-                    / (self.root_tissue_density * self.struct_mass_C_content)
+                    / (n.root_tissue_density * self.struct_mass_C_content)
                 # We calculate the maximal possible volume based on the volume of the new cylinder after elongation
                 # and the increase in volume that could be achieved by consuming all the remaining hexose:
                 volume_max = self.volume_from_radius_and_length(n, n.initial_radius, n.length) + possible_radial_increase_in_volume
@@ -1423,7 +1433,7 @@ class RootGrowthModel(Model):
                     # We then calculate the remaining amount of hexose after thickening:
                     hexose_actual_contribution_to_thickening = \
                         1. / 6. * net_increase_in_volume \
-                        * self.root_tissue_density * self.struct_mass_C_content / self.yield_growth
+                        * n.root_tissue_density * self.struct_mass_C_content / self.yield_growth
 
                 # REGISTERING THE COSTS FOR THICKENING:
                 # --------------------------------------
@@ -2101,7 +2111,7 @@ class RootGrowthModel(Model):
             # In the calculation of surface, we consider the root hair to be a cylinder, and include the lateral section,
             # but exclude the section of the cylinder at the tip:
             n.root_hairs_volume = (self.root_hair_radius ** 2 * pi) * n.root_hair_length * n.total_root_hairs_number
-            n.root_hairs_struct_mass = n.root_hairs_volume * self.root_tissue_density
+            n.root_hairs_struct_mass = n.root_hairs_volume * n.root_tissue_density
             if n.total_root_hairs_number > 0.:
                 n.living_root_hairs_struct_mass = n.root_hairs_struct_mass * n.living_root_hairs_number \
                                                   / n.total_root_hairs_number
@@ -2115,8 +2125,8 @@ class RootGrowthModel(Model):
 
             # We add the cost of producing the new living root hairs (if any) to the hexose consumption by growth:
             hexose_consumption = n.root_hairs_struct_mass_produced * self.struct_mass_C_content / self.yield_growth / 6.
-            n.hexose_consumption_by_growth += hexose_consumption
-            n.hexose_consumption_by_growth_rate += hexose_consumption / self.time_step_in_seconds
+            n.hexose_consumption_by_growth_amount += hexose_consumption
+            n.hexose_consumption_by_growth += hexose_consumption / self.time_step_in_seconds
             n.resp_growth += hexose_consumption * 6. * (1 - self.yield_growth)
 
     # TODO UNUSED
@@ -2150,7 +2160,7 @@ class RootGrowthModel(Model):
             potential_volume = self.volume_from_radius_and_length(n, n.potential_radius, n.potential_length)
 
             # The growth demand of the element in struct_mass is calculated:
-            n.growth_demand_in_struct_mass = (potential_volume - initial_volume) * self.root_tissue_density
+            n.growth_demand_in_struct_mass = (potential_volume - initial_volume) * n.root_tissue_density
             sum_struct_mass_demand += n.growth_demand_in_struct_mass
 
         # We make sure that the structural mass input is not negative, as this case does not work with ArchiSimple:
@@ -2237,7 +2247,7 @@ class RootGrowthModel(Model):
             # The volume of the element is automatically calculated:
             n.volume = self.volume_from_radius_and_length(n, n.radius, n.length)
             # The new dry structural struct_mass of the element is calculated from its new volume:
-            n.struct_mass = n.volume * self.root_tissue_density
+            n.struct_mass = n.volume * n.root_tissue_density
 
             # In case where the root element corresponds to an apex, the distance to the last ramification is increased:
             if n.label == "Apex":
@@ -2270,7 +2280,7 @@ class RootGrowthModel(Model):
         nodule.radius = mother_element.radius
         nodule.original_radius = nodule.radius
         nodule.volume = self.volume_from_radius_and_length(nodule, nodule.radius, nodule.length)
-        nodule.struct_mass = nodule.volume * self.root_tissue_density * self.struct_mass_C_content
+        nodule.struct_mass = nodule.volume * nodule.root_tissue_density * self.struct_mass_C_content
 
         # print("Nodule", nodule.index(), "has been formed!")
 
