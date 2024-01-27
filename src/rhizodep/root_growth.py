@@ -251,22 +251,22 @@ class RootGrowthModel(Model):
     initial_segment_length: float = declare(default=1e-3, unit="m", unit_comment="", description="Initial segment length", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
-    initial_apex_length: float = declare(default=0., unit="m", unit_comment="", description="Initial apex length", 
+    initial_apex_length: float = declare(default=1e-4, unit="m", unit_comment="", description="Initial apex length", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
-    initial_C_hexose_root: float = declare(default=0., unit="m", unit_comment="", description="Initial hexose concentration of root segments", 
+    initial_C_hexose_root: float = declare(default=1e-3, unit="m", unit_comment="", description="Initial hexose concentration of root segments", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
     input_file_path: str = declare(default="C:/Users/frees/rhizodep/src/rhizodep/", unit="m", unit_comment="", description="Filepath for input files", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
-    forcing_seminal_roots_events: bool = declare(default=True, unit="m", unit_comment="", description="a Boolean expliciting if seminal root events should be forced", 
+    forcing_seminal_roots_events: bool = declare(default=False, unit="m", unit_comment="", description="a Boolean expliciting if seminal root events should be forced", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
     seminal_roots_events_file: str = declare(default="seminal_roots_inputs.csv", unit="m", unit_comment="", description="Filepath pointing to input table to plan seminal root emergence event", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
-    forcing_adventitious_roots_events: bool = declare(default=True, unit="m", unit_comment="", description="a Boolean expliciting if adventicious root events should be forced", 
+    forcing_adventitious_roots_events: bool = declare(default=False, unit="m", unit_comment="", description="a Boolean expliciting if adventicious root events should be forced", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
     adventitious_roots_events_file: str = declare(default="adventitious_roots_inputs.csv", unit="adim", unit_comment="", description="Filepath pointing to input table to plan adventitious root emergence event", 
@@ -394,7 +394,6 @@ class RootGrowthModel(Model):
 
         # Time indications:
         # ------------------
-        # USED
         # base_segment.growth_duration = GDs * (2. * base_radius) ** 2 * main_roots_growth_extender #WATCH OUT!!! we artificially multiply growth duration for seminal and adventious roots!!!!!!!!!!!!!!!!!!!!!!
         base_segment.growth_duration = self.calculate_growth_duration(radius=base_radius, index=id_segment, root_order=1)
         base_segment.life_duration = self.LDs * (2. * base_radius) * self.new_root_tissue_density
@@ -430,6 +429,7 @@ class RootGrowthModel(Model):
                 seminal_inputs_file = pd.DataFrame()
                 # We define a list that will contain the successive thermal times corresponding to root emergence:
                 list_time = [x * 1 / self.ER for x in range(1, self.n_seminal_roots)]
+
                 # We define another list containing only "1" as the number of roots to be emerged for each event:
                 list_number = np.ones(self.n_seminal_roots - 1, dtype='int8')
                 # We assigned the two lists to the dataframe, and record it:
@@ -461,9 +461,11 @@ class RootGrowthModel(Model):
                                                                nil_properties=True)
 
                     # We define the radius of a seminal root according to the parameter Di:
-                    if random:
+                    if self.random:
                         radius_seminal = abs(np.random.normal(self.D_ini / 2. * self.D_sem_to_D_ini_ratio,
                                                               self.D_ini / 2. * self.D_sem_to_D_ini_ratio * self.CVDD))
+                    else:
+                        radius_seminal = self.D_ini / 2. * self.D_sem_to_D_ini_ratio
 
                     # And we add one new primordium of seminal root on the previously defined segment:
                     apex_seminal = self.ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Apex',
@@ -537,10 +539,12 @@ class RootGrowthModel(Model):
                                                                nil_properties=True)
 
                     # We define the radius of a adventitious root according to the parameter Di:
-                    if random:
+                    if self.random:
                         radius_adventitious = abs(np.random.normal(self.D_ini / 2. * self.D_adv_to_D_ini_ratio,
                                                                    self.D_ini / 2. * self.D_adv_to_D_ini_ratio *
                                                                    self.CVDD))
+                    else:
+                        radius_adventitious = self.D_ini / 2. * self.D_adv_to_D_ini_ratio
 
                     # And we add one new primordium of adventitious root on the previously defined segment:
                     apex_adventitious = self.ADDING_A_CHILD(mother_element=segment, edge_type='+',
@@ -692,6 +696,7 @@ class RootGrowthModel(Model):
                 if apex.thermal_potential_time_since_emergence > self.time_step_in_seconds * temperature_time_adjustment:
                     # The time since emergence is reduced to the time elapsed during this time step:
                     apex.thermal_potential_time_since_emergence = self.time_step_in_seconds * temperature_time_adjustment
+
                 # We record the different elements that can contribute to the C supply necessary for growth,
                 # and we calculate a mean concentration of hexose in this supplying zone:
                 self.calculating_C_supply_for_elongation(element=apex)
@@ -1565,7 +1570,7 @@ class RootGrowthModel(Model):
 
         # ADJUSTING ROOT ANGLES FOR THE FUTURE NEW SEGMENTS:
         # Optional - We can add random geometry, or not:
-        if random:
+        if self.random:
             # The seed used to generate random values is defined according to a parameter random_choice and the index of the apex:
             np.random.seed(self.random_choice * apex.index())
             angle_mean = 0

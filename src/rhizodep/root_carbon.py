@@ -447,13 +447,6 @@ class RootCarbonModel(Model):
         self.apply_scenario(**scenario)
         self.link_self_to_mtg()
 
-    
-
-    def run_exchanges_and_balance(self):
-
-        # Supply of sucrose from the shoots to the roots and spreading into the whole phloem:
-        self.shoot_sucrose_supply_and_spreading()
-
     def post_growth_updating(self):
         """
         Description :
