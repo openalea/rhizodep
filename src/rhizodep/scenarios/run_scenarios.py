@@ -1,7 +1,7 @@
 # -*- coding: latin-1 -*-
 
 """
-    This script allows to run a simulation of RhizoDep using a specific set of arguments and parameters, which are given in an input csv file.
+    This script allows to run a scenarios of RhizoDep using a specific set of arguments and parameters, which are given in an input csv file.
     See the function run_one_scenario.
 
     :copyright: see AUTHORS.
@@ -12,13 +12,14 @@ import os
 import sys
 import getopt
 import pandas as pd
+import numpy as np
 import multiprocessing as mp
 import shutil
 import time
 import pickle
 
 import rhizodep.model as model
-import rhizodep.simulation as simulation
+import rhizodep.run_simulation as run_simulation
 import rhizodep.parameters as param
 import rhizodep.tools as tools
 import rhizodep.mycorrhizae as mycorrhizae
@@ -28,11 +29,11 @@ import rhizodep.mycorrhizae as mycorrhizae
 # Function for running the instruction of one scenario:
 #------------------------------------------------------
 def run_one_scenario(scenario_id=1,
-                     inputs_dir_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
-                     outputs_dir_path="C:/Users/frees/rhizodep/simulations/running_scenarios/outputs",
+                     inputs_dir_path="inputs",
+                     outputs_dir_path="outputs",
                      scenarios_list="scenarios_list.xlsx"):
     """
-    This function runs the main_simulation() using instructions from a specific scenario read in a file.
+    This function runs the scenarios() using instructions from a specific scenario read in a file.
 
     :param int scenario_id: the index of the scenario to be read in the file containing the list of scenarios
     :param str inputs_dir_path: the path directory of inputs
@@ -152,6 +153,8 @@ def run_one_scenario(scenario_id=1,
     SOIL_TEMPERATURE = scenario_parameters.get('constant_soil_temperature_in_Celsius', 20)
     FORCING_SEMINAL_ROOTS_EVENTS = scenario_parameters.get('forcing_seminal_roots_events', False)
     FORCING_ADVENTITIOUS_ROOTS_EVENTS = scenario_parameters.get('forcing_seminal_roots_events', False)
+    HOMOGENIZING_ROOT_CONCENTRATIONS = scenario_parameters.get('homogenizing_root_sugar_concentrations', False)
+    HOMOGENIZING_SOIL_CONCENTRATIONS = scenario_parameters.get('homogenizing_soil_concentrations', False)
 
     INITIAL_SEGMENT_LENGTH = scenario_parameters.get('initial_segment_length', 1e-3)
     INITIAL_APEX_LENGTH = scenario_parameters.get('initial_apex_length', 0)
@@ -169,6 +172,10 @@ def run_one_scenario(scenario_id=1,
     CAMERA_ROTATION_N_POINTS = scenario_parameters.get('camera_rotation_n_points', 120)
     WIDTH = scenario_parameters.get('PlantGL_window_width', 1200)
     HEIGHT = scenario_parameters.get('PlantGL_window_height', 1200)
+    # For importing a color RGB vector, we need to do this step by step:
+    background_color_string = scenario_parameters.get('background_color', '[0,0,0]') # The information is recorded as a string
+    background_color_array = [int(i.strip()) for i in background_color_string[1:-1].split(",")] # Then converted into a list
+    BACKGROUND_COLOR = np.array(background_color_array) # And finally as the proper vector.
     X_CENTER = scenario_parameters.get('x_center', 0)
     Y_CENTER = scenario_parameters.get('y_center', 0)
     Z_CENTER = scenario_parameters.get('z_center', -1)
@@ -204,7 +211,7 @@ def run_one_scenario(scenario_id=1,
         SCENARIO_INPUT_FILE = os.path.join(INPUTS_DIRPATH, SCENARIO_INPUT_FILENAME)
     else:
         SCENARIO_INPUT_FILE = None
-    # If the instructions are to start the simulation(s) at a specific time step in the input file:
+    # If the instructions are to start the scenarios(s) at a specific time step in the input file:
     if SCENARIO_INPUT_FILE != None and STARTING_TIME_IN_DAYS > 0:
         # Then we read the file and copy it in a dataframe "df":
         original_input_frame = pd.read_csv(SCENARIO_INPUT_FILE, sep=',')
@@ -218,14 +225,14 @@ def run_one_scenario(scenario_id=1,
         SCENARIO_INPUT_FILE = os.path.join(OUTPUTS_DIRPATH, new_input_file_name)
 
     # LOOKING AT THE INITIAL ROOT MTG:
-    # We initalize a Boolean for authorizing the simulation:
+    # We initalize a Boolean for authorizing the scenarios:
     simulation_allowed = True
     # If we decide to start from a given root MTG to be loaded:
     if START_FROM_A_KNOWN_ROOT_MTG:
         filename = os.path.join(inputs_dir_path, ROOT_MTG_FILE)
         if not os.path.exists(filename):
             print("!!! ERROR: the file", ROOT_MTG_FILE,"could not be found in the folder", inputs_dir_path, "!!!")
-            print("The simulation stops here!")
+            print("The scenarios stops here!")
             simulation_allowed=False
         else:
             # We load the MTG file and name it "g":
@@ -240,6 +247,8 @@ def run_one_scenario(scenario_id=1,
             print("The initial MTG file has been saved in the outputs.")
     # Otherwise we initiate the properties of the MTG "g":
     else:
+        # seminal_file = os.path.join(INPUTS_DIRPATH,"seminal_roots_inputs.csv")
+        # adventitious_file = os.path.join(INPUTS_DIRPATH, "adventitious_roots_inputs.csv")
         g = model.initiate_mtg(random=RANDOM_OPTION,
                                ArchiSimple=ARCHISIMPLE_OPTION,
                                initial_segment_length=INITIAL_SEGMENT_LENGTH,
@@ -259,58 +268,61 @@ def run_one_scenario(scenario_id=1,
         f = None
 
     # LAUNCHING THE SIMULATION:
-    # If the simulation has been allowed (i.e. the MTG "g" has been defined):
+    # If the scenarios has been allowed (i.e. the MTG "g" has been defined):
     if simulation_allowed:
-        # We launch the main simulation program:
-        simulation.main_simulation(g, simulation_period_in_days=SIMULATION_PERIOD, time_step_in_days=TIME_STEP,
-                                   radial_growth=RADIAL_GROWTH,
-                                   ArchiSimple=ARCHISIMPLE_OPTION,
-                                   ArchiSimple_C_fraction=ARCHISIMPLE_C_FRACTION,
-                                   input_file=SCENARIO_INPUT_FILE,
-                                   input_file_time_step_in_days=INPUT_FILE_TIME_STEP,
-                                   outputs_directory=scenario_dirpath,
-                                   forcing_constant_inputs=FORCING_INPUTS,
-                                   constant_sucrose_input_rate=SUCROSE_INPUT_RATE,
-                                   constant_soil_temperature_in_Celsius=SOIL_TEMPERATURE,
-                                   nodules=NODULES_OPTION,
-                                   mycorrhizal_fungus=MYCORRHIZAL_FUNGUS,
-                                   fungus_MTG=f,
-                                   root_order_limitation=ROOT_ORDER_LIMITATION_OPTION,
-                                   root_order_treshold=ROOT_ORDER_TRESHOLD,
-                                   using_solver=USING_SOLVER,
-                                   printing_solver_outputs=PRINTING_SOLVER_OUTPUTS,
-                                   simulation_results_file='simulation_results.csv',
-                                   z_classification=CLASSIFICATION_BY_LAYERS,
-                                   z_classification_file='z_classification.csv',
-                                   recording_interval_in_days=RECORDING_INTERVAL_IN_DAYS,
-                                   z_min=LAYERS_Z_MIN, z_max=LAYERS_Z_MAX, z_interval=LAYERS_THICKNESS,
-                                   recording_images=RECORDING_IMAGES_OPTION,
-                                   root_images_directory=images_dirpath,
-                                   printing_sum=PRINTING_SUM_OPTION,
-                                   recording_sum=RECORDING_SUM_OPTION,
-                                   printing_warnings=PRINTING_WARNINGS_OPTION,
-                                   recording_g=RECORDING_MTG_FILES_OPTION,
-                                   g_directory=MTG_files_dirpath,
-                                   recording_g_properties=RECORDING_MTG_PROPERTIES_OPTION,
-                                   g_properties_directory=MTG_properties_dirpath,
-                                   random=RANDOM_OPTION,
-                                   plotting=PLOTTING,
-                                   scenario_id=scenario_id,
-                                   displayed_property=DISPLAYED_PROPERTY,
-                                   displayed_vmin=DISPLAYED_MIN_VALUE, displayed_vmax=DISPLAYED_MAX_VALUE,
-                                   log_scale=LOG_SCALE, cmap=COLOR_MAP,
-                                   root_hairs_display=ROOT_HAIRS_DISPLAY,
-                                   width=WIDTH, height=HEIGHT,
-                                   x_center=X_CENTER, y_center=Y_CENTER, z_center=Z_CENTER, z_cam=Z_CAMERA,
-                                   camera_distance=CAMERA_DISTANCE, step_back_coefficient=STEP_BACK_COEFFICIENT,
-                                   camera_rotation=CAMERA_ROTATION_OPTION, n_rotation_points=CAMERA_ROTATION_N_POINTS)
+        # We launch the main scenarios program:
+        run_simulation.main_simulation(g, simulation_period_in_days=SIMULATION_PERIOD, time_step_in_days=TIME_STEP,
+                                       radial_growth=RADIAL_GROWTH,
+                                       ArchiSimple=ARCHISIMPLE_OPTION,
+                                       ArchiSimple_C_fraction=ARCHISIMPLE_C_FRACTION,
+                                       input_file=SCENARIO_INPUT_FILE,
+                                       input_file_time_step_in_days=INPUT_FILE_TIME_STEP,
+                                       outputs_directory=scenario_dirpath,
+                                       forcing_constant_inputs=FORCING_INPUTS,
+                                       constant_sucrose_input_rate=SUCROSE_INPUT_RATE,
+                                       constant_soil_temperature_in_Celsius=SOIL_TEMPERATURE,
+                                       homogenizing_root_sugar_concentrations=HOMOGENIZING_ROOT_CONCENTRATIONS,
+                                       homogenizing_soil_concentrations=HOMOGENIZING_SOIL_CONCENTRATIONS,
+                                       nodules=NODULES_OPTION,
+                                       mycorrhizal_fungus=MYCORRHIZAL_FUNGUS,
+                                       fungus_MTG=f,
+                                       root_order_limitation=ROOT_ORDER_LIMITATION_OPTION,
+                                       root_order_treshold=ROOT_ORDER_TRESHOLD,
+                                       using_solver=USING_SOLVER,
+                                       printing_solver_outputs=PRINTING_SOLVER_OUTPUTS,
+                                       simulation_results_file='simulation_results.csv',
+                                       z_classification=CLASSIFICATION_BY_LAYERS,
+                                       z_classification_file='z_classification.csv',
+                                       recording_interval_in_days=RECORDING_INTERVAL_IN_DAYS,
+                                       z_min=LAYERS_Z_MIN, z_max=LAYERS_Z_MAX, z_interval=LAYERS_THICKNESS,
+                                       recording_images=RECORDING_IMAGES_OPTION,
+                                       root_images_directory=images_dirpath,
+                                       printing_sum=PRINTING_SUM_OPTION,
+                                       recording_sum=RECORDING_SUM_OPTION,
+                                       printing_warnings=PRINTING_WARNINGS_OPTION,
+                                       recording_g=RECORDING_MTG_FILES_OPTION,
+                                       g_directory=MTG_files_dirpath,
+                                       recording_g_properties=RECORDING_MTG_PROPERTIES_OPTION,
+                                       g_properties_directory=MTG_properties_dirpath,
+                                       random=RANDOM_OPTION,
+                                       plotting=PLOTTING,
+                                       scenario_id=scenario_id,
+                                       displayed_property=DISPLAYED_PROPERTY,
+                                       displayed_vmin=DISPLAYED_MIN_VALUE, displayed_vmax=DISPLAYED_MAX_VALUE,
+                                       log_scale=LOG_SCALE, cmap=COLOR_MAP,
+                                       root_hairs_display=ROOT_HAIRS_DISPLAY,
+                                       width=WIDTH, height=HEIGHT,
+                                       background_color=BACKGROUND_COLOR,
+                                       x_center=X_CENTER, y_center=Y_CENTER, z_center=Z_CENTER, z_cam=Z_CAMERA,
+                                       camera_distance=CAMERA_DISTANCE, step_back_coefficient=STEP_BACK_COEFFICIENT,
+                                       camera_rotation=CAMERA_ROTATION_OPTION, n_rotation_points=CAMERA_ROTATION_N_POINTS)
 
     return
 
 # Function for clearing the previous results:
 #--------------------------------------------
 def previous_outputs_clearing(clearing = False,
-                              output_path="C:/Users/frees/rhizodep/simulations/running_scenarios/outputs"):
+                              output_path="outputs"):
 
     if clearing:
         # If the output directory already exists:
@@ -354,7 +366,7 @@ def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx", input_path='inp
         # We remove the unnecessary names of the first 4 columns, so that scenarios only contains the scenario numbers:
         del scenarios[0:4]
 
-    # We record the starting time of the simulation:
+    # We record the starting time of the scenarios:
     t_start = time.time()
     # We look at the maximal number of parallel processes that can be run at the same time:
     num_processes = mp.cpu_count()
@@ -412,10 +424,10 @@ if __name__ == '__main__':
     # CASE 2 - CALLING MULTIPLE SCENARIOS:
     ######################################
     # We can clear the folder containing previous outputs:
-    previous_outputs_clearing(clearing=True, output_path="C:/Users/frees/rhizodep/simulations/running_scenarios/outputs")
+    previous_outputs_clearing(clearing=True, output_path="outputs")
     # We run the scenarios in parallel :
     # WATCH OUT: you will still need to manually modify the default arguments of 'run_one_scenarios',
     # e.g. the name of the file where to read scenario instructions, even if you have entered it below!!!!!!!!!!!!!!!!!!
     run_multiple_scenarios(scenarios_list="scenarios_list.xlsx",
-                           input_path="C:/Users/frees/rhizodep/simulations/running_scenarios/inputs",
-                           output_path="C:/Users/frees/rhizodep/simulations/running_scenarios/outputs")
+                           input_path="inputs",
+                           output_path="outputs")

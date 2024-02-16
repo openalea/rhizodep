@@ -55,7 +55,7 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
             previous_file = pd.read_csv(PATH2, sep=',', header=0)
 
             if len(previous_file['step_number']) == n_steps:
-                print("There is already an 'input_file.csv' of proper length for this simulation, "
+                print("There is already an 'input_file.csv' of proper length for this scenarios, "
                       "we therefore did not create a new input file here (if you wish to do so, please select 'do_not_execute_if_file_with_suitable_size_exists=False').")
                 return previous_file
 
@@ -87,7 +87,7 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
             # For each line of the data frame that contains information on sucrose input:
             for i in range(0, len(df['time_in_days'])):
 
-                # If the current cumulated time is below the time step of the main simulation:
+                # If the current cumulated time is below the time step of the main scenarios:
                 if (cumulated_time_in_days + original_time_step_in_days) < 0.9999 * final_time_step_in_days:
                     # Then the amount of time elapsed here is the initial time step:
                     net_elapsed_time_in_days = original_time_step_in_days
@@ -153,7 +153,7 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
             # For each line of the final table:
             for j in range(0, n_steps):
 
-                # If the current cumulated time is below the time step of the main simulation:
+                # If the current cumulated time is below the time step of the main scenarios:
                 if cumulated_time_in_days + final_time_step_in_days < 0.9999 * original_time_step_in_days:
                     # Then the amount of time elapsed here is the initial time step:
                     net_elapsed_time_in_days = final_time_step_in_days
@@ -353,8 +353,8 @@ def my_colormap(g, property_name, cmap='jet', vmin=None, vmax=None, lognorm=True
     return g
 
 
-def prepareScene(scene, width=1200, height=1200, scale=0.8, x_center=0., y_center=0., z_center=0.,
-                 x_cam=0., y_cam=0., z_cam=-1.5, grid=False):
+def prepareScene(scene, width=1200, height=1200, scale=1, x_center=0., y_center=0., z_center=0.,
+                 x_cam=0., y_cam=0., z_cam=-1.5, grid=True, background_color=[255,255,255]):
     """
     This function returns the scene that will be used in PlantGL to display the MTG.
     :param scene: the scene to start with
@@ -371,20 +371,28 @@ def prepareScene(scene, width=1200, height=1200, scale=0.8, x_center=0., y_cente
     :return: scene
     """
 
-    # We define the coordinates of the point cam_target that will be the center of the graph:
-    cam_target = pgl.Vector3(x_center * scale,
-                             y_center * scale,
-                             z_center * scale)
+    # # We define the coordinates of the point cam_target that will be the center of the graph:
+    # cam_target = pgl.Vector3(x_center * scale,
+    #                          y_center * scale,
+    #                          z_center * scale)
     # We define the coordinates of the point cam_pos that represents the position of the camera:
     cam_pos = pgl.Vector3(x_cam * scale,
                           y_cam * scale,
                           z_cam * scale)
-    # We position the camera in the scene relatively to the center of the scene:
-    pgl.Viewer.camera.lookAt(cam_pos, cam_target)
+
+    # # We position the camera in the scene relatively to the center of the scene:
+    # pgl.Viewer.camera.lookAt(cam_pos, cam_target)
+
+    # We define the absolute values of the (x,y,z) coordinates of the camera:
+    pgl.Viewer.camera.position=cam_pos
+    # pgl.Viewer.camera.angle=(0,180,180)
+    # print("Here is the camera position:", pgl.Viewer.camera.position)
     # We define the dimensions of the graph:
     pgl.Viewer.frameGL.setSize(width, height)
     # We define whether grids are displayed or not:
     pgl.Viewer.grids.set(grid, grid, grid, grid)
+    # We define the background color of the scene:
+    pgl.Viewer.frameGL.setBgColor(background_color[0],background_color[1],background_color[2])
 
     return scene
 
@@ -430,7 +438,13 @@ def plot_mtg(g,
              mycorrhizal_fungus_display=True,
              width=1200, height=1200,
              x_center=0., y_center=0., z_center=0.,
-             x_cam=1., y_cam=0., z_cam=0.):
+             x_cam=1., y_cam=0., z_cam=0.,
+             # # For a black background:
+             # background_color=[0,0,0]
+             # For a "soil" background:
+             background_color=[94,76,64],
+             displaying_PlantGL_Viewer=True
+             ):
     """
     This function creates a graph on PlantGL that displays a MTG and color it according to a specified property.
     :param g: the investigated MTG
@@ -450,168 +464,210 @@ def plot_mtg(g,
 
     # Consider: https://learnopengl.com/In-Practice/Text-Rendering
 
-    # DISPLAYING ROOTS:
-    #------------------
+    # MOVING THE TURTLE AND PREPARING THE ROOTS' SCENE:
+    #--------------------------------------------------
     visitor = get_root_visitor()
     # We initialize a turtle in PlantGL:
     turtle = turt.PglTurtle()
-    # We make the graph upside down:
-    turtle.down(180)
+
+    # # We reset the turtle:
+    # turtle.reset()
+
+    MTG_starting_position = pgl.Vector3(x_center,y_center,z_center)
+    angle_down = 0
+    angle_roll = 0
+
+    # And we define its starting position:
+    turtle.move(MTG_starting_position)
+    turtle.down(angle_down)
+    turtle.rollL(angle_roll)
+
     # We initialize the scene with the MTG g:
     scene = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
-    # We update the scene with the specified position of the center of the graph and the camera:
-    prepareScene(scene, width=width, height=height,
-                 x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
-    # We compute the colors of the graph:
-    my_colormap(g, prop_cmap, cmap=cmap, vmin=vmin, vmax=vmax, lognorm=lognorm)
-    # We get a list of all shapes in the scene:
-    shapes = dict((sh.id, sh) for sh in scene)
-    # We use the property 'color' of the MTG calculated by the function 'my_colormap':
-    colors = g.property('color')
-    # We cover each node of the MTG:
-    for vid in colors:
-        if vid in shapes:
-            n = g.node(vid)
-            # If the element is not dead:
-            if n.type != "Dead":
-                # We color it according to the property cmap defined by the user:
-                shapes[vid].appearance = pgl.Material(colors[vid], transparency=0.0)
-            else:
-                # Otherwise, we print it in black in a semi-transparent way:
-                shapes[vid].appearance = pgl.Material([0, 0, 0], transparency=0.8)
-            # # SPECIAL CASE:
-            # if mycorrhizal_fungus_display and n.fungal_infection_severity > 0.:
-            #     # Otherwise, we print it in black in a semi-transparent way:
-            #     shapes[vid].appearance = pgl.Material([255, 255, 255], transparency=0.0)
+    new_scene = scene
 
-            # SPECIAL CASE: If the element is a nodule, we transform the cylinder into a sphere:
-            if n.type == "Root_nodule":
-                # We create a sphere corresponding to the radius of the element:
-                s = pgl.Sphere(n.radius * 1.)
-                # We transform the cylinder into the sphere:
-                shapes[vid].geometry.geometry = pgl.Shape(s).geometry
-                # We select the parent element supporting the nodule:
-                index_parent = g.Father(vid, EdgeType='+')
-                parent = g.node(index_parent)
-                # We move the center of the sphere on the circle corresponding to the external envelop of the
-                # parent:
-                angle = parent.angle_roll
-                circle_x = parent.radius * cos(angle)
-                circle_y = parent.radius * sin(angle)
-                circle_z = 0
-                shapes[vid].geometry.translation += (circle_x, circle_y, circle_z)
+    if displaying_PlantGL_Viewer:
+        # # TODO: WATCH OUT the following
+        # # We update the scene with the specified position of the center of the graph and the camera:
+        # scene = prepareScene(scene, width=width, height=height,
+        #                      x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
+        #                      background_color=background_color)
 
-    # DISPLAYING ROOT HAIRS:
-    #-----------------------
-    if root_hairs_display:
-        visitor_for_hair = get_root_visitor()
-        # We initialize a turtle in PlantGL:
-        turtle_for_hair = turt.PglTurtle()
-        # We make the graph upside down:
-        turtle_for_hair.down(180)
-        # We initialize the scene with the MTG g:
-        scene_for_hairs = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_hair, gc=False)
-        # We update the scene with the specified position of the center of the graph and the camera:
-        prepareScene(scene_for_hairs, width=width, height=height,
-                     x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+        # We compute the colors of the graph:
+        my_colormap(g, prop_cmap, cmap=cmap, vmin=vmin, vmax=vmax, lognorm=lognorm)
         # We get a list of all shapes in the scene:
-        shapes_for_hairs = dict((sh.id, sh) for sh in scene_for_hairs)
+        shapes = dict((sh.id, sh) for sh in scene)
+        # We use the property 'color' of the MTG calculated by the function 'my_colormap':
+        colors = g.property('color')
 
         # We cover each node of the MTG:
         for vid in colors:
-            if vid in shapes_for_hairs:
+            if vid in shapes:
                 n = g.node(vid)
-                # If the element has no detectable root hairs:
-                if n.root_hair_length<=0.:
-                    # Then the element is set to be transparent:
-                    shapes_for_hairs[vid].appearance = pgl.Material(colors[vid], transparency=1)
+                # If the element is not dead:
+                if n.type != "Dead":
+                    # We color it according to the property cmap defined by the user:
+                    shapes[vid].appearance = pgl.Material(colors[vid], transparency=0.0)
                 else:
-                    # We color the root hairs according to the proportion of living and dead root hairs:
-                    dead_transparency = 0.9
-                    dead_color_vector=[0,0,0]
-                    dead_color_vector_Red=dead_color_vector[0]
-                    dead_color_vector_Green=dead_color_vector[1]
-                    dead_color_vector_Blue=dead_color_vector[2]
+                    # Otherwise, we print it in black in a semi-transparent way:
+                    shapes[vid].appearance = pgl.Material([0, 0, 0], transparency=0.8)
+                # # SPECIAL CASE:
+                # if mycorrhizal_fungus_display and n.fungal_infection_severity > 0.:
+                #     # Otherwise, we print it in black in a semi-transparent way:
+                #     shapes[vid].appearance = pgl.Material([255, 255, 255], transparency=0.0)
 
-                    living_transparency = 0.8
-                    living_color_vector=colors[vid]
-                    living_color_vector_Red = colors[vid][0]
-                    living_color_vector_Green = colors[vid][1]
-                    living_color_vector_Blue = colors[vid][2]
+                # SPECIAL CASE: If the element is a nodule, we transform the cylinder into a sphere:
+                if n.type == "Root_nodule":
+                    # We create a sphere corresponding to the radius of the element:
+                    s = pgl.Sphere(n.radius * 1.)
+                    # We transform the cylinder into the sphere:
+                    shapes[vid].geometry.geometry = pgl.Shape(s).geometry
+                    # We select the parent element supporting the nodule:
+                    index_parent = g.Father(vid, EdgeType='+')
+                    parent = g.node(index_parent)
+                    # We move the center of the sphere on the circle corresponding to the external envelop of the
+                    # parent:
+                    angle = parent.angle_roll
+                    circle_x = parent.radius * cos(angle)
+                    circle_y = parent.radius * sin(angle)
+                    circle_z = 0
+                    shapes[vid].geometry.translation += (circle_x, circle_y, circle_z)
 
-                    living_fraction = n.living_root_hairs_number/n.total_root_hairs_number
-                    # print("Living fraction is", living_fraction)
+        # DISPLAYING ROOT HAIRS:
+        #-----------------------
+        if root_hairs_display:
+            visitor_for_hair = get_root_visitor()
+            # We initialize a turtle in PlantGL:
+            turtle_for_hair = turt.PglTurtle()
+            # And we define its starting position:
+            turtle_for_hair.move(MTG_starting_position)
+            turtle_for_hair.down(angle_down)
+            turtle_for_hair.rollL(angle_roll)
 
-                    transparency = dead_transparency + (living_transparency - dead_transparency) * living_fraction
-                    color_vector_Red = floor(dead_color_vector_Red
-                                             + (living_color_vector_Red - dead_color_vector_Red) * living_fraction)
-                    color_vector_Green = floor(dead_color_vector_Green
-                                               + (living_color_vector_Green - dead_color_vector_Green) * living_fraction)
-                    color_vector_Blue = floor(dead_color_vector_Blue
-                                              + (living_color_vector_Blue - dead_color_vector_Blue) * living_fraction)
-                    color_vector = [color_vector_Red,color_vector_Green,color_vector_Blue]
+            # We initialize the scene with the MTG g:
+            scene_for_hairs = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_hair, gc=False)
+            # # We update the scene with the specified position of the center of the graph and the camera:
+            # prepareScene(scene_for_hairs, width=width, height=height,
+            #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
+            #              background_color=background_color)
+            # We get a list of all shapes in the scene:
+            shapes_for_hairs = dict((sh.id, sh) for sh in scene_for_hairs)
 
-                    shapes_for_hairs[vid].appearance = pgl.Material(color_vector, transparency=transparency)
-
-                    # We finally transform the radius of the cylinder:
-                    if vid > 1:
-                        # For normal cases:
-                        shapes_for_hairs[vid].geometry.geometry.geometry.radius = n.radius + n.root_hair_length
+            # We cover each node of the MTG:
+            for vid in colors:
+                if vid in shapes_for_hairs:
+                    n = g.node(vid)
+                    # If the element has no detectable root hairs:
+                    if n.root_hair_length<=0.:
+                        # Then the element is set to be transparent:
+                        shapes_for_hairs[vid].appearance = pgl.Material(colors[vid], transparency=1)
                     else:
-                        # For the base of the root system [don't ask why this has not the same formalism..!]:
-                        shapes_for_hairs[vid].geometry.geometry.radius = n.radius + n.root_hair_length
+                        # We color the root hairs according to the proportion of living and dead root hairs:
+                        dead_transparency = 0.9
+                        dead_color_vector=[0,0,0]
+                        dead_color_vector_Red=dead_color_vector[0]
+                        dead_color_vector_Green=dead_color_vector[1]
+                        dead_color_vector_Blue=dead_color_vector[2]
 
-    # DISPLAYING MYCORRHIZAL FUNGI:
-    #------------------------------
-    if mycorrhizal_fungus_display:
-        # We recreate a new list of shapes corresponding to the MTG:
-        visitor_for_fungus = get_root_visitor()
-        # We initialize a new turtle in PlantGL:
-        turtle_for_fungus = turt.PglTurtle()
-        # We make the graph upside down:
-        turtle_for_fungus.down(180)
-        # We initialize the scene with the MTG g:
-        scene_for_fungus = turt.TurtleFrame(g, visitor=visitor_for_fungus, turtle=turtle_for_fungus, gc=False)
-        # We get a list of all shapes in the scene:
-        shapes_for_fungus = dict((sh.id, sh) for sh in scene_for_fungus)
+                        living_transparency = 0.8
+                        living_color_vector=colors[vid]
+                        living_color_vector_Red = colors[vid][0]
+                        living_color_vector_Green = colors[vid][1]
+                        living_color_vector_Blue = colors[vid][2]
 
-        for vid in colors:
-            if vid in shapes_for_fungus:
-                n = g.node(vid)
-                try:
-                    # If the current root element has been infected by the fungus:
-                    if n.fungal_infection_severity > 0.:
-                        # We set the reference color:
-                        color_vector = [150, 50, 100]
-                        # We set the transparency based on the level of infection:
-                        transparency = 0.2 + (1 - n.fungal_infection_severity) * 0.8
-                        shapes_for_fungus[vid].appearance = pgl.Material(color_vector, transparency=transparency)
+                        living_fraction = n.living_root_hairs_number/n.total_root_hairs_number
+                        # print("Living fraction is", living_fraction)
+
+                        transparency = dead_transparency + (living_transparency - dead_transparency) * living_fraction
+                        color_vector_Red = floor(dead_color_vector_Red
+                                                 + (living_color_vector_Red - dead_color_vector_Red) * living_fraction)
+                        color_vector_Green = floor(dead_color_vector_Green
+                                                   + (living_color_vector_Green - dead_color_vector_Green) * living_fraction)
+                        color_vector_Blue = floor(dead_color_vector_Blue
+                                                  + (living_color_vector_Blue - dead_color_vector_Blue) * living_fraction)
+                        color_vector = [color_vector_Red,color_vector_Green,color_vector_Blue]
+
+                        shapes_for_hairs[vid].appearance = pgl.Material(color_vector, transparency=transparency)
 
                         # We finally transform the radius of the cylinder:
                         if vid > 1:
                             # For normal cases:
-                            shapes_for_fungus[vid].geometry.geometry.geometry.radius = (n.radius + n.root_hair_length) * 1.5
+                            shapes_for_hairs[vid].geometry.geometry.geometry.radius = n.radius + n.root_hair_length
                         else:
-                            # For the base of the root system [don't ask why this has not the same formalism ...!]:
-                            shapes_for_fungus[vid].geometry.geometry.radius = (n.radius + n.root_hair_length) * 1.5
-                except:
-                    continue
+                            # For the base of the root system [don't ask why this has not the same formalism..!]:
+                            shapes_for_hairs[vid].geometry.geometry.radius = n.radius + n.root_hair_length
 
-    # CREATING THE ACTUAL SCENE:
-    #---------------------------
-    # Finally, we update the scene with shapes from roots and, if specified, shapes from root hairs:
-    new_scene = pgl.Scene()
-    # We start by adding the shapes corresponding to the property to be displayed:
-    for vid in shapes:
-        new_scene += shapes[vid]
-    # We then add the shapes from the root hairs:
-    if root_hairs_display:
-        for vid in shapes_for_hairs:
-            new_scene += shapes_for_hairs[vid]
-    # And we eventually add the shapes of the mycorrhizal fungi, if any:
-    if mycorrhizal_fungus_display:
-        for vid in shapes_for_fungus:
-            new_scene += shapes_for_fungus[vid]
+        # DISPLAYING MYCORRHIZAL FUNGI:
+        #------------------------------
+        if mycorrhizal_fungus_display:
+            # We recreate a new list of shapes corresponding to the MTG:
+            visitor_for_fungus = get_root_visitor()
+            # We initialize a new turtle in PlantGL:
+            turtle_for_fungus = turt.PglTurtle()
+            # # We make the graph upside down:
+            # turtle_for_fungus.down(180)
+            # And we define its starting position:
+            turtle_for_fungus.move(MTG_starting_position)
+            turtle_for_fungus.down(angle_down)
+            turtle_for_fungus.rollL(angle_roll)
+            # We initialize the scene with the MTG g:
+            scene_for_fungus = turt.TurtleFrame(g, visitor=visitor_for_fungus, turtle=turtle_for_fungus, gc=False)
+            # We get a list of all shapes in the scene:
+            shapes_for_fungus = dict((sh.id, sh) for sh in scene_for_fungus)
+
+            for vid in colors:
+                if vid in shapes_for_fungus:
+                    n = g.node(vid)
+                    try:
+                        # If the current root element has been infected by the fungus:
+                        if n.fungal_infection_severity > 0.:
+                            # We set the reference color:
+                            color_vector = [150, 50, 100]
+                            # We set the transparency based on the level of infection:
+                            transparency = 0.3 + (1 - n.fungal_infection_severity) * 0.7
+                            shapes_for_fungus[vid].appearance = pgl.Material(color_vector, transparency=transparency)
+
+                            # We finally transform the radius of the cylinder:
+                            if vid > 1:
+                                # For normal cases:
+                                shapes_for_fungus[vid].geometry.geometry.geometry.radius = (n.radius + n.root_hair_length) * 1.5
+                            else:
+                                # For the base of the root system [don't ask why this has not the same formalism ...!]:
+                                shapes_for_fungus[vid].geometry.geometry.radius = (n.radius + n.root_hair_length) * 1.5
+
+                            # We also recolor the underlying root segment, by mixing the colors with pure white.
+                            # We get the normal color of the root element:
+                            # initial_red = shapes[vid].appearance.ambient.red
+                            # initial_green = shapes[vid].appearance.ambient.green
+                            # initial_blue = shapes[vid].appearance.ambient.blue
+                            # # And we set the final color to have the mean value between the normal color and pure white:
+                            # final_red = round((initial_red + 255)/2.)
+                            # final_green = round((initial_green + 255) / 2)
+                            # final_blue = round((initial_blue + 255) / 2)
+                            # shapes[vid].appearance = pgl.Material([final_red, final_green, final_blue], transparency=0.0)
+
+                    except:
+                        continue
+
+        # CREATING THE ACTUAL SCENE:
+        #---------------------------
+        # We add the shapes from the root hairs:
+        if root_hairs_display:
+            for vid in shapes_for_hairs:
+                new_scene += shapes_for_hairs[vid]
+        # And we eventually add the shapes of the mycorrhizal fungi, if any:
+        if mycorrhizal_fungus_display:
+            for vid in shapes_for_fungus:
+                new_scene += shapes_for_fungus[vid]
+
+        # TODO: WATCH OUT the following
+        # We update the scene with the specified position of the center of the graph and the camera:
+        new_scene = prepareScene(new_scene, width=width, height=height,
+                                  x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
+                                  background_color=background_color)
+
+        # # For preventing PlantGL to update the display of the graph at each new time step:
+        # pgl.Viewer.redrawPolicy=False
 
     return new_scene
 

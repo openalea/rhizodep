@@ -1,10 +1,10 @@
 #  -*- coding: utf-8 -*-
 
 """
-    rhizodep.simulation
+    rhizodep.scenarios
     ~~~~~~~~~~~~~
 
-    The module :mod:`rhizodep.simulation` is the front-end to run the RhizoDep model.
+    The module :mod:`rhizodep.scenarios` is the front-end to run the RhizoDep model.
 
     :copyright: see AUTHORS.
     :license: see LICENSE for details.
@@ -27,13 +27,14 @@ import pickle
 
 # TODO: explicitly add 'surfaces_and_volumes()' in the sequence of modelling!
 
-# We define the main simulation program:
+# We define the main scenarios program:
 def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     radial_growth="Impossible", ArchiSimple=False, ArchiSimple_C_fraction=0.10,
                     input_file="None",
                     input_file_time_step_in_days=1/24.,
                     outputs_directory='outputs',
                     forcing_constant_inputs=False, constant_sucrose_input_rate=1.e-6,
+                    homogenizing_root_sugar_concentrations=False, homogenizing_soil_concentrations=False,
                     constant_soil_temperature_in_Celsius=20,
                     nodules=False,
                     mycorrhizal_fungus=True,
@@ -63,18 +64,19 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     root_hairs_display=True,
                     width=1200, height=1200,
                     x_center=0, y_center=0, z_center=-1, z_cam=-1,
-                    camera_distance=10., step_back_coefficient=0., camera_rotation=False, n_rotation_points=24 * 5):
+                    camera_distance=0., step_back_coefficient=0., camera_rotation=False, n_rotation_points=24 * 5,
+                    background_color = [0,0,0]):
     """
-    This general function controls the actual simulation of root growth and C fluxes over the whole simulation period.
+    This general function controls the actual scenarios of root growth and C fluxes over the whole scenarios period.
     :param g: the root MTG to consider
-    :param simulation_period_in_days: the length of the simulation period (days)
-    :param time_step_in_days: the regular time step over the simulation (days)
+    :param simulation_period_in_days: the length of the scenarios period (days)
+    :param time_step_in_days: the regular time step over the scenarios (days)
     :param radial_growth: if True, radial growth will be enabled
     :param ArchiSimple: if True, only original ArchiSimple rules will be used, without C fluxes
     :param ArchiSimple_C_fraction: in case of ArchiSimple only, this fraction is used to determine the fraction of the incoming C that us actually used to produce “root biomass”
     :param input_file: the path/name of the CSV file where inputs (sucrose and temperature) are read
     :param input_file_time_step_in_days: the time step used in the input file (days)
-    :param outputs_directory: the name of the folder where simulation outputs will be registered
+    :param outputs_directory: the name of the folder where scenarios outputs will be registered
     :param forcing_constant_inputs: if True, input file will be ignored and a constant sucrose input rate and a constant soil temperature will be applied as inputs
     :param constant_sucrose_input_rate: input of sucrose applied at every time step (mol of sucrose per second per plant)
     :param constant_soil_temperature_in_Celsius: soil temperature applied to every root at every time step (degree Celsius)
@@ -84,7 +86,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     :param using_solver: if True, a solver will be used to compute C fluxes and concentrations
     :param printing_solver_outputs: if True, the intermediate calculations of the solver will be printed for each root element
     :param simulation_results_file: the name of the CSV file where outputs will be written
-    :param recording_interval_in_days: the time interval of distinct recordings of the current simulation (useful for checking the outputs while the simulation is still running)
+    :param recording_interval_in_days: the time interval of distinct recordings of the current scenarios (useful for checking the outputs while the scenarios is still running)
     :param recording_images: if True, every PlantGL graph will be recorded as an image
     :param root_images_directory: the name of the folder where root images will be registered
     :param z_classification: if True, root variables will be intercepted and summed within distinct z-layers of the soil
@@ -121,9 +123,9 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     # We convert the time step in seconds:
     time_step_in_seconds = time_step_in_days * 60. * 60. * 24.
-    # We calculate the number of steps necessary to reach the end of the simulation period:
+    # We calculate the number of steps necessary to reach the end of the scenarios period:
     if simulation_period_in_days == 0. or time_step_in_days == 0.:
-        print("WATCH OUT: No simulation was done, as time input was 0.")
+        print("WATCH OUT: No scenarios was done, as time input was 0.")
         n_steps = 0
     else:
         n_steps = trunc(simulation_period_in_days / time_step_in_days)
@@ -244,7 +246,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         initial_step_number = input_frame['step_number'].loc[0]
         initial_time_in_days = input_frame['initial_time_in_days'].loc[0]
     else:
-        # We then initialize the step and time according to the first line of the inputs dataframe:
+        # We then initialize the step and time at 0:
         initial_step_number = 0
         initial_time_in_days = 0.
 
@@ -258,84 +260,91 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     # ---------------------------------------
 
     # We display the MTG on PlantGL and possibly record it:
+
+    # visitor = tools.get_root_visitor()
+    # # We initialize a turtle in PlantGL:
+    # turtle_for_roots = turt.PglTurtle()
+    # turtle_for_hairs = turt.PglTurtle()
+    # turtle_for_fungus = turt.PglTurtle()
+    # # We make the graph upside down:
+    # turtle_for_roots.down(180)
+    # turtle_for_hairs.down(180)
+    # turtle_for_fungus.down(180)
+    # # We initialize the scene with the MTG g:
+    # scene_for_roots = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_roots, gc=False)
+    # scene_for_hairs = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_hairs, gc=False)
+    # scene_for_fungus = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_fungus, gc=False)
+
+    # x_cam = camera_distance
+    # y_cam = 0
+    # z_cam = z_cam
+    # tools.prepareScene(scene_for_roots, width=width, height=height,
+    #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+    # tools.prepareScene(scene_for_hairs, width=width, height=height,
+    #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+    # tools.prepareScene(scene_for_fungus, width=width, height=height,
+    #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
+
+    # If the rotation of the camera around the root system is required:
+    if camera_rotation:
+        index_camera=0
+        x_cam = x_coordinates[index_camera]
+        y_cam = y_coordinates[index_camera]
+        z_cam = z_coordinates[index_camera]
+
+        # # We prepare the scene with the specified position of the center of the graph and the camera:
+        # initial_scene = pgl.Scene()
+        # tools.prepareScene(initial_scene, width=width, height=height,
+        #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
+        #                    background_color=background_color)
+
+        sc = tools.plot_mtg(g,
+                            # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
+                            prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+                            vmax=displayed_vmax, cmap=cmap,
+                            root_hairs_display=root_hairs_display,
+                            mycorrhizal_fungus_display=mycorrhizal_fungus,
+                            width=width, height=height,
+                            x_center=x_center, y_center=y_center, z_center=z_center,
+                            x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
+                            displaying_PlantGL_Viewer=plotting)
+
+        # We define the index of the coordinates to read at the next step:
+        index_camera = index_camera + 1
+        # If this index is higher than the number of coordinates in each vector:
+        if index_camera >= n_rotation_points:
+            # Then we reset the index to 0:
+            index_camera = 0
+
+    # Otherwise, the camera will stay on a fixed direction:
+    else:
+        x_cam = camera_distance
+        y_cam = 0
+        z_cam = z_cam
+
+        # # We prepare the scene with the specified position of the center of the graph and the camera:
+        # initial_scene = pgl.Scene()
+        # tools.prepareScene(initial_scene, width=width, height=height,
+        #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam,
+        #                    z_cam=z_cam,
+        #                    background_color=background_color)
+
+        sc = tools.plot_mtg(g,
+                            # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
+                            prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+                            vmax=displayed_vmax, cmap=cmap,
+                            root_hairs_display=root_hairs_display,
+                            mycorrhizal_fungus_display=mycorrhizal_fungus,
+                            width=width, height=height,
+                            x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam,
+                            y_cam=y_cam, z_cam=z_cam,
+                            displaying_PlantGL_Viewer=plotting)
+
+        # We move the camera further from the root system:
+        x_camera = x_cam * (1 + step_back_coefficient)
+        z_camera = z_cam * (1 + step_back_coefficient)
+
     if plotting:
-
-        # visitor = tools.get_root_visitor()
-        # # We initialize a turtle in PlantGL:
-        # turtle_for_roots = turt.PglTurtle()
-        # turtle_for_hairs = turt.PglTurtle()
-        # turtle_for_fungus = turt.PglTurtle()
-        # # We make the graph upside down:
-        # turtle_for_roots.down(180)
-        # turtle_for_hairs.down(180)
-        # turtle_for_fungus.down(180)
-        # # We initialize the scene with the MTG g:
-        # scene_for_roots = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_roots, gc=False)
-        # scene_for_hairs = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_hairs, gc=False)
-        # scene_for_fungus = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_fungus, gc=False)
-
-        # x_cam = camera_distance
-        # y_cam = 0
-        # z_cam = z_cam
-        # tools.prepareScene(scene_for_roots, width=width, height=height,
-        #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
-        # tools.prepareScene(scene_for_hairs, width=width, height=height,
-        #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
-        # tools.prepareScene(scene_for_fungus, width=width, height=height,
-        #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
-
-        # If the rotation of the camera around the root system is required:
-        if camera_rotation:
-            index_camera=0
-            x_cam = x_coordinates[index_camera]
-            y_cam = y_coordinates[index_camera]
-            z_cam = z_coordinates[index_camera]
-
-            # # We prepare the scene with the specified position of the center of the graph and the camera:
-            # tools.prepareScene(scene_for_roots, width=width, height=height,
-            #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
-
-            sc = tools.plot_mtg(g,
-                                # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
-                                prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
-                                vmax=displayed_vmax, cmap=cmap,
-                                root_hairs_display=root_hairs_display,
-                                mycorrhizal_fungus_display=mycorrhizal_fungus,
-                                width=width, height=height,
-                                x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam,
-                                y_cam=y_cam, z_cam=z_cam)
-
-            # We define the index of the coordinates to read at the next step:
-            index_camera = index_camera + 1
-            # If this index is higher than the number of coordinates in each vector:
-            if index_camera >= n_rotation_points:
-                # Then we reset the index to 0:
-                index_camera = 0
-
-        # Otherwise, the camera will stay on a fixed direction:
-        else:
-            x_cam = camera_distance
-            y_cam = 0
-            z_cam = z_cam
-
-            # # We prepare the scene with the specified position of the center of the graph and the camera:
-            # tools.prepareScene(scene_for_roots, width=width, height=height,
-            #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
-
-            sc = tools.plot_mtg(g,
-                                # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
-                                prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
-                                vmax=displayed_vmax, cmap=cmap,
-                                root_hairs_display=root_hairs_display,
-                                mycorrhizal_fungus_display=mycorrhizal_fungus,
-                                width=width, height=height,
-                                x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam,
-                                y_cam=y_cam, z_cam=z_cam)
-
-            # We move the camera further from the root system:
-            x_camera = x_cam * (1 + step_back_coefficient)
-            z_camera = z_cam * (1 + step_back_coefficient)
-
         # We display the scene:
         pgl.Viewer.display(sc)
         # If needed, we wait for a few seconds so that the graph is well positioned:
@@ -370,16 +379,15 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     # We reset to 0 all growth-associated C costs:
     model.reinitializing_growth_variables(g)
 
-    if printing_sum:
-        dictionary = model.summing(g,
-                                   printing_total_length=True,
-                                   printing_total_struct_mass=True,
-                                   printing_all=True)
-    elif not printing_sum and recording_sum:
-        dictionary = model.summing(g,
-                                   printing_total_length=True,
-                                   printing_total_struct_mass=True,
-                                   printing_all=False)
+    if printing_sum or (not printing_sum and recording_sum):
+        dictionary = model.summing_and_possibly_homogenizing(g,
+                                                             printing_total_length=True,
+                                                             printing_total_struct_mass=True,
+                                                             printing_all=printing_sum,
+                                                             homogenizing_root_sugar_concentrations=homogenizing_root_sugar_concentrations,
+                                                             homogenizing_soil_concentrations=homogenizing_soil_concentrations,
+                                                             time_step_in_seconds=time_step_in_seconds)
+
     if recording_sum:
         time_in_days_series.append(time_step_in_days * step)
         sucrose_input_series.append(sucrose_input_rate * time_step_in_seconds)
@@ -444,7 +452,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     # ------------------------------------------------------------------------------------------------------------------
     # We create an internal function for saving the sum properties, the MTG file and the z_classification_file (if any)
-    # over the course of the simulation:
+    # over the course of the scenarios:
     def recording_attempt():
 
         # In any case, we record the MTG file:
@@ -598,7 +606,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             # TODO: WATHC OUT - her we artificially increase the supply of C depending on the mass of the fungus!
             if mycorrhizal_fungus:
                 if fungus_MTG.overall_infection_severity > 0.:
-                    sucrose_input_rate =sucrose_input_rate * (1 + fungus_MTG.overall_infection_severity * 1)
+                    sucrose_input_rate =sucrose_input_rate * (1 + fungus_MTG.overall_infection_severity \
+                                                              * param.relative_increase_in_C_allocation_due_to_fungus)
 
             # DEFINING THE TEMPERATURE OF THE SOIL FOR THIS TIME STEP:
             # --------------------------------------------------------
@@ -719,6 +728,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
                 # 2d - SPECIFIC MYCORRHIZAL FUNGI DYNAMICS:
                 # =========================================
+                # If the dynamics of fungus is considered, we let the fungus grow and exchnage C with the roots:
                 if mycorrhizal_fungus:
                     mycorrhizae.mycorrhizal_interaction(root_MTG=g, fungus=fungus_MTG,
                                                         step=step, time_step_in_seconds=time_step_in_seconds)
@@ -750,115 +760,16 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # # OPTIONAL: checking of possible anomalies in the root system:
                 # model.control_of_anomalies(g)
 
-            # PLOTTING THE MTG:
-            # ------------------
-
-            # visitor = tools.get_root_visitor()
-            # # We initialize a turtle in PlantGL:
-            # turtle = turt.PglTurtle()
-            # # We make the graph upside down:
-            # turtle.down(180)
-            # # We initialize the scene with the MTG g:
-            # scene_for_roots = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
-            # scene_for_hairs = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
-            # scene_for_fungus = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
-
-            # If the rotation of the camera around the root system is required:
-            if camera_rotation:
-                index_camera = 0
-                x_cam = x_coordinates[index_camera]
-                y_cam = y_coordinates[index_camera]
-                z_cam = z_coordinates[index_camera]
-
-                # # We prepare the scene with the specified position of the center of the graph and the camera:
-                # tools.prepareScene(scene_for_roots, width=width, height=height,
-                #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam,
-                #                    z_cam=z_cam)
-
-                sc = tools.plot_mtg(g,
-                                    # scene=scene_for_roots, scene_for_hairs=scene_for_hairs,
-                                    scene_for_fungus=scene_for_fungus,
-                                    prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
-                                    vmax=displayed_vmax, cmap=cmap,
-                                    root_hairs_display=root_hairs_display,
-                                    mycorrhizal_fungus_display=mycorrhizal_fungus,
-                                    width=width, height=height,
-                                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam,
-                                    y_cam=y_cam, z_cam=z_cam)
-
-                # We define the index of the coordinates to read at the next step:
-                index_camera = index_camera + 1
-                # If this index is higher than the number of coordinates in each vector:
-                if index_camera >= n_rotation_points:
-                    # Then we reset the index to 0:
-                    index_camera = 0
-
-            # Otherwise, the camera will stay on a fixed direction:
-            else:
-                x_cam = camera_distance
-                y_cam = 0
-                z_cam = z_cam
-
-                # # We prepare the scene with the specified position of the center of the graph and the camera:
-                # tools.prepareScene(scene_for_roots, width=width, height=height,
-                #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam,
-                #                    z_cam=z_cam)
-
-                sc = tools.plot_mtg(g,
-                                    # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
-                                    prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
-                                    vmax=displayed_vmax, cmap=cmap,
-                                    root_hairs_display=root_hairs_display,
-                                    mycorrhizal_fungus_display=mycorrhizal_fungus,
-                                    width=width, height=height,
-                                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam,
-                                    y_cam=y_cam, z_cam=z_cam)
-
-                # We move the camera further from the root system:
-                x_camera = x_cam * (1 + step_back_coefficient)
-                z_camera = z_cam * (1 + step_back_coefficient)
-
-            # We finally display the MTG on PlantGL and possibly record it:
-            if plotting:
-                pgl.Viewer.display(sc)
-                # If needed, we wait for a few seconds so that the graph is well positioned:
-                time.sleep(0.5)
-                if recording_images:
-                    image_name = os.path.join(root_images_directory, 'root%.5d.png')
-                    pgl.Viewer.saveSnapshot(image_name % (step +1))
-
-            # For integrating root variables on the z axis:
-            # ----------------------------------------------
-            if z_classification:
-                z_dictionary = model.classifying_on_z(g, z_min=z_min, z_max=z_max, z_interval=z_interval)
-                z_dictionary["time_in_days"] = time_step_in_days * step
-                z_dictionary_series.append(z_dictionary)
-
-            # For recording the MTG at each time step to load it later on:
-            # ------------------------------------------------------------
-            if recording_g:
-                g_file_name = os.path.join(g_directory, 'root%.5d.pckl')
-                with open(g_file_name % (step+1), 'wb') as output:
-                    pickle.dump(g, output, protocol=2)
-
-            # For recording the properties of g in a csv file at each time step:
-            # ------------------------------------------------------------------
-            if recording_g_properties:
-                prop_file_name = os.path.join(g_properties_directory, 'root%.5d.csv')
-                model.recording_MTG_properties(g, file_name=prop_file_name % (step+1))
-
             # SUMMING AND PRINTING VARIABLES ON THE ROOT SYSTEM:
             # --------------------------------------------------
-            if printing_sum:
-                dictionary = model.summing(g,
-                                           printing_total_length=True,
-                                           printing_total_struct_mass=True,
-                                           printing_all=True)
-            elif not printing_sum and recording_sum:
-                dictionary = model.summing(g,
-                                           printing_total_length=True,
-                                           printing_total_struct_mass=True,
-                                           printing_all=False)
+            if printing_sum or (not printing_sum and recording_sum):
+                dictionary = model.summing_and_possibly_homogenizing(g,
+                                                                     printing_total_length=True,
+                                                                     printing_total_struct_mass=True,
+                                                                     printing_all=printing_sum,
+                                                                     homogenizing_root_sugar_concentrations=homogenizing_root_sugar_concentrations,
+                                                                     homogenizing_soil_concentrations=homogenizing_soil_concentrations,
+                                                                     time_step_in_seconds=time_step_in_seconds)
 
             if recording_sum:
                 time_in_days_series.append(time_step_in_days * (step+1))
@@ -938,7 +849,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                               "{:.2E}".format(Decimal(theoretical_current_C_in_the_system)), "mol of C")
                         print("This corresponds to a net disappearance of C of",
                               "{:.2E}".format(Decimal(theoretical_current_C_in_the_system - current_C_in_the_system)),
-                              "mol of C, and the cumulated difference since the start of the simulation and the current one is",
+                              "mol of C, and the cumulated difference since the start of the scenarios and the current one is",
                               "{:.2E}".format(
                                   Decimal(theoretical_cumulated_C_in_the_system - current_C_in_the_system)),
                               "mol of C.")
@@ -946,19 +857,119 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                         # We reinitialize the "previous" amount of C in the system with the current one for the next time step:
                     previous_C_in_the_system = current_C_in_the_system
 
+            # PLOTTING THE MTG:
+            # ------------------
+
+            # visitor = tools.get_root_visitor()
+            # # We initialize a turtle in PlantGL:
+            # turtle = turt.PglTurtle()
+            # # We make the graph upside down:
+            # turtle.down(180)
+            # # We initialize the scene with the MTG g:
+            # scene_for_roots = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
+            # scene_for_hairs = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
+            # scene_for_fungus = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
+
+            # If the rotation of the camera around the root system is required:
+            if camera_rotation:
+                index_camera = 0
+                x_cam = x_coordinates[index_camera]
+                y_cam = y_coordinates[index_camera]
+                z_cam = z_coordinates[index_camera]
+
+                # # We prepare the scene with the specified position of the center of the graph and the camera:
+                # tools.prepareScene(scene_for_roots, width=width, height=height,
+                #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam,
+                #                    z_cam=z_cam)
+
+                sc = tools.plot_mtg(g,
+                                    # scene=scene_for_roots, scene_for_hairs=scene_for_hairs,
+                                    scene_for_fungus=scene_for_fungus,
+                                    prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+                                    vmax=displayed_vmax, cmap=cmap,
+                                    root_hairs_display=root_hairs_display,
+                                    mycorrhizal_fungus_display=mycorrhizal_fungus,
+                                    width=width, height=height,
+                                    x_center=x_center, y_center=y_center, z_center=z_center,
+                                    x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
+                                    displaying_PlantGL_Viewer=plotting)
+
+                # We define the index of the coordinates to read at the next step:
+                index_camera = index_camera + 1
+                # If this index is higher than the number of coordinates in each vector:
+                if index_camera >= n_rotation_points:
+                    # Then we reset the index to 0:
+                    index_camera = 0
+
+            # Otherwise, the camera will stay on a fixed direction:
+            else:
+                # x_cam = camera_distance
+                # y_cam = 0
+                # z_cam = z_cam
+
+                # # We prepare the scene with the specified position of the center of the graph and the camera:
+                # tools.prepareScene(scene_for_roots, width=width, height=height,
+                #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam,
+                #                    z_cam=z_cam)
+
+                sc = tools.plot_mtg(g,
+                                    # scene=scene_for_roots, scene_for_hairs=scene_for_hairs,
+                                    # scene_for_fungus=scene_for_fungus,
+                                    prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
+                                    vmax=displayed_vmax, cmap=cmap,
+                                    root_hairs_display=root_hairs_display,
+                                    mycorrhizal_fungus_display=mycorrhizal_fungus,
+                                    width=width, height=height,
+                                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam,
+                                    y_cam=y_cam, z_cam=z_cam,
+                                    displaying_PlantGL_Viewer=plotting)
+
+                # We move the camera further from the root system:
+                x_camera = x_cam * (1 + step_back_coefficient)
+                z_camera = z_cam * (1 + step_back_coefficient)
+
+            # We finally display the MTG on PlantGL and possibly record it:
+            if plotting:
+                pgl.Viewer.display(sc)
+                # If needed, we wait for a few seconds so that the graph is well positioned:
+                time.sleep(0.5)
+                if recording_images:
+                    image_name = os.path.join(root_images_directory, 'root%.5d.png')
+                    pgl.Viewer.saveSnapshot(image_name % (step + 1))
+
+            # For integrating root variables on the z axis:
+            # ----------------------------------------------
+            if z_classification:
+                z_dictionary = model.classifying_on_z(g, z_min=z_min, z_max=z_max, z_interval=z_interval)
+                z_dictionary["time_in_days"] = time_step_in_days * step
+                z_dictionary_series.append(z_dictionary)
+
+            # For recording the MTG at each time step to load it later on:
+            # ------------------------------------------------------------
+            if recording_g:
+                g_file_name = os.path.join(g_directory, 'root%.5d.pckl')
+                with open(g_file_name % (step + 1), 'wb') as output:
+                    pickle.dump(g, output, protocol=2)
+
+            # For recording the properties of g in a csv file at each time step:
+            # ------------------------------------------------------------------
+            if recording_g_properties:
+                prop_file_name = os.path.join(g_properties_directory, 'root%.5d.csv')
+                model.recording_MTG_properties(g, file_name=prop_file_name % (step + 1))
+
             print("   The root system finally includes", len(g) - 1, "root elements.")
             print("(SCENARIO {})".format(scenario_id))
 
             # If the current iteration correspond to the time where one full time interval for recording has been reached:
             if step in recording_steps_list:
-                # Then we record the current simulation results:
-                print("Recording the simulation results obtained so far (until time t = {:.2f}".format(
+                # Then we record the current scenarios results:
+                print("Recording the scenarios results obtained so far (until time t = {:.2f}".format(
                     Decimal((step+1) * time_step_in_days)), "days)...")
                 recording_attempt()
 
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    # At the end of the simulation (or just before an error is about to interrupt the program!):
+    # At the end of the scenarios (or just before an error is about to interrupt the program!):
     # -------------------------------------------------------------------------------------------
     finally:
         print("")

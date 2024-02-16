@@ -10,7 +10,7 @@
 
 from math import pi
 
-# We set the random seed, so that the same simulation can be repeted with the same seed:
+# We set the random seed, so that the same scenarios can be repeted with the same seed:
 random_choice = 8
 
 #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -121,6 +121,11 @@ root_tissue_density = 0.10 * 1e6
 #-----------------------------------------------------------------
 struct_mass_C_content = 0.44 / 12.01
 # => We assume that the structural mass contains 44% of C.
+
+# N content of structural mass (mol of N per gram of structural mass):
+#-----------------------------------------------------------------
+struct_mass_N_content = 0.05 / 14.
+# => We assume that the structural mass contains 5% of N.
 
 # Gravitropism (dimensionless):
 #------------------------------
@@ -677,14 +682,12 @@ hyphal_struct_mass_C_content = 0.44 / 12.01
 
 C_hexose_fungus_min = 1e-6
 
-initial_fungus_infection_risk = 1e-1
-initial_fungus_infection_risk = 1
+initial_fungus_infection_risk = 5e-2
 initial_infected_surface_fraction = 1e-4
+min_distance_for_fungus_infection = segment_length * 1.2
 
 fungus_permeability = 1e-5
+fungus_surface_to_mass_ratio = 1. # m2 per gram of structural mass
 fungus_yield_growth = 0.8
 
-min_distance_for_fungus_infection = 2 * segment_length
-min_distance_for_fungus_infection = segment_length * 1.1
-
-fungus_surface_to_mass_ratio = 0.1 # m2 per gram of structural mass
+relative_increase_in_C_allocation_due_to_fungus = 0.

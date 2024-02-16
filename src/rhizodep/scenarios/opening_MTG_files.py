@@ -80,7 +80,7 @@ def showing_image(image_name="text.png",
     # We define a zone that will correspond to these coordinates:
     carre = QuadSet(points, indices)
     # We load an image as a texture material:
-    my_path = os.path.join("./", image_name)
+    my_path = os.path.join("../../simulations/running_scenarios/", image_name)
     tex = ImageTexture(my_path)
     # We define the texture coordinates that we will use:
     # texCoord = [(0,0),
@@ -323,8 +323,12 @@ def loading_MTG_files(my_path='',
                       list_of_MTG_ID=None,
                       property="C_hexose_root", vmin=1e-5, vmax=1e-2, log_scale=True, cmap='jet',
                       width=1200, height=1200,
-                      x_center=0, y_center=0, z_center=-1, z_cam=-2,
-                      camera_distance=4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+                      x_center=0, y_center=0, z_center=0,
+                      x_cam=0, y_cam=0, z_cam=0,
+                      step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+                      background_color=[0,0,0],
+                      root_hairs_display=True,
+                      mycorrhizal_fungus_display=False,
                       adding_images_on_plot=False,
                       recording_images=False,
                       images_directory='root_new_images',
@@ -419,8 +423,40 @@ def loading_MTG_files(my_path='',
     else:
         list_of_MTG_numbers = [int(single_MTG_filename[-10:-5])]
 
-        # We cover each of the MTG files in the list (or only the specified file when requested):
-    # ----------------------------------------------------------------------------------------
+    # # Preparing the PGL viewer:
+    # #--------------------------
+    # # Defining the ID and full name of the MTG file:
+    # ID = list_of_MTG_numbers[-1]
+    # filename = 'root%.5d.pckl' % ID
+    #
+    # # Loading the MTG file:
+    # MTG_path = os.path.join(g_dir, filename)
+    # f = open(MTG_path, 'rb')
+    # g = pickle.load(f)
+    # f.close()
+    #
+    # MTG_scene = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
+    #                      width=width,
+    #                      height=height,
+    #                      x_center=x_center,
+    #                      y_center=y_center,
+    #                      z_center=z_center,
+    #                      x_cam=x_cam,
+    #                      y_cam=y_cam,
+    #                      z_cam=z_cam,
+    #                      background_color=background_color,
+    #                      root_hairs_display=root_hairs_display,
+    #                      mycorrhizal_fungus_display=mycorrhizal_fungus_display)
+    # MTG_scene = prepareScene(MTG_scene, width=width, height=height,
+    #                          x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
+    #                          background_color=background_color)
+    # pgl.Viewer.display(MTG_scene)
+
+    # # TODO: WATCH OUT!
+    # pgl.Viewer.redrawPolicy=False
+
+    # We cover each of the MTG files in the list (or only the specified file when requested):
+    # ---------------------------------------------------------------------------------------
     # for step in range(step_initial, step_final):
     for MTG_position in range(0,len(list_of_MTG_numbers)):
         # Defining the ID and full name of the MTG file:
@@ -460,23 +496,37 @@ def loading_MTG_files(my_path='',
                           y_cam=y_cam,
                           z_cam=z_cam)
         else:
-            x_camera = camera_distance
-            x_cam = camera_distance
-            z_camera = z_cam
             # We plot the current file:
-            sc = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
-                          width=width,
-                          height=height,
-                          x_center=x_center,
-                          y_center=y_center,
-                          z_center=z_center,
-                          x_cam=x_camera,
-                          y_cam=0,
-                          z_cam=z_camera)
+            MTG_scene = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
+                                 width=width,
+                                 height=height,
+                                 x_center=x_center,
+                                 y_center=y_center,
+                                 z_center=z_center,
+                                 x_cam=x_cam,
+                                 y_cam=y_cam,
+                                 z_cam=z_cam,
+                                 background_color=background_color,
+                                 root_hairs_display=root_hairs_display,
+                                 mycorrhizal_fungus_display=mycorrhizal_fungus_display)
+            # # We get a list of all shapes in the scene:
+            # shapes = dict((MTG_scene.id, sh) for sh in MTG_scene)
+            # # We add the shapes of the MTG in the initial general scene:
+            # for vid in shapes:
+            #     general_scene += shapes[vid]
 
-            # And we move the camera further from the root system:
-            x_camera = x_cam + x_cam * step_back_coefficient * MTG_position
-            z_camera = z_cam + z_cam * step_back_coefficient * MTG_position
+            # general_scene += MTG_scene
+
+            # for shape in MTG_scene:
+            #     general_scene += shape
+
+            # # And we move the camera further from the root system:
+            # x_camera = x_cam + x_cam * step_back_coefficient * MTG_position
+            # z_camera = z_cam + z_cam * step_back_coefficient * MTG_position
+
+            # general_scene = prepareScene(MTG_scene, width=width, height=height,
+            #                              x_center=x_center, y_center=y_center, z_center=z_center,
+            #                              x_cam=x_cam, y_cam=y_cam, z_cam=z_cam, background_color=[0, 0, 0])
 
         if adding_images_on_plot:
             text = "t = 100 days"
@@ -516,10 +566,20 @@ def loading_MTG_files(my_path='',
                                    )
             # Viewer.display(shape)
             sc += shape2
+
+        # DISPLAYING:
+        #############
+        # # We update the scene with the specified position of the center of the graph and the camera:
+        # MTG_scene = prepareScene(MTG_scene, width=width, height=height,
+        #                           x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
+        #                           background_color=background_color)
+
         # We finally display the MTG on PlantGL:
-        pgl.Viewer.display(sc)
-        # We wait for 1 second, if needed:
-        time.sleep(1)
+        pgl.Viewer.display(MTG_scene)
+        # pgl.Viewer.update()
+
+        # # We wait for 1 second, if needed:
+        # time.sleep(1)
 
         # For recording the image of the graph for making a video later:
         # -------------------------------------------------------------
@@ -558,9 +618,9 @@ def loading_MTG_files(my_path='',
 # Function for creating one average MTG from a list of MTG:
 #----------------------------------------------------------
 def averaging_a_list_of_MTGs(list_of_MTG_numbers=[143, 167, 191], list_of_properties=[],
-                             directory_path = 'C:/Users/frees/rhizodep/MTG_files', recording_averaged_MTG=True,
+                             directory_path = 'MTG_files', recording_averaged_MTG=True,
                              averaged_MTG_name=None,
-                             recording_directory = 'C:/Users/frees/rhizodep/averaged_MTG_files'):
+                             recording_directory = 'averaged_MTG_files'):
     """
     This function calculate an "averaged" MTG that attributes for the property of a given node the mean value of that
     property value for the same node found in a list of MTG. This is especially useful for calculating mean values over
@@ -645,9 +705,9 @@ def averaging_a_list_of_MTGs(list_of_MTG_numbers=[143, 167, 191], list_of_proper
 
 # Function for creating many averaged MTG when covering a large list of MTG files:
 #---------------------------------------------------------------------------------
-def averaging_through_a_series_of_MTGs(MTG_directory='C:/Users/frees/rhizodep/MTG_files', list_of_properties=[],
+def averaging_through_a_series_of_MTGs(MTG_directory='MTG_files', list_of_properties=[],
                                        odd_number_of_MTGs_for_averaging = 3, recording_averaged_MTG=True,
-                                       recording_directory='C:/Users/frees/rhizodep/averaged_MTG_files'):
+                                       recording_directory='averaged_MTG_files'):
     """
     This function covers each MTG in a directory, and for each one calculates an averaged MTG based on a specific number
     of MTG files (located right before and right after the current MTG in the list), for a certain list of properties.
@@ -754,25 +814,27 @@ if __name__ == "__main__":
     # im_resized.save('colorbar_new.png', quality=95)
     # # im_new.save('colorbar_new.png', quality=95)
 
-    # To open a single file:
-    loading_MTG_files(my_path='C:/Users/frees/rhizodep/simulations/saving_outputs/outputs_2023-08/Scenario_0100/',
+    # To open a list:
+    loading_MTG_files(my_path='C:/Users/frees/rhizodep/src/rhizodep/scenarios/outputs/Scenario_0142',
                       opening_list=True,
                       MTG_directory='MTG_files',
-                      list_of_MTG_ID=[999, 1000],
+                      list_of_MTG_ID=range(0, 900),
                       # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
                       # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
                       # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
-                      # property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True,
-                      property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True,
+                      property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True,
+                      # property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True,
                       cmap='jet',
                       width=1200, height=1200,
-                      x_center=0, y_center=0, z_center=-0.1, z_cam=-0.2,
-                      camera_distance=0.4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-                      # x_center=0, y_center=0, z_center=-0, z_cam=-0,
-                      # camera_distance=1, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+                      x_center=0.0, y_center=0.0, z_center=0.0,
+                      x_cam=0.2, y_cam=0.0, z_cam=-0.2,
+                      background_color=[94,76,64],
+                      root_hairs_display=True,
+                      mycorrhizal_fungus_display=False,
+                      step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
                       adding_images_on_plot=False,
                       recording_images=True,
-                      images_directory="single_root_image",
+                      images_directory="new_root_image_test",
                       printing_sum=False,
                       recording_sum=False,
                       recording_g_properties=False,
