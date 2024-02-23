@@ -10,6 +10,7 @@
     :license: see LICENSE for details.
 """
 
+# TODO: Check again whether concentrations relate to living or dead root mass or surface (e.g. with root hairs!)
 # TODO: Check the calculation of "Structural mass produced (g)"
 # TODO: Update ArchiSimple option (e.g. with the new way to represent Seminal/Adventitious roots?)
 # TODO: Add a general upper scale for the whole root system, in which the properties about phloem sucrose could be stored?
@@ -4580,10 +4581,12 @@ def adjusting_pools_and_deficits(n, time_step_in_seconds, printing_warnings=Fals
         n.Deficit_cells_soil_rate = n.Deficit_cells_soil / time_step_in_seconds
         # And we set the concentration to 0:
         n.Cs_cells_soil = 0.
-        # To avoid registering much too low values:
-        if n.Deficit_cells_soil < 1e-25:
-            n.Deficit_cells_soil = 0.
 
+    # To avoid registering much too low values:
+    for value in [n.C_hexose_root, n.C_hexose_reserve, n.C_hexose_soil, n.Cs_mucilage_soil, n.Cs_cells_soil,
+                  n.Deficit_hexose_root, n.Deficit_hexose_reserve, n.Deficit_hexose_soil, n.Deficit_mucilage_soil, n.Deficit_cells_soil]:
+        if value < 1e-20:
+            value = 0.
     return n
 
 # We create a class containing the system of differential equations to be solved with a solver:
@@ -5065,6 +5068,7 @@ def summing_and_possibly_homogenizing(g,
                                       printing_total_length=True, printing_total_struct_mass=True, printing_all=False,
                                       homogenizing_root_sugar_concentrations=False,
                                       homogenizing_soil_concentrations=False,
+                                      renewal_of_soil_solution=False,
                                       time_step_in_seconds=60.*60.):
     """
     This function computes a number of general properties summed over the whole MTG.
@@ -5133,6 +5137,7 @@ def summing_and_possibly_homogenizing(g,
         if n.length <= 0.:
             continue
 
+        # INCREMEMENTATION OF TOTAL AMOUNTS:
         # Calculations of total mass, length and surface:
         if n.type == "Dead" or n.type == "Just_dead":
             # Note: we only include dead root hairs in the necromass balance when the root element itself has died!
@@ -5190,13 +5195,12 @@ def summing_and_possibly_homogenizing(g,
         total_mucilage_degradation += n.mucilage_degradation
         total_cells_degradation += n.cells_degradation
 
-    # POSSIBLE REHOMOGENIZING:
-    # ------------------------
-
-    # Eventually, we consider options to rehomogenize the root sugar concentrations along all roots:
+    # CONSIDERING THE POSSIBLE REHOMOGENIZING OF INTERNAL SUGAR CONCENTRATIONS ALONG THE ROOTS:
+    # -----------------------------------------------------------------------------------------
     if homogenizing_root_sugar_concentrations:
 
-        # FOR ROOT HEXOSE CONCENTRATION: the concentration is already homogenized by 'shoot_sucrose_supply_and_spreading'
+        # FOR ROOT HEXOSE CONCENTRATION: 
+        # the concentration is already homogenized by 'shoot_sucrose_supply_and_spreading'
 
         # FOR ROOT HEXOSE CONCENTRATION:
         # We calculate the new homogenized concentration to apply everywhere along the living roots:
@@ -5222,17 +5226,19 @@ def summing_and_possibly_homogenizing(g,
                 total_hexose_root_deficit = 0.
             # Otherwise, there is no need for correction of the total amounts.
         else:
-            # Otherwise, we simply record the deficit and set the concentration to 0 everywhere along the living roots:
+            # Otherwise, we set the concentration to 0 everywhere along the living roots:
             g.properties()["C_hexose_root"] \
                 = {vid: 0. for vid in g.properties()["C_hexose_root"].keys()
                    if g.node(vid).type != "Just_dead" and g.node(vid).type != "Dead"}
+            # We calculate the deficit of each relevant root element relatively to its mass ratio:
             g.properties()["Deficit_hexose_root"] \
-                = {vid: -new_C_hexose_root for vid in g.properties()["Deficit_hexose_root"].keys()
-                   if g.node(vid).type != "Just_dead" and g.node(vid).type != "Dead"}
+                = {vid: -new_C_hexose_root * (g.node(vid).struct_mass + g.node(vid).living_root_hairs_struct_mass)
+                   for vid in g.vertices_iter(scale=1) if
+                   g.node(vid).type != "Just_dead" and g.node(vid).type != "Dead"}
             g.properties()["Deficit_hexose_root_rate"] \
                 = {vid: -new_C_hexose_root * total_living_struct_mass / time_step_in_seconds
-                   for vid in g.properties()["Deficit_hexose_root_rate"].keys()
-                   if g.node(vid).type != "Just_dead" and g.node(vid).type != "Dead"}
+                   for vid in g.vertices_iter(scale=1) if
+                   g.node(vid).type != "Just_dead" and g.node(vid).type != "Dead"}
             # If a positive total amount had been registered:
             if total_hexose_root > 0.:
                 # Then it is now integrated in the new total deficit,
@@ -5264,31 +5270,39 @@ def summing_and_possibly_homogenizing(g,
                 total_hexose_reserve_deficit = 0.
             # Otherwise, there is no need for correction of the total amounts.
         else:
-            # Otherwise, we simply record the deficit and set the concentration to 0 everywhere along the living roots:
+            # Otherwise, we set the concentration to 0 everywhere along the living roots:
             g.properties()["C_hexose_reserve"] \
                 = {vid: 0. for vid in g.properties()["C_hexose_reserve"].keys()
                    if g.node(vid).type != "Just_dead" and g.node(vid).type != "Dead"}
+            # We calculate the deficit of each relevant root element relatively to its mass ratio:
             g.properties()["Deficit_hexose_reserve"] \
-                = {vid: -new_C_hexose_reserve for vid in g.properties()["Deficit_hexose_reserve"].keys()
-                   if g.node(vid).type != "Just_dead" and g.node(vid).type != "Dead"}
+                = {vid: -new_C_hexose_reserve * (g.node(vid).struct_mass + g.node(vid).living_root_hairs_struct_mass)
+                   for vid in g.vertices_iter(scale=1) if g.node(vid).type!="Just_dead" and g.node(vid).type!="Dead"}
             g.properties()["Deficit_hexose_reserve_rate"] \
                 = {vid: -new_C_hexose_reserve * total_living_struct_mass / time_step_in_seconds
-                   for vid in g.properties()["Deficit_hexose_reserve_rate"].keys()
-                   if g.node(vid).type != "Just_dead" and g.node(vid).type != "Dead"}
+                   for vid in g.vertices_iter(scale=1) if g.node(vid).type!="Just_dead" and g.node(vid).type!="Dead"}
             # If a positive total amount had been registered:
             if total_hexose_reserve > 0.:
                 # Then it is now integrated in the new total deficit,
                 # and we cancel the registered total amount:
                 total_hexose_reserve_deficit = -new_C_hexose_reserve * total_living_struct_mass
                 total_hexose_reserve = 0.
-
-    # Eventually, we consider options to rehomogenize the soil rhizodeposit concentrations along all roots:
+    
+    # CONSIDERING THE POSSIBLE REHOMOGENIZING OF RHIZODEPOSITS CONCENTRATIONS ALONG THE ROOTS:
+    #-----------------------------------------------------------------------------------------
     if homogenizing_soil_concentrations:
 
         # FOR SOIL HEXOSE CONCENTRATION:
-        # We calculate the new homogenized concentration to apply everywhere along the roots:
-        new_C_hexose_soil = (total_hexose_soil - total_hexose_soil_deficit) / total_living_struct_mass
-        # => Note: the total_struct_mass includes living root hairs mass!
+        # If the soil solution is to be renewed:
+        if renewal_of_soil_solution:
+            # Then the concentration is set to 0:
+            new_C_hexose_soil = 0.
+            # And we correspondingly increase the total amount that has "disappeared" from the root interface:
+            total_hexose_degradation += total_hexose_soil - total_hexose_soil_deficit
+        else:
+            # Otherwise, we calculate the new homogenized concentration to apply everywhere along the roots:
+            new_C_hexose_soil = (total_hexose_soil - total_hexose_soil_deficit) / total_living_struct_mass
+            # => Note: the total_struct_mass includes living root hairs mass!
         # If the newly calculated concentration is positive:
         if new_C_hexose_soil >= 0.:
             # Then we apply the same concentration and the corresponding deficit everywhere along the roots:
@@ -5306,26 +5320,34 @@ def summing_and_possibly_homogenizing(g,
                 total_hexose_soil_deficit = 0.
             # Otherwise, there is no need for correction of the total amounts.
         else:
-            # Otherwise, we simply record the deficit and set the concentration to 0 everywhere along the roots:
+            # Otherwise, we set the concentration to 0 everywhere along the roots:
             g.properties()["C_hexose_soil"] \
                 = {vid: 0. for vid in g.properties()["C_hexose_soil"].keys()}
+            # We calculate the deficit of each relevant root element relatively to its mass ratio:
             g.properties()["Deficit_hexose_soil"] \
-                = {vid: -new_C_hexose_soil for vid in g.properties()["Deficit_hexose_soil"].keys()}
+                = {vid: -new_C_hexose_soil * (g.node(vid).struct_mass + g.node(vid).living_root_hairs_struct_mass)
+                   for vid in g.vertices_iter(scale=1) if g.node(vid).type!="Just_dead" and g.node(vid).type!="Dead"}
             g.properties()["Deficit_hexose_soil_rate"] \
-                = {vid: -new_C_hexose_soil * total_living_struct_mass / time_step_in_seconds
-                   for vid in g.properties()["Deficit_hexose_soil_rate"].keys()}
+                = {vid: g.node(vid).Deficit_hexose_soil / time_step_in_seconds
+                   for vid in g.vertices_iter(scale=1) if g.node(vid).type!="Just_dead" and g.node(vid).type!="Dead"}
             # If a positive total amount had been registered:
             if total_hexose_soil > 0.:
-                # Then it is now integrated in the new total deficit,
-                # and we cancel the registered total amount:
+                # Then it is now integrated in the new total deficit, and we cancel the registered total amount:
                 total_hexose_soil_deficit = -new_C_hexose_soil * total_living_struct_mass
                 total_hexose_soil = 0.
 
         # FOR SOIL MUCILAGE CONCENTRATION:
-        # We calculate the new homogenized concentration to apply everywhere along the roots:
-        new_Cs_mucilage_soil = (total_mucilage_soil - total_mucilage_soil_deficit) \
-                               / (total_surface + total_living_root_hairs_surface)
-        # => Note: the total_surface does NOT include living root hairs surface!
+        # If the soil solution is to be renewed:
+        if renewal_of_soil_solution:
+            # Then the concentration is set to 0:
+            new_Cs_mucilage_soil = 0.
+            # And we correspondingly increase the total amount that has "disappeared" from the root interface:
+            total_mucilage_degradation += total_mucilage_soil - total_mucilage_soil_deficit
+        else:
+            # We calculate the new homogenized concentration to apply everywhere along the roots:
+            new_Cs_mucilage_soil = (total_mucilage_soil - total_mucilage_soil_deficit) \
+                                   / (total_surface + total_living_root_hairs_surface)
+            # => Note: the total_surface does NOT include living root hairs surface!
         # If the newly calculated concentration is positive:
         if new_Cs_mucilage_soil >= 0.:
             # Then we apply the same concentration and the corresponding deficit everywhere along the roots:
@@ -5343,14 +5365,16 @@ def summing_and_possibly_homogenizing(g,
                 total_mucilage_soil_deficit = 0.
             # Otherwise, there is no need for correction of the total amounts.
         else:
-            # Otherwise, we simply record the deficit and set the concentration to 0 everywhere along the roots:
+            # Otherwise, we simply set the concentration to 0 everywhere along the roots:
             g.properties()["Cs_mucilage_soil"] \
                 = {vid: 0. for vid in g.properties()["Cs_mucilage_soil"].keys()}
+            # We calculate the deficit of each relevant root element relatively to its surface ratio:
             g.properties()["Deficit_mucilage_soil"] \
-                = {vid: -new_Cs_mucilage_soil for vid in g.properties()["Deficit_mucilage_soil"].keys()}
+                = {vid: -new_Cs_mucilage_soil * (g.node(vid).external_surface + g.node(vid).living_root_hairs_external_surface)
+                   for vid in g.vertices_iter(scale=1)}
             g.properties()["Deficit_mucilage_soil_rate"] \
-                = {vid: -new_Cs_mucilage_soil*(total_surface + total_living_root_hairs_surface)/time_step_in_seconds
-                   for vid in g.properties()["Deficit_mucilage_soil_rate"].keys()}
+                = {vid: g.node(vid).Deficit_mucilage_soil / time_step_in_seconds
+                   for vid in g.vertices_iter(scale=1)}
             # If a positive total amount had been registered:
             if total_mucilage_soil > 0.:
                 # Then it is now integrated in the new total deficit,
@@ -5359,10 +5383,17 @@ def summing_and_possibly_homogenizing(g,
                 total_mucilage_soil = 0.
 
         # FOR SOIL CELLS CONCENTRATION:
-        # We calculate the new homogenized concentration to apply everywhere along the roots:
-        new_Cs_cells_soil = (total_cells_soil - total_cells_soil_deficit) \
-                               / (total_surface + total_living_root_hairs_surface)
-        # => Note: the total_surface does NOT include living root hairs surface!
+        # If the soil solution is to be renewed:
+        if renewal_of_soil_solution:
+            # Then the concentration is set to 0:
+            new_Cs_cells_soil = 0.
+            # And we correspondingly increase the total amount that has "disappeared" from the root interface:
+            total_cells_degradation += total_cells_soil - total_cells_soil_deficit
+        else:
+            # We calculate the new homogenized concentration to apply everywhere along the roots:
+            new_Cs_cells_soil = (total_cells_soil - total_cells_soil_deficit) \
+                                   / (total_surface + total_living_root_hairs_surface)
+            # => Note: the total_surface does NOT include living root hairs surface!
         # If the newly calculated concentration is positive:
         if new_Cs_cells_soil >= 0.:
             # Then we apply the same concentration and the corresponding deficit everywhere along the roots:
@@ -5380,14 +5411,16 @@ def summing_and_possibly_homogenizing(g,
                 total_cells_soil_deficit = 0.
             # Otherwise, there is no need for correction of the total amounts.
         else:
-            # Otherwise, we simply record the deficit and set the concentration to 0 everywhere along the roots:
+            # Otherwise, we simply set the concentration to 0 everywhere along the roots:
             g.properties()["Cs_cells_soil"] \
                 = {vid: 0. for vid in g.properties()["Cs_cells_soil"].keys()}
+            # We calculate the deficit of each relevant root element relatively to its surface ratio:
             g.properties()["Deficit_cells_soil"] \
-                = {vid: -new_Cs_cells_soil for vid in g.properties()["Deficit_cells_soil"].keys()}
+                = {vid: -new_Cs_cells_soil * (g.node(vid).external_surface + g.node(vid).living_root_hairs_external_surface)
+                   for vid in g.vertices_iter(scale=1)}
             g.properties()["Deficit_cells_soil_rate"] \
-                = {vid: -new_Cs_cells_soil * (total_surface + total_living_root_hairs_surface) / time_step_in_seconds
-                   for vid in g.properties()["Deficit_cells_soil_rate"].keys()}
+                = {vid: g.node(vid).Deficit_cells_soil / time_step_in_seconds
+                   for vid in g.vertices_iter(scale=1)}
             # If a positive total amount had been registered:
             if total_cells_soil > 0.:
                 # Then it is now integrated in the new total deficit,

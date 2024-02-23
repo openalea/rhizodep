@@ -82,8 +82,7 @@ def run_one_scenario(scenario_id=1,
         # parameter:
         transposed_df = scenarios_df.T
         transposed_df.to_csv(os.path.join(OUTPUTS_DIRPATH, 'scenarios_list.csv'), na_rep='NA', header=False)
-        new_scenarios_df = pd.read_csv(os.path.join(OUTPUTS_DIRPATH, 'scenarios_list.csv'), index_col='Scenario',
-                                       header=0)
+        new_scenarios_df = pd.read_csv(os.path.join(OUTPUTS_DIRPATH, 'scenarios_list.csv'), index_col='Scenario', header=0)
         scenario = new_scenarios_df.loc[scenario_id].to_dict()
         scenario_name = 'Scenario_%.4d' % scenario_id
     else:
@@ -126,7 +125,7 @@ def run_one_scenario(scenario_id=1,
     useless_columns = ["__name__", "__doc__", "__package__", "__loader__", "__spec__", "__file__", "__cached__", "__builtins__"]
     data_frame_parameters.drop(useless_columns, axis=1, inplace=True)
     data_frame_parameters.head(1).to_csv(os.path.join(scenario_dirpath, 'updated_parameters.csv'),
-                                 na_rep='NA', index=False, header=True)
+                                         na_rep='NA', index=False, header=True)
 
     # We read the other specific instructions of the scenario that don't correspond to the parameters in the list
     # (Note: The following function "get" looks if the first argument is present in the scenario parameters.
@@ -155,6 +154,8 @@ def run_one_scenario(scenario_id=1,
     FORCING_ADVENTITIOUS_ROOTS_EVENTS = scenario_parameters.get('forcing_seminal_roots_events', False)
     HOMOGENIZING_ROOT_CONCENTRATIONS = scenario_parameters.get('homogenizing_root_sugar_concentrations', False)
     HOMOGENIZING_SOIL_CONCENTRATIONS = scenario_parameters.get('homogenizing_soil_concentrations', False)
+    RENEWAL_OF_SOIL_SOLUTION = scenario_parameters.get('renewal_of_soil_solution', False)
+    INTERVAL_BETWEEN_RENEWAL_EVENTS = scenario_parameters.get('interval_between_renewal_events', 1. * 60. * 60. * 24.)
 
     INITIAL_SEGMENT_LENGTH = scenario_parameters.get('initial_segment_length', 1e-3)
     INITIAL_APEX_LENGTH = scenario_parameters.get('initial_apex_length', 0)
@@ -283,6 +284,8 @@ def run_one_scenario(scenario_id=1,
                                        constant_soil_temperature_in_Celsius=SOIL_TEMPERATURE,
                                        homogenizing_root_sugar_concentrations=HOMOGENIZING_ROOT_CONCENTRATIONS,
                                        homogenizing_soil_concentrations=HOMOGENIZING_SOIL_CONCENTRATIONS,
+                                       renewal_of_soil_solution=RENEWAL_OF_SOIL_SOLUTION,
+                                       interval_between_renewal_events=INTERVAL_BETWEEN_RENEWAL_EVENTS,
                                        nodules=NODULES_OPTION,
                                        mycorrhizal_fungus=MYCORRHIZAL_FUNGUS,
                                        fungus_MTG=f,
@@ -394,7 +397,7 @@ def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx", input_path='inp
 ###############
 
 if __name__ == '__main__':
-# (Note: this condition avoids launching automatically the program when imported in another file)
+    # (Note: this condition avoids launching automatically the program when imported in another file)
 
     # # CASE 1 - CALLING ONE SCENARIO ONLY:
     # #####################################

@@ -16,6 +16,7 @@ import openalea.plantgl.all as pgl
 from openalea.plantgl.all import *
 from PIL import Image, ImageDraw, ImageFont
 from rhizodep.tools import my_colormap, get_root_visitor, prepareScene, circle_coordinates, plot_mtg
+from rhizodep.alternative_plotting import plotting_roots_with_pyvista, fast_plotting_roots_with_pyvista
 
 import pickle
 
@@ -325,6 +326,7 @@ def loading_MTG_files(my_path='',
                       width=1200, height=1200,
                       x_center=0, y_center=0, z_center=0,
                       x_cam=0, y_cam=0, z_cam=0,
+                      plotting_with_pyvista = False,
                       step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
                       background_color=[0,0,0],
                       root_hairs_display=True,
@@ -452,7 +454,6 @@ def loading_MTG_files(my_path='',
     #                          background_color=background_color)
     # pgl.Viewer.display(MTG_scene)
 
-    # # TODO: WATCH OUT!
     # pgl.Viewer.redrawPolicy=False
 
     # We cover each of the MTG files in the list (or only the specified file when requested):
@@ -496,37 +497,60 @@ def loading_MTG_files(my_path='',
                           y_cam=y_cam,
                           z_cam=z_cam)
         else:
-            # We plot the current file:
-            MTG_scene = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
-                                 width=width,
-                                 height=height,
-                                 x_center=x_center,
-                                 y_center=y_center,
-                                 z_center=z_center,
-                                 x_cam=x_cam,
-                                 y_cam=y_cam,
-                                 z_cam=z_cam,
-                                 background_color=background_color,
-                                 root_hairs_display=root_hairs_display,
-                                 mycorrhizal_fungus_display=mycorrhizal_fungus_display)
-            # # We get a list of all shapes in the scene:
-            # shapes = dict((MTG_scene.id, sh) for sh in MTG_scene)
-            # # We add the shapes of the MTG in the initial general scene:
-            # for vid in shapes:
-            #     general_scene += shapes[vid]
+            if plotting_with_pyvista:
+                if recording_images:
+                    # We define the name of the image:
+                    image_name = os.path.join(video_dir, 'root%.5d.png' % ID)
+                else:
+                    image_name = "plot.png"
+                # We color the MTG according to the property:
+                my_colormap(g, property_name=property, cmap='jet', vmin=vmin, vmax=vmax, lognorm=log_scale)
+                # # We plot the current file:
+                # plotting_roots_with_pyvista(g, displaying_root_hairs=root_hairs_display,
+                #                             showing=False, recording_image=True, image_file=image_name,
+                #                             background_color=background_color,
+                #                             plot_width=width, plot_height=height,
+                #                             camera_x=x_cam, camera_y=y_cam, camera_z=z_cam,
+                #                             focal_x=x_center, focal_y=y_center, focal_z=z_center)
+                # We plot the current file:
+                fast_plotting_roots_with_pyvista(g, displaying_root_hairs=root_hairs_display,
+                                                 showing=False, recording_image=recording_images, image_file=image_name,
+                                                 background_color=background_color,
+                                                 plot_width=width, plot_height=height,
+                                                 camera_x=x_cam, camera_y=y_cam, camera_z=z_cam,
+                                                 focal_x=x_center, focal_y=y_center, focal_z=z_center)
+            else:
+                # We plot the current file:
+                MTG_scene = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
+                                     width=width,
+                                     height=height,
+                                     x_center=x_center,
+                                     y_center=y_center,
+                                     z_center=z_center,
+                                     x_cam=x_cam,
+                                     y_cam=y_cam,
+                                     z_cam=z_cam,
+                                     background_color=background_color,
+                                     root_hairs_display=root_hairs_display,
+                                     mycorrhizal_fungus_display=mycorrhizal_fungus_display)
+                # # We get a list of all shapes in the scene:
+                # shapes = dict((MTG_scene.id, sh) for sh in MTG_scene)
+                # # We add the shapes of the MTG in the initial general scene:
+                # for vid in shapes:
+                #     general_scene += shapes[vid]
 
-            # general_scene += MTG_scene
+                # general_scene += MTG_scene
 
-            # for shape in MTG_scene:
-            #     general_scene += shape
+                # for shape in MTG_scene:
+                #     general_scene += shape
 
-            # # And we move the camera further from the root system:
-            # x_camera = x_cam + x_cam * step_back_coefficient * MTG_position
-            # z_camera = z_cam + z_cam * step_back_coefficient * MTG_position
+                # # And we move the camera further from the root system:
+                # x_camera = x_cam + x_cam * step_back_coefficient * MTG_position
+                # z_camera = z_cam + z_cam * step_back_coefficient * MTG_position
 
-            # general_scene = prepareScene(MTG_scene, width=width, height=height,
-            #                              x_center=x_center, y_center=y_center, z_center=z_center,
-            #                              x_cam=x_cam, y_cam=y_cam, z_cam=z_cam, background_color=[0, 0, 0])
+                # general_scene = prepareScene(MTG_scene, width=width, height=height,
+                #                              x_center=x_center, y_center=y_center, z_center=z_center,
+                #                              x_cam=x_cam, y_cam=y_cam, z_cam=z_cam, background_color=[0, 0, 0])
 
         if adding_images_on_plot:
             text = "t = 100 days"
@@ -574,16 +598,17 @@ def loading_MTG_files(my_path='',
         #                           x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
         #                           background_color=background_color)
 
-        # We finally display the MTG on PlantGL:
-        pgl.Viewer.display(MTG_scene)
-        # pgl.Viewer.update()
+        if not plotting_with_pyvista:
+            # We finally display the MTG on PlantGL:
+            pgl.Viewer.display(MTG_scene)
+            # pgl.Viewer.update()
 
         # # We wait for 1 second, if needed:
         # time.sleep(1)
 
         # For recording the image of the graph for making a video later:
         # -------------------------------------------------------------
-        if recording_images:
+        if recording_images and not plotting_with_pyvista:
             image_name = os.path.join(video_dir, 'root%.5d.png')
             pgl.Viewer.saveSnapshot(image_name % ID)
 
@@ -609,6 +634,7 @@ def loading_MTG_files(my_path='',
         print("A new file 'z_classification.csv' has been saved.")
 
     return g
+
 
 ########################################################################################################################
 ########################################################################################################################
@@ -815,25 +841,26 @@ if __name__ == "__main__":
     # # im_new.save('colorbar_new.png', quality=95)
 
     # To open a list:
-    loading_MTG_files(my_path='C:/Users/frees/rhizodep/src/rhizodep/scenarios/outputs/Scenario_0142',
+    loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-01/Scenario_0142',
+                      plotting_with_pyvista=True,
                       opening_list=True,
                       MTG_directory='MTG_files',
-                      list_of_MTG_ID=range(0, 900),
+                      list_of_MTG_ID=range(2007, 2012),
                       # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
                       # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
                       # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
                       property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True,
                       # property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True,
                       cmap='jet',
-                      width=1200, height=1200,
-                      x_center=0.0, y_center=0.0, z_center=0.0,
-                      x_cam=0.2, y_cam=0.0, z_cam=-0.2,
+                      width=800, height=800,
+                      x_center=0.0, y_center=0.0, z_center=-0.07,
+                      x_cam=0.3, y_cam=0.0, z_cam=-0.07,
                       background_color=[94,76,64],
                       root_hairs_display=True,
                       mycorrhizal_fungus_display=False,
                       step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
                       adding_images_on_plot=False,
-                      recording_images=True,
+                      recording_images=False,
                       images_directory="new_root_image_test",
                       printing_sum=False,
                       recording_sum=False,

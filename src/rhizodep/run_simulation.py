@@ -35,6 +35,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     outputs_directory='outputs',
                     forcing_constant_inputs=False, constant_sucrose_input_rate=1.e-6,
                     homogenizing_root_sugar_concentrations=False, homogenizing_soil_concentrations=False,
+                    renewal_of_soil_solution=False, interval_between_renewal_events=1.*60.*60.*24.,
                     constant_soil_temperature_in_Celsius=20,
                     nodules=False,
                     mycorrhizal_fungus=True,
@@ -192,6 +193,9 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     # We create an empty list that will contain the results of z classification:
     z_dictionary_series = []
+
+    # In case of renewal of the soil solution, we initialize a counter for determining when the renewal will happen:
+    renewal_counter_in_seconds = 0
 
     if recording_images:
         # We define the directory of root images if it doesn't exist:
@@ -763,12 +767,24 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             # SUMMING AND PRINTING VARIABLES ON THE ROOT SYSTEM:
             # --------------------------------------------------
             if printing_sum or (not printing_sum and recording_sum):
+
+                # In case of renewal of the soil solution:
+                if renewal_of_soil_solution and renewal_counter_in_seconds >= interval_between_renewal_events:
+                    renewing_soil_solution = True
+                    # We reinitialize a counter for determining whether
+                    renewal_counter_in_seconds = 0
+                else:
+                    renewing_soil_solution = False
+                    # We reinitialize a counter for determining whether
+                    renewal_counter_in_seconds += time_step_in_seconds
+
                 dictionary = model.summing_and_possibly_homogenizing(g,
                                                                      printing_total_length=True,
                                                                      printing_total_struct_mass=True,
                                                                      printing_all=printing_sum,
                                                                      homogenizing_root_sugar_concentrations=homogenizing_root_sugar_concentrations,
                                                                      homogenizing_soil_concentrations=homogenizing_soil_concentrations,
+                                                                     renewal_of_soil_solution=renewal_of_soil_solution,
                                                                      time_step_in_seconds=time_step_in_seconds)
 
             if recording_sum:
