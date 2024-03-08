@@ -22,6 +22,7 @@ python -m pip install pyvista
 mamba install -c conda-forge imageio
 python -m pip install imageio[ffmpeg]
 python -m pip install statsmodels
+mamba install openpyxl
 
 
 :: Generic model dependancies
