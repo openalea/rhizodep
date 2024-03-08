@@ -52,19 +52,20 @@ class RootGrowthModel(Model):
                                                     variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
     radius: float = declare(default=3.5e-4, unit="m", unit_comment="", description="Example root segment radius", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
     length: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example root segment length", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
     struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Example root segment structural mass", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+    #TODO parameter!
     initial_struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
     living_root_hairs_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Example root segment living root hairs structural mass", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
     root_hair_length: float = declare(default=1.e-3, unit="m", unit_comment="", description="Example root hair length", 
                                                     min_value="", max_value="", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair maximal length for wheat and barley evolves between 0.5 and 1.3 mm.", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
@@ -158,10 +159,10 @@ class RootGrowthModel(Model):
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
     # potential development
-    emergence_delay: float = declare(default=3. * (60. * 60. * 24.), unit="s", unit_comment="time equivalent at temperature of T_ref", description="Delay of emergence of the primordium", 
+    emergence_delay: float = declare(default=3.27 * (60. * 60. * 24.), unit="s", unit_comment="time equivalent at temperature of T_ref", description="Delay of emergence of the primordium", 
                                                     min_value="", max_value="", value_comment="", references="emergence_delay = 3 days (??)", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
-    EL: float = declare(default=1.39 * 20 / (60. * 60. * 24.), unit="s-1", unit_comment="meters of root per meter of radius per second equivalent to T_ref_growth", description="Slope of the elongation rate = f(tip diameter) ", 
+    EL: float = declare(default=6.5e-4, unit="s-1", unit_comment="meters of root per meter of radius per second equivalent to T_ref_growth", description="Slope of the elongation rate = f(tip diameter) ", 
                                                     min_value="", max_value="", value_comment="", references="EL = 5 mm mm-1 day-1 (??)", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     Km_elongation: float = declare(default=1250 * 1e-6 / 6., unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for root elongation", 
@@ -201,13 +202,13 @@ class RootGrowthModel(Model):
     nodule_formation_probability: float = declare(default=0.5, unit="m", unit_comment="", description="Probability (between 0 and 1) of nodule formation for each apex that elongates", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
-    Dmin: float = declare(default=0.1 / 1000., unit="m", unit_comment="", description="Minimal threshold tip diameter (i.e. the diameter of the finest observable roots)", 
+    Dmin: float = declare(default=0.122 / 1000., unit="m", unit_comment="", description="Minimal threshold tip diameter (i.e. the diameter of the finest observable roots)", 
                                                     min_value="", max_value="", value_comment="", references="Dmin=0.05 mm (??)", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
-    RMD: float = declare(default=0.3, unit="adim", unit_comment="", description="Average ratio of the diameter of the daughter root to that of the mother root", 
+    RMD: float = declare(default=0.57, unit="adim", unit_comment="", description="Average ratio of the diameter of the daughter root to that of the mother root", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
-    IPD: float = declare(default=5. / 1000., unit="m", unit_comment="", description="Inter-primordia distance", 
+    IPD: float = declare(default=0.00474, unit="m", unit_comment="", description="Inter-primordia distance", 
                                                     min_value="", max_value="", value_comment="", references="IPD = 7.6 mm (??)", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     new_root_tissue_density: float = declare(default=0.10 * 1e6, unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", 
@@ -486,8 +487,7 @@ class RootGrowthModel(Model):
                     apex_seminal.life_duration = self.LDs * (2. * radius_seminal) * apex_seminal.root_tissue_density
 
                     # We defined the delay of emergence for the new primordium:
-                    apex_seminal.emergence_delay_in_thermal_time = seminal_inputs_file.emergence_delay_in_thermal_time[
-                        i]
+                    apex_seminal.emergence_delay_in_thermal_time = seminal_inputs_file.emergence_delay_in_thermal_time[i]
 
         # ADDING THE PRIMORDIA OF ALL POSSIBLE ADVENTIOUS ROOTS:
         # ------------------------------------------------------

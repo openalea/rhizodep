@@ -213,6 +213,8 @@ class SoilModel(Model):
                 for prop in self.state_variables:
                     # All concentrations, temperature and pressure are intensive, so we need structural mass wise partitioning to initialize
                     getattr(self, prop).update({vid: getattr(self, prop)[parent]})
+                
+
 
     def apply_to_voxel(self, element, root_flows: list = []):
         """
@@ -347,24 +349,27 @@ class SoilModel(Model):
     @state
     def _C_hexose_soil(self, C_hexose_soil, volume_soil, hexose_degradation, hexose_exudation,
                              phloem_hexose_exudation, hexose_uptake_from_soil, phloem_hexose_uptake_from_soil):
-        return C_hexose_soil + (self.time_steps_in_seconds / volume_soil) * (
+        balance = C_hexose_soil + (self.time_steps_in_seconds / volume_soil) * (
             hexose_exudation
             + phloem_hexose_exudation
             - hexose_uptake_from_soil
             - phloem_hexose_uptake_from_soil
             - hexose_degradation
         )
+        return max(balance, 1e-6)
 
     @state
     def _Cs_mucilage_soil(self, Cs_mucilage_soil, volume_soil, mucilage_secretion, mucilage_degradation):
-        return Cs_mucilage_soil + (self.time_steps_in_seconds / volume_soil) * (
+        balance = Cs_mucilage_soil + (self.time_steps_in_seconds / volume_soil) * (
             mucilage_secretion
             - mucilage_degradation
         )
+        return max(balance, 1e-6)
     
     @state
     def _Cs_cells_soil(self, Cs_cells_soil, volume_soil, cells_release, cells_degradation):
-        return Cs_cells_soil + (self.time_steps_in_seconds / volume_soil) * (
+        balance = Cs_cells_soil + (self.time_steps_in_seconds / volume_soil) * (
                 cells_release
                 - cells_degradation
         )
+        return max(balance, 1e-6)

@@ -118,7 +118,7 @@ class RootCarbonModel(Model):
                                        variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
 
     # FROM SHOOT MODEL
-    sucrose_input_rate: float = declare(default=1e-6, unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", 
+    sucrose_input_rate: float = declare(default=1e-9, unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", 
                                        min_value="", max_value="", value_comment="", references="", DOI="",
                                         variable_type="input", by="model_shoot", state_variable_type="", edit_by="user")
 
@@ -447,6 +447,8 @@ class RootCarbonModel(Model):
         self.apply_scenario(**scenario)
         self.link_self_to_mtg()
 
+        self.previous_C_amount_in_the_root_system = self.compute_root_system_C_content()
+
     def post_growth_updating(self):
         """
         Description :
@@ -733,7 +735,7 @@ class RootCarbonModel(Model):
             #     corrected_permeability_coeff = corrected_P_max_apex \
             #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
             corrected_permeability_coeff = corrected_P_max_apex
-
+            
             return max(corrected_permeability_coeff * (C_hexose_root - C_hexose_soil) * root_exchange_surface,
                        0)
 
@@ -880,6 +882,7 @@ class RootCarbonModel(Model):
     # a C balance.
     # TODO account for struct mass evolution in the update. When is it updated?
     # TODO FOR TRISTAN: Consider adding N balance here (to be possibly used in the solver).
+        
     @potential
     @state
     def _C_sucrose_root(self, C_sucrose_root, struct_mass, living_root_hairs_struct_mass, hexose_diffusion_from_phloem,
@@ -950,46 +953,64 @@ class RootCarbonModel(Model):
         else:
             return 0.
 
-    # TODO : check possibility of doubled names
+    # NOTE : double names in methods are forbiden!
     @actual
     @state
-    def _C_sucrose_root(self, C_sucrose_root):
-        return max(C_sucrose_root, 0.)
+    def _threshold_C_sucrose_root(self):
+        for vid in self.props["focus_elements"]:
+            if self.C_sucrose_root[vid] < 0.:
+                self.C_sucrose_root[vid] = 0.
     
     @actual
     @state
-    def _C_hexose_reserve(self, C_hexose_reserve):
-        return max(C_hexose_reserve, 0.)
+    def _threshold_C_hexose_reserve(self):
+        for vid in self.props["focus_elements"]:
+            if self.C_hexose_reserve[vid] < 0.:
+                self.C_hexose_reserve[vid] = 0.
 
     @actual
     @state
-    def _C_hexose_root(self, C_hexose_root):
-        return max(C_hexose_root, 0.)
+    def _threshold_C_hexose_root(self):
+        for vid in self.props["focus_elements"]:
+            if self.C_hexose_root[vid] < 0.:
+                self.C_hexose_root[vid] = 0.
     
 
-    def control_of_anomalies(self):
+    def check_balance(self):
         """
-        The function contol_of_anomalies checks for the presence of elements with negative measurable properties (e.g. length, concentrations).
-        (untouched)
+        This function computes carbon balance and it is aligned with fluxes integration.
         """
-        # CHECKING THAT UNEMERGED ROOT ELEMENTS DO NOT CONTAIN CARBON:
-        # We cover all the vertices in the MTG:
-        for vid in self.g.vertices_iter(scale=1):
-            # n represents the vertex:
-            n = self.g.node(vid)
-            if n.length <= 0.:
-                if n.C_sucrose_root != 0.:
-                    print("")
-                    print("??? ERROR: for element", n.index(), " of length", n.length,
-                          "m, the concentration of root sucrose is", n.C_sucrose_root)
-                if n.C_hexose_root != 0.:
-                    print("")
-                    print("??? ERROR: for element", n.index(), " of length", n.length,
-                          "m, the concentration of root hexose is", n.C_hexose_root)
-                if n.C_hexose_soil != 0.:
-                    print("")
-                    print("??? ERROR: for element", n.index(), " of length", n.length,
-                          "m, the concentration of soil hexose is", n.C_hexose_soil)
+
+        actual_C_amount_in_the_root_system = self.compute_root_system_C_content()
+
+        print(self.previous_C_amount_in_the_root_system)
+        
+        expected_C_amount_in_the_root_system = self.previous_C_amount_in_the_root_system + self.time_steps_in_seconds*(
+            12*self.sucrose_input_rate[1]
+            - 6*sum(self.hexose_exudation.values())
+            - sum(self.props["resp_growth"].values())
+            - 6*sum(self.hexose_consumption_by_growth.values())
+            - 6*sum(self.phloem_hexose_exudation.values())
+            + 6*sum(self.hexose_uptake_from_soil.values())
+            + 6*sum(self.phloem_hexose_uptake_from_soil.values())
+            - 6*sum(self.mucilage_secretion.values())
+            - 6*sum(self.cells_release.values())
+            )
+
+        self.previous_C_amount_in_the_root_system = actual_C_amount_in_the_root_system
+
+        print(f"Actual amount of carbon in the root system is {actual_C_amount_in_the_root_system} mol")
+        print(f"Expected amount of carbon in the root system is {expected_C_amount_in_the_root_system} mol")
+
+        #assert expected_C_amount_in_the_root_system == actual_C_amount_in_the_root_system
+
+
+    def compute_root_system_C_content(self):
+        return sum([(6*labile + 12*phloem + 6*reserve)*m for labile, phloem, reserve, m in zip(
+            self.C_hexose_root.values(), 
+            self.C_sucrose_root.values(),
+            self.C_hexose_reserve.values(),
+            self.struct_mass.values())])
 
     # TODO adapt to class structure
     class Differential_Equation_System(object):

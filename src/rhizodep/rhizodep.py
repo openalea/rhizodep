@@ -30,7 +30,7 @@ class Model(CompositeModel):
         :param g: the openalea.MTG() instance that will be worked on. It must be representative of a root architecture.
         :param time_step: the resolution time_step of the model in seconds.
         """
-
+        
         # INIT INDIVIDUAL MODULES
         self.root_growth = self.load(RootGrowthModel, time_step, **scenario)
         self.g = self.root_growth.g
@@ -56,3 +56,4 @@ class Model(CompositeModel):
 
         self.root_anatomy()
         self.root_carbon()
+        #self.root_carbon.check_balance()

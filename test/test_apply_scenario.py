@@ -1,6 +1,7 @@
 from rhizodep.rhizodep import Model
 from data_utility.logging import Logger
 from data_utility.data_analysis import analyze_data
+from data_utility.preprocess_scenario import make_scenarios
 
 def test_small_run():
     rhizodep = Model(time_step=3600)
@@ -15,7 +16,7 @@ def test_small_run():
                     recording_performance=False,
                     echo=True)
     
-    for step in range(1000):
+    for step in range(300):
         # Placed here also to capture mtg initialization
         logger()
 

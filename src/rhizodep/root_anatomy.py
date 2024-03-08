@@ -71,12 +71,12 @@ class RootAnatomy(Model):
                             variable_type="state_variable", by="model_anatomy", state_variable_type="intensive", edit_by="user")
     xylem_differentiation_factor: float = declare(default=1., unit="adim", unit_comment="", description="Xylem differentiation, i.e. apoplasmic opening, from 0 to 1", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
-                            variable_type="state_variable", by="model_anatomy", state_variable_type="instensive", edit_by="user")
+                            variable_type="state_variable", by="model_anatomy", state_variable_type="intensive", edit_by="user")
 
     # Tissue density
     root_tissue_density: float = declare(default=0.10 * 1e6, unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
-                            variable_type="state_variable", by="model_anatomy", state_variable_type="", edit_by="user")
+                            variable_type="state_variable", by="model_anatomy", state_variable_type="intensive", edit_by="user")
     
     # --- INITIALIZES MODEL PARAMETERS ---
 
@@ -165,10 +165,13 @@ class RootAnatomy(Model):
             if vid not in list(self.root_exchange_surface.keys()):
                 parent = self.g.parent(vid)
                 mass_fraction = self.struct_mass[vid] / (self.struct_mass[vid] + self.struct_mass[parent])
-                for prop in self.state_variables:
-                    # All surfaces are extensive, so we need structural mass wise partitioning to initialize
+                # All surfaces are extensive, so we need structural mass wise partitioning to initialize
+                for prop in self.extensive_variables:
                     getattr(self, prop).update({vid: getattr(self, prop)[parent] * mass_fraction,
                                                     parent: getattr(self, prop)[parent] * (1-mass_fraction)})
+                for prop in self.intensive_variables:
+                    getattr(self, prop).update({vid: getattr(self, prop)[parent]})
+                    
 
 
     # Computation of transport limitations by xylem, endodermis and epidermis differentiations, sequentially.
