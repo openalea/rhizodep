@@ -1,9 +1,10 @@
+import rhizodep
 from rhizodep.root_growth import RootGrowthModel
 from rhizodep.root_carbon import RootCarbonModel
 from rhizodep.root_anatomy import RootAnatomy
 from rhizodep.rhizo_soil import SoilModel
 
-from generic_fspm.composite_wrapper import CompositeModel
+from genericmodel.composite_wrapper import CompositeModel
 
 
 class Model(CompositeModel):
@@ -29,40 +30,30 @@ class Model(CompositeModel):
         :param g: the openalea.MTG() instance that will be worked on. It must be representative of a root architecture.
         :param time_step: the resolution time_step of the model in seconds.
         """
-
+        
         # INIT INDIVIDUAL MODULES
-        self.root_growth = RootGrowthModel(time_step, **scenario)
+        self.root_growth = self.load(RootGrowthModel, time_step, **scenario)
         self.g = self.root_growth.g
-        self.root_anatomy = RootAnatomy(self.g, time_step, **scenario)
-        self.root_carbon = RootCarbonModel(self.g, time_step, **scenario)
-        self.soil = SoilModel(self.g, time_step, **scenario)
+        self.root_anatomy = self.load(RootAnatomy, self.g, time_step, **scenario)
+        self.root_carbon = self.load(RootCarbonModel, self.g, time_step, **scenario)
+        self.soil = self.load(SoilModel, self.g, time_step, **scenario)
 
-        self.models = (self.root_growth, self.root_anatomy, self.root_carbon, self.soil)
+        self.models = (self.soil, self.root_growth, self.root_anatomy, self.root_carbon)
 
         # LINKING MODULES
-        # Get or build translator matrix
-        try:
-            from rhizodep.coupling_translator import translator
-        except ImportError:
-            print("NOTE : You will now have to provide information about shared variables between the modules composing this model :\n")
-            translator = self.translator_matrix_builder()
-            print(translator)
-
-
-        # Actually link modules together
-        self.link_around_mtg(translator)
+        self.link_around_mtg(translator_path=rhizodep.__path__[0])
 
         # Some initialization must be performed AFTER linking modules
-        (m.post_coupling_init() for m in self.models)
+        [m.post_coupling_init() for m in self.models]
 
     def run(self):
-        # Update environment boundary conditions
-        self.soil.run_exchanges_and_balance()
+        self.soil()
+        self.root_growth()
 
-        # Compute root growth from resulting states
-        self.root_growth.run_time_step_growth()
-        # Update topological surfaces and volumes based on other evolved structural properties
-        self.root_anatomy.run_actualize_anatomy()
+        self.root_anatomy.post_growth_updating()
+        self.root_carbon.post_growth_updating()
+        self.soil.post_growth_updating()
 
-        # OR : 
-        (m() for m in self.models)
+        self.root_anatomy()
+        self.root_carbon()
+        #self.root_carbon.check_balance()
