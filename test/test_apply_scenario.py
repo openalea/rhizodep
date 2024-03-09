@@ -10,11 +10,11 @@ def single_run(scenario, outputs_dirpath="test/outputs"):
     logger = Logger(model_instance=rhizodep, outputs_dirpath=outputs_dirpath, 
                     time_step_in_hours=1,
                     logging_period_in_hours=1,
-                    recording_images=True, 
+                    recording_images=False, 
                     recording_mtg=False,
                     recording_raw=False,
                     recording_sums=True,
-                    recording_performance=False,
+                    recording_performance=True,
                     echo=True)
     
     for step in range(300):
@@ -26,7 +26,7 @@ def single_run(scenario, outputs_dirpath="test/outputs"):
     logger.stop()
     analyze_data(outputs_dirpath=outputs_dirpath, 
                  on_sums=True,
-                 on_performance=False,
+                 on_performance=True,
                  target_properties=[]
                  )
     
