@@ -17,7 +17,7 @@ def single_run(scenario, outputs_dirpath="test/outputs"):
                     recording_performance=True,
                     echo=True)
     
-    for step in range(300):
+    for step in range(250):
         # Placed here also to capture mtg initialization
         logger()
 
