@@ -1,3 +1,9 @@
+# Output files
+*outputs*
+*output*
+outputs
+/outputs
+
 # Python files
 *.py[cod]
 
