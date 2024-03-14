@@ -42,7 +42,7 @@ class RootGrowthModel(Model):
                                                     variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
 
     # FROM ANATOMY MODEL
-    root_tissue_density: float = declare(default=0.10 * 1e6, unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", 
+    root_tissue_density: float = declare(default=0.10 * 1e6, unit="g.m-3", unit_comment="of structural mass", description="root_tissue_density", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="input", by="model_anatomy", state_variable_type="", edit_by="user")
 

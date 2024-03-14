@@ -46,19 +46,19 @@ class SoilModel(Model):
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
 
     # Carbon and nitrogen concentrations
-    C_hexose_soil: float = declare(default=1e-5, unit="mol.g-1", unit_comment="of hexose", description="Hexose concentration in soil", 
+    C_hexose_soil: float = declare(default=30, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-    Cs_mucilage_soil: float = declare(default=1e-5, unit="mol.g-1", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
+    Cs_mucilage_soil: float = declare(default=15, unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-    Cs_cells_soil: float = declare(default=1e-5, unit="mol.g-1", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
+    Cs_cells_soil: float = declare(default=15, unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-    C_mineralN_soil: float = declare(default=1e-3, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", 
+    C_mineralN_soil: float = declare(default=0.5, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-    C_AA_soil: float = declare(default=1e-4, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", 
+    C_AA_soil: float = declare(default=0.5, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
 
@@ -66,7 +66,7 @@ class SoilModel(Model):
     water_potential_soil: float = declare(default=-0.1e6, unit="Pa", unit_comment="", description="Mean soil water potential", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-    volume_soil: float = declare(default=1e-7, unit="m3", unit_comment="", description="Volume of the soil element in contact with a the root segment", 
+    volume_soil: float = declare(default=1e-6, unit="m3", unit_comment="", description="Volume of the soil element in contact with a the root segment", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user")
 
@@ -356,7 +356,7 @@ class SoilModel(Model):
             - phloem_hexose_uptake_from_soil
             - hexose_degradation
         )
-        return max(balance, 1e-6)
+        return max(balance, 0)
 
     @state
     def _Cs_mucilage_soil(self, Cs_mucilage_soil, volume_soil, mucilage_secretion, mucilage_degradation):
@@ -364,7 +364,7 @@ class SoilModel(Model):
             mucilage_secretion
             - mucilage_degradation
         )
-        return max(balance, 1e-6)
+        return max(balance, 0)
     
     @state
     def _Cs_cells_soil(self, Cs_cells_soil, volume_soil, cells_release, cells_degradation):
@@ -372,4 +372,4 @@ class SoilModel(Model):
                 cells_release
                 - cells_degradation
         )
-        return max(balance, 1e-6)
+        return max(balance, 0)
