@@ -46,7 +46,7 @@ class SoilModel(Model):
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
 
     # Carbon and nitrogen concentrations
-    C_hexose_soil: float = declare(default=30, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil", 
+    C_hexose_soil: float = declare(default=50, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
     Cs_mucilage_soil: float = declare(default=15, unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
@@ -346,7 +346,7 @@ class SoilModel(Model):
 
     # TODO FOR TRISTAN: Consider adding similar functions for describing N mineralization/organization in the soil?
 
-    @state
+    #@state
     def _C_hexose_soil(self, C_hexose_soil, volume_soil, hexose_degradation, hexose_exudation,
                              phloem_hexose_exudation, hexose_uptake_from_soil, phloem_hexose_uptake_from_soil):
         balance = C_hexose_soil + (self.time_steps_in_seconds / volume_soil) * (
@@ -358,7 +358,7 @@ class SoilModel(Model):
         )
         return max(balance, 0)
 
-    @state
+    #@state
     def _Cs_mucilage_soil(self, Cs_mucilage_soil, volume_soil, mucilage_secretion, mucilage_degradation):
         balance = Cs_mucilage_soil + (self.time_steps_in_seconds / volume_soil) * (
             mucilage_secretion
@@ -366,7 +366,7 @@ class SoilModel(Model):
         )
         return max(balance, 0)
     
-    @state
+    #@state
     def _Cs_cells_soil(self, Cs_cells_soil, volume_soil, cells_release, cells_degradation):
         balance = Cs_cells_soil + (self.time_steps_in_seconds / volume_soil) * (
                 cells_release
