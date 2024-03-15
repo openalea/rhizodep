@@ -21,6 +21,10 @@ RootCarbonModel:
       apoplasmic_exchange_surface: 1.0
     root_exchange_surface:
       root_exchange_surface: 1.0
+    phloem_exchange_surface:
+      phloem_exchange_surface: 1.0
+    symplasmic_volume:
+      symplasmic_volume: 1.0
   RootCarbonModel: {}
   RootGrowthModel:
     distance_from_tip:

@@ -81,13 +81,13 @@ class RootCarbonModel(Model):
     soil_temperature_in_Celsius: float = declare(default=15, unit="°C", unit_comment="", description="soil temperature in contact with roots", 
                                                 min_value="", max_value="", value_comment="", references="", DOI="",
                                                  variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
-    C_hexose_soil: float = declare(default=1e-5, unit="mol.g-1", unit_comment="of hexose", description="Hexose concentration in soil", 
+    C_hexose_soil: float = declare(default=50, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil", 
                                   min_value="", max_value="", value_comment="", references="", DOI="",
                                    variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
-    Cs_mucilage_soil: float = declare(default=1e-5, unit="mol.g-1", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
+    Cs_mucilage_soil: float = declare(default=15, unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
                                      min_value="", max_value="", value_comment="", references="", DOI="",
                                       variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
-    Cs_cells_soil: float = declare(default=1e-5, unit="mol.g-1", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
+    Cs_cells_soil: float = declare(default=15, unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
                                   min_value="", max_value="", value_comment="", references="", DOI="",
                                    variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
 
@@ -118,7 +118,7 @@ class RootCarbonModel(Model):
                                        variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
 
     # FROM SHOOT MODEL
-    sucrose_input_rate: float = declare(default=1e-9, unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", 
+    sucrose_input_rate: float = declare(default=1e-10, unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", 
                                        min_value="", max_value="", value_comment="", references="", DOI="",
                                         variable_type="input", by="model_shoot", state_variable_type="", edit_by="user")
 
@@ -132,6 +132,9 @@ class RootCarbonModel(Model):
     apoplasmic_exchange_surface: float = declare(default=0., unit="m2", unit_comment="", description="Exchange surface to account for exchanges between xylem + stele apoplasm and soil. We account for it through cylindrical surface, a pathway closing as soon as endodermis differentiates", 
                                                 min_value="", max_value="", value_comment="", references="", DOI="",
                                                  variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user")
+    symplasmic_volume: float = declare(default=1e-9, unit="m3", unit_comment="", description="symplasmic volume for water content of root elements", 
+                            min_value="", max_value="", value_comment="", references="", DOI="",
+                            variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user")
 
     # --- INITIALIZE MODEL STATE VARIABLES ---
 
@@ -140,10 +143,10 @@ class RootCarbonModel(Model):
     C_sucrose_root: float = declare(default=0.0100 / 12.01 / 12, unit="mol.g-1", unit_comment="of sucrose", description="Sucrose concentration in root", 
                                     min_value="", max_value="", value_comment="", references="0.0025 is a plausible value according to the results of Gauthier (2019, pers. communication), but here, we use a plausible sucrose concentration (10 mgC g-1) in roots according to various experimental results.", DOI="",
                                     variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
-    C_hexose_root: float = declare(default=1e-3, unit="mol.g-1", unit_comment="of sucrose", description="Hexose concentration in root", 
+    C_hexose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="of labile hexose", description="Hexose concentration in root", 
                                   min_value="", max_value="", value_comment="", references="", DOI="",
                                    variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
-    C_hexose_reserve: float = declare(default=1e-3 * 2., unit="mol.g-1", unit_comment="of sucrose", description="Hexose reserve concentration in root", 
+    C_hexose_reserve: float = declare(default=1e-3 * 2., unit="mol.g-1", unit_comment="of reserve hexose", description="Hexose reserve concentration in root", 
                                      min_value="", max_value="", value_comment="C_hexose_root * 2",  references="We expect the reserve pool to be two times higher than the mobile one.", DOI="",
                                       variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
 
@@ -395,8 +398,8 @@ class RootCarbonModel(Model):
     expected_exudation_efflux: float = declare(default=608 * 0.000001 / 12.01 / 6 / 3600 * 1 / (0.5 * 10), unit="mol.m-2.s-1", unit_comment="of hexose", description="Expected exudation rate", 
                                                 min_value="", max_value="", value_comment="", references="According to Jones and Darrah (1992): the net efflux of C for a root of maize is 608 ug C g-1 root DW h-1, and we assume that 1 gram of dry root mass is equivalent to 0.5 m2 of external surface. OR: expected_exudation_efflux = 5.2 / 12.01 / 6. * 1e-6 * 100. ** 2. / 3600. Explanation: According to Personeni et al. (2007), we expect a flux of 5.2 ugC per cm2 per hour", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
-    Pmax_apex: float = declare(default=608 * 0.000001 / 12.01 / 6 / 3600 * 1 / (0.5 * 10) / (1.3 + 1.3 / 100), unit="g.m-2.s-1", unit_comment="", description="Permeability coefficient", 
-                                                min_value="", max_value="", value_comment="expected_exudation_efflux / (expected_C_hexose_root - expected_C_hexose_soil)", references="We calculate the permeability according to the expected exudation flux and expected concentration gradient between cytosol and soil.", DOI="",
+    Pmax_apex: float = declare(default=1e-7 / 2000, unit="mol.m-2.s-1.mol-1.m3", unit_comment="", description="Permeability coefficient", 
+                                                min_value="", max_value="", value_comment="expected_exudation_efflux / (expected_C_hexose_root - expected_C_hexose_soil). Recalculated expected surfacic flow and max concentration difference were reestimated", references="We calculate the permeability according to the expected exudation flux and expected concentration gradient between cytosol and soil.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     uptake_rate_max: float = declare(default=277 * 0.000000001 / (60 * 60 * 24) * 1000 * 1 / (0.5 * 1), unit="mol.m-2.s-1", unit_comment="of hexose", description="Maximum rate of influx of hexose from soil to roots", 
                                                 min_value="", max_value="", value_comment="", references="According to Jones and Darrah (1996), the uptake rate measured for all sugars tested with an individual external concentration of 100 uM is equivalent to 277 nmol hexose mg-1 day-1, and we assume that 1 gram of dry root mass is equivalent to 0.5 m2 of external surface.", DOI="",
@@ -719,7 +722,7 @@ class RootCarbonModel(Model):
     # vascular_exchange_surface = cond_walls * cond_exo * cond_endo * S_vessels
 
     @rate
-    def _hexose_exudation(self, length, root_exchange_surface, C_hexose_root, C_hexose_soil, soil_temperature_in_Celsius):
+    def _hexose_exudation(self, struct_mass, length, root_exchange_surface, symplasmic_volume, C_hexose_root, C_hexose_soil, soil_temperature_in_Celsius):
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
             return 0.
         else:
@@ -734,13 +737,14 @@ class RootCarbonModel(Model):
             # else:
             #     corrected_permeability_coeff = corrected_P_max_apex \
             #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
-            corrected_permeability_coeff = corrected_P_max_apex
             
-            return max(corrected_permeability_coeff * (C_hexose_root - C_hexose_soil) * root_exchange_surface,
+            corrected_permeability_coeff = corrected_P_max_apex
+            #print("gradient :",  (C_hexose_root * struct_mass / symplasmic_volume) - C_hexose_soil)
+            return max(corrected_permeability_coeff * ((C_hexose_root * struct_mass / symplasmic_volume) - C_hexose_soil) * root_exchange_surface,
                        0)
-
+        
     @rate
-    def _phloem_hexose_exudation(self, length, root_exchange_surface, C_hexose_root, C_sucrose_root,
+    def _phloem_hexose_exudation(self, struct_mass, length, symplasmic_volume, root_exchange_surface, C_hexose_root, C_sucrose_root,
                                         C_hexose_soil, apoplasmic_exchange_surface, soil_temperature_in_Celsius):
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
             return 0.
@@ -757,8 +761,8 @@ class RootCarbonModel(Model):
             #     corrected_permeability_coeff = corrected_P_max_apex \
             #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
             corrected_permeability_coeff = corrected_P_max_apex
-            return corrected_permeability_coeff * (2 * C_sucrose_root - C_hexose_soil) * apoplasmic_exchange_surface
-
+            return corrected_permeability_coeff * ((2 * C_sucrose_root * struct_mass / symplasmic_volume) - C_hexose_soil) * apoplasmic_exchange_surface
+    
     # Uptake of hexose from the soil by the root:
     # -------------------------------------------
     # This function computes the rate of hexose uptake by roots from the soil. This influx of hexose is represented
@@ -776,7 +780,6 @@ class RootCarbonModel(Model):
                                                                                 A=self.uptake_rate_max_A,
                                                                                 B=self.uptake_rate_max_B,
                                                                                 C=self.uptake_rate_max_C)
-
             return corrected_uptake_rate_max * root_exchange_surface \
                 * C_hexose_soil / (self.Km_uptake + C_hexose_soil)
 

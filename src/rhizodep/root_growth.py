@@ -42,7 +42,7 @@ class RootGrowthModel(Model):
                                                     variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
 
     # FROM ANATOMY MODEL
-    root_tissue_density: float = declare(default=0.10 * 1e6, unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", 
+    root_tissue_density: float = declare(default=0.10 * 1e6, unit="g.m-3", unit_comment="of structural mass", description="root_tissue_density", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="input", by="model_anatomy", state_variable_type="", edit_by="user")
 
@@ -78,7 +78,7 @@ class RootGrowthModel(Model):
     distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
-    volume: float = declare(default=1e-7, unit="m3", unit_comment="", description="Initial volume of the collar element", 
+    volume: float = declare(default=1e-9, unit="m3", unit_comment="", description="Initial volume of the collar element", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
     struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
@@ -255,7 +255,7 @@ class RootGrowthModel(Model):
     initial_apex_length: float = declare(default=1e-4, unit="m", unit_comment="", description="Initial apex length", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
-    initial_C_hexose_root: float = declare(default=1e-3, unit="m", unit_comment="", description="Initial hexose concentration of root segments", 
+    initial_C_hexose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="", description="Initial hexose concentration of root segments", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
     input_file_path: str = declare(default="C:/Users/frees/rhizodep/src/rhizodep/", unit="m", unit_comment="", description="Filepath for input files", 

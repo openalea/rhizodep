@@ -58,6 +58,9 @@ class RootAnatomy(Model):
                             variable_type="state_variable", by="model_anatomy", state_variable_type="extensive", edit_by="user")
 
     # Volumes
+    symplasmic_volume: float = declare(default=1e-9, unit="m3", unit_comment="", description="symplasmic volume for water content of root elements", 
+                            min_value="", max_value="", value_comment="", references="", DOI="",
+                            variable_type="state_variable", by="model_anatomy", state_variable_type="extensive", edit_by="user")
     xylem_volume: float = declare(default=1e-10, unit="m3", unit_comment="", description="xylem volume for water transport between elements", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="state_variable", by="model_anatomy", state_variable_type="extensive", edit_by="user")
@@ -126,7 +129,10 @@ class RootAnatomy(Model):
     phloem_surfacic_fraction: float = declare(default=2.5, unit="adim", unit_comment="", description="phloem surface ratio over root's cylinder surface", 
                             min_value="", max_value="", value_comment="", references="report", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
-    xylem_cross_area_surfacic_fraction: float = declare(default=0.84 * (0.36 ** 2), unit="adim", unit_comment="apoplasmic cross-section area ratio * stele radius ratio^2", description="apoplasmic cross-section ratio over root segment's sectional surface", 
+    apoplasm_cross_area_surfacic_fraction: float = declare(default=0.5, unit="adim", unit_comment="", description="symplasmic cross-section ratio over root segment's sectional surface", 
+                            min_value="", max_value="", value_comment="", references="report", DOI="",
+                            variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
+    xylem_cross_area_surfacic_fraction: float = declare(default=0.84 * (0.36 ** 2), unit="adim", unit_comment="apoplasmic cross-section area ratio * stele radius ratio^2", description="apoplasmic cross-section ratio of xylem over root segment's sectional surface", 
                             min_value="", max_value="", value_comment="", references="report", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
     root_hair_radius: float = declare(default=12 * 1e-6 / 2., unit="m", unit_comment="", description="Average radius of root hair", 
@@ -369,6 +375,19 @@ class RootAnatomy(Model):
         :return: the surface (m2)
         """
         return 2 * pi * radius * length * self.phloem_surfacic_fraction
+
+
+    @actual
+    @state
+    def _symplasmic_volume(self, radius, length):
+        """
+        Computes symplasmic volume for water content of elements
+
+        :param radius: the root segment radius (m)
+        :param length: the root segment length (m)
+        :return: the volume (m3)
+        """
+        return pi * (radius ** 2) * self.apoplasm_cross_area_surfacic_fraction * length
 
     @actual
     @state
