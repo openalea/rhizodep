@@ -19,7 +19,7 @@ import time
 import openalea.plantgl.all as pgl
 import rhizodep.model as model
 import rhizodep.tools as tools
-import rhizodep.parameters as param
+import rhizodep.unused_but_ressource.parameters as param
 
 import pickle
 
