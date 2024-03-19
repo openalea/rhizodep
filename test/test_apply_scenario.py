@@ -17,7 +17,7 @@ def single_run(scenario, outputs_dirpath="test/outputs"):
                     recording_performance=True,
                     echo=True)
     
-    for step in range(400):
+    for step in range(1500):
         # Placed here also to capture mtg initialization
         logger()
 
@@ -31,7 +31,7 @@ def single_run(scenario, outputs_dirpath="test/outputs"):
                  )
     
 def test_apply_scenarios():
-    scenarios = ms.from_excel(file_path="test/inputs/scenario_test.xlsx", which=["Reference"])
+    scenarios = ms.from_excel(file_path="test/inputs/Scenario_142.xlsx", which=["T1"])
     for scenario_name, scenario in scenarios.items():
         single_run(scenario=scenario, outputs_dirpath=os.path.join("test/outputs", str(scenario_name)))
 
