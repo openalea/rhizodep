@@ -2,8 +2,8 @@ import numpy as np
 from math import pi
 from dataclasses import dataclass
 
-from genericmodel.component import Model, declare
-from genericmodel.component_factory import *
+from metafspm.component import Model, declare
+from metafspm.component_factory import *
 
 
 @dataclass

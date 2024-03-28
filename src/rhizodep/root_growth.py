@@ -19,8 +19,8 @@ from dataclasses import dataclass
 from openalea.mtg import *
 from openalea.mtg.traversal import post_order
 
-from genericmodel.component import Model, declare
-from genericmodel.component_factory import *
+from metafspm.component import Model, declare
+from metafspm.component_factory import *
 
 
 @dataclass
@@ -304,6 +304,9 @@ class RootGrowthModel(Model):
         self.choregrapher.add_data(instance=self, data_name="props", filter={"label": ["Segment", "Apex"], "type":["Base_of_the_root_system", "Normal_root_after_emergence", "Stopped", "Just_Stopped", "Root_nodule"]})
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_step_in_seconds = time_step_in_seconds
+
+        for name in self.state_variables:
+            setattr(self, name, self.props[name])
         
 
     # Initialization of the root system:

@@ -9,15 +9,15 @@ def single_run(scenario, outputs_dirpath="test/outputs"):
 
     logger = Logger(model_instance=rhizodep, outputs_dirpath=outputs_dirpath, 
                     time_step_in_hours=1,
-                    logging_period_in_hours=12,
-                    recording_images=False, plotted_property="C_hexose_root",
+                    logging_period_in_hours=6,
+                    recording_images=True, plotted_property="C_hexose_root",
                     recording_mtg=False,
                     recording_raw=False,
                     recording_sums=True,
                     recording_performance=True,
                     echo=True)
     
-    for step in range(1500):
+    for step in range(2000):
         # Placed here also to capture mtg initialization
         logger()
 

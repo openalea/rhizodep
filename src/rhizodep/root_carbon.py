@@ -62,8 +62,8 @@ import inspect as ins
 from functools import partial
 from math import pi
 
-from genericmodel.component import Model, declare
-from genericmodel.component_factory import *
+from metafspm.component import Model, declare
+from metafspm.component_factory import *
 
 
 @dataclass
@@ -205,7 +205,7 @@ class RootCarbonModel(Model):
     total_sucrose_root: float = declare(default=0., unit="mol", unit_comment="of sucrose", description="Summed sucrose root at root system level", 
                                        min_value="", max_value="", value_comment="", references="", DOI="",
                                         variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user")
-    total_living_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Summed structural mass at root system level", 
+    total_living_struct_mass: float = declare(default=0.001, unit="g", unit_comment="", description="Summed structural mass at root system level", 
                                              min_value="", max_value="", value_comment="", references="", DOI="",
                                               variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user")
     global_sucrose_deficit: float = declare(default=0., unit="mol.s-1", unit_comment="of sucrose", description="Summed sucrose deficit at root system level", 

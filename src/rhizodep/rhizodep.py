@@ -4,7 +4,7 @@ from rhizodep.root_carbon import RootCarbonModel
 from rhizodep.root_anatomy import RootAnatomy
 from rhizodep.rhizo_soil import SoilModel
 
-from genericmodel.composite_wrapper import CompositeModel
+from metafspm.composite_wrapper import CompositeModel
 
 
 class Model(CompositeModel):
