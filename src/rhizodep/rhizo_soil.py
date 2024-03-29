@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from metafspm.component import Model, declare
 from metafspm.component_factory import *
+from log.visualize import plot_mtg
 
 
 @dataclass
@@ -44,6 +45,7 @@ class SoilModel(Model):
     soil_temperature_in_Celsius: float = declare(default=15., unit="°C", unit_comment="", description="soil temperature in contact with roots", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
+
 
     # Carbon and nitrogen concentrations
     C_hexose_soil: float = declare(default=50, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil", 
@@ -163,42 +165,68 @@ class SoilModel(Model):
         self.choregrapher.add_data(instance=self, data_name="props", filter={"label": ["Segment", "Apex"], "type":["Base_of_the_root_system", "Normal_root_after_emergence", "Stopped", "Just_Stopped", "Root_nodule"]})
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_steps_in_seconds = time_step_in_seconds
-        #self.voxels = self.initiate_voxel_soil() # TODO Not tested for now
 
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
         self.apply_scenario(**scenario)
+        self.initiate_voxel_soil()
         self.link_self_to_mtg()
+        
 
     # Just ressource for now
     def initiate_voxel_soil(self):
         """
         Note : not tested for now, just computed to support discussions.
         """
-        voxels = {}
+        self.voxels = {}
+        self.props.setdefault("voxel_neighbor", {})
+        self.props["voxel_neighbor"].update({key: None for key in self.vertices})
+        setattr(self, "voxel_neighbor", self.props["voxel_neighbor"])
 
         voxel_width = 1e-2
-        voxel_height = 1e-3
-        voxel_xy_range = 2e-1
-        voxel_number_xy = int(voxel_xy_range / voxel_width)
-        voxel_z_range = 1
-        voxel_number_z = int(voxel_z_range / voxel_height)
+        voxel_height = 1e-2
+        voxel_volume = voxel_height * voxel_width * voxel_width
+        scene_xy_range = 4e-1
+        self.voxel_number_xy = int(scene_xy_range / voxel_width)
+        # We want the plant to be centered
+        if self.voxel_number_xy%2 == 0:
+            self.voxel_number_xy += 1
+        scene_z_range = 1
+        self.voxel_number_z = int(scene_z_range / voxel_height)
 
-        vid = 0
-        for x in range(-voxel_number_xy, voxel_number_xy + 1):
-            for y in range(-voxel_number_xy, voxel_number_xy + 1):
-                for z in range(voxel_number_z):
-                    vid += 1
-                    voxels[vid] = {}
-                    v = voxels[vid]
-                    v["x1"] = (x - 0.5) * voxel_width
-                    v["x2"] = (x + 0.5) * voxel_width
-                    v["y1"] = (y - 0.5) * voxel_width
-                    v["y2"] = (y + 0.5) * voxel_width
-                    v["z1"] = z * voxel_height
-                    v["z2"] = (z + 1) * voxel_height
-                    v["volume_soil_solution"] = 2 * voxel_width * voxel_height * 0.1  # TODO quick estimation necessary
+        y, z, x = np.indices((self.voxel_number_xy, self.voxel_number_z, self.voxel_number_xy))
+        self.voxels["x1"] = x * voxel_width - ((self.voxel_number_xy*voxel_width)/2)
+        self.voxels["x2"] = self.voxels["x1"] + voxel_width
+        self.voxels["y1"] = y * voxel_width - ((self.voxel_number_xy*voxel_width)/2)
+        self.voxels["y2"] = self.voxels["y1"] + voxel_width
+        self.voxels["z1"] = z * voxel_height
+        self.voxels["z2"] = self.voxels["z1"] + voxel_height
 
-        return voxels
+        for name in self.state_variables + self.inputs:
+            self.voxel_grid_to_self(name, init_value=getattr(self, name))
+
+        self.voxel_grid_to_self("volume", voxel_volume)
+
+    def voxel_grid_to_self(self, name, init_value):
+        self.voxels[name] = np.zeros((self.voxel_number_xy, self.voxel_number_z, self.voxel_number_xy))
+        self.voxels[name].fill(init_value)
+        #setattr(self, name, self.voxels[name])
+
+    def compute_mtg_voxel_neighbors(self):
+        # necessary to get updated coordinates.
+        plot_mtg(self.g)
+        for vid in self.vertices:
+            if self.struct_mass[vid] > 0. and self.props["hexose_consumption_by_growth"][vid] > 0.:
+                baricenter = (np.mean((self.props["x1"][vid], self.props["x2"][vid])), 
+                            np.mean((self.props["y1"][vid], self.props["y2"][vid])),
+                            -np.mean((self.props["z1"][vid], self.props["z2"][vid])))
+                testx1 = self.voxels["x1"] <= baricenter[0]
+                testx2 = baricenter[0] <= self.voxels["x2"]
+                testy1 = self.voxels["y1"] <= baricenter[1]
+                testy2 = baricenter[1] <= self.voxels["y2"]
+                testz1 = self.voxels["z1"] <= baricenter[2]
+                testz2 = baricenter[2] <= self.voxels["z2"]
+                test = testx1 * testx2 * testy1 * testy2 * testz1 * testz2
+                self.voxel_neighbor[vid] = [int(v) for v in np.where(test)]
 
     def post_growth_updating(self):
         """
@@ -213,10 +241,11 @@ class SoilModel(Model):
                 for prop in self.state_variables:
                     # All concentrations, temperature and pressure are intensive, so we need structural mass wise partitioning to initialize
                     getattr(self, prop).update({vid: getattr(self, prop)[parent]})
+                # Specific as it can be a mix of None and lists
+                getattr(self, "voxel_neighbor").update({vid: None})
                 
 
-
-    def apply_to_voxel(self, element, root_flows: list = []):
+    def apply_to_voxel(self):
         """
         This function computes the flow perceived by voxels surrounding the considered root segment.
         Note : not tested for now, just computed to support discussions.
@@ -225,27 +254,17 @@ class SoilModel(Model):
         :param root_flows: The root flows to be perceived by soil voxels. The underlying assumptions are that only flows, i.e. extensive variables are passed as arguments.
         :return:
         """
-        neighbor_voxels = []
-        v = self.voxels
-        for vid in v.keys():
-            if v[vid]["x1"] <= element.x1 <= v[vid]["x2"] and v[vid]["y1"] <= element.y1 <= v[vid]["y2"] and v[vid][
-                "z1"] >= element.z1 >= v[vid]["z2"]:
-                neighbor_voxels += [vid]
-            if v[vid]["x1"] <= element.x2 <= v[vid]["x2"] and v[vid]["y1"] <= element.y2 <= v[vid]["y2"] and v[vid][
-                "z1"] >= element.z2 >= v[vid]["z2"]:
-                neighbor_voxels += [vid]
+        for name in self.inputs:
+            self.voxels[name].fill(0)
+        
+        for vid in self.vertices:
+            if self.voxel_neighbor[vid] != None:
+                vy, vz, vx = self.voxel_neighbor[vid]
+                for name in self.inputs:
+                    self.voxels[name][vy][vz][vx] += getattr(self, name)[vid]
 
-        neighbor_voxels = list(set(neighbor_voxels))
 
-        if len(neighbor_voxels) == 1:
-            for name in root_flows:
-                setattr(v[neighbor_voxels[0]], name, getattr(element, name))
-        elif len(neighbor_voxels) > 1:
-            for vid in neighbor_voxels:
-                for name in root_flows:
-                    setattr(v[vid], name, getattr(element, name) / len(neighbor_voxels))
-
-    def get_from_voxel(self, element, soil_states: list):
+    def get_from_voxel(self):
         """
         This function computes the soil states from voxels perceived by the considered root segment.
         Note : not tested for now, just computed to support discussions.
@@ -254,24 +273,19 @@ class SoilModel(Model):
         :param soil_states: The soil states to be perceived by soil voxels. The underlying assumptions are that only intensive extensive variables are passed as arguments.
         :return:
         """
-        neighbor_voxels = []
-        v = self.voxels
-        for vid in v.keys():
-            if v[vid]["x1"] <= element.x1 <= v[vid]["x2"] and v[vid]["y1"] <= element.y1 <= v[vid]["y2"] and v[vid][
-                "z1"] >= element.z1 >= v[vid]["z2"]:
-                neighbor_voxels += [vid]
-            if v[vid]["x1"] <= element.x2 <= v[vid]["x2"] and v[vid]["y1"] <= element.y2 <= v[vid]["y2"] and v[vid][
-                "z1"] >= element.z2 >= v[vid]["z2"]:
-                neighbor_voxels += [vid]
+        for vid in self.vertices:
+            for name in self.state_variables:
+                if self.voxel_neighbor[vid] != None:
+                    vy, vz, vx = self.voxel_neighbor[vid]
+                    getattr(self, name)[vid] = self.voxels[name][vy][vz][vx]
 
-        neighbor_voxels = list(set(neighbor_voxels))
 
-        if len(neighbor_voxels) == 1:
-            for name in soil_states:
-                setattr(element, name, getattr(v[neighbor_voxels[0]], name))
-        elif len(neighbor_voxels) > 1:
-            for name in soil_states:
-                setattr(element, name, np.mean([getattr(v[vid], name) for vid in neighbor_voxels]))
+    def __call__(self):
+        self.compute_mtg_voxel_neighbors()
+        self.apply_to_voxel()
+        # TODO resolve soil model on voxels
+        self.get_from_voxel()
+
 
     @rate
     def _hexose_degradation(self, C_hexose_soil, root_exchange_surface, soil_temperature_in_Celsius):
