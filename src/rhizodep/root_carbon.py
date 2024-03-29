@@ -442,7 +442,7 @@ class RootCarbonModel(Model):
         """
         self.g = g
         self.props = self.g.properties()
-        self.choregrapher.add_data(instance=self, data_name="props", filter={"label": ["Segment", "Apex"], "type":["Base_of_the_root_system", "Normal_root_after_emergence", "Stopped", "Just_Stopped", "Root_nodule"]})
+        self.choregrapher.add_data(instance=self, data_name="props")
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_steps_in_seconds = time_step_in_seconds
 

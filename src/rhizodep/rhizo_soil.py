@@ -162,13 +162,14 @@ class SoilModel(Model):
         """
         self.g = g
         self.props = self.g.properties()
-        self.choregrapher.add_data(instance=self, data_name="props", filter={"label": ["Segment", "Apex"], "type":["Base_of_the_root_system", "Normal_root_after_emergence", "Stopped", "Just_Stopped", "Root_nodule"]})
+        self.vertices = self.g.vertices(scale=self.g.max_scale())
+        self.initiate_voxel_soil()
+        self.choregrapher.add_data(instance=self, data_name="voxels", compartment="soil")
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_steps_in_seconds = time_step_in_seconds
 
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
         self.apply_scenario(**scenario)
-        self.initiate_voxel_soil()
         self.link_self_to_mtg()
         
 
@@ -280,10 +281,10 @@ class SoilModel(Model):
                     getattr(self, name)[vid] = self.voxels[name][vy][vz][vx]
 
 
-    def __call__(self):
+    def __call__(self, *args):
         self.compute_mtg_voxel_neighbors()
         self.apply_to_voxel()
-        # TODO resolve soil model on voxels
+        self.choregrapher(module_name=self.__module__.split(".")[-1], *args)
         self.get_from_voxel()
 
 
@@ -307,8 +308,10 @@ class SoilModel(Model):
                                                                         C=self.hexose_degradation_rate_max_C)
 
         # The degradation rate is defined according to a Michaelis-Menten function of the concentration of hexose in the soil:
-        return max(corrected_hexose_degradation_rate_max * root_exchange_surface * C_hexose_soil / (
-                                                                            self.Km_hexose_degradation + C_hexose_soil), 0.)
+        result = corrected_hexose_degradation_rate_max * root_exchange_surface * C_hexose_soil / (
+                                                                            self.Km_hexose_degradation + C_hexose_soil)
+        result[result < 0.] = 0.
+        return result
 
     @rate
     def _mucilage_degradation(self, Cs_mucilage_soil, root_exchange_surface, soil_temperature_in_Celsius):
@@ -331,8 +334,11 @@ class SoilModel(Model):
 
         # The degradation rate is defined according to a Michaelis-Menten function of the concentration of mucilage
         # in the soil:
-        return max(corrected_mucilage_degradation_rate_max * root_exchange_surface * Cs_mucilage_soil / (
-                self.Km_mucilage_degradation + Cs_mucilage_soil), 0.)
+        result = corrected_mucilage_degradation_rate_max * root_exchange_surface * Cs_mucilage_soil / (
+                self.Km_mucilage_degradation + Cs_mucilage_soil)
+        result[result < 0.] = 0.
+
+        return result
 
     @rate
     def _cells_degradation(self, Cs_cells_soil, root_exchange_surface, soil_temperature_in_Celsius):
@@ -355,12 +361,14 @@ class SoilModel(Model):
 
         # The degradation rate is defined according to a Michaelis-Menten function of the concentration of root cells
         # in the soil:
-        return max(corrected_cells_degradation_rate_max * root_exchange_surface * Cs_cells_soil / (
-                self.Km_cells_degradation + Cs_cells_soil), 0.)
+        result = corrected_cells_degradation_rate_max * root_exchange_surface * Cs_cells_soil / (
+                self.Km_cells_degradation + Cs_cells_soil)
+        result[result < 0] = 0.
+        return result
 
     # TODO FOR TRISTAN: Consider adding similar functions for describing N mineralization/organization in the soil?
 
-    #@state
+    @state
     def _C_hexose_soil(self, C_hexose_soil, volume_soil, hexose_degradation, hexose_exudation,
                              phloem_hexose_exudation, hexose_uptake_from_soil, phloem_hexose_uptake_from_soil):
         balance = C_hexose_soil + (self.time_steps_in_seconds / volume_soil) * (
@@ -370,20 +378,57 @@ class SoilModel(Model):
             - phloem_hexose_uptake_from_soil
             - hexose_degradation
         )
-        return max(balance, 0)
+        balance[balance < 0.] = 0.
+        return balance
 
-    #@state
+    @state
     def _Cs_mucilage_soil(self, Cs_mucilage_soil, volume_soil, mucilage_secretion, mucilage_degradation):
         balance = Cs_mucilage_soil + (self.time_steps_in_seconds / volume_soil) * (
             mucilage_secretion
             - mucilage_degradation
         )
-        return max(balance, 0)
+        balance[balance < 0.] = 0.
+        return balance
     
-    #@state
+    @state
     def _Cs_cells_soil(self, Cs_cells_soil, volume_soil, cells_release, cells_degradation):
         balance = Cs_cells_soil + (self.time_steps_in_seconds / volume_soil) * (
                 cells_release
                 - cells_degradation
         )
-        return max(balance, 0)
+        balance[balance < 0.] = 0.
+        return balance
+
+
+    def temperature_modification(self, soil_temperature=15, process_at_T_ref=1., T_ref=0., A=-0.05, B=3., C=1.):
+        """
+        This function calculates how the value of a process should be modified according to soil temperature (in degrees Celsius).
+        Parameters correspond to the value of the process at reference temperature T_ref (process_at_T_ref),
+        to two empirical coefficients A and B, and to a coefficient C used to switch between different formalisms.
+        If C=0 and B=1, then the relationship corresponds to a classical linear increase with temperature (thermal time).
+        If C=1, A=0 and B>1, then the relationship corresponds to a classical exponential increase with temperature (Q10).
+        If C=1, A<0 and B>0, then the relationship corresponds to bell-shaped curve, close to the one from Parent et al. (2010).
+        :param T_ref: the reference temperature
+        :param A: parameter A (may be equivalent to the coefficient of linear increase)
+        :param B: parameter B (may be equivalent to the Q10 value)
+        :param C: parameter C (either 0 or 1)
+        :return: the new value of the process
+        """
+        # We compute a temperature-modified process, correspond to a Q10-modified relationship,
+        # based on the work of Tjoelker et al. (2001):
+        if C != 0 and C != 1:
+            print("The modification of the process at T =", soil_temperature,
+                  "only works for C=0 or C=1!")
+            print("The modified process has been set to 0.")
+            return np.zeros_like(soil_temperature)
+
+        modified_process = process_at_T_ref * (A * (soil_temperature - T_ref) + B) ** (1 - C) \
+                           * (A * (soil_temperature - T_ref) + B) ** (
+                                   C * (soil_temperature - T_ref) / 10.)
+        
+        if C == 1:
+            modified_process[(A * (soil_temperature - T_ref) + B) < 0.] = 0.
+
+        modified_process[modified_process < 0.] = 0.
+
+        return modified_process
