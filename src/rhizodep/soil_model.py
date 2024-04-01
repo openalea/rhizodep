@@ -7,7 +7,7 @@ from log.visualize import plot_mtg
 
 
 @dataclass
-class SoilModel(Model):
+class RhizoInputsSoilModel(Model):
     # --- INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
 
     # FROM CARBON MODEL

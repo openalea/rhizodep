@@ -2,7 +2,7 @@ import rhizodep
 from rhizodep.root_growth import RootGrowthModel
 from rhizodep.root_carbon import RootCarbonModel
 from rhizodep.root_anatomy import RootAnatomy
-from rhizodep.rhizo_soil import SoilModel
+from rhizodep.soil_model import SoilModel
 
 from metafspm.composite_wrapper import CompositeModel
 
