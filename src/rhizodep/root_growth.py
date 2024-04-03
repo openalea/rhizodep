@@ -317,7 +317,7 @@ class RootGrowthModel(Model):
         :return: g: an initiated root MTG
         """
 
-        # TODO FOR TRISTAN: Add all initial N-related variables that need to be explicited before N fluxes computation.
+        # TODO# FOR TRISTAN: Add all initial N-related variables that need to be explicited before N fluxes computation.
 
         # We create a new MTG called g:
         g = MTG()
@@ -613,9 +613,6 @@ class RootGrowthModel(Model):
 
         :return:
         """
-
-        # TODO FOR TRISTAN: Consider reinitializing the demand/cost for N in each element here, at the begining of a new time step
-
         # We cover all the vertices in the MTG:
         for vid in self.g.vertices_iter(scale=1):
             # n represents the vertex:
@@ -702,9 +699,9 @@ class RootGrowthModel(Model):
 
                 # We record the different elements that can contribute to the C supply necessary for growth,
                 # and we calculate a mean concentration of hexose in this supplying zone:
-                self.calculating_C_supply_for_elongation(element=apex)
+                self.calculating_supply_for_elongation(element=apex)
                 # The corresponding potential elongation of the apex is calculated:
-                apex.potential_length = self.elongated_length(initial_length=apex.initial_length,
+                apex.potential_length = self.elongated_length(element=apex, initial_length=apex.initial_length,
                                                               radius=apex.initial_radius,
                                                               C_hexose_root=apex.growing_zone_C_hexose_root,
                                                               elongation_time_in_seconds=apex.thermal_potential_time_since_emergence)
@@ -736,9 +733,9 @@ class RootGrowthModel(Model):
                     apex.thermal_potential_time_since_emergence = self.time_step_in_seconds * temperature_time_adjustment
                 # We record the different element that can contribute to the C supply necessary for growth,
                 # and we calculate a mean concentration of hexose in this supplying zone:
-                self.calculating_C_supply_for_elongation(element=apex)
+                self.calculating_supply_for_elongation(element=apex)
                 # The corresponding elongation of the apex is calculated:
-                apex.potential_length = self.elongated_length(initial_length=apex.initial_length,
+                apex.potential_length = self.elongated_length(element=apex, initial_length=apex.initial_length,
                                                               radius=apex.initial_radius,
                                                               C_hexose_root=apex.growing_zone_C_hexose_root,
                                                               elongation_time_in_seconds=apex.thermal_potential_time_since_emergence)
@@ -782,9 +779,9 @@ class RootGrowthModel(Model):
             apex.thermal_time_since_emergence += self.time_step_in_seconds * temperature_time_adjustment
             # We record the different element that can contribute to the C supply necessary for growth,
             # and we calculate a mean concentration of hexose in this supplying zone:
-            self.calculating_C_supply_for_elongation(element=apex)
+            self.calculating_supply_for_elongation(element=apex)
             # The corresponding potential elongation of the apex is calculated:
-            apex.potential_length = self.elongated_length(initial_length=apex.length, radius=apex.radius,
+            apex.potential_length = self.elongated_length(element=apex, initial_length=apex.length, radius=apex.radius,
                                                           C_hexose_root=apex.growing_zone_C_hexose_root,
                                                           elongation_time_in_seconds=self.time_step_in_seconds * temperature_time_adjustment)
             # And the new element returned by the function corresponds to the modified apex:
@@ -827,9 +824,9 @@ class RootGrowthModel(Model):
 
                     # We record the different element that can contribute to the C supply necessary for growth,
                     # and we calculate a mean concentration of hexose in this supplying zone:
-                    self.calculating_C_supply_for_elongation(element=apex)
+                    self.calculating_supply_for_elongation(element=apex)
                     # And the potential elongation of the apex before growth stopped is calculated:
-                    apex.potential_length = self.elongated_length(initial_length=apex.length, radius=apex.radius,
+                    apex.potential_length = self.elongated_length(element=apex, initial_length=apex.length, radius=apex.radius,
                                                                   C_hexose_root=apex.growing_zone_C_hexose_root,
                                                                   elongation_time_in_seconds=self.time_step_in_seconds * temperature_time_adjustment - apex.thermal_time_since_growth_stopped)
                     # VERIFICATION:
@@ -895,7 +892,7 @@ class RootGrowthModel(Model):
                     return new_apex
 
     # Function for calculating root elongation:
-    def elongated_length(self, initial_length: float, radius: float, C_hexose_root: float, elongation_time_in_seconds: float):
+    def elongated_length(self, element, initial_length: float, radius: float, C_hexose_root: float, elongation_time_in_seconds: float):
         """
         This function computes a new length (m) based on the elongation process described by ArchiSimple and regulated by
         the available concentration of hexose.
@@ -905,9 +902,7 @@ class RootGrowthModel(Model):
         :param elongation_time_in_seconds: the period of elongation (s)
         :return: the new elongated length
         """
-
-        # TODO FOR TRISTAN: Consider including a control of potential elongation by N availability (only the regulation by hexose concentration has been considered so far).
-
+        
         # If we keep the classical ArchiSimple rule:
         if self.ArchiSimple:
             # Then the elongation is calculated following the rules of Pages et al. (2014):
@@ -929,14 +924,13 @@ class RootGrowthModel(Model):
         return new_length
 
     # Function for calculating the amount of C to be used in neighbouring elements for sustaining root elongation:
-    def calculating_C_supply_for_elongation(self, element):
+    def calculating_supply_for_elongation(self, element):
         """
         This function computes the list of root elements that can supply C as hexose for sustaining the elongation
         of a given element, as well as their structural mass and their amount of available hexose.
         :param element: the element for which we calculate the possible supply of C for its elongation
         :return: three lists containing the indices of elements, their hexose amount (mol of hexose) and their structural mass (g).
         """
-        # TODO FOR TRISTAN: Consider using a similar approach for sustaining the need for N when a root apex should elongate.
         n = element
 
         # We initialize each amount of hexose available for growth:
@@ -1043,8 +1037,7 @@ class RootGrowthModel(Model):
         :return: the updated segment
         """
 
-        # TODO FOR TRISTAN: Consider adding a regulation of root thickening with the availability of N in the root segment (only the limitation by hexose has been considered so far).
-
+        
         # We initialize an empty list that will contain the new segment to be returned:
         new_segment = []
         # We record the current radius and length prior to growth as the initial radius and length:
@@ -1262,9 +1255,7 @@ class RootGrowthModel(Model):
         :return:
         """
 
-        # TODO FOR TRISTAN: Here you would need to explicit at least a cost of N associated to the actual growth,
-        #  and consider how to limit the actual growth when not enough N is available.
-        #  In a second step, you may consider how the emergence of primordia may depend on N availability in the root or in the soil.
+        # TODO FOR TRISTAN: In a second step, you may consider how the emergence of primordia may depend on N availability in the root or in the soil.
 
         # PROCEEDING TO ACTUAL GROWTH:
         # -----------------------------
@@ -1560,7 +1551,7 @@ class RootGrowthModel(Model):
         # TODO: Simplify the readability of this function by looping on two sets of variables, the ones that remain identical
         #  within the segments, and those that are divided.
 
-        # TODO FOR TRISTAN: When working with a dynamic root structure, you will need to specify in this function "segmentation"
+        # TODO# FOR TRISTAN: When working with a dynamic root structure, you will need to specify in this function "segmentation"
         #  the new quantitative variables that would need to be recalculated when segmenting a long root apex
         #  (ex: N amount will need to be divided, while N concentration will remain identical among the segments)
 
@@ -1970,9 +1961,7 @@ class RootGrowthModel(Model):
         and specifies which hairs are alive or dead.
         :return:
         """
-
-        # TODO FOR TRISTAN: Consider adding a limitation of growth for root hairs associated to the availability of N in the root.
-        #  In a second step, consider playing on the density / max. length of root hairs depending on the availability of N in the soil (if relevant)?
+        # TODO FOR TRISTAN In a second step, consider playing on the density / max. length of root hairs depending on the availability of N in the soil (if relevant)?
 
         # We cover all the vertices in the MTG:
         for vid in self.g.vertices_iter(scale=1):
@@ -2353,7 +2342,7 @@ class RootGrowthModel(Model):
         :return: the new child element
         """
 
-        # TODO FOR TRISTAN: When working with a dynamic root structure, you will need to specify in this function
+        # TODO# FOR TRISTAN: When working with a dynamic root structure, you will need to specify in this function
         #  "ADDING_A_CHILD" your new variables that will either be set to 0 (nil properties) or be equal to that of the mother
         #  element.
 

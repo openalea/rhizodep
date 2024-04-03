@@ -110,7 +110,7 @@ class RootCarbonModel(Model):
     living_root_hairs_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Example root segment living root hairs structural mass", 
                                                   min_value="", max_value="", value_comment="", references="", DOI="",
                                                    variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
-    hexose_consumption_by_growth: float = declare(default=0., unit="g", unit_comment="", description="Hexose consumption by growth is coupled to a root growth model", 
+    hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth", 
                                                  min_value="", max_value="", value_comment="", references="", DOI="",
                                                   variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
@@ -186,7 +186,7 @@ class RootCarbonModel(Model):
     hexose_immobilization_as_reserve: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                                      min_value="", max_value="", value_comment="", references="", DOI="",
                                                       variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
-    maintenance_respiration: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
+    maintenance_respiration: float = declare(default=0., unit="mol.s-1", unit_comment="of carbon", description="", 
                                             min_value="", max_value="", value_comment="", references="", DOI="",
                                              variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
 
@@ -687,8 +687,6 @@ class RootCarbonModel(Model):
     @rate
     def _maintenance_respiration(self, type, C_hexose_root, struct_mass, living_root_hairs_struct_mass, soil_temperature_in_Celsius):
 
-        # TODO FOR TRISTAN: Consider expliciting a respiration cost associated to the exchange of N in the root (e.g. cost for uptake, xylem loading)?
-
         # CONSIDERING CASES THAT SHOULD BE AVOIDED:
         # We consider that dead elements cannot respire (unless over the first time step following death,
         # i.e. when the type is "Just_dead"):
@@ -883,8 +881,6 @@ class RootCarbonModel(Model):
 
     # These methods calculate the time derivative (dQ/dt) of the amount in each pool, for a given root element, based on
     # a C balance.
-    # TODO account for struct mass evolution in the update. When is it updated?
-    # TODO FOR TRISTAN: Consider adding N balance here (to be possibly used in the solver).
         
     @potential
     @state
@@ -956,7 +952,8 @@ class RootCarbonModel(Model):
         else:
             return 0.
 
-    # NOTE : double names in methods are forbiden!
+    # NOTE : double names in methods are forbiden as they will be overwritten in Choregrapher's resolution
+    # However, it is a behavios of interest when inheriting the class to edit it.
     @actual
     @state
     def _threshold_C_sucrose_root(self):
@@ -1017,8 +1014,6 @@ class RootCarbonModel(Model):
 
     # TODO adapt to class structure
     class Differential_Equation_System(object):
-
-        # TODO FOR TRISTAN: Consider adding N-related variables here to be computed together with C fluxes...
 
         def __init__(self, g, n, time_step_in_seconds=1. * (60. * 60. * 24.), soil_temperature_in_Celsius=20,
                      printing_warnings=False, printing_solver_outputs=False):
@@ -1351,7 +1346,6 @@ class RootCarbonModel(Model):
     #     :return:
     #     """
     #
-    #     # TODO FOR TRISTAN: Consider updating this function with N fluxes, or doing a similar function separated from here.
     #     # TODO : map with conditions on length or struct mass?
     #     # We initialize a tip concentration:
     #     tip_C_hexose_root = -1
