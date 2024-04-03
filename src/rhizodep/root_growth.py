@@ -72,7 +72,7 @@ class RootGrowthModel(Model):
     total_root_hairs_number: float = declare(default=30 * (1.6e-4 / 3.5e-4) * 3.e-3 * 1e3, unit="adim", unit_comment="", description="Example root hairs number on segment external surface", 
                                                     min_value="", max_value="", value_comment="30 * (1.6e-4 / radius) * length * 1e3", references=" According to the work of Gahoonia et al. (1997), the root hair density is about 30 hairs per mm for winter wheat, for a root radius of about 0.16 mm.", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
-    hexose_consumption_by_growth: float = declare(default=0., unit="g", unit_comment="", description="Hexose consumption by growth is coupled to a root growth model", 
+    hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth is coupled to a root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
     distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
@@ -306,6 +306,10 @@ class RootGrowthModel(Model):
         self.time_step_in_seconds = time_step_in_seconds
 
         for name in self.state_variables:
+            # We do this to avoid having the initiate_mtg rewritten each time a new state variable is defined.
+            if name not in self.props.keys():
+                self.props.setdefault(name, {})
+                self.props[name].update({key: getattr(self, name) for key in self.vertices})
             setattr(self, name, self.props[name])
         
 
