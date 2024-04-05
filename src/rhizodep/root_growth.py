@@ -1959,6 +1959,7 @@ class RootGrowthModel(Model):
         return new_apex
 
     @postsegmentation
+    @state
     def root_hairs_dynamics(self):
         """
         This function computes the evolution of the density and average length of root hairs along each root,
@@ -2288,6 +2289,7 @@ class RootGrowthModel(Model):
         return nodule
 
     @postsegmentation
+    @state
     def update_distance_from_tip(self):
         """
         The function "distance_from_tip" computes the distance (in meter) of a given vertex from the apex
