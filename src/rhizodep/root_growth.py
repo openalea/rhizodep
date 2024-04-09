@@ -87,6 +87,7 @@ class RootGrowthModel(Model):
     thermal_time_since_emergence: float = declare(default=0, unit="°C", unit_comment="", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    
 
     # --- INITIALIZES MODEL PARAMETERS ---
     # Segment initialization
@@ -311,6 +312,7 @@ class RootGrowthModel(Model):
                 self.props.setdefault(name, {})
                 self.props[name].update({key: getattr(self, name) for key in self.vertices})
             setattr(self, name, self.props[name])
+
         
 
     # Initialization of the root system:
@@ -1474,6 +1476,10 @@ class RootGrowthModel(Model):
             # The new dry structural struct_mass of the element is calculated from its new volume:
             n.struct_mass = n.volume * n.root_tissue_density
             n.struct_mass_produced = (n.volume - initial_volume) * n.root_tissue_density
+
+            if n.struct_mass < n.initial_struct_mass and n.struct_mass_produced > 0.:
+                print(f"!!! ERROR during initialisation for initial struct mass, no concentrations will be updated on {n.index()}")
+                n.initial_struct_mass = n.struct_mass
 
             # Verification: we check that no negative length or struct_mass have been generated!
             if n.volume < 0:

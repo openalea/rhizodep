@@ -455,31 +455,47 @@ class RootCarbonModel(Model):
     def post_growth_updating(self):
         """
         Description :
-            Extend property dictionnary uppon new element partionning and updates concentrations uppon structural_mass change
+            Extend property dictionary upon new element partitioning and updates concentrations upon structural_mass change
         """
         self.vertices = self.g.vertices(scale=self.g.max_scale())
+        already_updated = []
         for vid in self.vertices:
+            # We ignore already updated elements, e.g. parents of apices
+            if vid in already_updated:
+                continue
+
+            # If we focus on a new element
             if vid not in list(self.C_sucrose_root.keys()):
+                print(True)
                 parent = self.g.parent(vid)
-                mass_fraction = self.struct_mass[vid] / (self.struct_mass[vid] + self.struct_mass[parent])
                 for prop in self.state_variables:
-                    # if intensive, equals to parent
+                    # if intensive, equals to parent AFTER it has been updated
                     if self.__dataclass_fields__[prop].metadata["state_variable_type"] == "intensive":
+                        getattr(self, prop).update({parent: getattr(self, prop)[parent] * (
+                                self.initial_struct_mass[parent] / self.struct_mass[parent])})
                         getattr(self, prop).update({vid: getattr(self, prop)[parent]})
                     # if extensive, we need structural mass wise partitioning
                     else:
+                        # we partition the initial flow in the parent accounting for mass fraction
+                        # We use struct_mass, the resulting structural mass after growth
+                        mass_fraction = self.struct_mass[vid] / (self.struct_mass[vid] + self.struct_mass[parent])
                         getattr(self, prop).update({vid: getattr(self, prop)[parent] * mass_fraction,
                                                     parent: getattr(self, prop)[parent] * (1-mass_fraction)})
+                already_updated += [vid, parent]
+
+            # If the element already exists and isn't immediate neighbor of an apex
             else:
+                # If after growth the element actually grown
                 if self.struct_mass[vid] > 0:
                     for prop in self.state_variables:
                         # if intensive, concentrations have to be updated based on new structural mass
                         if self.__dataclass_fields__[prop].metadata["state_variable_type"] == "intensive":
                             getattr(self, prop).update({vid: getattr(self, prop)[vid] * (
                                 self.initial_struct_mass[vid] / self.struct_mass[vid])})
+                        # if extensive, it doesn't need to be updated and if parent is segmented,
 
-    # Calculation of the total amount of sucrose and structural struct_mass in the root system:
-    # -----------------------------------------------------------------------------------------
+                already_updated += [vid]
+
     def total_root_sucrose_and_living_struct_mass(self):
         """
         This function computes the total amount of sucrose of the root system (in mol of sucrose),
