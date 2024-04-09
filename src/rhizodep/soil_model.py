@@ -164,9 +164,9 @@ class RhizoInputsSoilModel(Model):
         self.props = self.g.properties()
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.initiate_voxel_soil()
-        self.choregrapher.add_data(instance=self, data_name="voxels", compartment="soil")
+        self.time_step_in_seconds = time_step_in_seconds
+        self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.voxels, compartment="soil")
         self.vertices = self.g.vertices(scale=self.g.max_scale())
-        self.time_steps_in_seconds = time_step_in_seconds
 
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
         self.apply_scenario(**scenario)
@@ -371,7 +371,7 @@ class RhizoInputsSoilModel(Model):
     @state
     def _C_hexose_soil(self, C_hexose_soil, volume_soil, hexose_degradation, hexose_exudation,
                              phloem_hexose_exudation, hexose_uptake_from_soil, phloem_hexose_uptake_from_soil):
-        balance = C_hexose_soil + (self.time_steps_in_seconds / volume_soil) * (
+        balance = C_hexose_soil + (self.time_step_in_seconds / volume_soil) * (
             hexose_exudation
             + phloem_hexose_exudation
             - hexose_uptake_from_soil
@@ -383,7 +383,7 @@ class RhizoInputsSoilModel(Model):
 
     @state
     def _Cs_mucilage_soil(self, Cs_mucilage_soil, volume_soil, mucilage_secretion, mucilage_degradation):
-        balance = Cs_mucilage_soil + (self.time_steps_in_seconds / volume_soil) * (
+        balance = Cs_mucilage_soil + (self.time_step_in_seconds / volume_soil) * (
             mucilage_secretion
             - mucilage_degradation
         )
@@ -392,13 +392,12 @@ class RhizoInputsSoilModel(Model):
     
     @state
     def _Cs_cells_soil(self, Cs_cells_soil, volume_soil, cells_release, cells_degradation):
-        balance = Cs_cells_soil + (self.time_steps_in_seconds / volume_soil) * (
+        balance = Cs_cells_soil + (self.time_step_in_seconds / volume_soil) * (
                 cells_release
                 - cells_degradation
         )
         balance[balance < 0.] = 0.
         return balance
-
 
     def temperature_modification(self, soil_temperature=15, process_at_T_ref=1., T_ref=0., A=-0.05, B=3., C=1.):
         """

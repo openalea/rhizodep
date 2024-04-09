@@ -429,7 +429,7 @@ class RootCarbonModel(Model):
                                                 min_value="", max_value="", value_comment="DO A REAL ESTIMATION!", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
-    def __init__(self, g, time_step_in_seconds: int, **scenario: dict):
+    def __init__(self, g, time_step_in_seconds: int,  **scenario: dict):
         """
         DESCRIPTION
         -----------
@@ -442,9 +442,9 @@ class RootCarbonModel(Model):
         """
         self.g = g
         self.props = self.g.properties()
-        self.choregrapher.add_data(instance=self, data_name="props")
+        self.time_step_in_seconds = time_step_in_seconds
+        self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.props)
         self.vertices = self.g.vertices(scale=self.g.max_scale())
-        self.time_steps_in_seconds = time_step_in_seconds
 
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
         self.apply_scenario(**scenario)
@@ -549,7 +549,7 @@ class RootCarbonModel(Model):
                   self.global_sucrose_deficit[1])
         # The new average sucrose concentration in the root system is calculated as:
         C_sucrose_root_after_supply = (self.total_sucrose_root[1] + (
-                    self.sucrose_input_rate[1] * self.time_steps_in_seconds) - self.global_sucrose_deficit[1]) \
+                    self.sucrose_input_rate[1] * self.time_step_in_seconds) - self.global_sucrose_deficit[1]) \
                                       / self.total_living_struct_mass[1]
         # This new concentration includes the amount of sucrose from element that have just died,
         # but excludes the mass of these dead elements!
@@ -903,7 +903,7 @@ class RootCarbonModel(Model):
     def _C_sucrose_root(self, C_sucrose_root, struct_mass, living_root_hairs_struct_mass, hexose_diffusion_from_phloem,
                             hexose_active_production_from_phloem, phloem_hexose_exudation, sucrose_loading_in_phloem,
                             phloem_hexose_uptake_from_soil, deficit_sucrose_root):
-        return C_sucrose_root + (self.time_steps_in_seconds / (struct_mass + living_root_hairs_struct_mass)) * (
+        return C_sucrose_root + (self.time_step_in_seconds / (struct_mass + living_root_hairs_struct_mass)) * (
                 - hexose_diffusion_from_phloem / 2.
                 - hexose_active_production_from_phloem / 2.
                 - phloem_hexose_exudation / 2.
@@ -915,7 +915,7 @@ class RootCarbonModel(Model):
     @state
     def _C_hexose_reserve(self, C_hexose_reserve, struct_mass, living_root_hairs_struct_mass, hexose_immobilization_as_reserve,
                               hexose_mobilization_from_reserve, deficit_hexose_reserve):
-        return C_hexose_reserve + (self.time_steps_in_seconds / (struct_mass + living_root_hairs_struct_mass)) * (
+        return C_hexose_reserve + (self.time_step_in_seconds / (struct_mass + living_root_hairs_struct_mass)) * (
                 hexose_immobilization_as_reserve
                 - hexose_mobilization_from_reserve
                 - deficit_hexose_reserve)
@@ -927,7 +927,7 @@ class RootCarbonModel(Model):
                            hexose_consumption_by_growth, hexose_diffusion_from_phloem,
                            hexose_active_production_from_phloem, sucrose_loading_in_phloem,
                            hexose_mobilization_from_reserve, hexose_immobilization_as_reserve, deficit_hexose_root):
-        return C_hexose_root + (self.time_steps_in_seconds / (struct_mass + living_root_hairs_struct_mass)) * (
+        return C_hexose_root + (self.time_step_in_seconds / (struct_mass + living_root_hairs_struct_mass)) * (
                 - hexose_exudation
                 + hexose_uptake_from_soil
                 - mucilage_secretion
@@ -947,7 +947,7 @@ class RootCarbonModel(Model):
     @state
     def _deficit_sucrose_root(self, C_sucrose_root, struct_mass, living_root_hairs_struct_mass):
         if C_sucrose_root < 0:
-            return - C_sucrose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_steps_in_seconds
+            return - C_sucrose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_step_in_seconds
         else:
             # TODO : or None could be more efficient?
             return 0.
@@ -956,7 +956,7 @@ class RootCarbonModel(Model):
     @state
     def _deficit_hexose_reserve(self, C_hexose_reserve, struct_mass, living_root_hairs_struct_mass):
         if C_hexose_reserve < 0:
-            return - C_hexose_reserve * (struct_mass + living_root_hairs_struct_mass) / self.time_steps_in_seconds
+            return - C_hexose_reserve * (struct_mass + living_root_hairs_struct_mass) / self.time_step_in_seconds
         else:
             return 0.
 
@@ -964,7 +964,7 @@ class RootCarbonModel(Model):
     @state
     def _deficit_hexose_root(self, C_hexose_root, struct_mass, living_root_hairs_struct_mass):
         if C_hexose_root < 0:
-            return - C_hexose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_steps_in_seconds
+            return - C_hexose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_step_in_seconds
         else:
             return 0.
 
@@ -1001,7 +1001,7 @@ class RootCarbonModel(Model):
 
         print(self.previous_C_amount_in_the_root_system)
         
-        expected_C_amount_in_the_root_system = self.previous_C_amount_in_the_root_system + self.time_steps_in_seconds*(
+        expected_C_amount_in_the_root_system = self.previous_C_amount_in_the_root_system + self.time_step_in_seconds*(
             12*self.sucrose_input_rate[1]
             - 6*sum(self.hexose_exudation.values())
             - sum(self.props["resp_growth"].values())

@@ -302,9 +302,9 @@ class RootGrowthModel(Model):
 
         self.g = self.initiate_mtg()
         self.props = self.g.properties()
-        self.choregrapher.add_data(instance=self, data_name="props")
-        self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.time_step_in_seconds = time_step_in_seconds
+        self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.props)
+        self.vertices = self.g.vertices(scale=self.g.max_scale())
 
         for name in self.state_variables:
             # We do this to avoid having the initiate_mtg rewritten each time a new state variable is defined.
@@ -313,9 +313,6 @@ class RootGrowthModel(Model):
                 self.props[name].update({key: getattr(self, name) for key in self.vertices})
             setattr(self, name, self.props[name])
 
-        
-
-    # Initialization of the root system:
     def initiate_mtg(self):
         """
         This functions generates a root MTG from nothing, containing only one segment of a specific length,
