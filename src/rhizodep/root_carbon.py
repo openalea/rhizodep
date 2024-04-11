@@ -81,7 +81,7 @@ class RootCarbonModel(Model):
     soil_temperature_in_Celsius: float = declare(default=15, unit="°C", unit_comment="", description="soil temperature in contact with roots", 
                                                 min_value="", max_value="", value_comment="", references="", DOI="",
                                                  variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
-    C_hexose_soil: float = declare(default=50, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil", 
+    C_hexose_soil: float = declare(default=50, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil",
                                   min_value="", max_value="", value_comment="", references="", DOI="",
                                    variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
     Cs_mucilage_soil: float = declare(default=15, unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
@@ -140,13 +140,13 @@ class RootCarbonModel(Model):
 
     # LOCAL VARIABLES
     # Pools initial size
-    C_sucrose_root: float = declare(default=0.0100 / 12.01 / 12, unit="mol.g-1", unit_comment="of sucrose", description="Sucrose concentration in root", 
+    C_sucrose_root: float = declare(default=0.01 / 12.01 / 12, unit="mol.g-1", unit_comment="of sucrose", description="Sucrose concentration in root",
                                     min_value="", max_value="", value_comment="", references="0.0025 is a plausible value according to the results of Gauthier (2019, pers. communication), but here, we use a plausible sucrose concentration (10 mgC g-1) in roots according to various experimental results.", DOI="",
                                     variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
-    C_hexose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="of labile hexose", description="Hexose concentration in root", 
+    C_hexose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="of labile hexose", description="Hexose concentration in root",
                                   min_value="", max_value="", value_comment="", references="", DOI="",
                                    variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
-    C_hexose_reserve: float = declare(default=1e-3 * 2., unit="mol.g-1", unit_comment="of reserve hexose", description="Hexose reserve concentration in root", 
+    C_hexose_reserve: float = declare(default=1e-3 * 2., unit="mol.g-1", unit_comment="of reserve hexose", description="Hexose reserve concentration in root",
                                      min_value="", max_value="", value_comment="C_hexose_root * 2",  references="We expect the reserve pool to be two times higher than the mobile one.", DOI="",
                                       variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
 
@@ -466,7 +466,6 @@ class RootCarbonModel(Model):
 
             # If we focus on a new element
             if vid not in list(self.C_sucrose_root.keys()):
-                print(True)
                 parent = self.g.parent(vid)
                 for prop in self.state_variables:
                     # if intensive, equals to parent AFTER it has been updated

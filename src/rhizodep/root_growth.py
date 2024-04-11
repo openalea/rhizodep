@@ -62,31 +62,31 @@ class RootGrowthModel(Model):
     #TODO parameter!
     initial_struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
     living_root_hairs_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Example root segment living root hairs structural mass", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
     root_hair_length: float = declare(default=1.e-3, unit="m", unit_comment="", description="Example root hair length", 
                                                     min_value="", max_value="", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair maximal length for wheat and barley evolves between 0.5 and 1.3 mm.", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
     total_root_hairs_number: float = declare(default=30 * (1.6e-4 / 3.5e-4) * 3.e-3 * 1e3, unit="adim", unit_comment="", description="Example root hairs number on segment external surface", 
                                                     min_value="", max_value="", value_comment="30 * (1.6e-4 / radius) * length * 1e3", references=" According to the work of Gahoonia et al. (1997), the root hair density is about 30 hairs per mm for winter wheat, for a root radius of about 0.16 mm.", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
     hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth is coupled to a root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
     distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
     volume: float = declare(default=1e-9, unit="m3", unit_comment="", description="Initial volume of the collar element", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
     struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
     thermal_time_since_emergence: float = declare(default=0, unit="°C", unit_comment="", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
                                                     
 
     # --- INITIALIZES MODEL PARAMETERS ---
@@ -1493,7 +1493,6 @@ class RootGrowthModel(Model):
             # -----------------------------------------------
             # If there has been an actual elongation:
             if n.length > n.initial_length:
-
                 # If the elongated apex corresponded to any primordium that has been allowed to emerge:
                 if n.type == "Seminal_root_before_emergence" \
                         or n.type == "Adventitious_root_before_emergence" \
@@ -1546,6 +1545,7 @@ class RootGrowthModel(Model):
 
         # We make sure that stored vertices are well updated with the new ones
         self.vertices = self.g.vertices(scale=self.g.max_scale())
+        self.post_growth_updating()
 
     def segmentation_and_primordium_formation(self, apex):
         """
@@ -1624,7 +1624,7 @@ class RootGrowthModel(Model):
         # -------------------------------------
         # If the length of the apex is smaller than the defined length of a root segment:
         if apex.length <= self.segment_length:
-
+            print("no seg", apex.length)
             # CONSIDERING POSSIBLE PRIMORDIUM FORMATION:
             # We simply call the function primordium_formation to check whether a primordium should have been formed
             # (Note: we assume that the segment length is always smaller than the inter-branching distance IBD,
@@ -1672,7 +1672,6 @@ class RootGrowthModel(Model):
         # -------------------------------------
         # Otherwise, we have to calculate the number of entire segments within the apex.
         else:
-
             # CALCULATION OF THE NUMBER OF ROOT SEGMENTS TO BE FORMED:
             # If the final length of the apex does not correspond to an entire number of segments:
             if apex.length / self.segment_length - floor(apex.length / self.segment_length) > 0.:
