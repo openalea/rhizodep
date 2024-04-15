@@ -287,7 +287,7 @@ class RootGrowthModel(Model):
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
 
-    def __init__(self, time_step_in_seconds: int, **scenario: dict):
+    def __init__(self, time_step_in_seconds: int, g=None, **scenario: dict):
         """
         DESCRIPTION
         -----------
@@ -300,7 +300,10 @@ class RootGrowthModel(Model):
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
         self.apply_scenario(**scenario)
 
-        self.g = self.initiate_mtg()
+        if g is None:
+            self.g = self.initiate_mtg()
+        else:
+            self.g = g
         self.props = self.g.properties()
         self.time_step_in_seconds = time_step_in_seconds
         self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.props)
@@ -1624,7 +1627,6 @@ class RootGrowthModel(Model):
         # -------------------------------------
         # If the length of the apex is smaller than the defined length of a root segment:
         if apex.length <= self.segment_length:
-            print("no seg", apex.length)
             # CONSIDERING POSSIBLE PRIMORDIUM FORMATION:
             # We simply call the function primordium_formation to check whether a primordium should have been formed
             # (Note: we assume that the segment length is always smaller than the inter-branching distance IBD,
