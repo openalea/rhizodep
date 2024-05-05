@@ -40,12 +40,12 @@ class RhizoInputsSoilModel(Model):
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
 
-    # --- INITIALIZE MODEL STATE VARIABLES ---
-    # Temperature
-    soil_temperature_in_Celsius: float = declare(default=15., unit="°C", unit_comment="", description="soil temperature in contact with roots", 
-                                        value_comment="", references="", DOI="",
-                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
+    # FROM TEMPERATURE MODEL
+    soil_temperature_in_Celsius: float = declare(default=7.8, unit="°C", unit_comment="", description="soil temperature in contact with roots",
+                                                 value_comment="Derived from Swinnen et al. 1994 C inputs, estimated from a labelling experiment starting 3rd of March, with average temperature at 7.8 °C", references="Swinnen et al. 1994", DOI="",
+                                                 min_value="", max_value="", variable_type="input", by="model_temperature", state_variable_type="intensive", edit_by="user")
 
+    # --- INITIALIZE MODEL STATE VARIABLES ---
 
     # Carbon and nitrogen concentrations
     C_hexose_soil: float = declare(default=50, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil", 
@@ -238,13 +238,11 @@ class RhizoInputsSoilModel(Model):
         for vid in self.vertices:
             if vid not in list(self.C_hexose_soil.keys()):
                 parent = self.g.parent(vid)
-                mass_fraction = self.struct_mass[vid] / (self.struct_mass[vid] + self.struct_mass[parent])
                 for prop in self.state_variables:
                     # All concentrations, temperature and pressure are intensive, so we need structural mass wise partitioning to initialize
                     getattr(self, prop).update({vid: getattr(self, prop)[parent]})
                 # Specific as it can be a mix of None and lists
                 getattr(self, "voxel_neighbor").update({vid: None})
-                
 
     def apply_to_voxel(self):
         """
@@ -263,7 +261,6 @@ class RhizoInputsSoilModel(Model):
                 vy, vz, vx = self.voxel_neighbor[vid]
                 for name in self.inputs:
                     self.voxels[name][vy][vz][vx] += getattr(self, name)[vid]
-
 
     def get_from_voxel(self):
         """
@@ -431,3 +428,4 @@ class RhizoInputsSoilModel(Model):
         modified_process[modified_process < 0.] = 0.
 
         return modified_process
+

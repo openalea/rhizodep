@@ -377,7 +377,7 @@ class RootCarbonModel(Model):
 
     # C TRANSPORT PROCESSES
     # kinetic parameters
-    phloem_permeability: float = declare(default=2e-4, unit="g.m-2.s-1", unit_comment="", description="Coefficient of permeability of unloading phloem", 
+    phloem_permeability: float = declare(default=2e-4, unit="g.m-2.s-1", unit_comment="", description="Coefficient of permeability of unloading phloem",
                                                 min_value="", max_value="", value_comment="cheating, 5.76 override", references="According to Ross-Eliott et al. (2017), an unloading flow of sucrose of 1.2e-13 mol of sucrose per second can be calculated for a sieve element of 3.6 µm and the length of the unloading zone of 350 µm, # assuming a phloem concentration of 0.5 mol/l. We calculated that this concentration corresponded to 5.3 e-6 mol/gDW, considering that the sieve element was filled with phloem sap, that the root diameter was 111 µm, and that root tissue density was 0.1 g cm-3. Calculating an exchange surface of the sieve tube of 4e-9 m2, we obtained a permeability coefficient of 5.76 gDW m-2 s-1 using the values of the flow, of the gradient of sugar concentration (assuming hexose concentration was 0) and of the exchange surface.", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
     reference_rate_of_hexose_consumption_by_growth: float = declare(default=3e-14, unit="mol.s-1", unit_comment="of hexose", description="Coefficient of permeability of unloading phloem", 
