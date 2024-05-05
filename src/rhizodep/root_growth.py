@@ -287,7 +287,7 @@ class RootGrowthModel(Model):
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
 
-    def __init__(self, time_step_in_seconds: int, g=None, **scenario: dict):
+    def __init__(self, g=None, time_step_in_seconds: int=3600, **scenario: dict):
         """
         DESCRIPTION
         -----------
@@ -299,7 +299,7 @@ class RootGrowthModel(Model):
         """
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
         self.apply_scenario(**scenario)
-
+        print(g)
         if g is None:
             self.g = self.initiate_mtg()
         else:
