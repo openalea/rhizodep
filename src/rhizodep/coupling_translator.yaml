@@ -50,8 +50,8 @@ RootCarbonModel:
       Cs_cells_soil: 1.0
     Cs_mucilage_soil:
       Cs_mucilage_soil: 1.0
-    soil_temperature_in_Celsius:
-      soil_temperature_in_Celsius: 1.0
+    soil_temperature:
+      soil_temperature: 1.0
 RootGrowthModel:
   RootAnatomy:
     root_tissue_density:
@@ -59,8 +59,8 @@ RootGrowthModel:
   RootCarbonModel: {}
   RootGrowthModel: {}
   SoilModel:
-    soil_temperature_in_Celsius:
-      soil_temperature_in_Celsius: 1.0
+    soil_temperature:
+      soil_temperature: 1.0
 SoilModel:
   RootAnatomy:
     root_exchange_surface:

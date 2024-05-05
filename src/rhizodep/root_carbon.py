@@ -78,7 +78,7 @@ class RootCarbonModel(Model):
     """
     # --- INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
     # FROM SOIL MODEL
-    soil_temperature_in_Celsius: float = declare(default=15, unit="°C", unit_comment="", description="soil temperature in contact with roots", 
+    soil_temperature: float = declare(default=15, unit="°C", unit_comment="", description="soil temperature in contact with roots", 
                                                 min_value="", max_value="", value_comment="", references="", DOI="",
                                                  variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
     C_hexose_soil: float = declare(default=50, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil",
@@ -588,7 +588,7 @@ class RootCarbonModel(Model):
     # considering that 2 mol of hexose are produced for 1 mol of sucrose.
     @rate
     def _hexose_diffusion_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
-                                             hexose_consumption_by_growth, soil_temperature_in_Celsius):
+                                             hexose_consumption_by_growth, soil_temperature):
         # We consider all the cases where no net exchange should be allowed:
         if length <= 0. or phloem_exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
             return 0
@@ -599,7 +599,7 @@ class RootCarbonModel(Model):
             else:
                 phloem_permeability = self.phloem_permeability * (1 + hexose_consumption_by_growth /
                                                                   self.reference_rate_of_hexose_consumption_by_growth)
-                phloem_permeability *= self.temperature_modification(soil_temperature=soil_temperature_in_Celsius,
+                phloem_permeability *= self.temperature_modification(soil_temperature=soil_temperature,
                                                                      T_ref=self.phloem_unloading_T_ref,
                                                                      A=self.phloem_unloading_A,
                                                                      B=self.phloem_unloading_B,
@@ -608,7 +608,7 @@ class RootCarbonModel(Model):
 
     @rate
     def _hexose_active_production_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
-                                                     hexose_consumption_by_growth, soil_temperature_in_Celsius):
+                                                     hexose_consumption_by_growth, soil_temperature):
         # We consider all the cases where no net exchange should be allowed:
         if length <= 0. or phloem_exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
             return 0
@@ -619,7 +619,7 @@ class RootCarbonModel(Model):
             else:
                 max_unloading_rate = self.max_unloading_rate * (1 + hexose_consumption_by_growth /
                                                                 self.reference_rate_of_hexose_consumption_by_growth)
-                max_unloading_rate *= self.temperature_modification(soil_temperature=soil_temperature_in_Celsius,
+                max_unloading_rate *= self.temperature_modification(soil_temperature=soil_temperature,
                                                                     T_ref=self.phloem_unloading_T_ref,
                                                                     A=self.phloem_unloading_A,
                                                                     B=self.phloem_unloading_B,
@@ -628,14 +628,14 @@ class RootCarbonModel(Model):
                             self.Km_unloading + C_sucrose_root), 0)
 
     @rate
-    def _sucrose_loading_in_phloem(self, phloem_exchange_surface, C_hexose_root, soil_temperature_in_Celsius):
+    def _sucrose_loading_in_phloem(self, phloem_exchange_surface, C_hexose_root, soil_temperature):
         # # We correct the max loading rate according to the distance from the tip in the middle of the segment.
         # max_loading_rate = param.surfacic_loading_rate_reference \
         #     * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
         # TODO: Reconsider the way the variation of the max loading rate along the root axis has been described!
 
         # We correct loading according to soil temperature:
-        max_loading_rate = self.max_loading_rate * self.temperature_modification(soil_temperature=soil_temperature_in_Celsius,
+        max_loading_rate = self.max_loading_rate * self.temperature_modification(soil_temperature=soil_temperature,
                                                                                  T_ref=self.max_loading_rate_T_ref,
                                                                                  A=self.max_loading_rate_A,
                                                                                  B=self.max_loading_rate_B,
@@ -647,7 +647,7 @@ class RootCarbonModel(Model):
 
     @rate
     def _hexose_mobilization_from_reserve(self, length, C_hexose_root, C_hexose_reserve, type, struct_mass,
-                                         living_root_hairs_struct_mass, soil_temperature_in_Celsius):
+                                         living_root_hairs_struct_mass, soil_temperature):
         """
         TODO not used??
         CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE
@@ -658,7 +658,7 @@ class RootCarbonModel(Model):
         else:
             # We correct maximum rates according to soil temperature:
             corrected_max_mobilization_rate = self.max_mobilization_rate * self.temperature_modification(
-                                                                        soil_temperature=soil_temperature_in_Celsius,
+                                                                        soil_temperature=soil_temperature,
                                                                         T_ref=self.max_mobilization_rate_T_ref,
                                                                         A=self.max_mobilization_rate_A,
                                                                         B=self.max_mobilization_rate_B,
@@ -671,7 +671,7 @@ class RootCarbonModel(Model):
 
     @rate
     def _hexose_immobilization_as_reserve(self, C_hexose_root, C_hexose_reserve, type,
-                                          struct_mass, living_root_hairs_struct_mass, soil_temperature_in_Celsius):
+                                          struct_mass, living_root_hairs_struct_mass, soil_temperature):
         # CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE:
         if C_hexose_root <= self.C_hexose_root_min_for_reserve or C_hexose_reserve >= self.C_hexose_reserve_max \
                 or type == "Just_dead" or type == "Dead":
@@ -679,7 +679,7 @@ class RootCarbonModel(Model):
         else:
             corrected_max_immobilization_rate = self.max_immobilization_rate \
                                                 * self.temperature_modification(
-                                                                        soil_temperature=soil_temperature_in_Celsius,
+                                                                        soil_temperature=soil_temperature,
                                                                         T_ref=self.max_immobilization_rate_T_ref,
                                                                         A=self.max_immobilization_rate_A,
                                                                         B=self.max_immobilization_rate_B,
@@ -700,7 +700,7 @@ class RootCarbonModel(Model):
     # concentration of hexose.
 
     @rate
-    def _maintenance_respiration(self, type, C_hexose_root, struct_mass, living_root_hairs_struct_mass, soil_temperature_in_Celsius):
+    def _maintenance_respiration(self, type, C_hexose_root, struct_mass, living_root_hairs_struct_mass, soil_temperature):
 
         # CONSIDERING CASES THAT SHOULD BE AVOIDED:
         # We consider that dead elements cannot respire (unless over the first time step following death,
@@ -710,7 +710,7 @@ class RootCarbonModel(Model):
         else:
             # We correct the maximal respiration rate according to soil temperature:
             corrected_resp_maintenance_max = self.resp_maintenance_max * self.temperature_modification(
-                                                                    soil_temperature=soil_temperature_in_Celsius,
+                                                                    soil_temperature=soil_temperature,
                                                                     T_ref=self.resp_maintenance_max_T_ref,
                                                                     A=self.resp_maintenance_max_A,
                                                                     B=self.resp_maintenance_max_B,
@@ -735,12 +735,12 @@ class RootCarbonModel(Model):
     # vascular_exchange_surface = cond_walls * cond_exo * cond_endo * S_vessels
 
     @rate
-    def _hexose_exudation(self, struct_mass, length, root_exchange_surface, symplasmic_volume, C_hexose_root, C_hexose_soil, soil_temperature_in_Celsius):
+    def _hexose_exudation(self, struct_mass, length, root_exchange_surface, symplasmic_volume, C_hexose_root, C_hexose_soil, soil_temperature):
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
             return 0.
         else:
             corrected_P_max_apex = self.Pmax_apex * self.temperature_modification(
-                                                                   soil_temperature=soil_temperature_in_Celsius,
+                                                                   soil_temperature=soil_temperature,
                                                                    T_ref=self.permeability_coeff_T_ref,
                                                                    A=self.permeability_coeff_A,
                                                                    B=self.permeability_coeff_B,
@@ -758,12 +758,12 @@ class RootCarbonModel(Model):
         
     @rate
     def _phloem_hexose_exudation(self, struct_mass, length, symplasmic_volume, root_exchange_surface, C_hexose_root, C_sucrose_root,
-                                        C_hexose_soil, apoplasmic_exchange_surface, soil_temperature_in_Celsius):
+                                        C_hexose_soil, apoplasmic_exchange_surface, soil_temperature):
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
             return 0.
         else:
             corrected_P_max_apex = self.Pmax_apex * self.temperature_modification(
-                                                                   soil_temperature=soil_temperature_in_Celsius,
+                                                                   soil_temperature=soil_temperature,
                                                                    T_ref=self.permeability_coeff_T_ref,
                                                                    A=self.permeability_coeff_A,
                                                                    B=self.permeability_coeff_B,
@@ -783,12 +783,12 @@ class RootCarbonModel(Model):
     # concentration in the soil.
 
     @rate
-    def _hexose_uptake_from_soil(self, length, root_exchange_surface, C_hexose_soil, type, soil_temperature_in_Celsius):
+    def _hexose_uptake_from_soil(self, length, root_exchange_surface, C_hexose_soil, type, soil_temperature):
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
             return 0.
         else:
             corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
-                                                                                soil_temperature=soil_temperature_in_Celsius,
+                                                                                soil_temperature=soil_temperature,
                                                                                 T_ref=self.uptake_rate_max_T_ref,
                                                                                 A=self.uptake_rate_max_A,
                                                                                 B=self.uptake_rate_max_B,
@@ -797,12 +797,12 @@ class RootCarbonModel(Model):
                 * C_hexose_soil / (self.Km_uptake + C_hexose_soil)
 
     @rate
-    def _phloem_hexose_uptake_from_soil(self, length, apoplasmic_exchange_surface, C_hexose_soil, type, soil_temperature_in_Celsius):
+    def _phloem_hexose_uptake_from_soil(self, length, apoplasmic_exchange_surface, C_hexose_soil, type, soil_temperature):
         if length <= 0 or apoplasmic_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
             return 0.
         else:
             corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
-                                                                                    soil_temperature=soil_temperature_in_Celsius,
+                                                                                    soil_temperature=soil_temperature,
                                                                                     T_ref=self.uptake_rate_max_T_ref,
                                                                                     A=self.uptake_rate_max_A,
                                                                                     B=self.uptake_rate_max_B,
@@ -815,7 +815,7 @@ class RootCarbonModel(Model):
     # ------------------
     # This function computes the rate of mucilage secretion (in mol of equivalent hexose per second) for a given root element n.
     @rate
-    def _mucilage_secretion(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_mucilage_soil, soil_temperature_in_Celsius):
+    def _mucilage_secretion(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_mucilage_soil, soil_temperature):
         # First, we ensure that the element has a positive length and surface of exchange:
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0. or type == "Dead" or type == "Stopped" or distance_from_tip < length:
             return 0.
@@ -824,7 +824,7 @@ class RootCarbonModel(Model):
             # (This could to a bell-shape where the maximum is obtained at 27 degree Celsius,
             # as suggested by Morré et al. (1967) for maize mucilage secretion):
             corrected_secretion_rate_max = self.secretion_rate_max * self.temperature_modification(
-                                                                                    soil_temperature=soil_temperature_in_Celsius,
+                                                                                    soil_temperature=soil_temperature,
                                                                                     T_ref=self.secretion_rate_max_T_ref,
                                                                                     A=self.secretion_rate_max_A,
                                                                                     B=self.secretion_rate_max_B,
@@ -850,7 +850,7 @@ class RootCarbonModel(Model):
     # until reaching 0 at the end of the elongation zone. The external concentration of root cells (mol of equivalent-
     # hexose per m2) is also linearily decreasing the release of cells at the interface.
     @rate
-    def _cells_release(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_cells_soil, soil_temperature_in_Celsius):
+    def _cells_release(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_cells_soil, soil_temperature):
         # First, we ensure that the element has a positive length and surface of exchange:
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0. or type == "Just_dead" or type == "Dead" or type == "Stopped":
             return 0.
@@ -876,7 +876,7 @@ class RootCarbonModel(Model):
 
             # We correct the release rate according to soil temperature:
             corrected_cells_surfacic_release = cells_surfacic_release * self.temperature_modification(
-                                                                    soil_temperature=soil_temperature_in_Celsius,
+                                                                    soil_temperature=soil_temperature,
                                                                     T_ref=self.surfacic_cells_release_rate_T_ref,
                                                                     A=self.surfacic_cells_release_rate_A,
                                                                     B=self.surfacic_cells_release_rate_B,
@@ -1030,21 +1030,21 @@ class RootCarbonModel(Model):
     # TODO adapt to class structure
     class Differential_Equation_System(object):
 
-        def __init__(self, g, n, time_step_in_seconds=1. * (60. * 60. * 24.), soil_temperature_in_Celsius=20,
+        def __init__(self, g, n, time_step_in_seconds=1. * (60. * 60. * 24.), soil_temperature=20,
                      printing_warnings=False, printing_solver_outputs=False):
             """
             This class is used to solve a system of differential equations corresponding to the evolution of the amounts
             in each pool for a given root element n.
             :param n: the root element n
             :param time_step_in_seconds: the time step over which new amounts/concentrations will be updated
-            :param soil_temperature_in_Celsius: the temperature sensed by the root element n
+            :param soil_temperature: the temperature sensed by the root element n
             :param printing_warnings: if True, warning messages related to processes will be printed
             :param printing_solver_outputs: if True, the successive steps of the solver will be printed
             """
             self.g = g
             self.n = n
             self.time_step_in_seconds = time_step_in_seconds
-            self.soil_temperature_in_Celsius = soil_temperature_in_Celsius
+            self.soil_temperature = soil_temperature
             self.printing_warnings = printing_warnings
             self.printing_solver_outputs = printing_solver_outputs
 
@@ -1181,7 +1181,7 @@ class RootCarbonModel(Model):
             #  Calculation of all C-related fluxes:
             # -------------------------------------
             # We call an external function that computes all the fluxes for given element n, based on the new concentrations:
-            self.calculating_all_growth_independent_fluxes(self.g, self.n, self.soil_temperature_in_Celsius,
+            self.calculating_all_growth_independent_fluxes(self.g, self.n, self.soil_temperature,
                                                            self.printing_warnings)
 
             # Calculation of time derivatives:
@@ -1354,7 +1354,7 @@ class RootCarbonModel(Model):
     #
     #     :param g:
     #     :param time_step_in_seconds: the time step over which the balance is done
-    #     :param soil_temperature_in_Celsius:
+    #     :param soil_temperature:
     #     :param using_solver:
     #     :param printing_solver_outputs:
     #     :param printing_warnings:
@@ -1458,7 +1458,7 @@ class RootCarbonModel(Model):
     #             # We use the class corresponding to the system of differential equations and its resolution:
     #             System = self.Differential_Equation_System(self.g, n,
     #                                                   time_step_in_seconds,
-    #                                                   self.soil_temperature_in_Celsius,
+    #                                                   self.soil_temperature,
     #                                                   printing_warnings=printing_warnings,
     #                                                   printing_solver_outputs=printing_solver_outputs)
     #             System.run()
