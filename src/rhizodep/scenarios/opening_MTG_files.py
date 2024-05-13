@@ -7,6 +7,7 @@ from statistics import mean
 import os, os.path
 from path import Path
 import timeit
+import copy
 
 from openalea.mtg import *
 from openalea.mtg import turtle as turt
@@ -15,7 +16,7 @@ from openalea.mtg.traversal import pre_order, post_order
 import openalea.plantgl.all as pgl
 from openalea.plantgl.all import *
 from PIL import Image, ImageDraw, ImageFont
-from rhizodep.tools import my_colormap, get_root_visitor, prepareScene, circle_coordinates, plot_mtg
+from rhizodep.tools import my_colormap, get_root_visitor, prepareScene, circle_coordinates, plot_mtg, indexing_root_MTG
 from rhizodep.alternative_plotting import plotting_roots_with_pyvista, fast_plotting_roots_with_pyvista
 
 import pickle
@@ -339,6 +340,7 @@ def loading_MTG_files(my_path='',
                       recording_sum=True,
                       printing_warnings=True,
                       recording_g_properties=True):
+
     """
     This function opens one MTG file or a list of MTG files, displays them and record some of their properties if needed.
     :param my_path: the general file path, in which the directory 'MTG_directory' will be located
@@ -472,6 +474,8 @@ def loading_MTG_files(my_path='',
         g = pickle.load(f)
         f.close()
 
+        print("New MTG opened!")
+
         # Plotting the MTG:
         # ------------------
 
@@ -512,6 +516,7 @@ def loading_MTG_files(my_path='',
                 #                             plot_width=width, plot_height=height,
                 #                             camera_x=x_cam, camera_y=y_cam, camera_z=z_cam,
                 #                             focal_x=x_center, focal_y=y_center, focal_z=z_center)
+                print("Trying to plot...")
                 # We plot the current file:
                 fast_plotting_roots_with_pyvista(g, displaying_root_hairs=root_hairs_display,
                                                  showing=False, recording_image=recording_images, image_file=image_name,
@@ -551,7 +556,7 @@ def loading_MTG_files(my_path='',
                 # general_scene = prepareScene(MTG_scene, width=width, height=height,
                 #                              x_center=x_center, y_center=y_center, z_center=z_center,
                 #                              x_cam=x_cam, y_cam=y_cam, z_cam=z_cam, background_color=[0, 0, 0])
-
+        print("Plot made!")
         if adding_images_on_plot:
             text = "t = 100 days"
             # length_text=len(text)*50
@@ -823,13 +828,83 @@ def averaging_through_a_series_of_MTGs(MTG_directory='MTG_files', list_of_proper
 
 ########################################################################################################################
 ########################################################################################################################
+# # ISOLATING A FRACTION OF THE MTG BASED ON TOPOLOGICAL COORDINATES
+########################################################################################################################
+
+# Function for removing or making invisible different axes and subaxes from a root MTG:
+def subsampling_a_MTG(g, string_of_axis_ID_to_remove="Ax1-S1-", expected_starting_index_of_string = 0,
+                      maximal_string_length_of_axis_ID=-1,
+                      create_a_new_MTG = False):
+    """
+    This function aims to provide a MTG for showing only a few axes from it, based on the property 'axis_ID'
+    that corresponds to a chain of characters describing the position of each root element in the topology of the MTG.
+    The function will look for a specific chain of character starting at a specific position within the string "axis_ID',
+    and will either remove all coreesponding axes, or reduce their length to 0 so that they are not shown.
+    :param g: the root MTG to subsample
+    :param string_of_axis_ID_to_remove: specific chain of characters to detect within 'axis_ID' for removing axes
+    :param expected_starting_index_of_string: starting index of the chain of characters to detect within 'axis_ID'
+    :param create_a_new_MTG: if True, a new MTG containing only the remaining axes will be created;
+                             if False, the original MTG will be modified by setting the length of all removed axes to 0.
+    :return:
+    """
+
+    # If we wish to return a new MTG and not modify the original one, we create a copy of the MTG with all its properties:
+    if create_a_new_MTG:
+        print("Creating a copy of the MTG...")
+        new_g = copy.deepcopy(g)
+
+    print("Subsampling the new MTG...")
+    # We cover each node of the MTG:
+    for vid in g.vertices_iter(scale=1):
+        # We get the current node:
+        n = g.node(vid)
+        # We reinitialize the decision to remove the current element:
+        removal = False
+        # If the current element has an axis_ID that contains the specific string starting at the specified position:
+        # ( Note: the operator "finds" returns the index of the left character of the substring found in the main string,
+        # otherwise it returns -1)
+        if n.axis_ID.find(string_of_axis_ID_to_remove) == expected_starting_index_of_string:
+            removal = True
+        if maximal_string_length_of_axis_ID > 0 and len(n.axis_ID) > maximal_string_length_of_axis_ID:
+            removal = True
+        # Eventually, if one of these conditions is filled:
+        if removal:
+            # If we have decided to create a new MTG while keeping the original one intact:
+            if create_a_new_MTG:
+                # We remove the current vertex and all subsequent children vertices from the copy of the MTG:
+                new_g.remove_tree(vid)
+            # Otherwise, we will modify the original MTG, but won't remove any of its elements:
+            else:
+                # We don't want to display seminal or adventitious axes, so we set their length to 0
+                # but we save their original length in a new property:
+                n.original_length = n.length
+                n.length = 0
+
+    # We finally return either the new truncated MTG or the original one that has been modified:
+    if create_a_new_MTG:
+        return new_g
+    else:
+        return g
+
+# # Example:
+#
+# # We compute the new property "axis_ID" that gives an identifyer to each element based on the topology of the MTG:
+# indexing_root_MTG(g)
+# # Here, we want to remove all root elements but the elements from the main seminal axis. We will therefore look for
+# # each vertex having an axis_ID beginning by "Ax1-S1-" (i.e. with "Ax1-S1-" starting at the index 0 of the chain of
+# # characters), since all other seminal and nodal roots emerge from the first segment of the first axis:
+# MTG_to_display = subsampling_a_MTG(g, string_of_axis_ID_to_remove="Ax1-S1-", expected_starting_index_of_string = 0,
+#                                    create_a_new_MTG = True)
+
+########################################################################################################################
+########################################################################################################################
 
 # MAIN PROGRAM:
 ###############
 
 if __name__ == "__main__":
 
-    print("Considering opening and treating recorded MTG files...")
+    # print("Considering opening and treating recorded MTG files...")
 
     # # If we want to add time and colorbar:
     # # image_path = os.path.join("./", 'colobar.png')
@@ -840,38 +915,36 @@ if __name__ == "__main__":
     # im_resized.save('colorbar_new.png', quality=95)
     # # im_new.save('colorbar_new.png', quality=95)
 
-    # To open a list:
-    loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-01/Scenario_0142',
-                      plotting_with_pyvista=True,
-                      opening_list=True,
-                      MTG_directory='MTG_files',
-                      list_of_MTG_ID=range(2007, 2012),
-                      # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
-                      # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
-                      # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
-                      property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True,
-                      # property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True,
-                      cmap='jet',
-                      width=800, height=800,
-                      x_center=0.0, y_center=0.0, z_center=-0.07,
-                      x_cam=0.3, y_cam=0.0, z_cam=-0.07,
-                      background_color=[94,76,64],
-                      root_hairs_display=True,
-                      mycorrhizal_fungus_display=False,
-                      step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-                      adding_images_on_plot=False,
-                      recording_images=False,
-                      images_directory="new_root_image_test",
-                      printing_sum=False,
-                      recording_sum=False,
-                      recording_g_properties=False,
-                      z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
-    print("Done!")
+    # # To open a list:
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-01/Scenario_0151',
+    #                   plotting_with_pyvista=True,
+    #                   opening_list=True,
+    #                   MTG_directory='MTG_files',
+    #                   list_of_MTG_ID=range(3002, 3003),
+    #                   # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
+    #                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
+    #                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
+    #                   property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True,
+    #                   # property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True,
+    #                   cmap='jet',
+    #                   width=800, height=800,
+    #                   # x_center=0.0, y_center=0.0, z_center=-0.1,
+    #                   # x_cam=0.4, y_cam=0.4, z_cam=-0.1,
+    #                   x_center=0.0, y_center=0.0, z_center=-0.15,
+    #                   x_cam=0.3, y_cam=0.0, z_cam=-0.15,
+    #                   background_color=[94,76,64],
+    #                   root_hairs_display=False,
+    #                   mycorrhizal_fungus_display=False,
+    #                   step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+    #                   adding_images_on_plot=False,
+    #                   recording_images=True,
+    #                   images_directory="new_root_image_test",
+    #                   printing_sum=False,
+    #                   recording_sum=False,
+    #                   recording_g_properties=False,
+    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
 
-    # To avoid closing PlantGL as soon as the run is done:
-    input()
-
-
+    # memory_usage((loading_MTG_files, [], {}))
 
     # # (Re-)plotting the original MTG files:
     # loading_MTG_files(my_path='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0097/',
@@ -923,4 +996,84 @@ if __name__ == "__main__":
     #                   recording_sum=False,
     #                   recording_g_properties=False,
     #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
-# print("Done!")
+    # print("Done!")
+
+    # SHOWING ONLY ONE AXIS:
+    ########################
+
+    # We load a root MTG that was previously recorded:
+    print("Loading the MTG file...")
+    filepath = 'C:/Users/frees/rhizodep/saved_outputs/root02000_142.pckl'
+    f = open(filepath, 'rb')
+    g = pickle.load(f)
+    f.close()
+
+    # COMPUTING THE 'AXIS_ID' PROPERTY:
+    # We compute the new property "axis_ID" that gives an identifyer to each element based on the topology of the MTG:
+    print("Indexing root axes...")
+    indexing_root_MTG(g)
+    # print("Here are the values of axis_ID for the whole MTG:")
+    # print(g.properties()['axis_ID'])
+
+    # SUBSAMPLING THE MTG:
+    # Here, we want to remove all root elements but the elements from the main seminal axis. We will therefore look for
+    # each vertex having an axis_ID beginning by "Ax1-S1-" (i.e. starting at the index 0 of the chain of characters),
+    # since all other seminal and nodal roots emerge from the first segment of the first axis.
+    # We also exclude lateral roots from the main axis by specifying a maximal number of characters allowed in axis_ID:
+    MTG_to_display = subsampling_a_MTG(g,
+                                       string_of_axis_ID_to_remove="Ax00001-Se00001-",
+                                       expected_starting_index_of_string = 0,
+                                       # maximal_string_length_of_axis_ID=15,
+                                       create_a_new_MTG = True)
+
+
+    # PLOTTING THE NEW MTG:
+    print("Plotting...")
+
+    # We identify the coordinates of the main seminal axis' root tip:
+    vid = next(vid for vid in MTG_to_display.vertices_iter(scale=1)
+               if MTG_to_display.node(vid).axis_ID == "Ax00001-Ap00000")
+    apex = MTG_to_display.node(vid)
+    print("The coordinates of the apex are", apex.x2, apex.y2, apex.z2,)
+
+    # # PLOTTING WITH PLANTGL(1):
+    # # We create the plot:
+    # sc = plot_mtg(MTG_to_display,
+    #               prop_cmap="C_hexose_root", lognorm=True, vmin=1e-6,vmax=1e-2, cmap='jet',
+    #               root_hairs_display=True,
+    #               mycorrhizal_fungus_display=False,
+    #               width=1200, height=800,
+    #               x_center=0., y_center=0., z_center=0,
+    #               x_cam=5.3, y_cam=5.3, z_cam=0,
+    #               displaying_PlantGL_Viewer=True,
+    #               grid_display=False)
+    # # We display the scene:
+    # pgl.Viewer.display(sc)
+    # image_name = os.path.join('C:/Users/frees/rhizodep/saved_outputs/', 'plot_axis_ID.png')
+    # pgl.Viewer.saveSnapshot(image_name)
+
+    # # PLOTTING WITH PLANTGL(2):
+    # # We create the plot, by centering it on the lower end of the apex:
+    # sc = plot_mtg(MTG_to_display,
+    #               prop_cmap="C_hexose_root", lognorm=True, vmin=1e-6,vmax=1e-2, cmap='jet',
+    #               root_hairs_display=True,
+    #               mycorrhizal_fungus_display=False,
+    #               width=1200, height=800,
+    #               x_center=apex.x2, y_center=apex.y2, z_center=apex.z2,
+    #               x_cam=5.3, y_cam=5.3, z_cam=0,
+    #               displaying_PlantGL_Viewer=True,
+    #               grid_display=True)
+    # # We display the scene:
+    # pgl.Viewer.display(sc)
+    # image_name = os.path.join('C:/Users/frees/rhizodep/saved_outputs/', 'plot.png')
+    # pgl.Viewer.saveSnapshot(image_name)
+
+    # PLOTTING WITH PYVISTA:
+    fast_plotting_roots_with_pyvista(MTG_to_display, displaying_root_hairs=True,
+                                     showing=True, recording_image=False, closing_window=False,
+                                     image_file='C:/Users/frees/rhizodep/saved_outputs/plot_with_pyvista.png',
+                                     background_color=[94, 76, 64],
+                                     plot_width=1000, plot_height=800,
+                                     camera_x=apex.x2+0.2, camera_y=apex.y2, camera_z=apex.z2,
+                                     focal_x=apex.x2, focal_y=apex.y2, focal_z=apex.z2)
+                                     # focal_x=0., focal_y=0., focal_z=-0.07)

@@ -5598,7 +5598,7 @@ def initiate_mtg(random=True,
     g.add_property('global_sucrose_deficit')
     g.property('global_sucrose_deficit')[g.root] = 0.
 
-    # We first add one initial element:
+    # We first add one initial element:a
     # ---------------------------------
     id_segment = g.add_component(g.root, label='Segment')
     base_segment = g.node(id_segment)
@@ -5619,7 +5619,7 @@ def initiate_mtg(random=True,
 
     base_radius = param.D_ini / 2.
 
-    base_segment.angle_down = 0
+    base_segment.angle_down = 180
     base_segment.angle_roll = 0
     base_segment.length = initial_segment_length
     base_segment.radius = base_radius

@@ -21,6 +21,7 @@ from copy import deepcopy # Allows to make a copy of a dictionnary and change it
 
 from openalea.mtg import turtle as turt
 from openalea.mtg.plantframe import color
+from openalea.mtg.traversal import pre_order, post_order
 import openalea.plantgl.all as pgl
 import rhizodep.parameters as param
 
@@ -371,22 +372,22 @@ def prepareScene(scene, width=1200, height=1200, scale=1, x_center=0., y_center=
     :return: scene
     """
 
-    # # We define the coordinates of the point cam_target that will be the center of the graph:
-    # cam_target = pgl.Vector3(x_center * scale,
-    #                          y_center * scale,
-    #                          z_center * scale)
+    # We define the coordinates of the point cam_target that will be the center of the graph:
+    cam_target = pgl.Vector3(x_center * scale,
+                             y_center * scale,
+                             z_center * scale)
     # We define the coordinates of the point cam_pos that represents the position of the camera:
     cam_pos = pgl.Vector3(x_cam * scale,
                           y_cam * scale,
                           z_cam * scale)
 
-    # # We position the camera in the scene relatively to the center of the scene:
-    # pgl.Viewer.camera.lookAt(cam_pos, cam_target)
+    # We position the camera in the scene relatively to the center of the scene:
+    pgl.Viewer.camera.lookAt(cam_pos, cam_target)
 
-    # We define the absolute values of the (x,y,z) coordinates of the camera:
-    pgl.Viewer.camera.position=cam_pos
+    # # We define the absolute values of the (x,y,z) coordinates of the camera:
+    # pgl.Viewer.camera.position=cam_pos
     # pgl.Viewer.camera.angle=(0,180,180)
-    # print("Here is the camera position:", pgl.Viewer.camera.position)
+    print(" >>> The camera position for this plot is:", pgl.Viewer.camera.position)
     # We define the dimensions of the graph:
     pgl.Viewer.frameGL.setSize(width, height)
     # We define whether grids are displayed or not:
@@ -443,7 +444,8 @@ def plot_mtg(g,
              # background_color=[0,0,0]
              # For a "soil" background:
              background_color=[94,76,64],
-             displaying_PlantGL_Viewer=True
+             displaying_PlantGL_Viewer=True,
+             grid_display=False,
              ):
     """
     This function creates a graph on PlantGL that displays a MTG and color it according to a specified property.
@@ -474,7 +476,7 @@ def plot_mtg(g,
     # turtle.reset()
 
     MTG_starting_position = pgl.Vector3(x_center,y_center,z_center)
-    angle_down = 0
+    angle_down = 180
     angle_roll = 0
 
     # And we define its starting position:
@@ -664,6 +666,7 @@ def plot_mtg(g,
         # We update the scene with the specified position of the center of the graph and the camera:
         new_scene = prepareScene(new_scene, width=width, height=height,
                                   x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
+                                 grid=grid_display,
                                   background_color=background_color)
 
         # # For preventing PlantGL to update the display of the graph at each new time step:
@@ -729,3 +732,146 @@ def plot_mtg(g,
 # for i in range(1, 50):
 #     new_GD = np.random.standard_t(0.6829556179151338, size=10)
 #     print(new_GD)
+
+########################################################################################################################
+
+# Function for defining each element according to its axis ID:
+#-------------------------------------------------------------
+def indexing_root_MTG(g):
+    """
+    This function assigns a new property called 'axis_ID' to each root element, corresponding to a chain of character
+    related to its position in the topology of the root system. Each axis is defined by the segment from which it emerges,
+    and by a number, which is usually 1, or a higher number in case several axis emerges from the same segment).
+    Example 1: '[...]-Se00004-Ax00002' describes the second axis emerging from the fourth segment on the mother axis.
+    The final code for a given root element can be read from right to left, indicating the element position as 'Se' + i,
+    where i stands for the position of the segment along the axis (starting at 00001 at the base of the axis),
+    or as 'Ap0000' in case it corresponds to the terminal axis of the axis.
+    Example 2: for the the third segment of the only lateral axis emerging from the segment N°2 of the main seminal axis,
+    the axis_ID will be written 'Ax00001-Se00002-Ax00001-Se00003'.
+    Example 3: for the apex of the third seminal axis, the axis_ID will be written 'Ax00001-Se00001-Ax00002-Ap00000',
+    as currently the third seminal axis is the second axis emerging from the first segment of the main axis.
+    :param g: the root MTG to process
+    :return: [none]
+    """
+
+    #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+    # We create an internal function that computes the axis ID of each element on a given axis:
+    def indexing_segments(starting_vid=1, axis_string="Ax00001"):
+
+        # We initialize temporary variables:
+        segment_number = 1
+        subsegment_number = 1
+        vid = starting_vid
+        list_of_lateral_vid = []
+        list_of_lateral_axis_strings = []
+        # We will also use a special notation for all displayed number in the string, always with 5 digits:
+        number_string = '%.5d'
+
+        # We start with the first element and assign to it the proper axis ID:
+        n = g.node(vid)
+        # If the current element is the terminal apex of the root axis:
+        if n.label == "Apex":
+            # We set the segment_number to 0, which will stop the loop:
+            segment_number = 0
+            # We then define the correct axis ID for this apex:
+            n.axis_ID = axis_string + "-Ap" + number_string % segment_number
+        else:
+            n.axis_ID = axis_string + "-Se" + number_string % segment_number
+
+        # We check whether there is one lateral root emerging from the current root element:
+        if len(g.Sons(vid, EdgeType="+")) > 0:
+            # If so, we add this to the list of all emerging lateral elements from the current root axis:
+            list_of_lateral_vid.extend(g.Sons(vid, EdgeType="+"))
+            # SPECIAL CASE: if the current element is a support element at the base of the root system:
+            # if n.type == "Support_for_seminal_root" or n.type == "Support_for_adventitious_root":
+            #     # We give a special name to the lateral axis, made with the current number of the segment AND a specific subnumber:
+            #     lateral_axis_string = n.axis_ID + "-" + str(subsegment_number)
+            #     # We also increment the subnumber for the next lateral root on the same segment:
+            #     subsegment_number += 1
+            # else:
+                # Otherwise, we give a "classical" name for the lateral axis:
+
+            lateral_axis_string = n.axis_ID
+            # We add this axis name to the list of all lateral axes' names for the current root axis:
+            list_of_lateral_axis_strings.append(lateral_axis_string)
+
+        # For a given axis, we keep looping until the segment number is set to 0:
+        while segment_number > 0:
+
+            # We move to the next element of the axis:
+            vid = g.Successor(vid)
+            # And we define the current element as this element:
+            n = g.node(vid)
+
+            # DEFINING THE AXIS ID OF THE CURRENT ELEMENT:
+            # If the current element is the terminal apex of the root axis:
+            if n.label == "Apex":
+                # We set the segment_number to 0, which will stop the loop:
+                segment_number = 0
+                # We then define the correct axis ID for this apex:
+                n.axis_ID = axis_string + "-Ap" + number_string % segment_number
+            # Otherwise, the root element is a segment:
+            elif n.length > 0.:
+                # We increase the segment number by 1:
+                segment_number += 1
+                # We now assign the correct axis ID to the current element:
+                n.axis_ID = axis_string + "-Se" + number_string % segment_number
+            elif n.type == "Support_for_seminal_root" or n.type == "Support_for_adventitious_root":
+                # We keep the same segment number and assign the same axis ID as before to the current element:
+                n.axis_ID = axis_string + "-Se" + number_string % segment_number
+
+            # DEFINING THE AXIS ID NAME OF LATERAL EMERGING SEGMENTS:
+            # We check whether there is one lateral root emerging from the current root element:
+            if len(g.Sons(vid, EdgeType="+")) > 0:
+                # If so, we add its vid to the list of all emerging lateral elements from the current root axis:
+                list_of_lateral_vid.extend(g.Sons(vid, EdgeType="+"))
+                # SPECIAL CASE: if the current element is a support element at the base of the root system:
+                if n.type == "Support_for_seminal_root" or n.type == "Support_for_adventitious_root":
+                    # We give a special name to the lateral axis, made with the current number of the segment AND a specific subnumber:
+                    lateral_axis_string = n.axis_ID + "-Ax" + number_string % subsegment_number
+                    # We also increment the subnumber for the next lateral root on the same segment:
+                    subsegment_number += 1
+                else:
+                    # Otherwise, we give a "classical" name for the lateral axis:
+                    lateral_axis_string = n.axis_ID + "-Ax00001"
+                # We add this axis name to the list of all lateral axes' names for the current root axis:
+                list_of_lateral_axis_strings.append(lateral_axis_string)
+
+        # Finally, all the elements directly belonging to the axis have received an axis ID, and their lateral emerging
+        # elements have been listed in a first list containing the vertex ID, and a second list corresponding to the
+        # name of each corresponding lateral axis. We return the two lists.
+
+        return list_of_lateral_vid, list_of_lateral_axis_strings
+
+    #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+    # # We define "root" as the starting point of the loop below:
+    # root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
+    # root = next(root_gen)
+
+    # We first call the function indexing_segments on the main initial axis of the root system:
+    list_of_lateral_vid, list_of_lateral_axis_strings = indexing_segments(starting_vid=1, axis_string="Ax00001")
+    # We now have a list of all lateral elements emerging from this first axis, and a second list corresponding to the
+    # name of each corresponding lateral axis.
+
+    # We repeat the same operation over successive "root orders", until there is no new lateral axis to consider:
+    while len(list_of_lateral_vid) > 0.:
+        # We reinitialize two empty lists:
+        new_list_of_starting_vid = []
+        new_list_of_lateral_axis_strings = []
+        # We cover each lateral axis defined by their starting element in the current list:
+        for i in range(0,len(list_of_lateral_vid)):
+            new_vids, new_strings \
+                = indexing_segments(starting_vid=list_of_lateral_vid[i], axis_string=list_of_lateral_axis_strings[i])
+            new_list_of_starting_vid.extend(new_vids)
+            new_list_of_lateral_axis_strings.extend(new_strings)
+        # At this point, all the lateral axes originating from the "list_of_starting_vis" have been processed.
+        # We can now move to an upper root order, as we provide a new list of starting vids to consider:
+        list_of_lateral_vid = new_list_of_starting_vid
+        list_of_lateral_axis_strings = new_list_of_lateral_axis_strings
+
+    print("The property 'axis_ID' has been computed on the whole root MTG!")
+
+    return
+
