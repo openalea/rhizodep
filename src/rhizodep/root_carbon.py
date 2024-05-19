@@ -66,6 +66,9 @@ from metafspm.component import Model, declare
 from metafspm.component_factory import *
 
 
+family = "metabolic"
+
+
 @dataclass
 class RootCarbonModel(Model):
     """
@@ -76,6 +79,9 @@ class RootCarbonModel(Model):
     base_commit :
         92a6f7ad927ffa0acf01aef645f9297a4531878c
     """
+
+    family = family
+
     # --- INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
     # FROM SOIL MODEL
     soil_temperature: float = declare(default=15, unit="°C", unit_comment="", description="soil temperature in contact with roots", 
@@ -429,21 +435,21 @@ class RootCarbonModel(Model):
                                                 min_value="", max_value="", value_comment="DO A REAL ESTIMATION!", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
-    def __init__(self, g, time_step_in_seconds: int,  **scenario: dict):
+    def __init__(self, g, time_step: int,  **scenario: dict):
         """
         DESCRIPTION
         -----------
         __init__ method
 
         :param g: the root MTG
-        :param time_step_in_seconds: time step of the simulation (s)
+        :param time_step: time step of the simulation (s)
         :param scenario: mapping of existing variable initialization and parameters to superimpose.
         :return:
         """
         self.g = g
         self.props = self.g.properties()
-        self.time_step_in_seconds = time_step_in_seconds
-        self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.props)
+        self.time_step = time_step
+        self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step, data=self.props)
         self.vertices = self.g.vertices(scale=self.g.max_scale())
 
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
@@ -548,7 +554,7 @@ class RootCarbonModel(Model):
                   self.global_sucrose_deficit[1])
         # The new average sucrose concentration in the root system is calculated as:
         C_sucrose_root_after_supply = (self.total_sucrose_root[1] + (
-                    self.sucrose_input_rate[1] * self.time_step_in_seconds) - self.global_sucrose_deficit[1]) \
+                    self.sucrose_input_rate[1] * self.time_step) - self.global_sucrose_deficit[1]) \
                                       / self.total_living_struct_mass[1]
         # This new concentration includes the amount of sucrose from element that have just died,
         # but excludes the mass of these dead elements!
@@ -902,7 +908,7 @@ class RootCarbonModel(Model):
     def _C_sucrose_root(self, C_sucrose_root, struct_mass, living_root_hairs_struct_mass, hexose_diffusion_from_phloem,
                             hexose_active_production_from_phloem, phloem_hexose_exudation, sucrose_loading_in_phloem,
                             phloem_hexose_uptake_from_soil, deficit_sucrose_root):
-        return C_sucrose_root + (self.time_step_in_seconds / (struct_mass + living_root_hairs_struct_mass)) * (
+        return C_sucrose_root + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
                 - hexose_diffusion_from_phloem / 2.
                 - hexose_active_production_from_phloem / 2.
                 - phloem_hexose_exudation / 2.
@@ -914,7 +920,7 @@ class RootCarbonModel(Model):
     @state
     def _C_hexose_reserve(self, C_hexose_reserve, struct_mass, living_root_hairs_struct_mass, hexose_immobilization_as_reserve,
                               hexose_mobilization_from_reserve, deficit_hexose_reserve):
-        return C_hexose_reserve + (self.time_step_in_seconds / (struct_mass + living_root_hairs_struct_mass)) * (
+        return C_hexose_reserve + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
                 hexose_immobilization_as_reserve
                 - hexose_mobilization_from_reserve
                 - deficit_hexose_reserve)
@@ -926,7 +932,7 @@ class RootCarbonModel(Model):
                            hexose_consumption_by_growth, hexose_diffusion_from_phloem,
                            hexose_active_production_from_phloem, sucrose_loading_in_phloem,
                            hexose_mobilization_from_reserve, hexose_immobilization_as_reserve, deficit_hexose_root):
-        return C_hexose_root + (self.time_step_in_seconds / (struct_mass + living_root_hairs_struct_mass)) * (
+        return C_hexose_root + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
                 - hexose_exudation
                 + hexose_uptake_from_soil
                 - mucilage_secretion
@@ -946,7 +952,7 @@ class RootCarbonModel(Model):
     @state
     def _deficit_sucrose_root(self, C_sucrose_root, struct_mass, living_root_hairs_struct_mass):
         if C_sucrose_root < 0:
-            return - C_sucrose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_step_in_seconds
+            return - C_sucrose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_step
         else:
             # TODO : or None could be more efficient?
             return 0.
@@ -955,7 +961,7 @@ class RootCarbonModel(Model):
     @state
     def _deficit_hexose_reserve(self, C_hexose_reserve, struct_mass, living_root_hairs_struct_mass):
         if C_hexose_reserve < 0:
-            return - C_hexose_reserve * (struct_mass + living_root_hairs_struct_mass) / self.time_step_in_seconds
+            return - C_hexose_reserve * (struct_mass + living_root_hairs_struct_mass) / self.time_step
         else:
             return 0.
 
@@ -963,7 +969,7 @@ class RootCarbonModel(Model):
     @state
     def _deficit_hexose_root(self, C_hexose_root, struct_mass, living_root_hairs_struct_mass):
         if C_hexose_root < 0:
-            return - C_hexose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_step_in_seconds
+            return - C_hexose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_step
         else:
             return 0.
 
@@ -1000,7 +1006,7 @@ class RootCarbonModel(Model):
 
         print(self.previous_C_amount_in_the_root_system)
         
-        expected_C_amount_in_the_root_system = self.previous_C_amount_in_the_root_system + self.time_step_in_seconds*(
+        expected_C_amount_in_the_root_system = self.previous_C_amount_in_the_root_system + self.time_step*(
             12*self.sucrose_input_rate[1]
             - 6*sum(self.hexose_exudation.values())
             - sum(self.props["resp_growth"].values())
@@ -1030,20 +1036,20 @@ class RootCarbonModel(Model):
     # TODO adapt to class structure
     class Differential_Equation_System(object):
 
-        def __init__(self, g, n, time_step_in_seconds=1. * (60. * 60. * 24.), soil_temperature=20,
+        def __init__(self, g, n, time_step=1. * (60. * 60. * 24.), soil_temperature=20,
                      printing_warnings=False, printing_solver_outputs=False):
             """
             This class is used to solve a system of differential equations corresponding to the evolution of the amounts
             in each pool for a given root element n.
             :param n: the root element n
-            :param time_step_in_seconds: the time step over which new amounts/concentrations will be updated
+            :param time_step: the time step over which new amounts/concentrations will be updated
             :param soil_temperature: the temperature sensed by the root element n
             :param printing_warnings: if True, warning messages related to processes will be printed
             :param printing_solver_outputs: if True, the successive steps of the solver will be printed
             """
             self.g = g
             self.n = n
-            self.time_step_in_seconds = time_step_in_seconds
+            self.time_step = time_step
             self.soil_temperature = soil_temperature
             self.printing_warnings = printing_warnings
             self.printing_solver_outputs = printing_solver_outputs
@@ -1102,7 +1108,7 @@ class RootCarbonModel(Model):
 
             # We create a time grid of the simulation that will be used by the solver (NOTE: here it only contains 0 and the
             # final time at the end of the time step, but we could add more intermediate values):
-            self.time_grid_in_seconds = np.array([0.0, self.time_step_in_seconds])
+            self.time_grid_in_seconds = np.array([0.0, self.time_step])
 
         def _C_fluxes_within_each_segment_derivatives(self, t, y):
             """
@@ -1274,7 +1280,7 @@ class RootCarbonModel(Model):
                 # We get the value of the exchanged amount that has been updated:
                 exchanged_amount = getattr(self.n, variable_name)
                 # We calculate the overall mean rate of exchange between the whole time step:
-                new_mean_rate = exchanged_amount / self.time_step_in_seconds
+                new_mean_rate = exchanged_amount / self.time_step
                 # We assign this value of rate to the corresponding variable in n:
                 setattr(self.n, variable_name_rate, new_mean_rate)
 
@@ -1301,8 +1307,8 @@ class RootCarbonModel(Model):
                             y0=self.initial_conditions,
                             # method='BDF',
                             method='LSODA',
-                            # t_eval=np.array([self.time_step_in_seconds]), # Select this to get only the final quantities at the end of the time step
-                            # t_eval=np.linspace(0, self.time_step_in_seconds, 10), # Select this to get time points regularly distributed within the time step
+                            # t_eval=np.array([self.time_step]), # Select this to get only the final quantities at the end of the time step
+                            # t_eval=np.linspace(0, self.time_step, 10), # Select this to get time points regularly distributed within the time step
                             t_eval=None,
                             # Select t_eval=None to get automatical time points within the current macro time step
                             min_step=60,  # OPTIONAL: defines the minimal micro time step (0 by default)
@@ -1346,14 +1352,14 @@ class RootCarbonModel(Model):
     # NOTE: The function alls all processes of C exchange between pools on each root element and performs a new C balance,
     # with or without using a solver:
     # def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(self,
-    #                                                                    time_step_in_seconds=1. * (60. * 60. * 24.),
+    #                                                                    time_step=1. * (60. * 60. * 24.),
     #                                                                    using_solver=False,
     #                                                                    printing_solver_outputs=False,
     #                                                                    printing_warnings=False):
     #     """
     #
     #     :param g:
-    #     :param time_step_in_seconds: the time step over which the balance is done
+    #     :param time_step: the time step over which the balance is done
     #     :param soil_temperature:
     #     :param using_solver:
     #     :param printing_solver_outputs:
@@ -1376,7 +1382,7 @@ class RootCarbonModel(Model):
     #             continue
     #
     #         # # IF NOT DONE ELSEWHERE - We calculate an average flux of C consumption due to growth:
-    #         # n.hexose_consumption_by_growth_rate = n.hexose_consumption_by_growth / time_step_in_seconds
+    #         # n.hexose_consumption_by_growth_rate = n.hexose_consumption_by_growth / time_step
     #
     #         # OPTION 1: WITHOUT SOLVER
     #         ##########################
@@ -1393,7 +1399,7 @@ class RootCarbonModel(Model):
     #             #DONE self.calculating_all_growth_independent_fluxes(self.g, n, self.soil_temperature, printing_warnings)
     #
     #             # We then calculate the quantities that correspond to these fluxes (dependent of the time step):
-    #             # REPORTED IN UPDATE self.calculating_amounts_from_fluxes(n, time_step_in_seconds)
+    #             # REPORTED IN UPDATE self.calculating_amounts_from_fluxes(n, time_step)
     #
     #             # Calculating the new variations of the quantities in each pool over time:
     #             # -------------------------------------------------------------------------
@@ -1410,36 +1416,36 @@ class RootCarbonModel(Model):
     #             # TODO : get insights from bellow for mass actualization in update methods
     #
     #             # # We calculate the new concentration of sucrose in the root according to sucrose conversion into hexose:
-    #             # sucrose_root_derivative = y_time_derivatives["sucrose_root"] * time_step_in_seconds
+    #             # sucrose_root_derivative = y_time_derivatives["sucrose_root"] * time_step
     #             # n.C_sucrose_root = (n.C_sucrose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
     #             #                     + sucrose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
     #             #
     #             # # We calculate the new concentration of hexose in the root cytoplasm:
-    #             # hexose_root_derivative = y_time_derivatives["hexose_root"] * time_step_in_seconds
+    #             # hexose_root_derivative = y_time_derivatives["hexose_root"] * time_step
     #             # n.C_hexose_root = (n.C_hexose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
     #             #                    + hexose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
     #             #
     #             # # We calculate the new concentration of hexose in the reserve:
-    #             # hexose_reserve_derivative = y_time_derivatives["hexose_reserve"] * time_step_in_seconds
+    #             # hexose_reserve_derivative = y_time_derivatives["hexose_reserve"] * time_step
     #             # n.C_hexose_reserve = (n.C_hexose_reserve * (
     #             #             n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
     #             #                       + hexose_reserve_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
     #
     #             # TODO : report to soil
     #             # # We calculate the new concentration of hexose in the soil:
-    #             # hexose_soil_derivative = y_time_derivatives["hexose_soil"] * time_step_in_seconds
+    #             # hexose_soil_derivative = y_time_derivatives["hexose_soil"] * time_step
     #             # n.C_hexose_soil = (n.C_hexose_soil * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
     #             #                    + hexose_soil_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
     #             #
     #             # # We calculate the new concentration of hexose in the soil:
-    #             # mucilage_soil_derivative = y_time_derivatives["mucilage_soil"] * time_step_in_seconds
+    #             # mucilage_soil_derivative = y_time_derivatives["mucilage_soil"] * time_step
     #             # n.Cs_mucilage_soil = (n.Cs_mucilage_soil * (n.initial_external_surface
     #             #                                             + n.initial_living_root_hairs_external_surface)
     #             #                       + mucilage_soil_derivative) / (
     #             #                                  n.external_surface + n.living_root_hairs_external_surface)
     #             #
     #             # # We calculate the new concentration of cells in the soil:
-    #             # cells_soil_derivative = y_time_derivatives["cells_soil"] * time_step_in_seconds
+    #             # cells_soil_derivative = y_time_derivatives["cells_soil"] * time_step
     #             # n.Cs_cells_soil = (n.Cs_cells_soil * (n.initial_external_surface
     #             #                                       + n.initial_living_root_hairs_external_surface)
     #             #                    + cells_soil_derivative) / (
@@ -1457,7 +1463,7 @@ class RootCarbonModel(Model):
     #
     #             # We use the class corresponding to the system of differential equations and its resolution:
     #             System = self.Differential_Equation_System(self.g, n,
-    #                                                   time_step_in_seconds,
+    #                                                   time_step,
     #                                                   self.soil_temperature,
     #                                                   printing_warnings=printing_warnings,
     #                                                   printing_solver_outputs=printing_solver_outputs)
@@ -1483,7 +1489,7 @@ class RootCarbonModel(Model):
     #             # in particular sucrose, based on the balance between different rates (NOTE: the transfer of sucrose
     #             # between elements through the phloem is not considered at this stage!):
     #             y_time_derivatives = self.calculating_time_derivatives_of_the_amount_in_each_pool(n)
-    #             estimated_sucrose_root_derivative = y_time_derivatives['sucrose_root'] * time_step_in_seconds
+    #             estimated_sucrose_root_derivative = y_time_derivatives['sucrose_root'] * time_step
     #             # Eventually, the new concentration of sucrose in the root element is calculated:
     #             n.C_sucrose_root = (initial_sucrose_root_amount + estimated_sucrose_root_derivative) \
     #                                / (n.struct_mass + n.living_root_hairs_struct_mass)
@@ -1495,11 +1501,11 @@ class RootCarbonModel(Model):
     #         # --------------------------------------
     #         # We make sure that new concentration in each pool is not negative - otherwise we set it to 0 and record the
     #         # corresponding deficit to balance the next calculation of the concentration:
-    #         # DONE self.adjusting_pools_and_deficits(n, time_step_in_seconds, printing_warnings)
+    #         # DONE self.adjusting_pools_and_deficits(n, time_step, printing_warnings)
     #
     #         #  Calculation of additional variables:
     #         # -------------------------------------
-    #         # MOVED TO TOOLS self.calculating_extra_variables(n, time_step_in_seconds)
+    #         # MOVED TO TOOLS self.calculating_extra_variables(n, time_step)
     #
     #     #     # SPECIAL CASE: we record the property of the apex of the primary root
     #     #     # ---------------------------------------------------------------------

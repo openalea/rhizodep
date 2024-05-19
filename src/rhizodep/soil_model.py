@@ -6,8 +6,15 @@ from metafspm.component_factory import *
 from log.visualize import plot_mtg
 
 
+family = "soil"
+
+
 @dataclass
 class RhizoInputsSoilModel(Model):
+    
+    # We need the module AND the class to be named the same way
+    family = family
+
     # --- INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
 
     # FROM CARBON MODEL
@@ -57,8 +64,8 @@ class RhizoInputsSoilModel(Model):
     Cs_cells_soil: float = declare(default=15, unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-    C_mineralN_soil: float = declare(default=0.5, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", 
-                                        value_comment="", references="", DOI="",
+    C_mineralN_soil: float = declare(default=2.2, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", 
+                                        value_comment="", references="Fischer et al. 1966", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
     C_amino_acids_soil: float = declare(default=0.5, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", 
                                         value_comment="", references="", DOI="",
@@ -160,6 +167,7 @@ class RhizoInputsSoilModel(Model):
         :param scenario: mapping of existing variable initialization and parameters to superimpose.
         :return:
         """
+        
         self.g = g
         self.props = self.g.properties()
         self.vertices = self.g.vertices(scale=self.g.max_scale())
@@ -281,7 +289,7 @@ class RhizoInputsSoilModel(Model):
     def __call__(self, *args):
         self.compute_mtg_voxel_neighbors()
         self.apply_to_voxel()
-        self.choregrapher(module_name=self.__module__.split(".")[-1], *args)
+        self.choregrapher(module_family=self.family, *args)
         self.get_from_voxel()
 
 
@@ -310,7 +318,7 @@ class RhizoInputsSoilModel(Model):
         result[result < 0.] = 0.
         return result
 
-    @rate
+    #TP@rate
     def _mucilage_degradation(self, Cs_mucilage_soil, root_exchange_surface, soil_temperature):
         """
         This function computes the rate of mucilage degradation outside the root (in mol of equivalent-hexose per second)
@@ -337,7 +345,7 @@ class RhizoInputsSoilModel(Model):
 
         return result
 
-    @rate
+    #TP@rate
     def _cells_degradation(self, Cs_cells_soil, root_exchange_surface, soil_temperature):
         """
         This function computes the rate of root cells degradation outside the root (in mol of equivalent-hexose per second)
@@ -365,7 +373,7 @@ class RhizoInputsSoilModel(Model):
 
     # TODO FOR TRISTAN: Consider adding similar functions for describing N mineralization/organization in the soil?
 
-    @state
+    #TP@state
     def _C_hexose_soil(self, C_hexose_soil, volume_soil, hexose_degradation, hexose_exudation,
                              phloem_hexose_exudation, hexose_uptake_from_soil, phloem_hexose_uptake_from_soil):
         balance = C_hexose_soil + (self.time_step_in_seconds / volume_soil) * (
@@ -378,7 +386,7 @@ class RhizoInputsSoilModel(Model):
         balance[balance < 0.] = 0.
         return balance
 
-    @state
+    #TP@state
     def _Cs_mucilage_soil(self, Cs_mucilage_soil, volume_soil, mucilage_secretion, mucilage_degradation):
         balance = Cs_mucilage_soil + (self.time_step_in_seconds / volume_soil) * (
             mucilage_secretion
@@ -387,7 +395,7 @@ class RhizoInputsSoilModel(Model):
         balance[balance < 0.] = 0.
         return balance
     
-    @state
+    #TP@state
     def _Cs_cells_soil(self, Cs_cells_soil, volume_soil, cells_release, cells_degradation):
         balance = Cs_cells_soil + (self.time_step_in_seconds / volume_soil) * (
                 cells_release
