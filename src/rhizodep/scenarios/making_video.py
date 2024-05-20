@@ -485,20 +485,20 @@ if __name__ == "__main__":
 
     print("Considering creating a video...")
 
-    # # Creating a colorbar:
-    # ######################
+    # Creating a colorbar:
+    ######################
 
-    # path_colorbar = os.path.join('outputs', os.path.join('Scenario_0008','colorbar.png'))
-    # # We create the colorbar:
-    # vmin=1e-15
-    # vmax=1e-10
-    # bar = colorbar(title="Exudation rate from the phloem vessels (gC per day per cm)",
-    #                cmap='jet',
-    #                lognorm=True,
-    #                n_thicks_for_linear_scale=6,
-    #                vmin=vmin, vmax=vmax)
-    # # We save it in the output directory:
-    # bar.savefig(path_colorbar, facecolor="None", edgecolor="None")
+    path_colorbar = os.path.join('outputs', os.path.join('Scenario_0008','colorbar.png'))
+    # We create the colorbar:
+    vmin=1e-15
+    vmax=1e-10
+    bar = colorbar(title="Exudation rate from the phloem vessels (gC per day per cm)",
+                   cmap='jet',
+                   lognorm=True,
+                   n_thicks_for_linear_scale=6,
+                   vmin=vmin, vmax=vmax)
+    # We save it in the output directory:
+    bar.savefig(path_colorbar, facecolor="None", edgecolor="None")
 
     # # Creating a new movie from root systems for one given scenario:
     # ################################################################

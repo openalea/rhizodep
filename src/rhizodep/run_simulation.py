@@ -209,7 +209,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     os.remove(os.path.join(root, file))
 
     if recording_g:
-        # We define the directory "MTG_files" doesn't exist:
+        # If the directory "MTG_files" doesn't exist:
         if not os.path.exists(g_directory):
             # Then we create it:
             os.mkdir(g_directory)
@@ -220,7 +220,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     os.remove(os.path.join(root, file))
 
     if recording_g_properties:
-        # We define the directory "MTG_properties" doesn't exist:
+        # If the directory "MTG_properties" doesn't exist:
         if not os.path.exists(g_properties_directory):
             # Then we create it:
             os.mkdir(g_properties_directory)

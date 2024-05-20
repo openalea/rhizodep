@@ -514,7 +514,7 @@ if __name__ == '__main__':
     f = open(filepath, 'rb')
     g = pickle.load(f)
     f.close()
-    #
+
     # # In case it has not been done so far - we define the colors in g according to a specific property:
     # my_colormap(g, property_name="C_hexose_root", cmap='jet', vmin=1e-6, vmax=1e-3, lognorm=True)
 

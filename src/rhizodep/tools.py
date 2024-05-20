@@ -14,15 +14,20 @@
 
 import os
 from decimal import Decimal
-from math import pi, cos, sin, floor
+from math import pi, cos, sin, floor, ceil, trunc, log10
 import numpy as np
 import pandas as pd
 from copy import deepcopy # Allows to make a copy of a dictionnary and change it without modifying the original, whatever it is
+
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+from matplotlib.ticker import LogFormatter
 
 from openalea.mtg import turtle as turt
 from openalea.mtg.plantframe import color
 from openalea.mtg.traversal import pre_order, post_order
 import openalea.plantgl.all as pgl
+
 import rhizodep.parameters as param
 
 
@@ -732,6 +737,233 @@ def plot_mtg(g,
 # for i in range(1, 50):
 #     new_GD = np.random.standard_t(0.6829556179151338, size=10)
 #     print(new_GD)
+
+########################################################################################################################
+
+# Define function for string formatting of scientific notation
+def sci_notation(num, just_print_ten_power=True, decimal_digits=1, precision=None, exponent=None):
+    """
+    This function returns a string representation of the scientific notation of the given number formatted for use with
+    LaTeX or Mathtext, with specified number of significant decimal digits and precision (number of decimal digits
+    to show). The exponent to be used can also be specified explicitly.
+    """
+    if exponent is None:
+        if num != 0.:
+            if num >= 1:
+                exponent = int(ceil(log10(abs(num))))
+            else:
+                exponent = int(floor(log10(abs(num))))
+        else:
+            exponent = 0
+
+    coeff = round(num / float(10 ** exponent), 1)
+
+    if precision is None:
+        precision = decimal_digits
+
+    if num == 0:
+        return r"${}$".format(0)
+
+    if just_print_ten_power:
+        return r"$10^{{{0:d}}}$".format(exponent)
+    elif decimal_digits==0:
+        # return r"${0:.{2}f}/cdot10^{{{1:d}}}$".format(coeff, exponent, precision)
+        return str(int(round(coeff))) + " " + r"$10^{{{0:d}}}$".format(exponent)
+    else:
+        return str(coeff) + " " + r"$10^{{{0:d}}}$".format(exponent)
+
+# Function that draws a colorbar:
+def colorbar(title="Radius (m)", cmap='jet', lognorm=True, vmin=1e-12, vmax=1e3, ticks=[]):
+    """
+    This function creates a colorbar for showing the legend of a plot. The scale can be linear or normal. If no "ticks"
+    number are provided, the function will automatically add ticks and numbers on the graph. Note that numbers that are
+    too close to the left or right border of the bar will not be displayed.
+    :param title: the name of the property to be displayed on the bar
+    :param cmap: the name of the specific colormap in Python
+    :param lognorm: if True, the scale will be a log scale, otherwise, it will be a linear scale
+    :param ticks: a list of float number to be displayed on the colorbar.
+    :param vmin: the min value of the color scale
+    :param vmax: the max value of the color scale
+    :return: the new colorbar object
+    """
+
+    # CREATING THE COLORBAR WITH THICKS
+    ####################################
+
+    # Creating the box that will contain the colorbar:
+    fig, ax = plt.subplots(figsize=(36, 6))
+    fig.subplots_adjust(bottom=0.5)
+
+    _cmap = color.get_cmap(cmap)
+
+    # If the bar is to be displayed with log scale:
+    if lognorm:
+        # We check that the min value of the colorbar is positive:
+        if vmin <=0.:
+            print("WATCH OUT: when making the colorbar, vmin can't be equal or below zero when lognorm is True. "
+                  "Therefore vmin has been turned to 1e-10 by default.")
+            vmin=1e-10
+            if len(ticks) > 0 and ticks[0] == 0:
+                ticks[0] = vmin
+        # We create the logscaled color values:
+        norm = color.LogNorm(vmin=vmin, vmax=vmax)
+        # We create the log-scale color bar:
+        cbar = mpl.colorbar.ColorbarBase(ax,
+                                         cmap=cmap,
+                                         norm=norm,
+                                         orientation='horizontal')
+
+        # If a list of numbers where ticks are supposed to be displayed has not been provided:
+        if ticks==[]:
+            # Then we create our own set of major ticks:
+            min10 = ceil(np.log10(vmin))
+            max10 = floor(np.log10(vmax))
+            # We calculate the interval to cover:
+            n_intervals = int(abs(max10 - min10)) + 1
+            # We start with the first number
+            min_number = 10 ** min10
+            ticks.append(min_number)
+            # Then for subsequent numbers, we just add a new number that is 10 time higher than the previous number:
+            for i in range(1,n_intervals):
+                ticks.append(ticks[i-1]*10)
+        # Now we can define the positions of each label above major ticks as:
+        label_positions = [(log10(i)-log10(vmin))/(log10(vmax)-log10(vmin)) for i in ticks]
+        # Eventually, we add the ticks to the colorbar:
+        cbar.set_ticks(ticks)
+
+    # Otherwise the colorbar is in linear scale:
+    else:
+        # If a list of numbers where ticks are supposed to be displayed has not been provided:
+        if ticks == []:
+            # We set the number of intervals between two ticks:
+            n_intervals = 4
+            # We calculate the x-difference between two consecutive ticks:
+            delta = (vmax-vmin)/float(n_intervals)
+            # We start with the first number
+            min_number = vmin
+            ticks.append(min_number)
+            # Then for subsequent numbers, we just add a new number that is 10 time higher than the previous number:
+            for i in range(1, n_intervals+1):
+                ticks.append(ticks[i-1] + delta)
+        # Now we can define the positions of each label above major ticks as:
+        label_positions = [(i-vmin) / (vmax - vmin) for i in ticks]
+        # We create the normal-scale color bar:
+        norm = color.Normalize(vmin=vmin, vmax=vmax)
+        cbar = mpl.colorbar.ColorbarBase(ax,
+                                         cmap=cmap,
+                                         norm=norm,
+                                         ticks=ticks, # We specify a number of ticks to display
+                                         orientation='horizontal')
+
+    # In any case, we remove stupid automatic tick labels:
+    ax.axes.xaxis.set_ticklabels([])
+    ax.axes.yaxis.set_ticklabels([])
+
+    # We also specify the characteristics of the ticks and mines:
+    cbar.outline.set_linewidth(3)  # Thickness of the box lines
+    cbar.set_label(title, fontsize=40, weight='bold', labelpad=-130)  # Adjust the caption under the bar
+    cbar.ax.tick_params(which="major",
+                        direction="in",  # Position of the ticks in or out the bar
+                        labelsize=0,  # Size of the text
+                        length=20,  # Length of the ticks
+                        width=5,  # Thickness of the ticks
+                        pad=-60  # Distance between ticks and label
+                        )
+    cbar.ax.tick_params(which="minor",
+                        direction="in",  # Position of the ticks in or out the bar
+                        labelsize=0,  # Size of the text
+                        length=10,  # Length of the ticks
+                        width=3,  # Thickness of the ticks
+                        pad=-60  # Distance between ticks and label
+                        )
+
+    # For adding minor ticks:
+    ax.minorticks_on()
+    # minorticks = [0.1, 0.2, 0.3]
+    # ax.xaxis.set_ticks(minorticks, minor=True)
+    # ax.yaxis.set_ticks(minorticks, minor=True)
+
+    # CREATING SCIENTIFIC NUMBERS TO DISPLAY:
+    # We initialize empty lists:
+    numbers_to_display = []
+    # If we use a logs-cale:
+    if lognorm:
+        # We initialize a Boolean specifying whether coefficient of scientific notations should be dispayed or not:
+        just_print_ten_power = True
+        # We cover each number to display:
+        for number in ticks:
+            # If one number does not correspond to one power of tenth:
+            if floor(np.log10(number)) != np.log10(number):
+                # Then we will print the normal scientific notation for all numbers:
+                just_print_ten_power = False
+                break
+        for number in ticks:
+            coeff = number / 10**(floor(log10(number)))
+            if coeff > floor(coeff)*(1+1e-3):
+                number_of_digits = 1
+                break
+            else:
+                number_of_digits = 0
+
+        # We create the list of strings in a scientific format for displaying the numbers on the colorbar:
+        for number in ticks:
+            numbers_to_display.append(sci_notation(number, just_print_ten_power=just_print_ten_power,
+                                                   decimal_digits=number_of_digits))
+    # If we use a linear scale:
+    else:
+        # We will print numbers with coefficient and tenth-power:
+        just_print_ten_power = False
+        # We calculate the number of digits to display:
+        for number in ticks:
+            if number == 0:
+                coeff = 0
+            else:
+                coeff = round(number / 10**(floor(log10(number))),2)
+
+            if coeff > floor(coeff) * (1 + 1e-3) and coeff != 1:
+                number_of_digits = 1
+                print("Indeed:", coeff, floor(coeff) * (1 + 1e-3))
+                break
+            else:
+                number_of_digits = 0
+
+        # We create the list of strings in a scientific format for displaying the numbers on the colorbar:
+        for number in ticks:
+            numbers_to_display.append(sci_notation(number, just_print_ten_power=just_print_ten_power,
+                                                   decimal_digits=number_of_digits))
+
+    # ADJUSTMENT OF LABEL POSITIONS AND CORRECTIONS FOR BORDERS:
+    # We define limits between 0 and 1 within which the labels are authorized:
+    xmin=0.00
+    xmax=0.90
+    # We also defined the translation of labels' position so that labels are correctly centered above the ticks:
+    if just_print_ten_power:
+        x_translation = -0.012
+    else:
+        x_translation = - 0.018
+    # We now modify the label positions, and possibly mask some labels when too close to the borders:
+    for i in range(0,len(ticks)):
+        label_positions[i] += x_translation
+        # If the first and last label position are too close to the limit of the colorbar, we don't display the numbers:
+        if label_positions[i] < xmin or label_positions[i] > xmax:
+            numbers_to_display[i] = ""
+
+    # ADDING THE LABELS:
+    # Finally, we cover each number to add its label on the colorbar:
+    for i in range(0, len(numbers_to_display)):
+        position = 'left'
+        # We add the corresponding number on the colorbar:
+        cbar.ax.text(x=label_positions[i],
+                     y=0.4,
+                     s=numbers_to_display[i],
+                     va='top',
+                     ha=position,
+                     fontsize=40,
+                     # fontweight='bold', # This doesn't change much the output, unfortunately...
+                     transform=ax.transAxes)
+
+    print("The colorbar has been made!")
+    return fig
 
 ########################################################################################################################
 

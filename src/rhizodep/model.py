@@ -340,16 +340,20 @@ def transport_barriers(g, n, computation_with_age=True, computation_with_distanc
         # Note: As the transition between 100% conductance and 0% for both endodermis and exodermis is described by a
         # Gompertz function involving a double exponential, we avoid unnecessary long calculations when the content of
         # the exponential is too high/low:
-        if param.endodermis_b - param.endodermis_c * age > 1000:
-            relative_conductance_endodermis = 1.
-        else:
-            relative_conductance_endodermis = (100 - param.endodermis_a * np.exp(-np.exp(param.endodermis_b - param.endodermis_c * age)))/100.
-        if param.exodermis_b - param.exodermis_c * age > 1000:
-            relative_conductance_exodermis = 1.
-        else:
-            relative_conductance_exodermis = (100 - param.exodermis_a * np.exp(-np.exp(param.exodermis_b - param.exodermis_c * age)))/100.
+        # if param.endodermis_b - param.endodermis_c * age > 1000:
+        #     relative_conductance_endodermis = param.endodermis_a / 100.
+        # else:
+        #     relative_conductance_endodermis = (100 - param.endodermis_a * np.exp(-np.exp(param.endodermis_b - param.endodermis_c * age)))/100.
+        #     print("Conductance at the endodermis is", relative_conductance_endodermis)
+        relative_conductance_endodermis = (100 - param.endodermis_a * np.exp(-np.exp(param.endodermis_b / (60.*60.*24.) - param.endodermis_c * age))) / 100.
 
-        # OPTION 2 - The formation of transport barriers is dictated by the distance to root tip:
+        # if param.exodermis_b - param.exodermis_c * age > 1000:
+        #     relative_conductance_exodermis = param.exodermis_a / 100.
+        # else:
+        #     relative_conductance_exodermis = (100 - param.exodermis_a * np.exp(-np.exp(param.exodermis_b/(60.*60.*24.) - param.exodermis_c * age)))/100.
+        relative_conductance_exodermis = (100 - param.exodermis_a * np.exp(-np.exp(param.exodermis_b / (60. * 60. * 24.) - param.exodermis_c * age))) / 100.
+
+    # OPTION 2 - The formation of transport barriers is dictated by the distance to root tip:
     if computation_with_distance_to_tip:
 
         # We define the distances from apex where barriers start/end:
@@ -469,7 +473,7 @@ def update_surfaces_and_volumes(g):
         specific_surfaces(n)
 
         # We call the function that automatically updates the transport barriers (i.e. endodermis and exodermis):
-        transport_barriers(g, n)
+        transport_barriers(g, n, computation_with_age=True)
 
         # We update the surfaces of exchange between the soil solution and the accessible root symplast.
         # We first read the values from the current root element:
