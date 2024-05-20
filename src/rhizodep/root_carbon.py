@@ -87,8 +87,8 @@ class RootCarbonModel(Model):
     soil_temperature: float = declare(default=15, unit="°C", unit_comment="", description="soil temperature in contact with roots", 
                                                 min_value="", max_value="", value_comment="", references="", DOI="",
                                                  variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
-    C_hexose_soil: float = declare(default=50, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil",
-                                  min_value="", max_value="", value_comment="", references="", DOI="",
+    C_hexose_soil: float = declare(default=2.4e-3, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil",
+                                  min_value="", max_value="", value_comment="", references="Fischer et al 2007, water leaching estimation", DOI="",
                                    variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
     Cs_mucilage_soil: float = declare(default=15, unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
                                      min_value="", max_value="", value_comment="", references="", DOI="",
@@ -758,7 +758,7 @@ class RootCarbonModel(Model):
             #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
             
             corrected_permeability_coeff = corrected_P_max_apex
-            #print("gradient :",  (C_hexose_root * struct_mass / symplasmic_volume) - C_hexose_soil)
+            # print("Concentration : ", C_hexose_root * struct_mass / symplasmic_volume, "gradient :", (C_hexose_root * struct_mass / symplasmic_volume) - C_hexose_soil)
             return max(corrected_permeability_coeff * ((C_hexose_root * struct_mass / symplasmic_volume) - C_hexose_soil) * root_exchange_surface,
                        0)
         
