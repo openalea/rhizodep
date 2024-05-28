@@ -18,6 +18,7 @@ from dataclasses import dataclass
 
 from openalea.mtg import *
 from openalea.mtg.traversal import post_order
+from openalea.mtg import turtle as turt
 
 from metafspm.component import Model, declare
 from metafspm.component_factory import *
@@ -57,6 +58,12 @@ class RootGrowthModel(Model):
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
     radius: float = declare(default=3.5e-4, unit="m", unit_comment="", description="Example root segment radius", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
+    z1: float = declare(default=0., unit="m", unit_comment="", description="Depth of the segment tip computed by plantGL, colar side", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
+    z2: float = declare(default=0., unit="m", unit_comment="", description="Depth of the segment tip computed by plantGL, apex side", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
     length: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example root segment length", 
@@ -224,7 +231,10 @@ class RootGrowthModel(Model):
 
     # Growth durations
     GDs: float = declare(default=800 * (60. * 60. * 24.) * 1000. ** 2., unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="Coefficient of growth duration", 
-                                                    min_value="", max_value="", value_comment="", references="Reference: GDs=400. day mm-2 (??)", DOI="",
+                                                    min_value="", max_value="", value_comment="", references="Reference: GDs=930. day mm-2 (Pagès et Picon-Cochard, 2014)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    main_roots_growth_extender: float = declare(default=1., unit="s.s-1", unit_comment="", description="Coefficient of growth duration extension, by which the theoretical growth duration is multiplied for seminal and adventitious roots", 
+                                                    min_value="", max_value="", value_comment="", references="Reference: GDs=400. day mm-2 ()", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     GD_highest: float = declare(default=60 * (60. * 60. * 24.), unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="For seminal and adventitious roots, a longer growth duration is applied", 
                                                     min_value="", max_value="", value_comment="Expected growth duration of a seminal root", references="", DOI="",
@@ -411,8 +421,8 @@ class RootGrowthModel(Model):
 
         # Time indications:
         # ------------------
-        # base_segment.growth_duration = GDs * (2. * base_radius) ** 2 * main_roots_growth_extender #WATCH OUT!!! we artificially multiply growth duration for seminal and adventious roots!!!!!!!!!!!!!!!!!!!!!!
-        base_segment.growth_duration = self.calculate_growth_duration(radius=base_radius, index=id_segment, root_order=1)
+        base_segment.growth_duration = self.GDs * (2. * base_radius) ** 2 * self.main_roots_growth_extender #WATCH OUT!!! we artificially multiply growth duration for seminal and adventious roots!
+        # base_segment.growth_duration = self.calculate_growth_duration(radius=base_radius, index=id_segment, root_order=1)
         base_segment.life_duration = self.LDs * (2. * base_radius) * self.new_root_tissue_density
         base_segment.actual_time_since_primordium_formation = 0.
         base_segment.actual_time_since_emergence = 0.
@@ -496,10 +506,10 @@ class RootGrowthModel(Model):
                                                                     nil_properties=True)
                     apex_seminal.original_radius = radius_seminal
                     apex_seminal.initial_radius = radius_seminal
-                    # apex_seminal.growth_duration = GDs * (2. * radius_seminal) ** 2 * main_roots_growth_extender
-                    apex_seminal.growth_duration = self.calculate_growth_duration(radius=radius_seminal,
-                                                                                               index=apex_seminal.index(),
-                                                                                               root_order=1)
+                    apex_seminal.growth_duration = self.GDs * (2. * radius_seminal) ** 2 * self.main_roots_growth_extender
+                    # apex_seminal.growth_duration = self.calculate_growth_duration(radius=radius_seminal,
+                    #                                                                            index=apex_seminal.index(),
+                    #                                                                            root_order=1)
                     apex_seminal.life_duration = self.LDs * (2. * radius_seminal) * apex_seminal.root_tissue_density
 
                     # We defined the delay of emergence for the new primordium:
@@ -575,11 +585,11 @@ class RootGrowthModel(Model):
                                                                          nil_properties=True)
                     apex_adventitious.original_radius = radius_adventitious
                     apex_adventitious.initial_radius = radius_adventitious
-                    # apex_adventitious.growth_duration = GDs * (2. * radius_adventitious) ** 2 * main_roots_growth_extender
-                    apex_adventitious.growth_duration = self.calculate_growth_duration(
-                        radius=radius_adventitious,
-                        index=apex_adventitious.index(),
-                        root_order=1)
+                    apex_adventitious.growth_duration = self.GDs * (2. * radius_adventitious) ** 2 * self.main_roots_growth_extender
+                    # apex_adventitious.growth_duration = self.calculate_growth_duration(
+                    #     radius=radius_adventitious,
+                    #     index=apex_adventitious.index(),
+                    #     root_order=1)
                     apex_adventitious.life_duration = self.LDs * (2. * radius_adventitious) * apex_adventitious.root_tissue_density
 
                     # We defined the delay of emergence for the new primordium:
@@ -599,10 +609,10 @@ class RootGrowthModel(Model):
                                                 nil_properties=True)
         apex.original_radius = apex.radius
         apex.initial_radius = apex.radius
-        # apex.growth_duration = GDs * (2. * base_radius) ** 2 * main_roots_growth_extender
-        apex.growth_duration = self.calculate_growth_duration(radius=base_radius,
-                                                                           index=apex.index(),
-                                                                           root_order=1)
+        apex.growth_duration = self.GDs * (2. * base_radius) ** 2 * self.main_roots_growth_extender
+        # apex.growth_duration = self.calculate_growth_duration(radius=base_radius,
+        #                                                                    index=apex.index(),
+        #                                                                    root_order=1)
         apex.life_duration = self.LDs * (2. * base_radius) * apex.root_tissue_density
 
         if self.initial_apex_length <= 0.:
@@ -1672,10 +1682,8 @@ class RootGrowthModel(Model):
                 Thermal_age_of_non_elongated_part = apex.thermal_time_since_cells_formation + self.time_step_in_seconds * \
                                                     temperature_time_adjustment
                 Thermal_age_of_elongated_part = Age_of_elongated_part * temperature_time_adjustment
-                apex.thermal_time_since_cells_formation = (
-                                                                      apex.initial_length * Thermal_age_of_non_elongated_part
-                                                                      + (
-                                                                              apex.length - apex.initial_length) * Thermal_age_of_elongated_part) / apex.length
+                apex.thermal_time_since_cells_formation = (apex.initial_length * Thermal_age_of_non_elongated_part
+                                                        + (apex.length - apex.initial_length) * Thermal_age_of_elongated_part) / apex.length
 
         # CASE 2: THE APEX HAS TO BE SEGMENTED
         # -------------------------------------
@@ -1808,6 +1816,7 @@ class RootGrowthModel(Model):
                                        radius=apex.radius,
                                        identical_properties=True,
                                        nil_properties=False)
+
             apex.potential_length = new_length
             apex.initial_length = new_length
             apex.dist_to_ramif = initial_dist_to_ramif
@@ -1953,8 +1962,9 @@ class RootGrowthModel(Model):
                                         identical_properties=False,
                                         nil_properties=True)
             # We specifically recomputes the growth duration:
-            ramif.growth_duration = self.calculate_growth_duration(radius=ramif.radius, index=ramif.index(),
-                                                                   root_order=ramif.root_order)
+            ramif.growth_duration = self.GDs * (2. * ramif.radius) ** 2
+            # ramif.growth_duration = self.calculate_growth_duration(radius=ramif.radius, index=ramif.index(),
+            #                                                        root_order=ramif.root_order)
             # We specify the exact time since formation:
             ramif.actual_time_since_primordium_formation = actual_time_since_formation
             ramif.thermal_time_since_primordium_formation = actual_time_since_formation * temperature_time_adjustment
@@ -2444,6 +2454,7 @@ class RootGrowthModel(Model):
                                                  thermal_time_since_growth_stopped=0.,
                                                  thermal_time_since_death=0.
                                                  )
+            
             return new_child
 
         # Otherwise, if identical_properties=True, then we copy most of the properties of the mother element in the new element:
@@ -2527,6 +2538,7 @@ class RootGrowthModel(Model):
                                                  thermal_time_since_growth_stopped=mother_element.thermal_time_since_growth_stopped,
                                                  thermal_time_since_death=mother_element.thermal_time_since_death
                                                  )
+            
             return new_child
 
     def volume_from_radius_and_length(self, element, radius: float, length: float):
@@ -2548,6 +2560,7 @@ class RootGrowthModel(Model):
             volume = 4 / 3. * pi * radius ** 3
 
         return volume
+
 
     # Calculating the growth duration of a given root apex:
     # -----------------------------------------------------
