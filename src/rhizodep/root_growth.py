@@ -233,7 +233,7 @@ class RootGrowthModel(Model):
     GDs: float = declare(default=800 * (60. * 60. * 24.) * 1000. ** 2., unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="Coefficient of growth duration", 
                                                     min_value="", max_value="", value_comment="", references="Reference: GDs=930. day mm-2 (Pagès et Picon-Cochard, 2014)", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
-    main_roots_growth_extender: float = declare(default=1., unit="s.s-1", unit_comment="", description="Coefficient of growth duration extension, by which the theoretical growth duration is multiplied for seminal and adventitious roots", 
+    main_roots_growth_extender: float = declare(default=100., unit="s.s-1", unit_comment="", description="Coefficient of growth duration extension, by which the theoretical growth duration is multiplied for seminal and adventitious roots", 
                                                     min_value="", max_value="", value_comment="", references="Reference: GDs=400. day mm-2 ()", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     GD_highest: float = declare(default=60 * (60. * 60. * 24.), unit="s.m-2", unit_comment="time equivalent at temperature of T_ref", description="For seminal and adventitious roots, a longer growth duration is applied", 

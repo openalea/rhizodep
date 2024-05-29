@@ -256,7 +256,11 @@ class RhizoInputsSoilModel(Model):
                 testz1 = self.voxels["z1"] <= baricenter[2]
                 testz2 = baricenter[2] <= self.voxels["z2"]
                 test = testx1 * testx2 * testy1 * testy2 * testz1 * testz2
-                self.voxel_neighbor[vid] = [int(v) for v in np.where(test)]
+                try:
+                    self.voxel_neighbor[vid] = [int(v) for v in np.where(test)]
+                except:
+                    print(" WARNING, issue in computing the voxel neighbor for vid ", vid)
+                    self.voxel_neighbor[vid] = None
 
     def post_growth_updating(self):
         """
