@@ -353,6 +353,7 @@ class RootAnatomy(Model):
         :return: the surface (m2)
         """
         return ((self.root_hair_radius * 2 * pi) * root_hair_length) * total_root_hairs_number
+    
 
     @actual
     @state

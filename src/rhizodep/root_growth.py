@@ -315,7 +315,7 @@ class RootGrowthModel(Model):
         """
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
         self.apply_scenario(**scenario)
-
+        
         if g is None:
             self.g = self.initiate_mtg()
         else:
