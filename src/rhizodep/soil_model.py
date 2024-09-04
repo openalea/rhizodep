@@ -243,7 +243,8 @@ class RhizoInputsSoilModel(Model):
 
     def compute_mtg_voxel_neighbors(self):
         # necessary to get updated coordinates.
-        plot_mtg(self.g)
+        if "angle_down" in self.g.properties().keys():
+            plot_mtg(self.g)
         for vid in self.vertices:
             if self.struct_mass[vid] > 0. and self.props["hexose_consumption_by_growth"][vid] > 0.:
                 baricenter = (np.mean((self.props["x1"][vid], self.props["x2"][vid])), 

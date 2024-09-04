@@ -43,6 +43,10 @@ class RootAnatomy(Model):
     total_root_hairs_number: float = declare(default=30 * (1.6e-4 / 3.5e-4) * 3.e-3 * 1e3, unit="adim", unit_comment="", description="Example root hairs number on segment external surface", 
                             min_value="", max_value="", value_comment="30 * (1.6e-4 / radius) * length * 1e3", references=" According to the work of Gahoonia et al. (1997), the root hair density is about 30 hairs per mm for winter wheat, for a root radius of about 0.16 mm.", DOI="",
                             variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
+    thermal_time_since_primordium_formation: float = declare(default=200, unit="°C.d", unit_comment="", description="Input thermal age of the organ. It is a declared input for consistence, but homogeneity makes no sense.", 
+                            min_value="", max_value="", value_comment="", references="", DOI="",
+                            variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
+
 
     # --- INITIALIZE MODEL STATE VARIABLES ---
 

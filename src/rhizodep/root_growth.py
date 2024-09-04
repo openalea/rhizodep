@@ -320,6 +320,7 @@ class RootGrowthModel(Model):
             self.g = self.initiate_mtg()
         else:
             self.g = g
+            self.initiate_heterogeneous_variables()
 
         self.props = self.g.properties()
         self.time_step_in_seconds = time_step_in_seconds
@@ -627,6 +628,16 @@ class RootGrowthModel(Model):
 
         return g
 
+    def initiate_heterogeneous_variables(self):
+        # We cover all the vertices in the MTG:
+        for vid in self.g.vertices_iter(scale=1):
+            # n represents the vertex:
+            n = self.g.node(vid)
+            n.volume = self.volume_from_radius_and_length(n, n.radius, n.length)
+            n.struct_mass = n.volume * self.new_root_tissue_density
+
+        self.update_distance_from_tip()
+    
     # SUBDIVISIONS OF THE SCHEDULING LOOP
     # -----------------------------------
     @stepinit
@@ -2337,7 +2348,9 @@ class RootGrowthModel(Model):
             son = self.g.node(son_id)
 
             # We record the initial distance_from_tip as the "former" one (to be used by other functions):
-            n.former_distance_from_tip = n.distance_from_tip
+            if hasattr(n, "distance_from_tip"):
+                # Only if this is not the first time it is computed
+                n.former_distance_from_tip = n.distance_from_tip
 
             # We try to get the value of distance_from_tip for the neighbouring root element located closer to the apex of the root:
             try:
