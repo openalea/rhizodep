@@ -75,7 +75,20 @@ class RhizoInputsSoilModel(Model):
     water_potential_soil: float = declare(default=-0.1e6, unit="Pa", unit_comment="", description="Mean soil water potential", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-    volume_soil: float = declare(default=1e-6, unit="m3", unit_comment="", description="Volume of the soil element in contact with a the root segment", 
+    soil_moisture_content: float = declare(default=0.25, unit="adim", unit_comment="", description="Volumetric proportion of water per volume of soil", 
+                                        value_comment="", references="", DOI="",
+                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
+    water_volume: float = declare(default=0.25e-6, unit="m3", unit_comment="", description="Volume of the water in the soil element in contact with a the root segment", 
+                                        value_comment="", references="", DOI="",
+                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user")
+    # Structural properties
+    volume: float = declare(default=1e-6, unit="m3", unit_comment="", description="Volume of the soil element in contact with a the root segment", 
+                                        value_comment="", references="", DOI="",
+                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user")
+    bulk_density: float = declare(default=1.3e6, unit="g.m-3", unit_comment="", description="Volumic density of the dry soil", 
+                                        value_comment="", references="", DOI="",
+                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user")
+    dry_weight: float = declare(default=1.3e6, unit="g", unit_comment="", description="dry weight of the considered voxel element", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user")
 
@@ -134,6 +147,15 @@ class RhizoInputsSoilModel(Model):
                                        min_value="", max_value="", variable_type="parametyer", by="model_soil", state_variable_type="", edit_by="user")
     cells_degradation_rate_max_C: float = declare(default=1, unit="adim", unit_comment="", description="parameter C (either 0 or 1)", 
                                         value_comment="", references="We assume that all other parameters for mucilage degradation are identical to the ones for hexose degradation.", DOI="",
+                                       min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
+
+    # Water-related parameters
+    field_capacity: float = declare(default=0.25, unit="adim", unit_comment="", description="Soil moisture at which soil doesn't retain water anymore.", 
+                                        value_comment="", references="Cornell university, case of sandy loam soil", DOI="",
+                                       min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
+
+    permanent_wilting_point: float = declare(default=0.05, unit="adim", unit_comment="", description="Soil moisture at which soil doesn't retain water anymore.", 
+                                        value_comment="", references="Cornell university, case of sandy loam soil", DOI="",
                                        min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
 
     # Initialization parameters
@@ -224,10 +246,13 @@ class RhizoInputsSoilModel(Model):
         self.voxels["z1"] = z * voxel_height
         self.voxels["z2"] = self.voxels["z1"] + voxel_height
 
-        for name in self.state_variables + self.inputs:
-            self.voxel_grid_to_self(name, init_value=getattr(self, name))
-
         self.voxel_grid_to_self("volume", voxel_volume)
+        self.voxel_grid_to_self("water_volume", voxel_volume * self.soil_moisture_content)
+        self.voxel_grid_to_self("dry_weight", voxel_volume * self.bulk_density)
+
+        for name in self.state_variables + self.inputs:
+            if name not in ("volume", "water_volume"):
+                self.voxel_grid_to_self(name, init_value=getattr(self, name))
 
         # Set an heterogeneity uppon the mean background
         self.add_patch_repartition_to_soil(property_name="C_mineralN_soil", patch_value=self.C_mineralN_patch, 
@@ -444,9 +469,9 @@ class RhizoInputsSoilModel(Model):
     # TODO FOR TRISTAN: Consider adding similar functions for describing N mineralization/organization in the soil?
 
     #TP@state
-    def _C_hexose_soil(self, C_hexose_soil, volume_soil, hexose_degradation, hexose_exudation,
+    def _C_hexose_soil(self, C_hexose_soil, water_volume, hexose_degradation, hexose_exudation,
                              phloem_hexose_exudation, hexose_uptake_from_soil, phloem_hexose_uptake_from_soil):
-        balance = C_hexose_soil + (self.time_step_in_seconds / volume_soil) * (
+        balance = C_hexose_soil + (self.time_step_in_seconds / water_volume) * (
             hexose_exudation
             + phloem_hexose_exudation
             - hexose_uptake_from_soil
@@ -457,8 +482,8 @@ class RhizoInputsSoilModel(Model):
         return balance
 
     #TP@state
-    def _Cs_mucilage_soil(self, Cs_mucilage_soil, volume_soil, mucilage_secretion, mucilage_degradation):
-        balance = Cs_mucilage_soil + (self.time_step_in_seconds / volume_soil) * (
+    def _Cs_mucilage_soil(self, Cs_mucilage_soil, water_volume, mucilage_secretion, mucilage_degradation):
+        balance = Cs_mucilage_soil + (self.time_step_in_seconds / water_volume) * (
             mucilage_secretion
             - mucilage_degradation
         )
@@ -466,13 +491,25 @@ class RhizoInputsSoilModel(Model):
         return balance
     
     #TP@state
-    def _Cs_cells_soil(self, Cs_cells_soil, volume_soil, cells_release, cells_degradation):
-        balance = Cs_cells_soil + (self.time_step_in_seconds / volume_soil) * (
+    def _Cs_cells_soil(self, Cs_cells_soil, water_volume, cells_release, cells_degradation):
+        balance = Cs_cells_soil + (self.time_step_in_seconds / water_volume) * (
                 cells_release
                 - cells_degradation
         )
         balance[balance < 0.] = 0.
         return balance
+
+    @state
+    def _water_volume(self, water_volume):
+        return water_volume - 0
+    
+    @state
+    def _soil_moisture_content(self, volume, water_volume):
+        return water_volume / volume
+    
+    @state
+    def _water_potential_soil(self, volume, water_volume):
+        return 2e6 * 100 * (water_volume / volume) ** -3.415
 
     def temperature_modification(self, soil_temperature=15, process_at_T_ref=1., T_ref=0., A=-0.05, B=3., C=1.):
         """
