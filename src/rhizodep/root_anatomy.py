@@ -79,7 +79,7 @@ class RootAnatomy(Model):
     endodermis_conductance_factor: float = declare(default=1., unit="adim", unit_comment="", description="The endodermis barrier differentiation factor", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="state_variable", by="model_anatomy", state_variable_type="intensive", edit_by="user")
-    epidermis_conductance_factor: float = declare(default=0.5, unit="adim", unit_comment="", description="The epidermis barrier differentiation factor", 
+    exodermis_conductance_factor: float = declare(default=0.5, unit="adim", unit_comment="", description="The exodermis barrier differentiation factor", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="state_variable", by="model_anatomy", state_variable_type="intensive", edit_by="user")
     xylem_differentiation_factor: float = declare(default=1., unit="adim", unit_comment="", description="Xylem differentiation, i.e. apoplasmic opening, from 0 to 1", 
@@ -100,17 +100,17 @@ class RootAnatomy(Model):
     growing_zone_factor: float = declare(default=16., unit="adim", unit_comment="", description="Proportionality factor between the radius and the length of the root apical zone in which C can sustain root elongation", 
                             min_value="", max_value="", value_comment="", references="According to illustrations by Kozlova et al. (2020), the length of the growing zone corresponding to the root cap, meristem and elongation zones is about 8 times the diameter of the tip.", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
-    start_distance_for_endodermis_factor : float = declare(default=1., unit="adim", unit_comment="", description="Ratio between the distance from tip where barriers formation starts/ends, and root radius", 
-                            min_value="", max_value="", value_comment="", references="", DOI="",
+    start_distance_for_endodermis_factor : float = declare(default=10/0.1, unit="adim", unit_comment="", description="Ratio between the distance from tip where barriers formation starts/ends, and root radius", 
+                            min_value="", max_value="", value_comment="", references="(Clarkson et al., 1971; Wu et al., 2019)", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
-    end_distance_for_endodermis_factor : float = declare(default=3*1., unit="adim", unit_comment="", description="Ratio between the distance from tip where barriers formation starts/ends, and root radius", 
-                            min_value="", max_value="", value_comment="", references="", DOI="",
+    end_distance_for_endodermis_factor : float = declare(default=150/0.1, unit="adim", unit_comment="", description="Ratio between the distance from tip where barriers formation starts/ends, and root radius", 
+                            min_value="", max_value="", value_comment="", references="(Clarkson et al., 1971)", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
-    start_distance_for_exodermis_factor : float = declare(default=16., unit="adim", unit_comment="", description="Ratio between the distance from tip where barriers formation starts/ends, and root radius", 
-                            min_value="", max_value="", value_comment="", references="", DOI="",
+    start_distance_for_exodermis_factor : float = declare(default=20/0.1, unit="adim", unit_comment="", description="Ratio between the distance from tip where barriers formation starts/ends, and root radius", 
+                            min_value="", max_value="", value_comment="", references="(Schreiber et al., 2005)", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
-    end_distance_for_exodermis_factor : float = declare(default=16.*10, unit="adim", unit_comment="", description="Ratio between the distance from tip where barriers formation starts/ends, and root radius", 
-                            min_value="", max_value="", value_comment="", references="", DOI="",
+    end_distance_for_exodermis_factor : float = declare(default=400/0.1, unit="adim", unit_comment="", description="Ratio between the distance from tip where barriers formation starts/ends, and root radius", 
+                            min_value="", max_value="", value_comment="", references=" (Ouyang et al., 2020)", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
     endodermis_a: float = declare(default=100., unit="adim", unit_comment="", description="This parameter corresponds to the asymptote of the process in Gompertz law describing the evolution of apoplastic barriers with cell age.", 
                             min_value="", max_value="", value_comment="", references="estimations are derived from the works of Enstone et al. (2005, PCE) and Dupuy et al. (2016,Chemosphere) on the formation of apoplastic barriers in maize, fitting their data with a Gompertz curve.", DOI="",
@@ -121,31 +121,31 @@ class RootAnatomy(Model):
     endodermis_c: float = declare(default=1.11 / (60.*60.*24.), unit="s-1", unit_comment="time equivalent at T_ref", description="This parameter reflects the slope of the increase in Gompertz law describing the evolution of apoplastic barriers with cell age.", 
                             min_value="", max_value="", value_comment="", references="estimations are derived from the works of Enstone et al. (2005, PCE) and Dupuy et al. (2016,Chemosphere) on the formation of apoplastic barriers in maize, fitting their data with a Gompertz curve.", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
-    epidermis_a: float = declare(default=100., unit="adim", unit_comment="", description="This parameter corresponds to the asymptote of the process in Gompertz law describing the evolution of apoplastic barriers with cell age.", 
+    exodermis_a: float = declare(default=100., unit="adim", unit_comment="", description="This parameter corresponds to the asymptote of the process in Gompertz law describing the evolution of apoplastic barriers with cell age.", 
                             min_value="", max_value="", value_comment="", references="estimations are derived from the works of Enstone et al. (2005, PCE) and Dupuy et al. (2016,Chemosphere) on the formation of apoplastic barriers in maize, fitting their data with a Gompertz curve.", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
-    epidermis_b: float = declare(default=5.32 * (60.*60.*24.), unit="s", unit_comment="time equivalent at T_ref", description="This parameter corresponds to the time lag before the large increase in Gompertz law describing the evolution of apoplastic barriers with cell age.", 
+    exodermis_b: float = declare(default=5.32 * (60.*60.*24.), unit="s", unit_comment="time equivalent at T_ref", description="This parameter corresponds to the time lag before the large increase in Gompertz law describing the evolution of apoplastic barriers with cell age.", 
                             min_value="", max_value="", value_comment="", references="estimations are derived from the works of Enstone et al. (2005, PCE) and Dupuy et al. (2016,Chemosphere) on the formation of apoplastic barriers in maize, fitting their data with a Gompertz curve.", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
-    epidermis_c: float = declare(default=1.11 / (60.*60.*24.), unit="s-1", unit_comment="time equivalent at T_ref", description="This parameter reflects the slope of the increase in Gompertz law describing the evolution of apoplastic barriers with cell age.", 
+    exodermis_c: float = declare(default=1.11 / (60.*60.*24.), unit="s-1", unit_comment="time equivalent at T_ref", description="This parameter reflects the slope of the increase in Gompertz law describing the evolution of apoplastic barriers with cell age.", 
                             min_value="", max_value="", value_comment="", references="estimations are derived from the works of Enstone et al. (2005, PCE) and Dupuy et al. (2016,Chemosphere) on the formation of apoplastic barriers in maize, fitting their data with a Gompertz curve.", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
 
     max_thermal_time_since_endodermis_disruption: float = declare(default=6 * 60. * 60., unit="s", unit_comment="time equivalent at T_ref", description="Maximal thermal time above which no endodermis disruption is considered anymore after a lateral root has emerged", 
                             min_value="", max_value="", value_comment="", references="We assume that after 6h, no disruption is observed anymore! (??)", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
-    max_thermal_time_since_epidermis_disruption: float = declare(default=48 * 60. * 60., unit="s", unit_comment="time equivalent at T_ref", description="Maximal thermal time above which no epidermis disruption is considered anymore after a lateral root has emerged", 
+    max_thermal_time_since_exodermis_disruption: float = declare(default=48 * 60. * 60., unit="s", unit_comment="time equivalent at T_ref", description="Maximal thermal time above which no exodermis disruption is considered anymore after a lateral root has emerged", 
                             min_value="", max_value="", value_comment="", references="We assume that after 48h, no disruption is observed anymore! (??)", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
-    begin_xylem_differentiation: float = declare(default=0., unit="s", unit_comment="time equivalent at T_ref", description="Parameter indicating at which age xylem differentiation starts for a logistic function", 
+    begin_xylem_differentiation: float = declare(default=0., unit="m", unit_comment="distance from apex", description="Parameter indicating at which apex distance xylem differentiation starts for a logistic function", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
-    span_xylem_differentiation: float = declare(default=6. * 60. * 60., unit="s", unit_comment="time equivalent at T_ref", description="Parameter indicating what time span is necessary for the transition to fully opened xylem / stele apoplasm", 
-                            min_value="", max_value="", value_comment="", references="We assume that after 6h, xylem apoplasm is open (??)", DOI="",
+    span_xylem_differentiation: float = declare(default=0.002, unit="m", unit_comment="distance from apex", description="Parameter indicating what length span is necessary for the transition to fully opened xylem / stele apoplasm", 
+                            min_value="", max_value="", value_comment="", references="We assume that after few mm, xylem apoplasm is open (??)", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
 
     # Surfacic fractions
-    cortical_surfacic_fraction: float = declare(default=29., unit="adim", unit_comment="", description="Cortex (+epidermis) parenchyma surface ratio over root segment's cylinder surface", 
+    cortical_surfacic_fraction: float = declare(default=29., unit="adim", unit_comment="", description="Cortex (+exodermis) parenchyma surface ratio over root segment's cylinder surface", 
                             min_value="", max_value="", value_comment="", references="report", DOI="",
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
     stellar_surfacic_fraction: float = declare(default=11., unit="adim", unit_comment="", description="Stele (+endodermis) surface ratio over root segment's cylinder surface", 
@@ -205,12 +205,12 @@ class RootAnatomy(Model):
                     
 
 
-    # Computation of transport limitations by xylem, endodermis and epidermis differentiations, sequentially.
+    # Computation of transport limitations by xylem, endodermis and exodermis differentiations, sequentially.
     @potential
     @state
     def transport_barriers(self):
         """
-        This function computes the actual relative conductances of cell walls, endodermis and epidermis for a given root
+        This function computes the actual relative conductances of cell walls, endodermis and exodermis for a given root
         element, based on either the distance to root tip or the age of the root segment. It is classified as potential rate as the result
         of this computation limits the actual surface
         :param vid: the vertex ID to compute conductance for (adim).
@@ -221,10 +221,10 @@ class RootAnatomy(Model):
 
             age = n.thermal_time_since_primordium_formation
             
-            # TIME WISE BARRIERS OF ENDODERMIS & epidermis:
+            # TIME WISE BARRIERS OF ENDODERMIS & exodermis:
             # ------------------------------------
             # WITH GOMPERTZ CONTINUOUS EVOLUTION:
-            # Note: As the transition between 100% conductance and 0% for both endodermis and epidermis is described by a
+            # Note: As the transition between 100% conductance and 0% for both endodermis and exodermis is described by a
             # Gompertz function involving a double exponential, we avoid unnecessary long calculations when the content of
             # the exponential is too high/low:
             #if self.endodermis_b - self.endodermis_c * age > 1000:
@@ -233,21 +233,21 @@ class RootAnatomy(Model):
             #    endodermis_conductance_factor = (100 - self.endodermis_a * np.exp(
             #        -np.exp(self.endodermis_b - self.endodermis_c * age))) / 100.
 
-            #if self.epidermis_b - self.epidermis_c * age > 1000:
-            #    epidermis_conductance_factor = 1.
+            #if self.exodermis_b - self.exodermis_c * age > 1000:
+            #    exodermis_conductance_factor = 1.
             #else:
-            #    epidermis_conductance_factor = (100 - self.epidermis_a * np.exp(
-            #        -np.exp(self.epidermis_b - self.epidermis_c * age))) / 100.
+            #    exodermis_conductance_factor = (100 - self.exodermis_a * np.exp(
+            #        -np.exp(self.exodermis_b - self.exodermis_c * age))) / 100.
 
-            # DISTANCE WISE APPARITION OF ENDODERMIS AND EPIDERMIS DIFFERENTIATION BOUNDARIES
+            # DISTANCE WISE APPARITION OF ENDODERMIS AND exodermis DIFFERENTIATION BOUNDARIES
             # We define the distances from apex where barriers start/end:
             start_distance_endodermis = self.start_distance_for_endodermis_factor * n.radius
             end_distance_endodermis = self.end_distance_for_endodermis_factor * n.radius
             start_distance_exodermis = self.start_distance_for_exodermis_factor * n.radius
             end_distance_exodermis = self.end_distance_for_exodermis_factor * n.radius
-
+            
             barycenter_distance = (2 * n.distance_from_tip - n.length) / 2
-
+            
             # ENDODERMIS:
             # Above the starting distance, we consider that the conductance rapidly decreases as the endodermis is formed:
             if barycenter_distance > start_distance_endodermis:
@@ -268,16 +268,16 @@ class RootAnatomy(Model):
                 # # OPTION 1: Conductance decreases as y = x0/x
                 # conductance_exodermis = starting_distance_exodermis / distance_from_tip
                 # OPTION 2: Conductance linearly decreases with x, up to reaching 0:
-                epidermis_conductance_factor = 1 - (barycenter_distance - start_distance_exodermis) \
+                exodermis_conductance_factor = 1 - (barycenter_distance - start_distance_exodermis) \
                                         / (end_distance_exodermis - start_distance_exodermis)
-                if epidermis_conductance_factor < 0.:
-                    epidermis_conductance_factor = 0.
+                if exodermis_conductance_factor < 0.:
+                    exodermis_conductance_factor = 0.
                 # Below the starting distance, the conductance is necessarily maximal:
             else:
-                epidermis_conductance_factor = 1
+                exodermis_conductance_factor = 1
 
 
-            # SPECIAL CASE: # We now consider a special case where the endodermis and/or epidermis barriers are temporarily
+            # SPECIAL CASE: # We now consider a special case where the endodermis and/or exodermis barriers are temporarily
             # opened because of the emergence of a lateral root.
 
             # If there are more than one child, then it means there are lateral roots:
@@ -285,7 +285,7 @@ class RootAnatomy(Model):
             if len(lateral_children) > 1:
                 # We define two maximal thermal durations, above which the barriers are not considered to be affected anymore:
                 t_max_endo = self.max_thermal_time_since_endodermis_disruption
-                t_max_exo = self.max_thermal_time_since_epidermis_disruption
+                t_max_exo = self.max_thermal_time_since_exodermis_disruption
                 # We initialize empty lists of new conductances:
                 possible_conductances_endo = []
                 possible_conductances_exo = []
@@ -312,22 +312,22 @@ class RootAnatomy(Model):
                                             (t_max_endo - t_since_endodermis_was_disrupted) / t_max_endo)
                         possible_conductances_endo.append(new_conductance)
 
-                    # EPIDERMIS: If the lateral root has emerged recently, its epidermis barrier may have been diminished,
+                    # exodermis: If the lateral root has emerged recently, its exodermis barrier may have been diminished,
                     # provided that the length of the lateral root is actually higher than the radius of the mother root
-                    # (i.e. that the lateral root tip has actually crossed the epidermis of the mother root):
+                    # (i.e. that the lateral root tip has actually crossed the exodermis of the mother root):
                     if lateral_length >= n.radius:
-                        # We approximate the time since the epidermis was disrupted, considering the the lateral root has
+                        # We approximate the time since the exodermis was disrupted, considering the the lateral root has
                         # elongated at a constant speed:
-                        t_since_epidermis_was_disrupted = t * (lateral_length - n.radius) / lateral_length
-                        # If this time is small enough, the epidermis barrier may have been compromised:
-                        if t_since_epidermis_was_disrupted < t_max_exo:
-                            # We increase the relative conductance of epidermis according to the time elapsed since the lateral
-                            # root crossed the epidermis, considering that the barrier starts at 1 and linearily decreases with
+                        t_since_exodermis_was_disrupted = t * (lateral_length - n.radius) / lateral_length
+                        # If this time is small enough, the exodermis barrier may have been compromised:
+                        if t_since_exodermis_was_disrupted < t_max_exo:
+                            # We increase the relative conductance of exodermis according to the time elapsed since the lateral
+                            # root crossed the exodermis, considering that the barrier starts at 1 and linearily decreases with
                             # time until reaching 0. However, if the barrier was not completely formed initially, we should not
                             # set it to zero, and we therefore define the new conductance as the maximal value between the
                             # original conductance and the new one:
-                            new_conductance = max(epidermis_conductance_factor,
-                                                (t_max_exo - t_since_epidermis_was_disrupted) / t_max_exo)
+                            new_conductance = max(exodermis_conductance_factor,
+                                                (t_max_exo - t_since_exodermis_was_disrupted) / t_max_exo)
                             possible_conductances_exo.append(new_conductance)
 
                 # Now that we have covered all lateral roots, we limit the conductance of the barriers of the mother root
@@ -335,24 +335,24 @@ class RootAnatomy(Model):
                 if possible_conductances_endo:
                     endodermis_conductance_factor = max(possible_conductances_endo)
                 if possible_conductances_exo:
-                    epidermis_conductance_factor = max(possible_conductances_exo)
+                    exodermis_conductance_factor = max(possible_conductances_exo)
 
-            # We record the new conductances of cell walls, endodermis and epidermis:
+            # We record the new conductances of cell walls, endodermis and exodermis:
 
             self.endodermis_conductance_factor[vid] = endodermis_conductance_factor
-            self.epidermis_conductance_factor[vid] = epidermis_conductance_factor
+            self.exodermis_conductance_factor[vid] = exodermis_conductance_factor
         
             # Logistic xylem differentiation
             logistic_precision = 0.99
-            self.xylem_differentiation_factor[vid] = 1 - 1 / (1 + (logistic_precision / ((1 - logistic_precision) * np.exp(
-                                                            -self.begin_xylem_differentiation)) * np.exp(-age / self.span_xylem_differentiation)))
+            self.xylem_differentiation_factor[vid] = 1 / (1 + (logistic_precision / ((1 - logistic_precision) * np.exp(
+                                                            -self.begin_xylem_differentiation)) * np.exp(-barycenter_distance / self.span_xylem_differentiation)))
 
     # Utility, no decorator needed
     def root_hairs_external_surface(self, root_hair_length, total_root_hairs_number):
         """
         Compute root hairs surface for the considered segment
 
-        :param root_hair_length: the root hait length from epidermis surface to hair tip (m)
+        :param root_hair_length: the root hait length from exodermis surface to hair tip (m)
         :param total_root_hairs_number: number of root hairs on considered segment (adim)
         :return: the surface (m2)
         """
@@ -361,27 +361,27 @@ class RootAnatomy(Model):
 
     @actual
     @state
-    def _root_exchange_surface(self, radius, length, epidermis_conductance_factor, endodermis_conductance_factor, root_hair_length, total_root_hairs_number):
+    def _root_exchange_surface(self, radius, length, exodermis_conductance_factor, endodermis_conductance_factor, root_hair_length, total_root_hairs_number):
         """
         Exchange surface between soil and symplasmic parenchyma.
-        Note : here max() is used to prevent going bellow cylinder surface upon epidermis closing.
+        Note : here max() is used to prevent going bellow cylinder surface upon exodermis closing.
 
         :param radius: the root segment radius (m)
         :param length: the root segment length (m)
-        :param epidermis_conductance_factor: the endodermis barrier differentiation factor (adim)
+        :param exodermis_conductance_factor: the endodermis barrier differentiation factor (adim)
         :param endodermis_conductance_factor: the endodermis barrier differentiation factor (adim)
-        :param root_hair_length: the root hait length from epidermis surface to hair tip (m)
+        :param root_hair_length: the root hait length from exodermis surface to hair tip (m)
         :param total_root_hairs_number: number of root hairs on considered segment (adim)
         :return: the surface (m2)
         """
 
-        return (2 * pi * radius * length * max(self.cortical_surfacic_fraction * epidermis_conductance_factor +
+        return (2 * pi * radius * length * max(self.cortical_surfacic_fraction * exodermis_conductance_factor +
                                                self.stellar_surfacic_fraction * endodermis_conductance_factor, 1.) +
                 self.root_hairs_external_surface(root_hair_length, total_root_hairs_number))
 
     @actual
     @state
-    def _cortex_exchange_surface(self, radius, length, epidermis_conductance_factor, root_hair_length, total_root_hairs_number):
+    def _cortex_exchange_surface(self, radius, length, exodermis_conductance_factor, root_hair_length, total_root_hairs_number):
         """
         Exchange surface between soil and symplasmic cortex. It excludes stele parenchyma surface.
         This is computed as the exchange surface for water absorption from soil to stele apoplasm, which is supposed
@@ -391,12 +391,12 @@ class RootAnatomy(Model):
 
         :param radius: the root segment radius (m)
         :param length: the root segment length (m)
-        :param epidermis_conductance_factor: the epidermis barrier differentiation factor (adim)
-        :param root_hair_length: the root hait length from epidermis surface to hair tip (m)
+        :param exodermis_conductance_factor: the exodermis barrier differentiation factor (adim)
+        :param root_hair_length: the root hait length from exodermis surface to hair tip (m)
         :param total_root_hairs_number: number of root hairs on considered segment (adim)
         :return: the surface (m2)
         """
-        return (2 * pi * radius * length * self.cortical_surfacic_fraction * epidermis_conductance_factor +
+        return (2 * pi * radius * length * self.cortical_surfacic_fraction * exodermis_conductance_factor +
                 self.root_hairs_external_surface(root_hair_length, total_root_hairs_number))
 
     @actual
