@@ -511,7 +511,7 @@ class RhizoInputsSoilModel(Model):
     
     @state
     def _water_potential_soil(self, volume, water_volume):
-        return 2e6 * 100 * (water_volume / volume) ** -3.415
+        return - 315.28 * (water_volume / volume) ** -3.415
 
     def temperature_modification(self, soil_temperature=15, process_at_T_ref=1., T_ref=0., A=-0.05, B=3., C=1.):
         """
