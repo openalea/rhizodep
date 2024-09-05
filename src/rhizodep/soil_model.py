@@ -203,7 +203,7 @@ class RhizoInputsSoilModel(Model):
         :param scenario: mapping of existing variable initialization and parameters to superimpose.
         :return:
         """
-        
+        self.initialization_finished = False
         self.g = g
         self.props = self.g.properties()
         self.vertices = self.g.vertices(scale=self.g.max_scale())
@@ -271,7 +271,7 @@ class RhizoInputsSoilModel(Model):
         if "angle_down" in self.g.properties().keys():
             plot_mtg(self.g)
         for vid in self.vertices:
-            if self.struct_mass[vid] > 0. and self.props["hexose_consumption_by_growth"][vid] > 0.:
+            if self.struct_mass[vid] > 0. and (self.props["hexose_consumption_by_growth"][vid] > 0. or not self.initialization_finished):
                 baricenter = (np.mean((self.props["x1"][vid], self.props["x2"][vid])), 
                             np.mean((self.props["y1"][vid], self.props["y2"][vid])),
                             -np.mean((self.props["z1"][vid], self.props["z2"][vid])))
@@ -287,6 +287,8 @@ class RhizoInputsSoilModel(Model):
                 except:
                     print(" WARNING, issue in computing the voxel neighbor for vid ", vid)
                     self.voxel_neighbor[vid] = None
+        if not self.initialization_finished:
+            self.initialization_finished = True
 
     def post_growth_updating(self):
         """
