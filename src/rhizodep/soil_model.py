@@ -82,7 +82,7 @@ class RhizoInputsSoilModel(Model):
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user")
     # Structural properties
-    volume: float = declare(default=1e-6, unit="m3", unit_comment="", description="Volume of the soil element in contact with a the root segment", 
+    voxel_volume: float = declare(default=1e-6, unit="m3", unit_comment="", description="Volume of the soil element in contact with a the root segment",
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user")
     bulk_density: float = declare(default=1.3e6, unit="g.m-3", unit_comment="", description="Volumic density of the dry soil", 
@@ -246,12 +246,12 @@ class RhizoInputsSoilModel(Model):
         self.voxels["z1"] = z * voxel_height
         self.voxels["z2"] = self.voxels["z1"] + voxel_height
 
-        self.voxel_grid_to_self("volume", voxel_volume)
+        self.voxel_grid_to_self("voxel_volume", voxel_volume)
         self.voxel_grid_to_self("water_volume", voxel_volume * self.soil_moisture_content)
         self.voxel_grid_to_self("dry_weight", voxel_volume * self.bulk_density)
 
         for name in self.state_variables + self.inputs:
-            if name not in ("volume", "water_volume"):
+            if name not in ("voxel_volume", "water_volume"):
                 self.voxel_grid_to_self(name, init_value=getattr(self, name))
 
         # Set an heterogeneity uppon the mean background
@@ -506,12 +506,12 @@ class RhizoInputsSoilModel(Model):
         return water_volume - 0
     
     @state
-    def _soil_moisture_content(self, volume, water_volume):
-        return water_volume / volume
+    def _soil_moisture_content(self, voxel_volume, water_volume):
+        return water_volume / voxel_volume
     
     @state
-    def _water_potential_soil(self, volume, water_volume):
-        return - 315.28 * (water_volume / volume) ** -3.415
+    def _water_potential_soil(self, voxel_volume, water_volume):
+        return - 315.28 * (water_volume / voxel_volume) ** -3.415
 
     def temperature_modification(self, soil_temperature=15, process_at_T_ref=1., T_ref=0., A=-0.05, B=3., C=1.):
         """

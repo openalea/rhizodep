@@ -150,7 +150,7 @@ class RootCarbonModel(Model):
                                     min_value="", max_value="", value_comment="", references="0.0025 is a plausible value according to the results of Gauthier (2019, pers. communication), but here, we use a plausible sucrose concentration (10 mgC g-1) in roots according to various experimental results.", DOI="",
                                     variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
     C_hexose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="of labile hexose", description="Hexose concentration in root",
-                                  min_value="", max_value="", value_comment="", references="", DOI="",
+                                  min_value=1e-6, max_value=1e-2, value_comment="", references="", DOI="",
                                    variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
     C_hexose_reserve: float = declare(default=1e-3 * 2., unit="mol.g-1", unit_comment="of reserve hexose", description="Hexose reserve concentration in root",
                                      min_value="", max_value="", value_comment="C_hexose_root * 2",  references="We expect the reserve pool to be two times higher than the mobile one.", DOI="",
@@ -610,6 +610,7 @@ class RootCarbonModel(Model):
                                                                      A=self.phloem_unloading_A,
                                                                      B=self.phloem_unloading_B,
                                                                      C=self.phloem_unloading_C)
+
                 return max(2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) * phloem_exchange_surface, 0)
 
     @rate
