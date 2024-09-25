@@ -82,3 +82,6 @@ saving_outputs
 /simulations/running_scenarios/outputs
 /saved_outputs
 /Other_works
+/src/rhizodep/scenarios/outputs
+/src/rhizodep/scenarios/running_example/outputs
+/test/outputs
