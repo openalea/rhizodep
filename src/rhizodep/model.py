@@ -345,12 +345,12 @@ def transport_barriers(g, n, computation_with_age=True, computation_with_distanc
         # else:
         #     relative_conductance_endodermis = (100 - param.endodermis_a * np.exp(-np.exp(param.endodermis_b - param.endodermis_c * age)))/100.
         #     print("Conductance at the endodermis is", relative_conductance_endodermis)
-        relative_conductance_endodermis = (100 - param.endodermis_a * np.exp(-np.exp(param.endodermis_b / (60.*60.*24.) - param.endodermis_c * age))) / 100.
-
         # if param.exodermis_b - param.exodermis_c * age > 1000:
         #     relative_conductance_exodermis = param.exodermis_a / 100.
         # else:
         #     relative_conductance_exodermis = (100 - param.exodermis_a * np.exp(-np.exp(param.exodermis_b/(60.*60.*24.) - param.exodermis_c * age)))/100.
+
+        relative_conductance_endodermis = (100 - param.endodermis_a * np.exp(-np.exp(param.endodermis_b / (60. * 60. * 24.) - param.endodermis_c * age))) / 100.
         relative_conductance_exodermis = (100 - param.exodermis_a * np.exp(-np.exp(param.exodermis_b / (60. * 60. * 24.) - param.exodermis_c * age))) / 100.
 
     # OPTION 2 - The formation of transport barriers is dictated by the distance to root tip:
@@ -401,8 +401,8 @@ def transport_barriers(g, n, computation_with_age=True, computation_with_distanc
             t_since_endodermis_was_disrupted = t
             if t_since_endodermis_was_disrupted < t_max_endo:
                 # We increase the relative conductance of endodermis according to the age of the lateral root,
-                # considering that the barrier starts at 1 and linearily decreases with time until reaching 0. However,
-                # if the barrier was not completely formed initially, we should not set it to zero, and therefore
+                # considering that the conductance starts at 1 and linearily decreases with time until reaching 0.
+                # However, if the barrier was not completely formed initially, we should not set it to zero, and therefore
                 # define the new conductance as the maximal value between the original conductance and the new one:
                 new_conductance = max(relative_conductance_endodermis,
                                       (t_max_endo - t_since_endodermis_was_disrupted) / t_max_endo)
@@ -418,9 +418,9 @@ def transport_barriers(g, n, computation_with_age=True, computation_with_distanc
                 # If this time is small enough, the exodermis barrier may have been compromised:
                 if t_since_exodermis_was_disrupted < t_max_exo:
                     # We increase the relative conductance of exodermis according to the time elapsed since the lateral
-                    # root crossed the exodermis, considering that the barrier starts at 1 and linearily decreases with
-                    # time until reaching 0. However, if the barrier was not completely formed initially, we should not
-                    # set it to zero, and we therefore define the new conductance as the maximal value between the
+                    # root crossed the exodermis, considering that the conductance starts at 1 and linearily decreases
+                    # with time until reaching 0. However, if the barrier was not completely formed initially, we should
+                    # not set it to zero, and we therefore define the new conductance as the maximal value between the
                     # original conductance and the new one:
                     new_conductance = max(relative_conductance_exodermis,
                                           (t_max_exo - t_since_exodermis_was_disrupted) / t_max_exo)
@@ -457,6 +457,9 @@ def update_surfaces_and_volumes(g):
 
         # n represents the vertex:
         n = g.node(vid)
+
+        # We intialize a value for the exchange surface:
+        n.total_exchange_surface_with_soil_solution = 0.
 
         # First, we ensure that the element has a positive length:
         if n.length <= 0.:
@@ -762,7 +765,7 @@ def classifying_on_z(g, z_min=0., z_max=1., z_interval=0.1):
 
 # Recording the properties of each node of a MTG in a CSV file:
 # -------------------------------------------------------------
-def recording_MTG_properties(g, file_name='g_properties.csv'):
+def recording_MTG_properties(g, file_name='g_properties.csv', list_of_properties=[]):
     """
     This function records the properties of each node of the MTG "g" inside a csv file.
     :param g: the MTG where properties are recorded
@@ -770,9 +773,10 @@ def recording_MTG_properties(g, file_name='g_properties.csv'):
     :return: [no return]
     """
 
-    # We define and reorder the list of all properties of the MTG:
-    list_of_properties = list(g.properties().keys())
-    list_of_properties.sort()
+    if list_of_properties==[]:
+        # We define and reorder the list of all properties of the MTG by alphabetical order:
+        list_of_properties = list(g.properties().keys())
+        list_of_properties.sort(key=str.lower)
 
     # We create an empty list of node indices:
     node_index = []
@@ -790,7 +794,13 @@ def recording_MTG_properties(g, file_name='g_properties.csv'):
         # For each possible property:
         for property in list_of_properties:
             # We add the value of this property to the list:
-            node_properties.append(getattr(n, property, "NA"))
+            # node_properties.append(getattr(n, property, "NA"))
+            try:
+                value = g.properties()[property][vid]
+            except:
+                # print("!!! ERROR: the property", property,"could not be assessed for the element", vid)
+                value = "NA"
+            node_properties.append(value)
         # Finally, we add the new node's properties list as a new item in g_properties:
         g_properties.append(node_properties)
     # We create a list containing the headers of the dataframe:
@@ -904,6 +914,7 @@ def ADDING_A_CHILD(mother_element, edge_type='+', label='Apex', type='Normal_roo
                                              initial_length=0.,
                                              initial_radius=radius,
                                              external_surface=0.,
+                                             total_exchange_surface_with_soil_solution=0.,
                                              volume=0.,
                                              dist_to_ramif=0.,
                                              distance_from_tip=0.,
@@ -1022,6 +1033,7 @@ def ADDING_A_CHILD(mother_element, edge_type='+', label='Apex', type='Normal_roo
                                              initial_length=length,
                                              initial_radius=mother_element.radius,
                                              external_surface=0.,
+                                             total_exchange_surface_with_soil_solution=0.,
                                              volume=0.,
                                              dist_to_ramif=mother_element.dist_to_ramif,
                                              distance_from_tip=mother_element.distance_from_tip,
@@ -1170,7 +1182,7 @@ def elongated_length(initial_length=0., radius=0., C_hexose_root=1,
 
 def primordium_formation(g, apex, elongation_rate=0., time_step_in_seconds=1. * 60. * 60. * 24.,
                          soil_temperature_in_Celsius=20, random=True,
-                         root_order_limitation=False, root_order_treshold=2, ArchiSimple=False):
+                         root_order_limitation=False, root_order_treshold=2, simple_growth_duration=True):
     """
     This function considers the formation of a primordium on a root apex, and, if possible, creates this new element
     of length 0.
@@ -1279,7 +1291,7 @@ def primordium_formation(g, apex, elongation_rate=0., time_step_in_seconds=1. * 
                                nil_properties=True)
         # We specifically recomputes the growth duration:
         ramif.growth_duration = calculate_growth_duration(radius=ramif.radius, index=ramif.index(),
-                                                          root_order=ramif.root_order, ArchiSimple=ArchiSimple)
+                                                          root_order=ramif.root_order, ArchiSimple=simple_growth_duration)
         # We specify the exact time since formation:
         ramif.actual_time_since_primordium_formation = actual_time_since_formation
         ramif.thermal_time_since_primordium_formation = actual_time_since_formation * temperature_time_adjustment
@@ -1667,7 +1679,7 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
 
 # Function calculating the potential development of a root segment:
 #------------------------------------------------------------------
-def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 24., radial_growth="Possible",
+def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 24., radial_growth=True,
                                   ArchiSimple=False, soil_temperature_in_Celsius=20):
     """
     This function considers a root segment, i.e. a root element that can thicken but not elongate, and calculates its
@@ -1761,15 +1773,20 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
     # CHECKING WHETHER THE APEX OF THE ROOT AXIS HAS STOPPED GROWING:
     # ---------------------------------------------------------------
 
-    # We look at the apex of the axis to which the segment belongs (i.e. we get the last element of all the Descendants):
-    index_apex = g.Descendants(segment.index())[-1]
+    # We look at the apex of the axis to which the segment belongs (i.e. we get the last element of the axis):
+    index_apex = g.Axis(segment.index())[-1]
     apex = g.node(index_apex)
-    # print("For segment", segment.index(), "the terminal index is", index_apex, "and has the type", apex.label)
+    # print("For segment", segment.index(), "the terminal index is", index_apex, "and has the type", apex.type)
+    if apex.label != "Apex":
+        print("ERROR: when trying to access the terminal apex of the axis of the segment", segment.index(),
+              "we obtained the element", index_apex," that is a", apex.label, "!!!")
     # Depending on the type of the apex, we adjust the type of the segment on the same axis:
     if apex.type == "Just_stopped":
         segment.type == "Just_stopped"
+        # print("The segment", segment.index(), "has been considered as just stopped as the apex", index_apex, "has just stopped.")
     elif apex.type == "Stopped":
         segment.type == "Stopped"
+        # print("The segment", segment.index(), "has been considered as stopped as the apex", index_apex, "has stopped.")
 
     # CHECKING POSSIBLE ROOT SEGMENT DEATH:
     # -------------------------------------
@@ -1817,7 +1834,7 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
     # REGULATION OF RADIAL GROWTH BY AVAILABLE CARBON:
     # ------------------------------------------------
     # If the radial growth is possible:
-    if radial_growth == "Possible":
+    if radial_growth:
         # The radius of the root segment is defined according to the pipe model.
         # In ArchiSimp9, the radius is increased by considering the sum of the sections of all the children,
         # by adding a fraction (SGC) of this sum of sections to the current section of the parent segment,
@@ -1854,6 +1871,7 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
             if segment.theoretical_radius > new_radius_max:
                 # Then potential thickening is limited up to the maximal new radius:
                 segment.potential_radius = new_radius_max
+                # print(" >>> Radial growth has been limited by the maximal tickening rate!")
             # Otherwise, the potential radius to achieve is equal to the theoretical one:
             else:
                 segment.potential_radius = segment.theoretical_radius
@@ -1911,7 +1929,7 @@ class Simulate_potential_growth(object):
         self.apices_list = [g.node(v) for v in pre_order(g, root) if g.label(v) == 'Apex']
         self.segments_list = [g.node(v) for v in post_order(g, root) if g.label(v) == 'Segment']
 
-    def step(self, time_step_in_seconds=1. * (60. * 60. * 24.), radial_growth="Possible", ArchiSimple=False,
+    def step(self, time_step_in_seconds=1. * (60. * 60. * 24.), radial_growth=True, ArchiSimple=False,
              soil_temperature_in_Celsius=20):
         list_of_apices = list(self.apices_list)
         list_of_segments = list(self.segments_list)
@@ -1936,7 +1954,7 @@ class Simulate_potential_growth(object):
 
 # Function that calculates the potential growth of the whole MTG at a given time step:
 #-------------------------------------------------------------------------------------
-def potential_growth(g, time_step_in_seconds=1. * (60. * 60. * 24.), radial_growth="Possible", ArchiSimple=False,
+def potential_growth(g, time_step_in_seconds=1. * (60. * 60. * 24.), radial_growth=True, ArchiSimple=False,
                      soil_temperature_in_Celsius=20):
     """
     This function covers the whole root MTG and computes the potential growth of segments and apices.
@@ -1957,7 +1975,7 @@ def potential_growth(g, time_step_in_seconds=1. * (60. * 60. * 24.), radial_grow
 # Function that divides a root into segment and generates root primordia:
 #------------------------------------------------------------------------
 def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60. * 60. * 24.,
-                                          soil_temperature_in_Celsius=20, ArchiSimple=False, random=True,
+                                          soil_temperature_in_Celsius=20, simple_growth_duration=True, random=True,
                                           nodules=True, root_order_limitation=False, root_order_treshold=2):
     # NOTE: This function is supposed to be called AFTER the actual elongation of the apex has been done and the distance
     # between the tip of the apex and the last ramification (dist_to_ramif) has been increased!
@@ -1969,7 +1987,7 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
     :param apex: the root apex to be segmented
     :param time_step_in_seconds: the time step over which segmentation may have occured
     :param soil_temperature_in_Celsius: the temperature experienced by the root element
-    :param ArchiSimple: a Boolean (True/False) expliciting whether original rules for ArchiSimple should be kept or not
+    :param simple_growth_duration: a Boolean (True/False) expliciting whether original rules for ArchiSimple should be kept or not
     :param random: a Boolean (True/False) expliciting whether random orientations can be defined for the new elements
     :param nodules: a Boolean (True/False) expliciting whether nodules could be formed or not
     :param root_order_limitation: a Boolean (True/False) expliciting whether lateral roots should be prevented above a certain root order
@@ -2090,7 +2108,7 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
                                              soil_temperature_in_Celsius=soil_temperature_in_Celsius, random=random,
                                              root_order_limitation=root_order_limitation,
                                              root_order_treshold=root_order_treshold,
-                                             ArchiSimple=ArchiSimple))
+                                             simple_growth_duration=simple_growth_duration))
 
         # If there has been an actual elongation of the root apex:
         if apex.actual_elongation_rate > 0.:
@@ -2258,7 +2276,7 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
                                                  random=random,
                                                  root_order_limitation=root_order_limitation,
                                                  root_order_treshold=root_order_treshold,
-                                                 ArchiSimple=ArchiSimple))
+                                                 simple_growth_duration=simple_growth_duration))
 
             # The current element that has been elongated up to segment_length is now considered as a segment:
             apex.label = 'Segment'
@@ -2370,7 +2388,7 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
                                              soil_temperature_in_Celsius=soil_temperature_in_Celsius, random=random,
                                              root_order_limitation=root_order_limitation,
                                              root_order_treshold=root_order_treshold,
-                                             ArchiSimple=ArchiSimple))
+                                             simple_growth_duration=simple_growth_duration))
 
         # Finally, we add the last apex present at the end of the elongated axis:
         new_apex.append(apex)
@@ -2390,8 +2408,8 @@ class Simulate_segmentation_and_primordia_formation(object):
         # We define the list of apices for all vertices labelled as "Apex":
         self._apices = [g.node(v) for v in g.vertices_iter(scale=1) if g.label(v) == 'Apex']
 
-    def step(self, time_step_in_seconds, soil_temperature_in_Celsius=20, ArchiSimple=False, random=True, nodules=False,
-             root_order_limitation=False, root_order_treshold=2):
+    def step(self, time_step_in_seconds, soil_temperature_in_Celsius=20, simple_growth_duration=True, random=True,
+             nodules=False, root_order_limitation=False, root_order_treshold=2):
         # We define "apices_list" as the list of all apices in g:
         apices_list = list(self._apices)
         # For each apex in the list of apices that have emerged with a positive length:
@@ -2402,7 +2420,7 @@ class Simulate_segmentation_and_primordia_formation(object):
                                                                  apex,
                                                                  time_step_in_seconds=time_step_in_seconds,
                                                                  soil_temperature_in_Celsius=soil_temperature_in_Celsius,
-                                                                 ArchiSimple=ArchiSimple,
+                                                                 simple_growth_duration=simple_growth_duration,
                                                                  random=random,
                                                                  nodules=nodules,
                                                                  root_order_limitation=root_order_limitation,
@@ -2415,7 +2433,7 @@ class Simulate_segmentation_and_primordia_formation(object):
 #----------------------------------------------------------
 def segmentation_and_primordia_formation(g, time_step_in_seconds=1. * 60. * 60. * 24.,
                                          soil_temperature_in_Celsius=20,
-                                         ArchiSimple=False,
+                                         simple_growth_duration=True,
                                          random=True, printing_warnings=False,
                                          nodules=False,
                                          root_order_limitation=False,
@@ -2435,7 +2453,7 @@ def segmentation_and_primordia_formation(g, time_step_in_seconds=1. * 60. * 60. 
     # We simulate the segmentation of all apices:
     simulator = Simulate_segmentation_and_primordia_formation(g)
     simulator.step(time_step_in_seconds, soil_temperature_in_Celsius=soil_temperature_in_Celsius,
-                   ArchiSimple=ArchiSimple, random=random, nodules=nodules,
+                   simple_growth_duration=simple_growth_duration, random=random, nodules=nodules,
                    root_order_limitation=root_order_limitation, root_order_treshold=root_order_treshold)
     return
 
@@ -2652,6 +2670,7 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
                 n.radius = possible_radius
                 hexose_actual_contribution_to_thickening = remaining_hexose_for_thickening
                 remaining_hexose_for_thickening = 0.
+                print("---- Radial growth has been limited by the availability of hexose!")
             else:
                 # Otherwise, radial growth is done up to the full potential and the remaining hexose is calculated:
                 n.radius = n.potential_radius
@@ -5152,8 +5171,13 @@ def summing_and_possibly_homogenizing(g,
             total_length += n.length
             total_struct_mass += n.struct_mass + n.root_hairs_struct_mass
             total_living_struct_mass += n.struct_mass + n.living_root_hairs_struct_mass
-            total_surface += volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["external_surface"]
-            # Note that living root hairs are NOT included in the total surface of living roots!
+            # total_surface += volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["external_surface"]
+            # # NOTE: living root hairs are NOT included in the total external surface of living roots!
+            try:
+                total_surface +=  n.total_exchange_surface_with_soil_solution
+            except:
+                print("Hmmm...")
+            # NOTE: living root hairs are included in the total exchange surface with soil solution!
             # Additionaly, we calculate the total surface of living root hairs:
             total_living_root_hairs_surface +=  n.living_root_hairs_external_surface
 
@@ -5570,7 +5594,7 @@ def control_of_anomalies(g):
 # Initialization of the root system:
 #-----------------------------------
 def initiate_mtg(random=True,
-                 ArchiSimple=False,
+                 simple_growth_duration=True,
                  initial_segment_length=1e-3,
                  initial_apex_length=0.,
                  initial_C_sucrose_root=0.,
@@ -5623,7 +5647,8 @@ def initiate_mtg(random=True,
 
     base_radius = param.D_ini / 2.
 
-    base_segment.angle_down = 180
+    # base_segment.angle_down = 180
+    base_segment.angle_down = 0
     base_segment.angle_roll = 0
     base_segment.length = initial_segment_length
     base_segment.radius = base_radius
@@ -5738,7 +5763,7 @@ def initiate_mtg(random=True,
     # ------------------
     # base_segment.growth_duration = param.GDs * (2. * base_radius) ** 2 * param.main_roots_growth_extender #WATCH OUT!!! we artificially multiply growth duration for seminal and adventious roots!!!!!!!!!!!!!!!!!!!!!!
     base_segment.growth_duration = calculate_growth_duration(radius=base_radius, index=id_segment, root_order=1,
-                                                             ArchiSimple=ArchiSimple)
+                                                             ArchiSimple=simple_growth_duration)
     base_segment.life_duration = param.LDs * (2. * base_radius) * param.root_tissue_density
     base_segment.actual_time_since_primordium_formation = 0.
     base_segment.actual_time_since_emergence = 0.
@@ -5823,7 +5848,7 @@ def initiate_mtg(random=True,
                 apex_seminal.growth_duration = calculate_growth_duration(radius=radius_seminal,
                                                                          index=apex_seminal.index(),
                                                                          root_order=1,
-                                                                         ArchiSimple=ArchiSimple)
+                                                                         ArchiSimple=simple_growth_duration)
                 apex_seminal.life_duration = param.LDs * (2. * radius_seminal) * param.root_tissue_density
 
                 # We defined the delay of emergence for the new primordium:
@@ -5900,7 +5925,7 @@ def initiate_mtg(random=True,
                 apex_adventitious.growth_duration = calculate_growth_duration(radius=radius_adventitious,
                                                                               index=apex_adventitious.index(),
                                                                               root_order=1,
-                                                                              ArchiSimple=ArchiSimple)
+                                                                              ArchiSimple=simple_growth_duration)
                 apex_adventitious.life_duration = param.LDs * (2. * radius_adventitious) * param.root_tissue_density
 
                 # We defined the delay of emergence for the new primordium:
@@ -5924,7 +5949,7 @@ def initiate_mtg(random=True,
     apex.growth_duration = calculate_growth_duration(radius=base_radius,
                                                      index=apex.index(),
                                                      root_order=1,
-                                                     ArchiSimple=ArchiSimple)
+                                                     ArchiSimple=simple_growth_duration)
     apex.life_duration = param.LDs * (2. * base_radius) * param.root_tissue_density
 
     if initial_apex_length <=0.:

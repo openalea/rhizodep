@@ -1,6 +1,15 @@
 # Python files
 *.py[cod]
 
+Other_works/
+Other_works/*
+
+saved_outputs/
+saved_outputs/*
+
+*/outputs/
+*/outputs/*
+
 # C extensions
 *.so
 *.dll

@@ -108,11 +108,13 @@ def plot_mtg_new(g):
 #------------------------------------------------------------------------------------------
 
 def plotting_roots_with_pyvista(g, displaying_root_hairs = True,
-                                showing=True, recording_image=True, image_file='plot_.png',closing_window=False,
+                                showing=True, recording_image=True, image_file='plot_.png',
+                                factor_of_higher_resolution = 1,
                                 background_color = [94, 76, 64],
                                 plot_width=1000, plot_height=750,
                                 camera_x=0.3, camera_y=0., camera_z=-0.07,
-                                focal_x=0., focal_y=0., focal_z=-0.07):
+                                focal_x=0., focal_y=0., focal_z=-0.07,
+                                closing_window=False):
     """
     This functions aims to plot a root system with Pyvista, creating step by step every shape.
     :param g: the root MTG to be displayed
@@ -150,15 +152,18 @@ def plotting_roots_with_pyvista(g, displaying_root_hairs = True,
     # The creation of the cylinders with no directions raises a Warning in numpy, but we can ignore it.
     np.seterr(invalid='ignore')
 
-    print("    > Creating the shapes of the plot...")
+    print("   > Creating the shapes of the plot...")
     # We cover all the vertices in the MTG g:
     for vid in g.vertices_iter(scale=1):
 
         # We define the current root element as n:
         n = g.node(vid)
-        # We skip this element if it does not have a positive length:
-        if n.length <= 0.:
-            continue
+        try:
+            # We skip this element if it does not have a positive length:
+            if n.length <= 0.:
+                continue
+        except:
+            print("PROBLEM!")
 
         # We calculate the geometric features required by pyvista to display a cylinder at the right spot:
         x1 = n.x1
@@ -173,7 +178,7 @@ def plotting_roots_with_pyvista(g, displaying_root_hairs = True,
         direction_x = x2 - x1
         direction_y = y2 - y1
         direction_z = z2 - z1
-        height = ((x2 - x1) ** 2 + (y2 - y1) ** 2 + (z2 - z1) ** 2) ** 0.5
+        height = np.sqrt((x2 - x1)*(x2 - x1) + (y2 - y1)*(y2 - y1) + (z2 - z1)*(z2 - z1))
         radius = n.radius
         # We add the color and opacity to a list:
         color = n.color
@@ -230,7 +235,7 @@ def plotting_roots_with_pyvista(g, displaying_root_hairs = True,
     # CREATING THE SCENE:
     # Adding the multi-blocks to a plot:
     actor, mapper = p.add_composite(blocks)
-    print("    > Adding the colors and transparencies of the plot...")
+    print("   > Adding the colors and transparencies of the plot...")
     # We cover each block and set its color and opacity:
     for i in range(1,blocks.n_blocks+1):
         mapper.block_attr[i].color = colors[i-1]
@@ -260,14 +265,14 @@ def plotting_roots_with_pyvista(g, displaying_root_hairs = True,
     p.background_color = background_color
     # We set the final size of the window:
     p.window_size = [plot_width, plot_height]
-    # # We can improve the resolution of the image:
-    # p.image_scale = 2
+    # We can improve the resolution of the image:
+    p.image_scale = factor_of_higher_resolution
 
     # p.line_smoothing = True
     # p.add_bounding_box(line_width=3, color='black')
     # p.enable_terrain_style(mouse_wheel_zooms=True, shift_pans=True)
 
-    print("> The plot has been created!")
+    print("The plot has been created!")
 
     # SHOWING/RECORDING THE PLOT:
     if recording_image:
@@ -277,7 +282,8 @@ def plotting_roots_with_pyvista(g, displaying_root_hairs = True,
     elif showing:
         p.show(auto_close=closing_window)
 
-    # pv.close_all()
+    if closing_window:
+        pv.close_all()
 
     return p
 
@@ -285,11 +291,13 @@ def plotting_roots_with_pyvista(g, displaying_root_hairs = True,
 #-----------------------------------------------------------------------------------------------
 
 def fast_plotting_roots_with_pyvista(g, displaying_root_hairs = False,
-                                     showing=True, recording_image=True, image_file='plot.png', closing_window=False,
+                                     showing=True, recording_image=True, image_file='plot.png',
+                                     factor_of_higher_resolution=1,
                                      background_color = [94, 76, 64],
                                      plot_width=1000, plot_height=750,
                                      camera_x=0.3, camera_y=0., camera_z=-0.07,
-                                     focal_x=0., focal_y=0., focal_z=-0.07):
+                                     focal_x=0., focal_y=0., focal_z=-0.07,
+                                     closing_window=False):
     """
     This functions aims to plot root system with Pyvista.
     :param g: the root MTG to be displayed
@@ -481,14 +489,14 @@ def fast_plotting_roots_with_pyvista(g, displaying_root_hairs = False,
     p.background_color = background_color
     # We set the final size of the window:
     p.window_size = [plot_width, plot_height]
-    # # We can improve the resolution of the image:
-    # p.image_scale = 2
+    # We can improve the resolution of the image:
+    p.image_scale = factor_of_higher_resolution
 
     # p.line_smoothing = True
     # p.add_bounding_box(line_width=3, color='black')
     # p.enable_terrain_style(mouse_wheel_zooms=True, shift_pans=True)
 
-    print("> The plot has been created!")
+    print("The plot has been created!")
 
     # SHOWING/RECORDING THE PLOT:
     if recording_image:
@@ -498,7 +506,8 @@ def fast_plotting_roots_with_pyvista(g, displaying_root_hairs = False,
     elif showing:
         p.show(auto_close=closing_window)
 
-    # pv.close_all()
+    # if closing_window:
+    #     pv.close_all()
 
     return p
 
@@ -510,32 +519,34 @@ def fast_plotting_roots_with_pyvista(g, displaying_root_hairs = False,
 if __name__ == '__main__':
 
     # Loading an actual root MTG that was previously recorded:
-    filepath = 'C:/Users/frees/rhizodep/saved_outputs/root02000_142.pckl'
+    filepath = 'C:/Users/frees/rhizodep/saved_outputs/selected_MTG_files/root01847.pckl'
     f = open(filepath, 'rb')
     g = pickle.load(f)
     f.close()
-
-    # # In case it has not been done so far - we define the colors in g according to a specific property:
+    #
+    # In case it has not been done so far - we define the colors in g according to a specific property:
     # my_colormap(g, property_name="C_hexose_root", cmap='jet', vmin=1e-6, vmax=1e-3, lognorm=True)
+    # my_colormap(g, property_name="total_exchange_surface_with_soil_solution", cmap='jet', vmin=1e-6, vmax=1e-3, lognorm=True)
+    my_colormap(g, property_name = "net_rhizodeposition_rate_per_day_per_cm", cmap='jet', vmin=1e-8, vmax=1e-5, lognorm=True)
 
     # We can use the function based on plotting each axis (from Tristan):
     # plot_mtg_alt(g, cmap_property='length')
     # plot_mtg_new(g)
 
-    # We can create the "long-way" plot (TAKES TIME, BUT ALWAYS WORKS!):
-    p = plotting_roots_with_pyvista(g, displaying_root_hairs = True,
-                                    showing=True, recording_image=True,
-                                    image_file='C:/Users/frees/rhizodep/saved_outputs/plot.png',
-                                    background_color = [94, 76, 64],
-                                    plot_width=800, plot_height=800,
-                                    camera_x=0.3, camera_y=0., camera_z=-0.07,
-                                    focal_x=0., focal_y=0., focal_z=-0.07)
+    # # We can create the "long-way" plot (TAKES TIME, BUT ALWAYS WORKS!):
+    # p = plotting_roots_with_pyvista(g, displaying_root_hairs = False,
+    #                                 showing=True, recording_image=True,
+    #                                 image_file='C:/Users/frees/rhizodep/saved_outputs/plot.png',
+    #                                 background_color = [94, 76, 64],
+    #                                 plot_width=800, plot_height=800,
+    #                                 camera_x=0.3, camera_y=0., camera_z=-0.07,
+    #                                 focal_x=0., focal_y=0., focal_z=-0.07)
 
-    # # We can use the "fast" function that uses some tricks to plot all at once (FAST, BUT SOMETIMES BUGS!):
-    # fast_plotting_roots_with_pyvista(g, displaying_root_hairs = True,
-    #                                  showing=True, recording_image=False,
-    #                                  image_file='C:/Users/frees/rhizodep/saved_outputs/plot.png',
-    #                                  background_color = [94, 76, 64],
-    #                                  plot_width=1000, plot_height=800,
-    #                                  camera_x=0.3, camera_y=0., camera_z=-0.07,
-    #                                  focal_x=0., focal_y=0., focal_z=-0.07)
+    # We can use the "fast" function that uses some tricks to plot all at once (FAST, BUT SOMETIMES BUGS!):
+    fast_plotting_roots_with_pyvista(g, displaying_root_hairs = False,
+                                     showing=True, recording_image=False,
+                                     image_file='C:/Users/frees/rhizodep/saved_outputs/plot.png',
+                                     background_color = [94, 76, 64],
+                                     plot_width=1000, plot_height=800,
+                                     camera_x=0.3, camera_y=0., camera_z=-0.07,
+                                     focal_x=0., focal_y=0., focal_z=-0.07)

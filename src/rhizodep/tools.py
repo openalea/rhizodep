@@ -342,19 +342,34 @@ def my_colormap(g, property_name, cmap='jet', vmin=None, vmax=None, lognorm=True
     if lognorm and (vmin <=0 or vmax <=0):
         raise Exception("Sorry, it is not possible to represent negative values in a log scale - check vmin and vmax!")
 
+    # We access the property of the MTG and calculated normalized values between 0 and 255 from it, for each element:
     prop = g.property(property_name)
     keys = prop.keys()
     values = list(prop.values())
-    # m, M = int(values.min()), int(values.max())
-
     _cmap = color.get_cmap(cmap)
     norm = color.Normalize(vmin, vmax) if not lognorm else color.LogNorm(vmin, vmax)
     values = norm(values)
-
     colors = (_cmap(values)[:, 0:3]) * 255
     colors = np.array(colors, dtype=np.int).tolist()
 
+    # In case no color values could be calculated from the given information:
+    if len(colors) == 0:
+        print("WATCH OUT: we could not attribute colors to the values of the property", property_name,"; the colors were set to a default value.")
+        prop = g.property("label")
+        keys = prop.keys()
+        colors = [[250,150,100]]*len(keys)
+        colors = np.array(colors, dtype=np.int).tolist()
+
+    # Finally, the property "color" is created/updated with the new computed values:
     g.properties()['color'] = dict(zip(keys, colors))
+
+    # We also check whether dead roots should be displayed in a specific way:
+    for vid in g.vertices_iter(scale=1):
+        n=g.node(vid)
+        if n.length <= 0.:
+            continue
+        if n.type=="Dead" or n.type=="Just_dead":
+            n.color = [0,0,0]
 
     return g
 
@@ -392,7 +407,7 @@ def prepareScene(scene, width=1200, height=1200, scale=1, x_center=0., y_center=
     # # We define the absolute values of the (x,y,z) coordinates of the camera:
     # pgl.Viewer.camera.position=cam_pos
     # pgl.Viewer.camera.angle=(0,180,180)
-    print(" >>> The camera position for this plot is:", pgl.Viewer.camera.position)
+    # print(" >>> The camera position for this plot is:", pgl.Viewer.camera.position)
     # We define the dimensions of the graph:
     pgl.Viewer.frameGL.setSize(width, height)
     # We define whether grids are displayed or not:
@@ -583,7 +598,6 @@ def plot_mtg(g,
                         living_color_vector_Blue = colors[vid][2]
 
                         living_fraction = n.living_root_hairs_number/n.total_root_hairs_number
-                        # print("Living fraction is", living_fraction)
 
                         transparency = dead_transparency + (living_transparency - dead_transparency) * living_fraction
                         color_vector_Red = floor(dead_color_vector_Red
@@ -670,9 +684,9 @@ def plot_mtg(g,
         # TODO: WATCH OUT the following
         # We update the scene with the specified position of the center of the graph and the camera:
         new_scene = prepareScene(new_scene, width=width, height=height,
-                                  x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
+                                 x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
                                  grid=grid_display,
-                                  background_color=background_color)
+                                 background_color=background_color)
 
         # # For preventing PlantGL to update the display of the graph at each new time step:
         # pgl.Viewer.redrawPolicy=False
@@ -922,7 +936,6 @@ def colorbar(title="Radius (m)", cmap='jet', lognorm=True, vmin=1e-12, vmax=1e3,
 
             if coeff > floor(coeff) * (1 + 1e-3) and coeff != 1:
                 number_of_digits = 1
-                print("Indeed:", coeff, floor(coeff) * (1 + 1e-3))
                 break
             else:
                 number_of_digits = 0
@@ -986,10 +999,18 @@ def indexing_root_MTG(g):
     :return: [none]
     """
 
-    #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    #-------------------------------------------------------------------------------------------------------------------
 
     # We create an internal function that computes the axis ID of each element on a given axis:
     def indexing_segments(starting_vid=1, axis_string="Ax00001"):
+        """
+        This internal function starts from a specific root element on a specific axis, then covers all subsequent
+        children of the root element on this axis and generates for each of them a unique axis-element identifier.
+        :param starting_vid:  the vertex ID to start with
+        :param axis_string: the string code for the axis
+        :return: two lists, containing the vertices IDs from all first axis element of lateral roots emerging from the
+        current axis, and the axis-element identifier of each of them, respectively.
+        """
 
         # We initialize temporary variables:
         segment_number = 1
@@ -1076,7 +1097,7 @@ def indexing_root_MTG(g):
 
         return list_of_lateral_vid, list_of_lateral_axis_strings
 
-    #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    #-------------------------------------------------------------------------------------------------------------------
 
     # # We define "root" as the starting point of the loop below:
     # root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
@@ -1103,7 +1124,7 @@ def indexing_root_MTG(g):
         list_of_lateral_vid = new_list_of_starting_vid
         list_of_lateral_axis_strings = new_list_of_lateral_axis_strings
 
-    print("The property 'axis_ID' has been computed on the whole root MTG!")
+    # print("The property 'axis_ID' has been computed on the whole root MTG!")
 
     return
 

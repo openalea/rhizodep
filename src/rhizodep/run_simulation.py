@@ -20,6 +20,7 @@ import openalea.plantgl.all as pgl
 from openalea.mtg import turtle as turt
 import rhizodep.model as model
 import rhizodep.tools as tools
+import rhizodep.alternative_plotting as alternative_plotting
 import rhizodep.parameters as param
 import rhizodep.mycorrhizae as mycorrhizae
 
@@ -29,7 +30,8 @@ import pickle
 
 # We define the main scenarios program:
 def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
-                    radial_growth="Impossible", ArchiSimple=False, ArchiSimple_C_fraction=0.10,
+                    radial_growth=False, ArchiSimple=False, ArchiSimple_C_fraction=0.10,
+                    simple_growth_duration=True,
                     input_file="None",
                     input_file_time_step_in_days=1/24.,
                     outputs_directory='outputs',
@@ -59,14 +61,17 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     g_properties_directory="MTG_properties",
                     random=True,
                     plotting=True,
+                    plotting_with_pyvista=False,
                     scenario_id=1,
                     displayed_property="C_hexose_root", displayed_vmin=1e-6, displayed_vmax=1e-0,
                     log_scale=True, cmap='brg',
                     root_hairs_display=True,
                     width=1200, height=1200,
-                    x_center=0, y_center=0, z_center=-1, z_cam=-1,
+                    x_center=0, y_center=0, z_center=0,
+                    x_cam=-0.1, y_cam=-0.1, z_cam=-0.2,
                     camera_distance=0., step_back_coefficient=0., camera_rotation=False, n_rotation_points=24 * 5,
                     background_color = [0,0,0]):
+
     """
     This general function controls the actual scenarios of root growth and C fluxes over the whole scenarios period.
     :param g: the root MTG to consider
@@ -256,7 +261,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     step = initial_step_number
 
-    # If we want to save all results at specified time intervals, we can create a list corresponding time steps:
+    # If we want to save all results at specified time intervals, we can create a list with corresponding time steps:
     recording_steps_list = list(range(initial_step_number - 1, initial_step_number + n_steps,
                                       round(recording_interval_in_days / time_step_in_days)))
 
@@ -322,17 +327,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     # Otherwise, the camera will stay on a fixed direction:
     else:
-        x_cam = camera_distance
-        y_cam = 0
-        z_cam = z_cam
 
-        # # We prepare the scene with the specified position of the center of the graph and the camera:
-        # initial_scene = pgl.Scene()
-        # tools.prepareScene(initial_scene, width=width, height=height,
-        #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam,
-        #                    z_cam=z_cam,
-        #                    background_color=background_color)
-
+        # We call the function plot_MTG so that the (x,y,z) coordinates of each root element is recorded:
         sc = tools.plot_mtg(g,
                             # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
                             prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
@@ -340,23 +336,41 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                             root_hairs_display=root_hairs_display,
                             mycorrhizal_fungus_display=mycorrhizal_fungus,
                             width=width, height=height,
-                            x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam,
-                            y_cam=y_cam, z_cam=z_cam,
+                            x_center=x_center, y_center=y_center, z_center=z_center,
+                            x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
                             displaying_PlantGL_Viewer=plotting)
 
-        # We move the camera further from the root system:
+        # We can move the camera further from the root system:
         x_camera = x_cam * (1 + step_back_coefficient)
         z_camera = z_cam * (1 + step_back_coefficient)
 
     if plotting:
-        # We display the scene:
-        pgl.Viewer.display(sc)
-        # If needed, we wait for a few seconds so that the graph is well positioned:
-        time.sleep(0.5)
         if recording_images:
-            # pgl.Viewer.frameGL.setSize(width, height)
             image_name = os.path.join(root_images_directory, 'root%.5d.png')
-            pgl.Viewer.saveSnapshot(image_name % step)
+        if plotting_with_pyvista:
+            print("Before plotting...")
+            # We can create the "long-way" plot with Pyvista (TAKES TIME, BUT ALWAYS WORKS!):
+            p = alternative_plotting.plotting_roots_with_pyvista(g, displaying_root_hairs = root_hairs_display,
+                                                                 showing=True, recording_image=recording_images,
+                                                                 image_file=image_name,
+                                                                 background_color = background_color,
+                                                                 plot_width=width, plot_height=height,
+                                                                 camera_x=x_cam, camera_y=y_cam, camera_z=z_cam,
+                                                                 focal_x=x_center, focal_y=y_center, focal_z=z_center,
+                                                                 closing_window=True)
+            print("After plotting...")
+        else:
+            # We display the scene:
+            pgl.Viewer.display(sc)
+            # # If needed, we wait for a few seconds so that the graph is well positioned:
+            # time.sleep(0.5)
+            if recording_images:
+                # pgl.Viewer.frameGL.setSize(width, height)
+                pgl.Viewer.saveSnapshot(image_name % step)
+
+    # For computing a personalized indexation of the whole root system:
+    # -----------------------------------------------------------------
+    tools.indexing_root_MTG(g)
 
     # For integrating root variables on the z axis:
     # ----------------------------------------------
@@ -380,8 +394,9 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     # SUMMING AND PRINTING VARIABLES ON THE ROOT SYSTEM:
     # --------------------------------------------------
 
-    # We reset to 0 all growth-associated C costs:
+    # We reset to 0 all growth-associated C costs and recalculate the surfaces:
     model.reinitializing_growth_variables(g)
+    model.update_surfaces_and_volumes(g)
 
     if printing_sum or (not printing_sum and recording_sum):
         dictionary = model.summing_and_possibly_homogenizing(g,
@@ -465,7 +480,12 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             pickle.dump(g, output, protocol=2)
         print("The MTG file corresponding to the root system has been recorded.")
 
-        # We can record all the results in a CSV file:
+        # And we record all MTG properties:
+        prop_file_name = os.path.join(g_properties_directory, 'root%.5d.csv')
+        model.recording_MTG_properties(g, file_name=prop_file_name % (step + 1))
+        print("The properties of the MTG file have also been recorded.")
+
+        # We can also record all the results in a CSV file:
         if recording_sum:
             # We create a data_frame from the vectors generated in the main program up to this point:
             data_frame = pd.DataFrame({"Final time (days)": time_in_days_series,
@@ -676,7 +696,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # (NOTE: segmentation should always occur AFTER actual growth):
                 model.segmentation_and_primordia_formation(g, time_step_in_seconds, printing_warnings=printing_warnings,
                                                            soil_temperature_in_Celsius=soil_temperature, random=random,
-                                                           ArchiSimple=ArchiSimple,
+                                                           simple_growth_duration=simple_growth_duration,
                                                            nodules=nodules,
                                                            root_order_limitation=root_order_limitation,
                                                            root_order_treshold=root_order_treshold)
@@ -710,11 +730,12 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 # We proceed to the segmentation of the whole root system
                 # (NOTE: segmentation should always occur AFTER actual growth):
                 model.segmentation_and_primordia_formation(g, time_step_in_seconds,
-                                                             soil_temperature_in_Celsius=soil_temperature,
-                                                             random=random,
-                                                             nodules=nodules,
-                                                             root_order_limitation=root_order_limitation,
-                                                             root_order_treshold=root_order_treshold)
+                                                           soil_temperature_in_Celsius=soil_temperature,
+                                                           simple_growth_duration=simple_growth_duration,
+                                                           random=random,
+                                                           nodules=nodules,
+                                                           root_order_limitation=root_order_limitation,
+                                                           root_order_treshold=root_order_treshold)
 
                 # We update the distance from tip for each root element in each root axis:
                 model.update_distance_from_tip(g)
@@ -873,6 +894,10 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                         # We reinitialize the "previous" amount of C in the system with the current one for the next time step:
                     previous_C_in_the_system = current_C_in_the_system
 
+            # For computing a personalized indexation of the whole root system:
+            # -----------------------------------------------------------------
+            tools.indexing_root_MTG(g)
+
             # PLOTTING THE MTG:
             # ------------------
 
@@ -944,14 +969,27 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 x_camera = x_cam * (1 + step_back_coefficient)
                 z_camera = z_cam * (1 + step_back_coefficient)
 
-            # We finally display the MTG on PlantGL and possibly record it:
             if plotting:
-                pgl.Viewer.display(sc)
-                # If needed, we wait for a few seconds so that the graph is well positioned:
-                time.sleep(0.5)
                 if recording_images:
                     image_name = os.path.join(root_images_directory, 'root%.5d.png')
-                    pgl.Viewer.saveSnapshot(image_name % (step + 1))
+                if plotting_with_pyvista:
+                    # We can create the "long-way" plot with Pyvista (TAKES TIME, BUT ALWAYS WORKS!):
+                    p = alternative_plotting.plotting_roots_with_pyvista(g, displaying_root_hairs=root_hairs_display,
+                                                                         showing=True, recording_image=recording_images,
+                                                                         image_file=image_name,
+                                                                         background_color=background_color,
+                                                                         plot_width=width, plot_height=height,
+                                                                         camera_x=x_cam, camera_y=y_cam, camera_z=z_cam,
+                                                                         focal_x=x_center, focal_y=y_center, focal_z=z_center,
+                                                                         closing_window=True)
+                else:
+                    # We display the scene:
+                    pgl.Viewer.display(sc)
+                    # # If needed, we wait for a few seconds so that the graph is well positioned:
+                    # time.sleep(0.5)
+                    if recording_images:
+                        # pgl.Viewer.frameGL.setSize(width, height)
+                        pgl.Viewer.saveSnapshot(image_name % step)
 
             # For integrating root variables on the z axis:
             # ----------------------------------------------
@@ -979,6 +1017,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             # If the current iteration correspond to the time where one full time interval for recording has been reached:
             if step in recording_steps_list:
                 # Then we record the current scenarios results:
+                print("")
                 print("Recording the scenarios results obtained so far (until time t = {:.2f}".format(
                     Decimal((step+1) * time_step_in_days)), "days)...")
                 recording_attempt()

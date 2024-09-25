@@ -17,6 +17,7 @@ import openalea.plantgl.all as pgl
 from openalea.plantgl.all import *
 from PIL import Image, ImageDraw, ImageFont
 
+from rhizodep.model import recording_MTG_properties
 from rhizodep.tools import (my_colormap, get_root_visitor, prepareScene, circle_coordinates, plot_mtg,
                             colorbar, sci_notation, indexing_root_MTG)
 from rhizodep.alternative_plotting import plotting_roots_with_pyvista, fast_plotting_roots_with_pyvista
@@ -273,63 +274,72 @@ def classifying_on_z(g, z_min=0, z_max=1, z_interval=0.1):
 
     return final_dictionnary
 
-
-# Integration of root variables within different z_intervals:
-# -----------------------------------------------------------
-def recording_MTG_properties(g, file_name='g_properties.csv'):
-    """
-    This function records all the properties of each node of the MTG "g" in a specific csv file.
-    """
-
-    # We define and reorder the list of all properties of the MTG:
-    list_of_properties = list(g.properties().keys())
-    list_of_properties.sort()
-
-    # We create an empty list of node indices:
-    node_index = []
-    # We create an empty list that will contain the properties of each node:
-    g_properties = []
-
-    # We cover all the vertices in the MTG:
-    for vid in g.vertices_iter(scale=1):
-        # Inititalizing an empty list of properties for the current node:
-        node_properties = []
-        # Adding the index at the beginning of the list:
-        node_properties.append(vid)
-        # n represents the vertex:
-        n = g.node(vid)
-        # For each possible property:
-        for property in list_of_properties:
-            # We add the value of this property to the list:
-            node_properties.append(getattr(n, property, "NA"))
-        # Finally, we add the new node's properties list as a new item in g_properties:
-        g_properties.append(node_properties)
-    # We create a list containing the headers of the dataframe:
-    column_names = ['node_index']
-    column_names.extend(list_of_properties)
-    # We create the final dataframe:
-    data_frame = pd.DataFrame(g_properties, columns=column_names)
-    # We record the dataframe as a csv file:
-    data_frame.to_csv(file_name, na_rep='NA', index=False, header=True)
-
-    return
-
 ########################################################################################################################
+# SIMPLE FUNCTION FOR RECREATING A MTG FROM THE CSV FILES CONTAINING ITS PROPERTIES:
+def create_MTG_from_csv_file(csv_filename='MTG_00003.csv'):
+
+    # We first read the csv file where all the properties of each vertex has been previously recorded:
+    try:
+        dataframe = pd.read_csv(csv_filename, sep=',', header=0)
+    except:
+        print("ERROR: the file", csv_filename,"could not be opened!")
+
+    # We initialize an empty MTG:
+    g = MTG()
+    # We initialize the first element of the MTG:
+    n = g.node(g.add_component(g.root))
+
+    # We define the list of vertices'index to be added to the MTG:
+    list_of_vid = dataframe['node_index']
+    # We define the list containing the name of each property to add:
+    list_of_properties = list(dataframe.columns.values)
+
+    # We assign each property read in the file to an actual property of the MTG:
+    for property in list_of_properties:
+        # In the special case of "node_index", the old index might not correspond to the new ones in the MTG.
+        if property == "node_index":
+            # In that case, we rename this property as "original_node_index" to avoid any confusion in the new MTG:
+            g.add_property("original_node_index")
+        else:
+            g.add_property(property)
+
+    # We cover each new vertex to be added to the MTG:
+    for index in range(0,len(list_of_vid)):
+        # For the current element, we cover all the properties defined in the csv file:
+        for property in list_of_properties:
+            # For the specific property, we get the single value corresponding to the current vertex ID:
+            property_value = dataframe[property].loc[dataframe['node_index'] == list_of_vid[index]].iloc[0]
+            # NB: we need to add 'iloc[0]' as the previous expression otherwise returns a series, not a single value.
+            # And we finally assign the good value to the good property to the current element.
+            if property == "node_index":
+                g.properties()["original_node_index"][index+1] = property_value
+            else:
+                g.properties()[property][index+1] = property_value
+        # And if this did not correspond to the last element to be added, we add a new element:
+        if index != len(list_of_vid) - 1:
+            print("After element", n.index(), "we add a new child!")
+            # We now define the next element as the child of the previous element:
+            n = n.add_child()
+
+    return g
 
 ########################################################################################################################
 # MAIN FUNCTION FOR LOADING AND DISPLAYING/EXTRACTING PROPERTIES FROM MTG FILES
-########################################################################################################################
-
 def loading_MTG_files(my_path='',
                       opening_list=False,
+                      file_extension='pckl',
                       MTG_directory='MTG_files',
                       single_MTG_filename='root00001.pckl',
                       list_of_MTG_ID=None,
+                      plotting_with_PlantGL=False,
+                      normal_plotting_with_pyvista=False,
+                      fast_plotting_with_pyvista=False,
+                      closing_window=False,
+                      factor_of_higher_resolution=3,
                       property="C_hexose_root", vmin=1e-5, vmax=1e-2, log_scale=True, cmap='jet',
                       width=1200, height=1200,
                       x_center=0, y_center=0, z_center=0,
                       x_cam=0, y_cam=0, z_cam=0,
-                      plotting_with_pyvista = False,
                       step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
                       background_color=[0,0,0],
                       root_hairs_display=True,
@@ -394,6 +404,39 @@ def loading_MTG_files(my_path='',
                 for file in files:
                     os.remove(os.path.join(root, file))
 
+    # Depending on the extension of the file, we may either consider pickle files or csv files containing
+    # all the properties of the MTG:
+    if file_extension == 'pckl':
+        # We get the list of the names of all MTG files:
+        filenames = Path(g_dir).glob('*pckl')
+    elif file_extension == 'csv':
+        # We get the list of the names of all MTG files:
+        filenames = Path(g_dir).glob('*csv')
+    else:
+        print("!!! ERROR: the file extension can only be 'pckl' or 'csv'!!!")
+        return
+
+    filenames = sorted(filenames)
+    # We initialize a list containing the numbers of the MTG to be opened:
+    list_of_MTG_numbers = []
+
+    # If the instructions are to open the whole list of MTGs in the directory and not a subset of it:
+    if opening_list and not list_of_MTG_ID:
+        # We cover each name of MTG ending as 'rootXXXX.pckl' (where X is a digit), extract the corresponding number,
+        # and add it to the list:
+        for filename in filenames:
+            if file_extension == 'pckl':
+                MTG_ID = int(filename[-10:-5])
+            else:
+                MTG_ID = int(filename[-9:-4])
+            list_of_MTG_numbers.append(MTG_ID)
+    # If the instructions are to open a specific list:
+    elif opening_list and list_of_MTG_ID:
+        list_of_MTG_numbers =  list_of_MTG_ID
+    # Otherwise, we open a single file:
+    else:
+        list_of_MTG_numbers = [int(single_MTG_filename[-10:-5])]
+
     if recording_g_properties:
         # We define the directory "MTG_properties"
         prop_dir = os.path.join(MTG_properties_folder)
@@ -407,225 +450,203 @@ def loading_MTG_files(my_path='',
                 for file in files:
                     os.remove(os.path.join(root, file))
 
+        # In addition, we get the final list of properties corresponding to the last MTG of the list.
+        # We first load the last MTG of the list:
+        ID = list_of_MTG_numbers[-1]
+        if file_extension == 'pckl':
+            filename = 'root%.5d.pckl' % ID
+            MTG_path = os.path.join(g_dir, filename)
+            f = open(MTG_path, 'rb')
+            g = pickle.load(f)
+            f.close()
+        else:
+            filename = 'root%.5d.csv' % ID
+            MTG_path = os.path.join(g_dir, filename)
+            g = create_MTG_from_csv_file(csv_filename=MTG_path)
+
+        # And we define the final list of properties to record according to all the properties of this MTG:
+        list_of_properties = list(g.properties().keys())
+        # We sort it alphabetically:
+        list_of_properties.sort(key=str.lower)
+
     if z_classification:
         # We create an empty dataframe that will contain the results of z classification:
         z_dictionnary_series = []
 
-    # We get the list of the names of all MTG files:
-    filenames = Path(g_dir).glob('*pckl')
-    filenames = sorted(filenames)
-    # We initialize a list containing the numbers of the MTG to be opened:
-    list_of_MTG_numbers = []
-
-    # If the instructions are to open the whole list of MTGs in the directory and not a subset of it:
-    if opening_list and not list_of_MTG_ID:
-        # We cover each name of MTG ending as 'rootXXXX.pckl' (where X is a digit), extract the corresponding number,
-        # and add it to the list:
-        for filename in filenames:
-            MTG_ID = int(filename[-10:-5])
-            list_of_MTG_numbers.append(MTG_ID)
-    # If the instructions are to open a specific list:
-    elif opening_list and list_of_MTG_ID:
-        list_of_MTG_numbers =  list_of_MTG_ID
-    # Otherwise, we open a single file:
-    else:
-        list_of_MTG_numbers = [int(single_MTG_filename[-10:-5])]
-
-    # # Preparing the PGL viewer:
-    # #--------------------------
-    # # Defining the ID and full name of the MTG file:
-    # ID = list_of_MTG_numbers[-1]
-    # filename = 'root%.5d.pckl' % ID
-    #
-    # # Loading the MTG file:
-    # MTG_path = os.path.join(g_dir, filename)
-    # f = open(MTG_path, 'rb')
-    # g = pickle.load(f)
-    # f.close()
-    #
-    # MTG_scene = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
-    #                      width=width,
-    #                      height=height,
-    #                      x_center=x_center,
-    #                      y_center=y_center,
-    #                      z_center=z_center,
-    #                      x_cam=x_cam,
-    #                      y_cam=y_cam,
-    #                      z_cam=z_cam,
-    #                      background_color=background_color,
-    #                      root_hairs_display=root_hairs_display,
-    #                      mycorrhizal_fungus_display=mycorrhizal_fungus_display)
-    # MTG_scene = prepareScene(MTG_scene, width=width, height=height,
-    #                          x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
-    #                          background_color=background_color)
-    # pgl.Viewer.display(MTG_scene)
-
-    # pgl.Viewer.redrawPolicy=False
+    # If the camera is supposed to move around the MTG:
+    if camera_rotation:
+        # We record the initial distance of the camera from the center:
+        initial_camera_distance = max(x_cam, y_cam)
+        camera_distance = initial_camera_distance
+        # We initialize the index for reading each coordinates:
+        index_camera = 0
+        # We calculate the coordinates of the camera on the circle around the center:
+        x_coordinates, y_coordinates, z_coordinates = circle_coordinates(z_center=z_cam,
+                                                                         radius=camera_distance,
+                                                                         n_points=n_rotation_points)
 
     # We cover each of the MTG files in the list (or only the specified file when requested):
     # ---------------------------------------------------------------------------------------
-    # for step in range(step_initial, step_final):
     for MTG_position in range(0,len(list_of_MTG_numbers)):
-        # Defining the ID and full name of the MTG file:
-        ID = list_of_MTG_numbers[MTG_position]
-        filename = 'root%.5d.pckl' % ID
-
-        print("Dealing with MTG", ID, "-", MTG_position+1,"out of", len(list_of_MTG_numbers), "MTGs to consider...")
 
         # Loading the MTG file:
-        MTG_path = os.path.join(g_dir,filename)
-        f = open(MTG_path, 'rb')
-        g = pickle.load(f)
-        f.close()
+        #----------------------
+        ID = list_of_MTG_numbers[MTG_position]
+        print("Dealing with MTG", ID, "-", MTG_position+1,"out of", len(list_of_MTG_numbers), "MTGs to consider...")
 
-        print("New MTG opened!")
+        if file_extension == 'pckl':
+            filename = 'root%.5d.pckl' % ID
+            MTG_path = os.path.join(g_dir, filename)
+            f = open(MTG_path, 'rb')
+            g = pickle.load(f)
+            f.close()
+        else:
+            filename = 'root%.5d.csv' % ID
+            MTG_path = os.path.join(g_dir, filename)
+            g = create_MTG_from_csv_file(csv_filename=MTG_path)
+        print("   > New MTG opened!")
 
         # Plotting the MTG:
         # ------------------
+        if recording_images:
+            # We define the name of the image:
+            image_name = os.path.join(video_dir, 'root%.5d.png' % ID)
+        else:
+            image_name = "plot.png"
 
         # If the rotation of the camera around the root system is required:
         if camera_rotation:
-            # We calculate the coordinates of the camera on the circle around the center:
-            x_coordinates, y_coordinates, z_coordinates = circle_coordinates(z_center=z_cam,
-                                                                             radius=camera_distance,
-                                                                             n_points=n_rotation_points)
-            # We initialize the index for reading each coordinates:
-            index_camera = 0
+            # We redefine the position of the camera according to the pre-registered circle coordinates around the MTG:
             x_cam = x_coordinates[index_camera]
             y_cam = y_coordinates[index_camera]
             z_cam = z_coordinates[index_camera]
-            # We plot the current file:
-            sc = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
-                          width=width,
-                          height=height,
-                          x_center=x_center,
-                          y_center=y_center,
-                          z_center=z_center,
-                          x_cam=x_cam,
-                          y_cam=y_cam,
-                          z_cam=z_cam)
-        else:
-            if plotting_with_pyvista:
-                if recording_images:
-                    # We define the name of the image:
-                    image_name = os.path.join(video_dir, 'root%.5d.png' % ID)
-                else:
-                    image_name = "plot.png"
-                # We color the MTG according to the property:
-                my_colormap(g, property_name=property, cmap='jet', vmin=vmin, vmax=vmax, lognorm=log_scale)
-                # # We plot the current file:
-                # plotting_roots_with_pyvista(g, displaying_root_hairs=root_hairs_display,
-                #                             showing=False, recording_image=True, image_file=image_name,
-                #                             background_color=background_color,
-                #                             plot_width=width, plot_height=height,
-                #                             camera_x=x_cam, camera_y=y_cam, camera_z=z_cam,
-                #                             focal_x=x_center, focal_y=y_center, focal_z=z_center)
-                print("Trying to plot...")
+            # And we move the index for the next plot:
+            index_camera += 1
+            # If this index is higher than the number of coordinates in each vector:
+            if index_camera >= n_rotation_points:
+                # Then we reset the index to 0:
+                index_camera = 0
+            # If the camera is also supposed to change its distance from the center:
+            if step_back_coefficient != 0.:
+                # Then we increase the distance according to the step_back_coefficient:
+                camera_distance += initial_camera_distance * step_back_coefficient
+                # And we re-calculate the coordinates of the camera on the circle around the center, used at the next image:
+                x_coordinates, y_coordinates, z_coordinates = circle_coordinates(z_center=z_cam,
+                                                                                 radius=camera_distance,
+                                                                                 n_points=n_rotation_points)
+
+        # CASE 1: the MTG is to be plot with Pyvista
+        #-------------------------------------------
+        if normal_plotting_with_pyvista or fast_plotting_with_pyvista:
+
+            # We color the MTG according to the property:
+            my_colormap(g, property_name=property, cmap='jet', vmin=vmin, vmax=vmax, lognorm=log_scale)
+            print("   > Trying to plot...")
+            if normal_plotting_with_pyvista:
+                # We plot the current file:
+                plotting_roots_with_pyvista(g, displaying_root_hairs=root_hairs_display,
+                                            showing=False, recording_image=recording_images, image_file=image_name,
+                                            factor_of_higher_resolution=factor_of_higher_resolution,
+                                            background_color=background_color,
+                                            plot_width=width, plot_height=height,
+                                            camera_x=x_cam, camera_y=y_cam, camera_z=z_cam,
+                                            focal_x=x_center, focal_y=y_center, focal_z=z_center,
+                                            closing_window=closing_window)
+            else:
                 # We plot the current file:
                 fast_plotting_roots_with_pyvista(g, displaying_root_hairs=root_hairs_display,
                                                  showing=False, recording_image=recording_images, image_file=image_name,
+                                                 factor_of_higher_resolution=factor_of_higher_resolution,
                                                  background_color=background_color,
                                                  plot_width=width, plot_height=height,
                                                  camera_x=x_cam, camera_y=y_cam, camera_z=z_cam,
-                                                 focal_x=x_center, focal_y=y_center, focal_z=z_center)
-            else:
-                # We plot the current file:
-                MTG_scene = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
-                                     width=width,
-                                     height=height,
-                                     x_center=x_center,
-                                     y_center=y_center,
-                                     z_center=z_center,
-                                     x_cam=x_cam,
-                                     y_cam=y_cam,
-                                     z_cam=z_cam,
-                                     background_color=background_color,
-                                     root_hairs_display=root_hairs_display,
-                                     mycorrhizal_fungus_display=mycorrhizal_fungus_display)
-                # # We get a list of all shapes in the scene:
-                # shapes = dict((MTG_scene.id, sh) for sh in MTG_scene)
-                # # We add the shapes of the MTG in the initial general scene:
-                # for vid in shapes:
-                #     general_scene += shapes[vid]
+                                                 focal_x=x_center, focal_y=y_center, focal_z=z_center,
+                                                 closing_window=closing_window)
 
-                # general_scene += MTG_scene
+            # If the camera is supposed to move away at the next image, then we move the camera further from the root system:
+            x_cam = x_cam * (1 + step_back_coefficient)
+            z_cam = z_cam * (1 + step_back_coefficient)
 
-                # for shape in MTG_scene:
-                #     general_scene += shape
+            print("   > Plot made!")
+            print("")
 
-                # # And we move the camera further from the root system:
-                # x_camera = x_cam + x_cam * step_back_coefficient * MTG_position
-                # z_camera = z_cam + z_cam * step_back_coefficient * MTG_position
+        # CASE 2: the MTG is to be plot with PlantGL
+        #-------------------------------------------
+        elif plotting_with_PlantGL:
+            # We create the general scene:
+            sc = plot_mtg(g, prop_cmap=property, lognorm=log_scale, vmin=vmin, vmax=vmax, cmap=cmap,
+                                 width=width,
+                                 height=height,
+                                 x_center=x_center,
+                                 y_center=y_center,
+                                 z_center=z_center,
+                                 x_cam=x_cam,
+                                 y_cam=y_cam,
+                                 z_cam=z_cam,
+                                 background_color=background_color,
+                                 root_hairs_display=root_hairs_display,
+                                 mycorrhizal_fungus_display=mycorrhizal_fungus_display)
 
-                # general_scene = prepareScene(MTG_scene, width=width, height=height,
-                #                              x_center=x_center, y_center=y_center, z_center=z_center,
-                #                              x_cam=x_cam, y_cam=y_cam, z_cam=z_cam, background_color=[0, 0, 0])
-        print("Plot made!")
-        if adding_images_on_plot:
-            text = "t = 100 days"
-            # length_text=len(text)*50
-            # height_text = 120
-            length_text = 600
-            height_text = 600
-            font_size = 100
-            drawing_text(text=text, length=length_text, height=height_text, font_size=font_size, image_name="text.png")
-            # Adding text to the plot:
-            lower_left_x = 3
-            lower_left_y = -2
-            lower_left_z = -2
-            length = 1
-            height = 1
-            shape1 = showing_image(image_name="text.png",
-                                   x1=lower_left_x, y1=lower_left_y, z1=lower_left_z,
-                                   x2=lower_left_x, y2=lower_left_y, z2=lower_left_z + height,
-                                   x3=lower_left_x, y3=lower_left_y + length, z3=lower_left_z + height,
-                                   x4=lower_left_x, y4=lower_left_y + length, z4=lower_left_z
-                                   )
-            # Viewer.display(shape)
-            sc += shape1
+            # In case we want to add text:
+            if adding_images_on_plot:
+                text = "t = 100 days"
+                # length_text=len(text)*50
+                # height_text = 120
+                length_text = 600
+                height_text = 600
+                font_size = 100
+                drawing_text(text=text, length=length_text, height=height_text, font_size=font_size, image_name="text.png")
+                # Adding text to the plot:
+                lower_left_x = 3
+                lower_left_y = -2
+                lower_left_z = -2
+                length = 1
+                height = 1
+                shape1 = showing_image(image_name="text.png",
+                                       x1=lower_left_x, y1=lower_left_y, z1=lower_left_z,
+                                       x2=lower_left_x, y2=lower_left_y, z2=lower_left_z + height,
+                                       x3=lower_left_x, y3=lower_left_y + length, z3=lower_left_z + height,
+                                       x4=lower_left_x, y4=lower_left_y + length, z4=lower_left_z
+                                       )
+                # Viewer.display(shape)
+                sc += shape1
 
-            # Adding colorbar to the plot:
-            # Adding text to the plot:
-            lower_left_x = 6.5
-            lower_left_y = -1
-            lower_left_z = -3.8
-            length = 1
-            height = 1
-            shape2 = showing_image(image_name="colorbar_new.png",
-                                   x1=lower_left_x, y1=lower_left_y, z1=lower_left_z,
-                                   x2=lower_left_x, y2=lower_left_y, z2=lower_left_z + height,
-                                   x3=lower_left_x, y3=lower_left_y + length, z3=lower_left_z + height,
-                                   x4=lower_left_x, y4=lower_left_y + length, z4=lower_left_z
-                                   )
-            # Viewer.display(shape)
-            sc += shape2
+                # Adding colorbar to the plot:
+                # Adding text to the plot:
+                lower_left_x = 6.5
+                lower_left_y = -1
+                lower_left_z = -3.8
+                length = 1
+                height = 1
+                shape2 = showing_image(image_name="colorbar_new.png",
+                                       x1=lower_left_x, y1=lower_left_y, z1=lower_left_z,
+                                       x2=lower_left_x, y2=lower_left_y, z2=lower_left_z + height,
+                                       x3=lower_left_x, y3=lower_left_y + length, z3=lower_left_z + height,
+                                       x4=lower_left_x, y4=lower_left_y + length, z4=lower_left_z
+                                       )
+                # Viewer.display(shape)
+                sc += shape2
 
-        # DISPLAYING:
-        #############
-        # # We update the scene with the specified position of the center of the graph and the camera:
-        # MTG_scene = prepareScene(MTG_scene, width=width, height=height,
-        #                           x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
-        #                           background_color=background_color)
-
-        if not plotting_with_pyvista:
             # We finally display the MTG on PlantGL:
-            pgl.Viewer.display(MTG_scene)
-            # pgl.Viewer.update()
+            pgl.Viewer.display(sc)
+            # And we record its image:
+            if recording_images:
+                image_name = os.path.join(video_dir, 'root%.5d.png')
+                pgl.Viewer.saveSnapshot(image_name % ID)
 
-        # # We wait for 1 second, if needed:
-        # time.sleep(1)
+            # If the camera is supposed to move away at the next image, then we move the camera further from the root system:
+            x_cam = x_cam * (1 + step_back_coefficient)
+            z_cam = z_cam * (1 + step_back_coefficient)
 
-        # For recording the image of the graph for making a video later:
-        # -------------------------------------------------------------
-        if recording_images and not plotting_with_pyvista:
-            image_name = os.path.join(video_dir, 'root%.5d.png')
-            pgl.Viewer.saveSnapshot(image_name % ID)
+            print("   > Plot made!")
+            print("")
+
 
         # For recording the properties of g in a csv file:
         # ------------------------------------------------
         if recording_g_properties:
             prop_file_name = os.path.join(MTG_properties_folder, 'root%.5d.csv')
-            recording_MTG_properties(g, file_name=prop_file_name % ID)
+            recording_MTG_properties(g, file_name=prop_file_name % ID, list_of_properties=list_of_properties)
 
         # For integrating root variables on the z axis:
         # ----------------------------------------------
@@ -640,7 +661,7 @@ def loading_MTG_files(my_path='',
         data_frame_z = pd.DataFrame.from_dict(z_dictionnary_series)
         # We save the data_frame in a CSV file:
         data_frame_z.to_csv('z_classification.csv', na_rep='NA', index=False, header=True)
-        print("A new file 'z_classification.csv' has been saved.")
+        print("   > A new file 'z_classification.csv' has been saved.")
 
     return g
 
@@ -695,8 +716,13 @@ def averaging_a_list_of_MTGs(list_of_MTG_numbers=[143, 167, 191], list_of_proper
             n_vertices = g.nb_vertices()
             averaged_MTG = g
 
+    # We make sure that the list of properties is not empty:
+    if list_of_properties == [] or list_of_properties == None:
+        print("NOTE: as the list of required properties was empty, we considered all the properties of the MTG.")
+        list_of_properties = list(averaged_MTG.properties().keys())
+
     # We cover each possible vertex in the MTGs:
-    for vid in range(1, n_vertices):
+    for vid in averaged_MTG.vertices_iter(scale=1):
         # We cover each property to be averaged:
         for property in list_of_properties:
             # We initialize an empty list that will contain the values to be averaged:
@@ -709,12 +735,26 @@ def averaging_a_list_of_MTGs(list_of_MTG_numbers=[143, 167, 191], list_of_proper
                     # If it exists, we add this value to the list:
                     temporary_list.append(value)
                 except:
-                    # Otherwise, we add a nul value instead:
-                    temporary_list.append(0)
-            # Finally, we calculate the mean value from the list:
-            mean_value = mean(temporary_list)
-            # And we assign the mean value to the vertex in the averaged MTG:
-            averaged_MTG.property(property)[vid] = mean_value
+                    # Otherwise, we add a NA value instead:
+                    temporary_list.append(np.nan)
+
+            # For the current property, we check whether the list of values of each MTG contains numeric values or not:
+            testing_if_numeric = any(isinstance(item, (int, float, complex)) for item in temporary_list)
+            # If the list contains numerical values:
+            if testing_if_numeric is True:
+                # Then we calculate the mean value from the list:
+                try:
+                    mean_value = np.nanmean(temporary_list)
+                except:
+                    mean_value = np.nan
+                # And we assign the mean value to the vertex in the averaged MTG:
+                averaged_MTG.property(property)[vid] = mean_value
+            else:
+                # Otherwise we assign the original value of the last MTG to the vertex in the averaged MTG:
+                averaged_MTG.property(property)[vid] = g.property(property)[vid]
+
+            if property=="hexose_consumption_by_growth" and vid==363:
+                print("The mean value of hexose_consumption_by_growth for vid", vid, "was", averaged_MTG.property(property)[vid])
 
     if recording_averaged_MTG:
         # If no specific name for the averaged MTG has been specified:
@@ -728,7 +768,7 @@ def averaging_a_list_of_MTGs(list_of_MTG_numbers=[143, 167, 191], list_of_proper
         # We record the averaged MTG:
         g_file_name = os.path.join(recording_directory, new_name)
         with open(g_file_name, 'wb') as output:
-            pickle.dump(g, output, protocol=2)
+            pickle.dump(averaged_MTG, output, protocol=2)
 
     return  averaged_MTG
 
@@ -814,12 +854,12 @@ def averaging_through_a_series_of_MTGs(MTG_directory='MTG_files', list_of_proper
         # Eventually, we proceed to the averaging using the function 'averaging_a_list_of_MTGs':
         target_MTG_ID = int(filenames[target_MTG_position][-10:-5])
         print("For the MTG", str(target_MTG_ID), "we average over the MTGs' list", list_of_MTG_ID, "...")
-        averaging_a_list_of_MTGs(list_of_MTG_numbers=list_of_MTG_ID,
-                                 list_of_properties=list_of_properties,
-                                 directory_path =MTG_directory,
-                                 recording_averaged_MTG=recording_averaged_MTG,
-                                 averaged_MTG_name='root%.5d.pckl' % target_MTG_ID,
-                                 recording_directory=recording_directory)
+        averaged_MTG = averaging_a_list_of_MTGs(list_of_MTG_numbers=list_of_MTG_ID,
+                                                list_of_properties=list_of_properties,
+                                                directory_path=MTG_directory,
+                                                recording_averaged_MTG=recording_averaged_MTG,
+                                                averaged_MTG_name='root%.5d.pckl' % target_MTG_ID,
+                                                recording_directory=recording_directory)
 
     return
 
@@ -900,92 +940,235 @@ def subsampling_a_MTG(g, string_of_axis_ID_to_remove="Ax1-S1-", expected_startin
 # MTG_to_display = subsampling_a_MTG(g, string_of_axis_ID_to_remove="Ax1-S1-", expected_starting_index_of_string = 0,
 #                                    create_a_new_MTG = True)
 
-def showing_one_axis(MTG_filepath = 'C:/Users/frees/rhizodep/saved_outputs/root02000_142.pckl',
+def showing_one_axis(my_path='',
+                     opening_list=False,
+                     file_extension='pckl',
+                     MTG_directory='MTG_files',
+                     single_MTG_filename='root00001.pckl',
+                     list_of_MTG_ID=None,
                      starting_string_of_axes_to_remove="Ax00001-Se00001-",
                      targeted_apex_axis_ID="Ax00001-Ap00000",
                      maximal_string_length_of_axis_ID=-1,
-                     recording_new_MTG_file=False,
-                     new_MTG_file_path="C:/Users/frees/rhizodep/saved_outputs/selected_MTG_files",
-                     plotting=False,
+                     recording_new_MTG_files=False,
+                     new_MTG_files_folder=os.path.join('axis_MTG_files'),
+                     recording_new_MTG_properties=True,
+                     new_MTG_properties_folder=os.path.join('axis_MTG_properties'),
+                     plotting=True,
                      property_name="net_rhizodeposition_rate_per_day_per_cm",
                      vmin=1e-8, vmax=1e-5, lognorm=True, cmap='jet',
-                     final_image_filepath = 'C:/Users/frees/rhizodep/saved_outputs/plot.png'):
+                     images_directory="axis_images"):
 
-    # We load a root MTG that was previously recorded:
-    f = open(MTG_filepath, 'rb')
-    g = pickle.load(f)
-    f.close()
+    """
 
-    # COMPUTING THE 'AXIS_ID' PROPERTY:
-    # We compute the new property "axis_ID" that gives an identifyer to each element based on the topology of the MTG:
-    print("Indexing root axes...")
-    indexing_root_MTG(g)
-    # print("Here are the values of axis_ID for the whole MTG:")
-    # print(g.properties()['axis_ID'])
+    :param my_path:
+    :param opening_list:
+    :param file_extension:
+    :param MTG_directory:
+    :param single_MTG_filename:
+    :param list_of_MTG_ID:
+    :param starting_string_of_axes_to_remove:
+    :param targeted_apex_axis_ID:
+    :param maximal_string_length_of_axis_ID:
+    :param recording_new_MTG_file:
+    :param new_MTG_file_path:
+    :param plotting:
+    :param property_name:
+    :param vmin:
+    :param vmax:
+    :param lognorm:
+    :param cmap:
+    :param final_image_filepath:
+    :return:
+    """
 
-    # SUBSAMPLING THE MTG:
-    # Here, we want to remove all root elements but the elements from the main seminal axis. We will therefore look for
-    # each vertex having an axis_ID beginning by "Ax1-S1-" (i.e. starting at the index 0 of the chain of characters),
-    # since all other seminal and nodal roots emerge from the first segment of the first axis.
-    # We also exclude lateral roots from the main axis by specifying a maximal number of characters allowed in axis_ID:
-    MTG_to_display = subsampling_a_MTG(g,
-                                       string_of_axis_ID_to_remove=starting_string_of_axes_to_remove,
-                                       expected_starting_index_of_string=0,
-                                       maximal_string_length_of_axis_ID=maximal_string_length_of_axis_ID,
-                                       create_a_new_MTG=True)
-
-    # We compute new properties for the new MTG:
-    for vid in MTG_to_display.vertices_iter(scale=1):
-        n = MTG_to_display.node(vid)
-        if n.length > 0.:
-            n.exchange_surface_per_cm = n.total_exchange_surface_with_soil_solution / (n.length*100)
-            n.net_sucrose_unloading_per_cm_per_day = n.net_sucrose_unloading_rate / (n.length * 100) * 60.*60.*24.
-
-    if recording_new_MTG_file:
-        # # If the directory "MTG_files" doesn't exist:
-        # if not os.path.exists(new_MTG_file_path):
-        #     # Then we create it:
-        #     os.mkdir(new_MTG_file_path)
-        # else:
-        #     # Otherwise, we delete all the files that are already present inside:
-        #     for root, dirs, files in os.walk(new_MTG_file_path):
-        #         for file in files:
-        #             os.remove(os.path.join(root, file))
-        # We register the new MTG there:
-        with open(os.path.join(new_MTG_file_path), 'wb') as output:
-            pickle.dump(MTG_to_display, output, protocol=2)
-        print("The MTG file corresponding to the root system has been recorded.")
+    if opening_list:
+        # We define the directory "MTG_files":
+        g_dir = os.path.join(my_path, MTG_directory)
+    else:
+        g_dir = my_path
+    print("Loading the MTG file located in", g_dir,"...")
 
     if plotting:
-        # PLOTTING THE NEW MTG:
-        print("Plotting...")
+        # We define the directory "video"
+        video_dir = os.path.join(my_path, images_directory)
+        # If this directory doesn't exist:
+        if not os.path.exists(video_dir):
+            # Then we create it:
+            os.mkdir(video_dir)
+        else:
+            # Otherwise, we delete all the images that are already present inside:
+            for root, dirs, files in os.walk(video_dir):
+                for file in files:
+                    os.remove(os.path.join(root, file))
 
-        # In case it has not been done so far - we define the colors in g according to a specific property:
-        my_colormap(MTG_to_display,
-                    property_name=property_name, vmin=vmin, vmax=vmax, lognorm=lognorm, cmap=cmap)
+    # Depending on the extension of the file, we may either consider pickle files or csv files containing
+    # all the properties of the MTG:
+    if file_extension == 'pckl':
+        # We get the list of the names of all MTG files:
+        filenames = Path(g_dir).glob('*pckl')
+    elif file_extension == 'csv':
+        # We get the list of the names of all MTG files:
+        filenames = Path(g_dir).glob('*csv')
+    else:
+        print("!!! ERROR: the file extension can only be 'pckl' or 'csv'!!!")
+        return
 
-        # We identify the coordinates of the main seminal axis' root tip:
-        vid = next(vid for vid in MTG_to_display.vertices_iter(scale=1)
-                   if MTG_to_display.node(vid).axis_ID == targeted_apex_axis_ID)
-        apex = MTG_to_display.node(vid)
-        print("The coordinates of the apex are", apex.x2, apex.y2, apex.z2, )
+    filenames = sorted(filenames)
+    # We initialize a list containing the numbers of the MTG to be opened:
+    list_of_MTG_numbers = []
 
-        # PLOTTING WITH PYVISTA(1):
-        plotting_roots_with_pyvista(MTG_to_display, displaying_root_hairs=True,
-                                         showing=True, recording_image=True, closing_window=False,
-                                         image_file=final_image_filepath,
-                                         background_color=[94, 76, 64],
-                                         plot_width=600, plot_height=1600,
-                                         camera_x=apex.x2 + 0.2, camera_y=apex.y2, camera_z=apex.z2 - 0.1,
-                                         focal_x=apex.x2, focal_y=apex.y2, focal_z=apex.z2)
-        # # PLOTTING WITH PYVISTA(2):
-        # fast_plotting_roots_with_pyvista(MTG_to_display, displaying_root_hairs=True,
-        #                                  showing=True, recording_image=True, closing_window=False,
-        #                                  image_file=final_image_filepath,
-        #                                  background_color=[94, 76, 64],
-        #                                  plot_width=600, plot_height=1600,
-        #                                  camera_x=apex.x2 + 0.2, camera_y=apex.y2, camera_z=apex.z2 - 0.1,
-        #                                  focal_x=apex.x2, focal_y=apex.y2, focal_z=apex.z2)
+    # If the instructions are to open the whole list of MTGs in the directory and not a subset of it:
+    if opening_list and not list_of_MTG_ID:
+        # We cover each name of MTG ending as 'rootXXXX.pckl' (where X is a digit), extract the corresponding number,
+        # and add it to the list:
+        for filename in filenames:
+            if file_extension == 'pckl':
+                MTG_ID = int(filename[-10:-5])
+            else:
+                MTG_ID = int(filename[-9:-4])
+            list_of_MTG_numbers.append(MTG_ID)
+    # If the instructions are to open a specific list:
+    elif opening_list and list_of_MTG_ID:
+        list_of_MTG_numbers =  list_of_MTG_ID
+    # Otherwise, we open a single file:
+    else:
+        if file_extension == 'pckl':
+            list_of_MTG_numbers = [int(single_MTG_filename[-10:-5])]
+        else:
+            list_of_MTG_numbers = [int(single_MTG_filename[-9:-4])]
+
+    if recording_new_MTG_files:
+        # We define the directory "MTG_properties":
+        prop_dir = os.path.join(my_path, new_MTG_files_folder)
+        # If this directory doesn't exist:
+        if not os.path.exists(prop_dir):
+            # Then we create it:
+            os.mkdir(prop_dir)
+        else:
+            # Otherwise, we delete all the files that are already present inside:
+            for root, dirs, files in os.walk(prop_dir):
+                for file in files:
+                    os.remove(os.path.join(root, file))
+
+    if recording_new_MTG_properties:
+        # We define the directory "MTG_properties":
+        prop_dir = os.path.join(my_path, new_MTG_properties_folder)
+        # If this directory doesn't exist:
+        if not os.path.exists(prop_dir):
+            # Then we create it:
+            os.mkdir(prop_dir)
+        else:
+            # Otherwise, we delete all the files that are already present inside:
+            for root, dirs, files in os.walk(prop_dir):
+                for file in files:
+                    os.remove(os.path.join(root, file))
+        # In addition, we get the final list of properties corresponding to the last MTG of the list.
+        # We first load the last MTG of the list:
+        ID = list_of_MTG_numbers[-1]
+        if file_extension == 'pckl':
+            filename = 'root%.5d.pckl' % ID
+            MTG_path = os.path.join(g_dir, filename)
+            f = open(MTG_path, 'rb')
+            g = pickle.load(f)
+            f.close()
+        else:
+            filename = 'root%.5d.csv' % ID
+            MTG_path = os.path.join(g_dir, filename)
+            g = create_MTG_from_csv_file(csv_filename=MTG_path)
+
+        # And we define the final list of properties to record according to all the properties of this MTG:
+        list_of_properties = list(g.properties().keys())
+        list_of_properties.sort(key=str.lower)
+
+    # We cover each of the MTG files in the list (or only the specified file when requested):
+    # ---------------------------------------------------------------------------------------
+    for MTG_position in range(0, len(list_of_MTG_numbers)):
+
+        # Loading the MTG file:
+        # ----------------------
+        ID = list_of_MTG_numbers[MTG_position]
+        print("Dealing with MTG", ID, "-", MTG_position + 1, "out of", len(list_of_MTG_numbers),
+              "MTGs to consider...")
+
+        if file_extension == 'pckl':
+            filename = 'root%.5d.pckl' % ID
+            MTG_path = os.path.join(g_dir, filename)
+            f = open(MTG_path, 'rb')
+            g = pickle.load(f)
+            f.close()
+        else:
+            filename = 'root%.5d.csv' % ID
+            MTG_path = os.path.join(g_dir, filename)
+            g = create_MTG_from_csv_file(csv_filename=MTG_path)
+        print("   > New MTG opened!")
+
+        # COMPUTING THE 'AXIS_ID' PROPERTY:
+        # We compute the new property "axis_ID" that gives an identifyer to each element based on the topology of the MTG:
+        print("Indexing root axes...")
+        indexing_root_MTG(g)
+        # print("Here are the values of axis_ID for the whole MTG:")
+        # print(g.properties()['axis_ID'])
+
+        # SUBSAMPLING THE MTG:
+        # Here, we want to remove all root elements but the elements from the main seminal axis. We will therefore look for
+        # each vertex having an axis_ID beginning by "Ax1-S1-" (i.e. starting at the index 0 of the chain of characters),
+        # since all other seminal and nodal roots emerge from the first segment of the first axis.
+        # We also exclude lateral roots from the main axis by specifying a maximal number of characters allowed in axis_ID:
+        MTG_to_display = subsampling_a_MTG(g,
+                                           string_of_axis_ID_to_remove=starting_string_of_axes_to_remove,
+                                           expected_starting_index_of_string=0,
+                                           maximal_string_length_of_axis_ID=maximal_string_length_of_axis_ID,
+                                           create_a_new_MTG=True)
+
+        # We compute new properties for the new MTG:
+        for vid in MTG_to_display.vertices_iter(scale=1):
+            n = MTG_to_display.node(vid)
+            if n.length > 0.:
+                n.exchange_surface_per_cm = n.total_exchange_surface_with_soil_solution / (n.length*100)
+                n.net_sucrose_unloading_per_cm_per_day = n.net_sucrose_unloading_rate / (n.length * 100) * 60.*60.*24.
+
+        if recording_new_MTG_files:
+            # We register the new MTG there:
+            with open(os.path.join(my_path,new_MTG_files_folder,filename), 'wb') as output:
+                pickle.dump(MTG_to_display, output, protocol=2)
+            print("The MTG file corresponding to the root system has been recorded.")
+
+        if recording_new_MTG_properties:
+            prop_file_name = os.path.join(my_path, new_MTG_properties_folder, 'root%.5d.csv')
+            recording_MTG_properties(MTG_to_display, file_name=prop_file_name % ID, list_of_properties=list_of_properties)
+            print("The MTG properties corresponding to the new root system have been recorded.")
+
+        if plotting:
+            # PLOTTING THE NEW MTG:
+            print("Plotting...")
+
+            # In case it has not been done so far - we define the colors in g according to a specific property:
+            my_colormap(MTG_to_display,
+                        property_name=property_name, vmin=vmin, vmax=vmax, lognorm=lognorm, cmap=cmap)
+
+            # We identify the coordinates of the main seminal axis' root tip:
+            vid = next(vid for vid in MTG_to_display.vertices_iter(scale=1)
+                       if MTG_to_display.node(vid).axis_ID == targeted_apex_axis_ID)
+            apex = MTG_to_display.node(vid)
+            print("The coordinates of the apex are", apex.x2, apex.y2, apex.z2, )
+
+            # PLOTTING WITH PYVISTA(1):
+            final_image_filepath = os.path.join(my_path, images_directory, 'root%.5d.png' % ID)
+            plotting_roots_with_pyvista(MTG_to_display, displaying_root_hairs=True,
+                                        showing=False, recording_image=True, closing_window=True,
+                                        image_file=final_image_filepath,
+                                        background_color=[94, 76, 64],
+                                        plot_width=600, plot_height=1600,
+                                        camera_x=apex.x2 + 0.2, camera_y=apex.y2, camera_z=apex.z2 - 0.1,
+                                        focal_x=apex.x2, focal_y=apex.y2, focal_z=apex.z2)
+            # # PLOTTING WITH PYVISTA(2):
+            # fast_plotting_roots_with_pyvista(MTG_to_display, displaying_root_hairs=True,
+            #                                  showing=True, recording_image=True, closing_window=False,
+            #                                  image_file=final_image_filepath,
+            #                                  background_color=[94, 76, 64],
+            #                                  plot_width=600, plot_height=1600,
+            #                                  camera_x=apex.x2 + 0.2, camera_y=apex.y2, camera_z=apex.z2 - 0.1,
+            #                                  focal_x=apex.x2, focal_y=apex.y2, focal_z=apex.z2)
 
     return
 
@@ -998,7 +1181,7 @@ def showing_one_axis(MTG_filepath = 'C:/Users/frees/rhizodep/saved_outputs/root0
 
 if __name__ == "__main__":
 
-    # print("Considering opening and treating recorded MTG files...")
+    print("Considering opening and treating recorded MTG files...")
 
     # # If we want to add time and colorbar:
     # # image_path = os.path.join("./", 'colobar.png')
@@ -1038,7 +1221,27 @@ if __name__ == "__main__":
     #                   recording_g_properties=False,
     #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
 
-    # memory_usage((loading_MTG_files, [], {}))
+    # # (Re-)plotting one original MTG file:
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/Other_works/',
+    #                   opening_list=False,
+    #                   # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
+    #                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
+    #                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
+    #                   # property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True, cmap='jet',
+    #                   property="length", vmin=0., vmax=1., log_scale=False, cmap='jet',
+    #                   width=1200, height=1200,
+    #                   x_center=0, y_center=0, z_center=-0.1,
+    #                   x_cam=0, y_cam=0, z_cam=-0.2,
+    #                   step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+    #                   # x_center=0, y_center=0, z_center=-0, z_cam=-0,
+    #                   # camera_distance=1, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+    #                   adding_images_on_plot=False,
+    #                   recording_images=False,
+    #                   images_directory="original_root_images",
+    #                   printing_sum=False,
+    #                   recording_sum=False,
+    #                   recording_g_properties=False,
+    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
 
     # # (Re-)plotting the original MTG files:
     # loading_MTG_files(my_path='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0097/',
@@ -1159,35 +1362,50 @@ if __name__ == "__main__":
     #                                  camera_x=apex.x2+0.2, camera_y=apex.y2, camera_z=apex.z2-0.1,
     #                                  focal_x=apex.x2, focal_y=apex.y2, focal_z=apex.z2)
 
-    # # Calculating average MTG:
-    # averaging_through_a_series_of_MTGs(MTG_directory='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-01/Scenario_0142/MTG_files/',
-    #                                    list_of_properties=['struct_mass', 'length',
-    #                                                        'C_hexose_root',
-    #                                                        'total_exchange_surface_with_soil_solution',
-    #                                                        'net_sucrose_unloading_rate',
-    #                                                        'net_rhizodeposition_rate_per_day_per_cm'
-    #                                                        ],
+    # # CREATING AVERAGE MTG:
+    # averaging_through_a_series_of_MTGs(MTG_directory='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0179/MTG_files_to_average/',
+    #                                    # list_of_properties=['struct_mass', 'length',
+    #                                    #                     'C_hexose_root',
+    #                                    #                     'total_exchange_surface_with_soil_solution',
+    #                                    #                     'net_sucrose_unloading_rate',
+    #                                    #                     'net_rhizodeposition_rate_per_day_per_cm'
+    #                                    #                     ],
+    #                                    list_of_properties=[],
     #                                    odd_number_of_MTGs_for_averaging=7,
     #                                    recording_averaged_MTG=True,
-    #                                    recording_directory='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-01/Scenario_0142/averaged_MTG_files/'
+    #                                    recording_directory='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0179/averaged_axis_MTG_files/'
     #                                    )
+    # # Recording MTG properties:
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0179/',
+    #                   MTG_directory="averaged_axis_MTG_files",
+    #                   opening_list=True,
+    #                   plotting_with_PlantGL=False,
+    #                   normal_plotting_with_pyvista=False,
+    #                   fast_plotting_with_pyvista=False,
+    #                   adding_images_on_plot=False,
+    #                   recording_images=False,
+    #                   printing_sum=False,
+    #                   recording_sum=False,
+    #                   recording_g_properties=True,
+    #                   MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0179/averaged_axis_MTG_properties/',
+    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
+    # print("Done!")
 
-
-    # PLOTTING ONLY ONE AXIS:
-    list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
-    list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
-    MTG_folder_path = 'C:/Users/frees/rhizodep/saved_outputs/outputs_2024-01/Scenario_0142/MTG_files/'
-    new_MTG_folder_path = 'C:/Users/frees/rhizodep/saved_outputs/selected_MTG_files'
-    images_folder_path = 'C:/Users/frees/rhizodep/saved_outputs/axis_images/'
-
-    vmin = 1e-8
-    vmax = 1e-5
-    lognorm = True
-
+    # # PLOTTING ONLY ONE AXIS:
+    # list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
+    # list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
+    # MTG_folder_path = 'C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0161/MTG_files/'
+    # new_MTG_folder_path = 'C:/Users/frees/rhizodep/saved_outputs/axis_MTG_files'
+    # images_folder_path = 'C:/Users/frees/rhizodep/saved_outputs/axis_images/'
+    #
+    # vmin = 1e-4
+    # vmax = 8e-4
+    # lognorm = False
+    #
     # # bar = colorbar(title="Root mobile hexose concentration (mol of hexose per gDW of structural mass)", cmap='jet',
-    # # bar = colorbar(title="Root exchange surface with soil solution (square meter per cm of root)", cmap='jet',
+    # bar = colorbar(title="Root exchange surface with soil solution (square meter per cm of root)", cmap='jet',
     # # bar = colorbar(title="Net unloading rate from phloem (moles of sucrose per cm of root per day)", cmap='jet',
-    # bar = colorbar(title="Net rhizodeposition rate (gC per day per cm)", cmap='jet',
+    # # bar = colorbar(title="Net rhizodeposition rate (gC per day per cm)", cmap='jet',
     #                lognorm=lognorm, ticks=[], vmin=vmin, vmax=vmax)
     # # We save it in the output directory:
     # bar_name = os.path.join(images_folder_path, "colorbar.png")
@@ -1201,14 +1419,14 @@ if __name__ == "__main__":
     #                      maximal_string_length_of_axis_ID=15, # Here we select only the elements on the main axis, not the lateral ones
     #                      recording_new_MTG_file=True,
     #                      new_MTG_file_path=os.path.join(new_MTG_folder_path,'root%.5d.pckl' % i),
-    #                      plotting=False,
-    #                      property_name="net_rhizodeposition_rate_per_day_per_cm",
+    #                      plotting=True,
+    #                      # property_name="net_rhizodeposition_rate_per_day_per_cm",
     #                      # vmin=1e-8, vmax=1e-5, lognorm=True, cmap='jet',
     #                      # property_name="C_hexose_root",
     #                      # vmin=1e-6, vmax=1e-3, lognorm=True, cmap='jet',
     #                      # property_name="total_exchange_surface_with_soil_solution",
     #                      # vmin=5e-5, vmax=3.5e-4, lognorm=False, cmap='jet',
-    #                      # property_name="exchange_surface_per_cm",
+    #                      property_name="exchange_surface_per_cm",
     #                      # vmin=1e-4, vmax=8e-4, lognorm=False, cmap='jet',
     #                      # property_name="net_sucrose_unloading_per_cm_per_day",
     #                      # vmin=1e-9, vmax=1e-5, lognorm=True, cmap='jet',
@@ -1217,17 +1435,127 @@ if __name__ == "__main__":
     #                      )
 
     # # Recording MTG properties:
-    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-01/Scenario_0142/',
-    #                   MTG_directory="MTG_files_Seminal_axis",
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0161/',
+    #                   MTG_directory="axis_MTG_files",
     #                   opening_list=True,
     #                   adding_images_on_plot=False,
     #                   recording_images=False,
-    #                   images_directory="averaged_root_images",
+    #                   # images_directory="averaged_root_images",
     #                   printing_sum=False,
     #                   recording_sum=False,
     #                   recording_g_properties=True,
-    #                   MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-01/Scenario_0142/MTG_properties_Seminal_axis/',
+    #                   MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0161/axis_MTG_properties/',
     #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
     # print("Done!")
 
+    # Plotting a series of MTG with normal Pyvista function:
+    loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0183/',
+                      MTG_directory="MTG_files",
+                      opening_list=True,
+                      # single_MTG_filename="root00599.pckl",
+                      # list_of_MTG_ID=range(2,4318,6),
+                      # list_of_MTG_ID=range(3935, 3941),
+                      list_of_MTG_ID=[2003],
+                      adding_images_on_plot=False,
+                      recording_images=True,
+                      normal_plotting_with_pyvista=True,
+                      fast_plotting_with_pyvista=False,
+                      closing_window=True,
+                      factor_of_higher_resolution=2,
+                      # property="C_hexose_root",
+                      # vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
+                      property="net_rhizodeposition_rate_per_day_per_cm",
+                      vmin=1e-7, vmax=1e-4, log_scale=True, cmap='jet',
+                      # property="root_order",
+                      # vmin=1, vmax=5, log_scale=False, cmap='jet',
+                      # property=None,
+                      # width=800, height=800,
+                      width=400, height=800,
+                      # x_center=0, y_center=0, z_center=-0.20,
+                      # x_cam=0.4, y_cam=0, z_cam=-0.15,
+                      x_center=0, y_center=0, z_center=-0.2,
+                      x_cam=1.2, y_cam=0, z_cam=-0.2,
+                      step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+                      background_color=[94, 76, 64],
+                      root_hairs_display=True,
+                      mycorrhizal_fungus_display=False,
+                      images_directory="root_images_specific",
+                      printing_sum=False,
+                      recording_sum=False,
+                      recording_g_properties=False,
+                      # MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-05/Scenario_0163/MTG_properties/',
+                      z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
+    print("Done!")
 
+    # # (Re-)plotting the original MTG files from MTG_properties only:
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0161/',
+    #                   opening_list=True,
+    #                   # file_extension='pckl',
+    #                   # MTG_directory="axis_MTG_files",
+    #                   file_extension='csv',
+    #                   MTG_directory="MTG_properties",
+    #                   # list_of_MTG_ID=[720, 1440],
+    #                   normal_plotting_with_pyvista=True,
+    #                   fast_plotting_with_pyvista=False,
+    #                   closing_window=False,
+    #                   factor_of_higher_resolution=2,
+    #                   # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
+    #                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
+    #                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
+    #                   # property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True, cmap='jet',
+    #                   property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
+    #                   background_color=[255,255,255],
+    #                   width=1200, height=1200,
+    #                   x_center=0, y_center=0, z_center=-0.20,
+    #                   x_cam=0.4, y_cam=0, z_cam=-0.15,
+    #                   step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+    #                   # x_center=0, y_center=0, z_center=-0, z_cam=-0,
+    #                   # camera_distance=1, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+    #                   adding_images_on_plot=False,
+    #                   recording_images=True,
+    #                   images_directory="original_root_images",
+    #                   printing_sum=False,
+    #                   recording_sum=False,
+    #                   recording_g_properties=False,
+    #                   # MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0161/axis_MTG_properties_new/',
+    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
+
+    # # PLOTTING ONLY ONE AXIS:
+    # # list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
+    # # list_of_MTG = list(range(30*24-4,30*24+4)) + list(range(60*24-4,60*24+4)) + list(range(90*24-4,90*24+4)) + list(range(120*24-4,120*24+4)) + list(range(150*24-4,150*24+4))
+    # list_of_MTG = list(range(85 * 24, 95 * 24))
+    #
+    # property_name = "net_rhizodeposition_rate_per_day_per_cm"
+    # vmin = 1e-8
+    # vmax = 1e-5
+    # lognorm = True
+    #
+    # showing_one_axis(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0179/',
+    #                  opening_list=True,
+    #                  file_extension='pckl',
+    #                  MTG_directory="MTG_files",
+    #                  # file_extension='csv',
+    #                  # MTG_directory="MTG_properties",
+    #                  list_of_MTG_ID=list_of_MTG,
+    #                  starting_string_of_axes_to_remove="Ax00001-Se00001-",
+    #                  targeted_apex_axis_ID="Ax00001-Ap00000",
+    #                  maximal_string_length_of_axis_ID=-1, # Here we consider all lateral roots
+    #                  # maximal_string_length_of_axis_ID=15, # Here we select only the elements on the main axis, not the lateral ones
+    #                  recording_new_MTG_files=True,
+    #                  new_MTG_files_folder=os.path.join('new_axis_MTG_files'),
+    #                  recording_new_MTG_properties = True,
+    #                  new_MTG_properties_folder = os.path.join('new_axis_MTG_properties'),
+    #                  plotting=True,
+    #                  # property_name="net_rhizodeposition_rate_per_day_per_cm",
+    #                  # vmin=1e-8, vmax=1e-5, lognorm=True, cmap='jet',
+    #                  # property_name="C_hexose_root",
+    #                  # vmin=1e-6, vmax=1e-3, lognorm=True, cmap='jet',
+    #                  # property_name="total_exchange_surface_with_soil_solution",
+    #                  # vmin=5e-5, vmax=3.5e-4, lognorm=False, cmap='jet',
+    #                  property_name=property_name,
+    #                  # vmin=1e-4, vmax=8e-4, lognorm=False, cmap='jet',
+    #                  # property_name="net_sucrose_unloading_per_cm_per_day",
+    #                  # vmin=1e-9, vmax=1e-5, lognorm=True, cmap='jet',
+    #                  vmin=vmin, vmax=vmax, lognorm=lognorm, cmap='jet',
+    #                  images_directory="new_axis_images"
+    #                  )

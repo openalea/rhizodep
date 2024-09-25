@@ -9,6 +9,7 @@ from math import floor, ceil, trunc, log10
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
+from rhizodep.tools import colorbar, sci_notation
 
 # Use LaTeX as text renderer to get text in true LaTeX
 # If the two following lines are left out, Mathtext will be used
@@ -16,195 +17,6 @@ import matplotlib as mpl
 # mpl.rc('text', usetex=True)
 
 ########################################################################################################################
-
-# Define function for string formatting of scientific notation
-def sci_notation(num, just_print_ten_power=True, decimal_digits=0, precision=None, exponent=None):
-    """
-    Returns a string representation of the scientific
-    notation of the given number formatted for use with
-    LaTeX or Mathtext, with specified number of significant
-    decimal digits and precision (number of decimal digits
-    to show). The exponent to be used can also be specified
-    explicitly.
-    """
-    if exponent is None:
-        if num != 0.:
-            if num >= 1:
-                exponent = int(ceil(log10(abs(num))))
-            else:
-                exponent = int(floor(log10(abs(num))))
-        else:
-            exponent = 0
-    coeff = round(num / float(10 ** exponent), decimal_digits)
-
-    if precision is None:
-        precision = decimal_digits
-
-    if num == 0:
-        return r"${}$".format(0)
-
-    if just_print_ten_power:
-        return r"$10^{{{0:d}}}$".format(exponent)
-    else:
-        return r"${0:.{2}f}/cdot10^{{{1:d}}}$".format(coeff, exponent, precision)
-
-
-# Function that draws a colorbar:
-def colorbar(title="Radius (m)", cmap='jet', lognorm=True, n_thicks_for_linear_scale=6, vmin=1e-12, vmax=1e3):
-    """
-    This function creates a colorbar for showing the legend of a plot.
-    :param title: the name of the property to be displayed on the bar
-    :param cmap: the name of the specific colormap in Python
-    :param lognorm: if True, the scale will be a log scale, otherwise, it will be a linear scale
-    :param n_thicks_for_linear_scale: the number of thicks to represent for a linear scale
-    :param vmin: the min value of the color scale
-    :param vmax: the max value of the color scale
-    :return: the new colorbar object
-    """
-
-    # CREATING THE COLORBAR
-    #######################
-
-    # Creating the box that will contain the colorbar:
-    fig, ax = plt.subplots(figsize=(36, 6))
-    fig.subplots_adjust(bottom=0.5)
-
-    _cmap = color.get_cmap(cmap)
-
-    # If the bar is to be displayed with log scale:
-    if lognorm:
-        if vmin <=0.:
-            print("WATCH OUT: when making the colorbar, vmin can't be equal or below zero when lognorm is TRUE. "
-                  "vmin has been turned to 1e-10 by default.")
-            vmin=1e-10
-        # We create the log-scale color bar:
-        norm = color.LogNorm(vmin=vmin, vmax=vmax)
-        cbar = mpl.colorbar.ColorbarBase(ax,
-                                         cmap=cmap,
-                                         norm=norm,
-                                         orientation='horizontal')
-    # Otherwise the colorbar is in linear scale:
-    else:
-        # We create the normal-scale color bar:
-        norm = color.Normalize(vmin=vmin, vmax=vmax)
-        ticks = np.linspace(vmin, vmax, n_thicks_for_linear_scale)
-        cbar = mpl.colorbar.ColorbarBase(ax,
-                                         cmap=cmap,
-                                         norm=norm,
-                                         ticks=ticks, # We specify a number of ticks to display
-                                         orientation='horizontal')
-
-    # In any case, we remove stupid automatic tick labels:
-    ax.axes.xaxis.set_ticklabels([])
-    ax.axes.yaxis.set_ticklabels([])
-
-    cbar.outline.set_linewidth(3)  # Thickness of the box lines
-    cbar.set_label(title, fontsize=40, weight='bold', labelpad=-130)  # Adjust the caption under the bar
-
-    # We specify the characteristics of the ticks:
-    cbar.ax.tick_params(which="major",
-                        direction="in",  # Position of the ticks in or out the bar
-                        labelsize=0,  # Size of the text
-                        length=20,  # Length of the ticks
-                        width=5,  # Thickness of the ticks
-                        pad=-60  # Distance between ticks and label
-                        )
-    cbar.ax.tick_params(which="minor",
-                        direction="in",  # Position of the ticks in or out the bar
-                        labelsize=0,  # Size of the text
-                        length=10,  # Length of the ticks
-                        width=3,  # Thickness of the ticks
-                        pad=-60  # Distance between ticks and label
-                        )
-
-    # For adding minor ticks:
-    ax.minorticks_on()
-    # minorticks = [0.1, 0.2, 0.3]
-    # ax.xaxis.set_ticks(minorticks, minor=True)
-    # ax.yaxis.set_ticks(minorticks, minor=True)
-
-    # Manually adding the labels of the ticks:
-    ##########################################
-
-    # If the bar is to be displayed with log scale:
-    if lognorm:
-        # We get the exponents of the powers of 10th closets from vmin and vmax:
-        min10 = ceil(np.log10(vmin))
-        max10 = floor(np.log10(vmax))
-        # We calculate the interval to cover:
-        n_intervals = int(abs(max10 - min10))
-
-        # We initialize empty lists:
-        list_number = []
-        numbers_to_display = []
-        x_positions = []
-
-        # We start from the closest power of tenth equal or higher than vmin:
-        number = 10 ** min10
-        # And we start at a specific position from which we will add intervals for positioning the text:
-        position = -0.012
-        # We cover the range from vmin to vmax:
-        for i in range(0, n_intervals):
-            list_number.append(number)
-            x_positions.append(position)
-            number = number * 10
-            position = position + 1 / float(n_intervals)
-        # We correct the first position, if needed:
-        x_positions[0] = 0.005
-
-        # We create the list of strings in a scientific format for displaying the numbers on the colorbar:
-        for number in list_number:
-            # numbers_to_display.append("{:.0e}".format(number))
-            numbers_to_display.append(sci_notation(number, just_print_ten_power=True))
-
-    # Otherwise the colorbar is in linear scale:
-    else:
-
-        # We calculate the interval to cover:
-        n_intervals = n_thicks_for_linear_scale - 1
-
-        # We initialize empty lists:
-        list_number = []
-        numbers_to_display = []
-        x_positions = []
-
-        # We start from vmin:
-        number = vmin
-        # And we start at a specific position from which we will add intervals for positioning the text:
-        position = -0.007
-        # We cover the range from vmin to vmax:
-        for i in range(0, n_intervals+1):
-            list_number.append(number)
-            x_positions.append(position)
-            number = number + (vmax-vmin)/float(n_intervals)
-            position = position + 1 / float(n_intervals)
-        # We correct the first position, if needed:
-        x_positions[0] = 0.005
-
-        # We create the list of strings in a scientific format for displaying the numbers on the colorbar:
-        for number in list_number:
-            # numbers_to_display.append("{:.0e}".format(number))
-            numbers_to_display.append(sci_notation(number, decimal_digits=0, just_print_ten_power=False))
-        # We remove first and last point, if needed:
-        numbers_to_display[0]=""
-        numbers_to_display[-1]=""
-
-    # We cover each number to add on the colorbar:
-    for i in range(0, len(numbers_to_display)):
-        position = 'left'
-        # We add the corresponding number on the colorbar:
-        cbar.ax.text(x=x_positions[i],
-                     y=0.4,
-                     s=numbers_to_display[i],
-                     va='top',
-                     ha=position,
-                     fontsize=40,
-                     fontweight='bold', # This doesn't change much the output, unfortunately...
-                     transform=ax.transAxes)
-
-    print("The colorbar has been made!")
-    return fig
-
 
 # Definition of a function that can resize a list of images and make a movie from it:
 #------------------------------------------------------------------------------------
@@ -218,7 +30,7 @@ def resizing_and_film_making(outputs_path='outputs',
                              colorbar_option=True, colorbar_position=1,
                              colorbar_title="Radius (m)",
                              colorbar_cmap='jet', colorbar_lognorm=True,
-                             n_thicks_for_linear_scale=6,
+                             ticks=[],
                              vmin=1e-6, vmax=1e0,
                              time_printing=True, time_position=1,
                              time_step_in_days=1., sampling_frequency=1, fps=24,
@@ -239,7 +51,7 @@ def resizing_and_film_making(outputs_path='outputs',
     :param colorbar_title: the name of the property to be displayed on the bar
     :param colorbar_cmap: the name of the specific colormap in Python
     :param colorbar_lognorm: if True, the scale will be a log scale, otherwise, it will be a linear scale
-    :param n_thicks_for_linear_scale: the number of thicks to represent for a linear scale
+    :param ticks: a list of values at which to put a major thick, and, if possible, the corresponding number label (if the list is empty, the ticks are positionned automatically),
     :param vmin: the min value of the color scale
     :param vmax: the max value of the color scale
     :param time_printing: if True, a time indication will be calculated and displayed on the image
@@ -267,18 +79,24 @@ def resizing_and_film_making(outputs_path='outputs',
         bar = colorbar(title=colorbar_title,
                        cmap=colorbar_cmap,
                        lognorm=colorbar_lognorm,
-                       n_thicks_for_linear_scale=n_thicks_for_linear_scale,
+                       ticks=ticks,
                        vmin=vmin, vmax=vmax)
         # We save it in the output directory:
         bar.savefig(path_colorbar, facecolor="None", edgecolor="None")
         # We reload the bar with Image package:
         bar = Image.open(path_colorbar)
-        new_size = (1200, 200)
-        bar = bar.resize(new_size)
         if colorbar_position==1:
+            new_size = (1200, 200)
+            bar = bar.resize(new_size)
             box_colorbar = (-120,1070)
         elif colorbar_position==2:
+            new_size = (1200, 200)
+            bar = bar.resize(new_size)
             box_colorbar = (-120, 870)
+        else:
+            new_size = (1500, 250)
+            bar = bar.resize(new_size)
+            box_colorbar = (0, 1400)
 
     # 1. COMPRESSING THE IMAGES:
     if image_transforming:
@@ -305,8 +123,12 @@ def resizing_and_film_making(outputs_path='outputs',
         # We cover each image in the directory:
         for filename in filenames:
 
+            # We get the ID of the image in order to calculate the proper time step to be displayed:
+            MTG_ID = int(filename[-9:-4])
+
             # The time is calculated:
-            time_in_days = time_step_in_days * (number_of_images - remaining_images) * sampling_frequency
+            # time_in_days = time_step_in_days * (number_of_images - remaining_images) * sampling_frequency
+            time_in_days = time_step_in_days * MTG_ID
             # The count is increased:
             count += 1
             # If the count corresponds to the target number, the image is added to the gif:
@@ -431,7 +253,7 @@ def resizing_and_film_making_for_scenarios(general_outputs_folder='outputs',
                                            colorbar_option=True, colorbar_position=1,
                                            colorbar_title="Radius (m)",
                                            colorbar_cmap='jet', colorbar_lognorm=True,
-                                           n_thicks_for_linear_scale=6,
+                                           ticks=[],
                                            vmin=1e-6, vmax=1e0,
                                            time_printing=True, time_position=1,
                                            time_step_in_days=1., sampling_frequency=1, frames_per_second=24,
@@ -468,7 +290,7 @@ def resizing_and_film_making_for_scenarios(general_outputs_folder='outputs',
                                  colorbar_option=colorbar_option, colorbar_position=colorbar_position,
                                  colorbar_title=colorbar_title,
                                  colorbar_cmap=colorbar_cmap, colorbar_lognorm=colorbar_lognorm,
-                                 n_thicks_for_linear_scale=n_thicks_for_linear_scale,
+                                 ticks=ticks,
                                  vmin=vmin, vmax=vmax,
                                  resizing=resizing, dividing_size_by=dividing_size_by,
                                  title=title)
@@ -488,40 +310,70 @@ if __name__ == "__main__":
     # Creating a colorbar:
     ######################
 
-    path_colorbar = os.path.join('outputs', os.path.join('Scenario_0008','colorbar.png'))
-    # We create the colorbar:
-    vmin=1e-15
-    vmax=1e-10
-    bar = colorbar(title="Exudation rate from the phloem vessels (gC per day per cm)",
-                   cmap='jet',
-                   lognorm=True,
-                   n_thicks_for_linear_scale=6,
-                   vmin=vmin, vmax=vmax)
+    # path_colorbar = os.path.join('outputs', os.path.join('Scenario_0008','colorbar.png'))
+    # # We create the colorbar:
+    # vmin=1e-15
+    # vmax=1e-10
+    # bar = colorbar(title="Exudation rate from the phloem vessels (gC per day per cm)",
+    #                cmap='jet',
+    #                lognorm=True,
+    #                n_ticks_for_linear_scale=6,
+    #                vmin=vmin, vmax=vmax)
+    # # We save it in the output directory:
+    # bar.savefig(path_colorbar, facecolor="None", edgecolor="None")
+
+    main_folder_path = 'C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0183/'
+
+    bar_title = "Net rhizodeposition rate (gC per day per cm)"
+    bar_filename = "colorbar_net_rhizodeposition.png"
+    vmin = 1e-7
+    vmax = 1e-4
+    lognorm = True
+
+    # bar_title = "Actual root exchange surface (m2 per cm)"
+    # bar_filename = "colorbar_exchange_surface_per_cm.png"
+    # vmin = 1e-4
+    # vmax = 8e-4
+    # lognorm = False
+
+    # bar = colorbar(title="Root mobile hexose concentration (mol of hexose per gDW of structural mass)", cmap='jet',
+    # bar = colorbar(title="Root exchange surface with soil solution (square meter per cm of root)", cmap='jet',
+    # bar = colorbar(title="Net unloading rate from phloem (moles of sucrose per cm of root per day)", cmap='jet',
+    # bar = colorbar(title="Net rhizodeposition rate (gC per day per cm)", cmap='jet',
+    # bar = colorbar(title=bar_title, cmap='jet',
+    #                lognorm=lognorm, ticks=[3e-4,5e-4,7e-4], vmin=vmin, vmax=vmax)
     # We save it in the output directory:
-    bar.savefig(path_colorbar, facecolor="None", edgecolor="None")
+    # bar_name = os.path.join(main_folder_path, "colorbar_C_hexose_root.png")
+    # bar_name = os.path.join(main_folder_path, "colorbar_surface.png")
+    # bar_name = os.path.join(main_folder_path, "colorbar_unloading.png")
+    # bar_name = os.path.join(main_folder_path, "colorbar_rhizodeposition.png")
+    # bar_name = os.path.join(main_folder_path, bar_filename)
+    # bar.savefig(bar_name, facecolor="None", edgecolor="None")
 
     # # Creating a new movie from root systems for one given scenario:
     # ################################################################
 
     # FROM ORIGINAL GRAPHS:
-    resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0142'),
+    resizing_and_film_making(outputs_path=main_folder_path,
                              # outputs_path='C:/Users/frees/rhizodep/simulations/saving_outputs/outputs_2023-08/Scenario_0069',
+                             # images_folder='root_images_net_rhizodeposition',
                              images_folder='root_images',
-                             # images_folder='new_root_image',
+                             # images_folder='new_axis_images',
                              resized_images_folder='root_images_resized',
                              # resized_images_folder='new_root_images_resized',
                              film_making=True,
-                             film_name="root_movie_net_rhizodeposition.gif",
+                             film_name="root_movie.gif",
                              image_transforming=True,
                              resizing=False, dividing_size_by=1.,
-                             colorbar_option=True, colorbar_position=1,
+                             colorbar_option=True, colorbar_position=3,
                              colorbar_title="Net rhizodeposition rate (gC per day per cm)",
-                             # colorbar_title="Hexose concentration (mol of hexose per gram)",
-                             colorbar_cmap='jet', colorbar_lognorm=True,
-                             n_thicks_for_linear_scale=6,
-                             vmin=1e-6, vmax=1e-3,
+                             # colorbar_title=bar_title,
+                             colorbar_cmap='jet', colorbar_lognorm=lognorm,
+                             ticks=[],
+                             vmin=vmin, vmax=vmax,
                              time_printing=True, time_position=1,
-                             time_step_in_days=1./24., sampling_frequency=1, fps=24,
+                             # time_step_in_days=6/24., sampling_frequency=1, fps=24,
+                             time_step_in_days=1 / 24., sampling_frequency=1, fps=24,
                              title="")
 
     # # FROM REDRAWN GRAPHS:
@@ -537,7 +389,7 @@ if __name__ == "__main__":
     #                          colorbar_title="Net rhizodeposition rate (mol of hexose per day per cm)",
     #                          # colorbar_title="Hexose concentration (mol of hexose per gram)",
     #                          colorbar_cmap='jet', colorbar_lognorm=True,
-    #                          n_thicks_for_linear_scale=6,
+    #                          n_ticks_for_linear_scale=6,
     #                          vmin=1e-8, vmax=1e-5,
     #                          time_printing=True, time_position=1,
     #                          time_step_in_days=1., sampling_frequency=1, fps=6,
@@ -556,7 +408,7 @@ if __name__ == "__main__":
     #                          # colorbar_title="Net rhizodeposition rate (mol of hexose per day per cm)",
     #                          colorbar_title="Hexose concentration (mol of hexose per gram)",
     #                          colorbar_cmap='jet', colorbar_lognorm=True,
-    #                          n_thicks_for_linear_scale=6,
+    #                          n_ticks_for_linear_scale=6,
     #                          vmin=1e-6, vmax=1e-3,
     #                          time_printing=True, time_position=1,
     #                          time_step_in_days=1. / 24., sampling_frequency=1, fps=6,
@@ -574,7 +426,7 @@ if __name__ == "__main__":
     #                                        colorbar_option=True, colorbar_position=1,
     #                                        colorbar_title="Concentration of root mobile hexose (mol of hexose per gram of root)",
     #                                        colorbar_cmap='jet', colorbar_lognorm=True,
-    #                                        n_thicks_for_linear_scale=6,
+    #                                        n_ticks_for_linear_scale=6,
     #                                        vmin=1e-6, vmax=1e0,
     #                                        time_printing=True, time_position=1,
     #                                        time_step_in_days=1., sampling_frequency=24, frames_per_second=24,
@@ -594,7 +446,7 @@ if __name__ == "__main__":
     #                          colorbar_option=False, colorbar_position=1,
     #                          colorbar_title="Radius (m)",
     #                          colorbar_cmap='jet', colorbar_lognorm=True,
-    #                          n_thicks_for_linear_scale=6,
+    #                          n_ticks_for_linear_scale=6,
     #                          vmin=1e-6, vmax=1e0,
     #                          time_printing=True, time_position=2,
     #                          time_step_in_days=1., sampling_frequency=1, fps=10,
@@ -612,7 +464,7 @@ if __name__ == "__main__":
     #                                        colorbar_option=False, colorbar_position=1,
     #                                        colorbar_title="Concentration of root mobile hexose (mol of hexose per gram of root)",
     #                                        colorbar_cmap='jet', colorbar_lognorm=True,
-    #                                        n_thicks_for_linear_scale=6,
+    #                                        n_ticks_for_linear_scale=6,
     #                                        vmin=1e-6, vmax=1e0,
     #                                        time_printing=True, time_position=2,
     #                                        time_step_in_days=1., sampling_frequency=1, frames_per_second=24,

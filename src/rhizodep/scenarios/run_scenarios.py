@@ -141,6 +141,7 @@ def run_one_scenario(scenario_id=1,
 
     RADIAL_GROWTH = scenario_parameters.get('radial_growth', True)
     ARCHISIMPLE_OPTION = scenario_parameters.get('ArchiSimple', False)
+    GROWTH_DURATION_BY_FREQUENCY = scenario_parameters.get('GD_by_frequency', False)
     ARCHISIMPLE_C_FRACTION = scenario_parameters.get('ArchiSimple_C_fraction', 0.20)
     NODULES_OPTION = scenario_parameters.get('nodules_option', False)
     ROOT_ORDER_LIMITATION_OPTION = scenario_parameters.get('root_order_limitation', False)
@@ -251,7 +252,7 @@ def run_one_scenario(scenario_id=1,
         # seminal_file = os.path.join(INPUTS_DIRPATH,"seminal_roots_inputs.csv")
         # adventitious_file = os.path.join(INPUTS_DIRPATH, "adventitious_roots_inputs.csv")
         g = model.initiate_mtg(random=RANDOM_OPTION,
-                               ArchiSimple=ARCHISIMPLE_OPTION,
+                               simple_growth_duration=not GROWTH_DURATION_BY_FREQUENCY,
                                initial_segment_length=INITIAL_SEGMENT_LENGTH,
                                initial_apex_length=INITIAL_APEX_LENGTH,
                                initial_C_sucrose_root=INITIAL_C_SUCROSE_ROOT,
@@ -276,6 +277,7 @@ def run_one_scenario(scenario_id=1,
                                        radial_growth=RADIAL_GROWTH,
                                        ArchiSimple=ARCHISIMPLE_OPTION,
                                        ArchiSimple_C_fraction=ARCHISIMPLE_C_FRACTION,
+                                       simple_growth_duration=not GROWTH_DURATION_BY_FREQUENCY,
                                        input_file=SCENARIO_INPUT_FILE,
                                        input_file_time_step_in_days=INPUT_FILE_TIME_STEP,
                                        outputs_directory=scenario_dirpath,
