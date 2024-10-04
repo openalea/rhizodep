@@ -58,40 +58,16 @@ class RhizoInputsSoilModel(Model):
     C_hexose_soil: float = declare(default=2.4e-3, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil", 
                                         value_comment="", references="Fischer et al 2007, water leaching estimation", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
+    content_hexose_soil: float = declare(default=2.4e-3, unit="mol.g-1", unit_comment="of hexose", description="Hexose concentration in soil", 
+                                        value_comment="", references="Fischer et al 2007, water leaching estimation", DOI="",
+                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
     Cs_mucilage_soil: float = declare(default=15, unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
     Cs_cells_soil: float = declare(default=15, unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-    C_mineralN_soil: float = declare(default=2.2, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", 
-                                        value_comment="", references="Fischer et al. 1966", DOI="",
-                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-    C_amino_acids_soil: float = declare(default=8.2e-3, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in soil", 
-                                        value_comment="", references="Fischer et al 2007, water leaching estimation", DOI="",
-                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-
-    # Water
-    water_potential_soil: float = declare(default=-0.1e6, unit="Pa", unit_comment="", description="Mean soil water potential", 
-                                        value_comment="", references="", DOI="",
-                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-    soil_moisture_content: float = declare(default=0.25, unit="adim", unit_comment="", description="Volumetric proportion of water per volume of soil", 
-                                        value_comment="", references="", DOI="",
-                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="intensive", edit_by="user")
-    water_volume: float = declare(default=0.25e-6, unit="m3", unit_comment="", description="Volume of the water in the soil element in contact with a the root segment", 
-                                        value_comment="", references="", DOI="",
-                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user")
-    # Structural properties
-    voxel_volume: float = declare(default=1e-6, unit="m3", unit_comment="", description="Volume of the soil element in contact with a the root segment",
-                                        value_comment="", references="", DOI="",
-                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user")
-    bulk_density: float = declare(default=1.3e6, unit="g.m-3", unit_comment="", description="Volumic density of the dry soil", 
-                                        value_comment="", references="", DOI="",
-                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user")
-    dry_weight: float = declare(default=1.3e6, unit="g", unit_comment="", description="dry weight of the considered voxel element", 
-                                        value_comment="", references="", DOI="",
-                                       min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user")
-
+    
     # Degradation processes
     hexose_degradation: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Rate of hexose consumption  at the soil-root interface", 
                                         value_comment="", references="", DOI="",
@@ -147,29 +123,6 @@ class RhizoInputsSoilModel(Model):
                                        min_value="", max_value="", variable_type="parametyer", by="model_soil", state_variable_type="", edit_by="user")
     cells_degradation_rate_max_C: float = declare(default=1, unit="adim", unit_comment="", description="parameter C (either 0 or 1)", 
                                         value_comment="", references="We assume that all other parameters for mucilage degradation are identical to the ones for hexose degradation.", DOI="",
-                                       min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
-
-    # Water-related parameters
-    field_capacity: float = declare(default=0.25, unit="adim", unit_comment="", description="Soil moisture at which soil doesn't retain water anymore.", 
-                                        value_comment="", references="Cornell university, case of sandy loam soil", DOI="",
-                                       min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
-
-    permanent_wilting_point: float = declare(default=0.05, unit="adim", unit_comment="", description="Soil moisture at which soil doesn't retain water anymore.", 
-                                        value_comment="", references="Cornell university, case of sandy loam soil", DOI="",
-                                       min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
-
-    # Initialization parameters
-    C_mineralN_patch: float = declare(default=2.2, unit="mol.m-3", unit_comment="of equivalent mineral nitrogen", description="Mineral nitrogen concentration in a located patch in soil", 
-                                        value_comment="", references="Drew et al. 1975", DOI="",
-                                       min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
-    patch_depth_mineralN: float = declare(default=10e-2, unit="m", unit_comment="", description="Depth of a nitrate patch in soil", 
-                                        value_comment="", references="Drew et al. 1975", DOI="",
-                                       min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
-    patch_uniform_width_mineralN: float = declare(default=4e-2, unit="m", unit_comment="", description="Width of the zone of the patch with uniform concentration of nitrate", 
-                                        value_comment="", references="Drew et al. 1975", DOI="",
-                                       min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
-    patch_transition_mineralN: float = declare(default=1e-3, unit="m", unit_comment="", description="Variance of the normal law smooting the boundary transition of a nitrate patch with the background concentration", 
-                                        value_comment="", references="Drew et al. 1975", DOI="",
                                        min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
 
     # Kinetic soil degradation parameters
@@ -254,12 +207,6 @@ class RhizoInputsSoilModel(Model):
             if name not in ("voxel_volume", "water_volume"):
                 self.voxel_grid_to_self(name, init_value=getattr(self, name))
 
-        # Set an heterogeneity uppon the mean background
-        self.add_patch_repartition_to_soil(property_name="C_mineralN_soil", patch_value=self.C_mineralN_patch, 
-                                           z_loc=self.patch_depth_mineralN, 
-                                           z_width=self.patch_uniform_width_mineralN, 
-                                           z_dev=self.patch_transition_mineralN)
-
 
     def voxel_grid_to_self(self, name, init_value):
         self.voxels[name] = np.zeros((self.voxel_number_xy, self.voxel_number_z, self.voxel_number_xy))
@@ -339,50 +286,6 @@ class RhizoInputsSoilModel(Model):
                     getattr(self, name)[vid] = self.voxels[name][vy][vz][vx]
 
 
-    def add_patch_repartition_to_soil(self, property_name: str, patch_value: float, x_loc=None, y_loc=None, z_loc=None, 
-                                                                        x_width=0, y_width=0, z_width=0, 
-                                                                        x_dev=1e-3, y_dev=1e-3, z_dev=1e-3):
-
-        spherical_normal_patch = False
-        if spherical_normal_patch:
-            y_dev = x_dev
-            z_dev = x_dev
-            x_width = 0
-            y_width = 0
-            z_width = 0
-        
-        # Start with Z
-        if z_loc is not None:
-            
-            z_mean = (self.voxels["z1"] + self.voxels["z2"]) / 2
-
-            test = np.logical_and(z_loc - z_width/2 < z_mean, z_mean < z_loc + z_width/2)
-            self.voxels[property_name][test] = patch_value
-            test = z_mean > z_loc + z_width/2
-            new_values = self.voxels[property_name] + (patch_value - self.voxels[property_name]) / (z_dev * np.sqrt(2 * np.pi)) * np.exp(-((z_mean - (z_loc + z_width/2)) ** 2) / (2 * z_dev ** 2))
-            self.voxels[property_name][test] = new_values[test]
-            test = z_mean < z_loc - z_width/2
-            new_values = self.voxels[property_name] + (patch_value - self.voxels[property_name]) / (z_dev * np.sqrt(2 * np.pi)) * np.exp(-((z_mean - (z_loc - z_width/2)) ** 2) / (2 * z_dev ** 2))
-            self.voxels[property_name][test] = new_values[test]
-
-        # Then x and y
-        if x_loc is not None:
-            x_mean = (self.voxels["x1"] + self.voxels["x2"]) / 2
-
-            self.voxels[property_name][x_loc - x_width/2 < x_mean < x_loc + x_width/2] = patch_value
-            self.voxels[property_name][x_mean > x_loc + x_width/2] = self.voxels[property_name] + (patch_value - self.voxels[property_name]) / (x_dev * np.sqrt(2 * np.pi)) * np.exp(-((x_mean - (x_loc + x_width/2)) ** 2) / (2 * x_dev ** 2))
-            self.voxels[property_name][x_mean < x_loc - x_width/2] = self.voxels[property_name] + (patch_value - self.voxels[property_name]) / (x_dev * np.sqrt(2 * np.pi)) * np.exp(-((x_mean - (x_loc - x_width/2)) ** 2) / (2 * x_dev ** 2))
-
-        if y_loc is not None:
-            y_mean = (self.voxels["y1"] + self.voxels["y2"]) / 2
-
-            self.voxels[property_name][y_loc - y_width/2 < y_mean < y_loc + y_width/2] = patch_value
-            self.voxels[property_name][y_mean > y_loc + y_width/2] = self.voxels[property_name] + (patch_value - self.voxels[property_name]) / (y_dev * np.sqrt(2 * np.pi)) * np.exp(-((y_mean - (y_loc + y_width/2)) ** 2) / (2 * y_dev ** 2))
-            self.voxels[property_name][y_mean < y_loc - y_width/2] = self.voxels[property_name] + (patch_value - self.voxels[property_name]) / (y_dev * np.sqrt(2 * np.pi)) * np.exp(-((y_mean - (y_loc - y_width/2)) ** 2) / (2 * y_dev ** 2))
-
-        
-
-
     def __call__(self, *args):
         self.compute_mtg_voxel_neighbors()
         self.apply_to_voxel()
@@ -390,7 +293,7 @@ class RhizoInputsSoilModel(Model):
         self.get_from_voxel()
 
 
-    @rate
+    #TP@rate
     def _hexose_degradation(self, C_hexose_soil, root_exchange_surface, soil_temperature):
         """
         This function computes the rate of hexose "consumption" (in mol of hexose per seconds) at the soil-root interface
@@ -471,9 +374,9 @@ class RhizoInputsSoilModel(Model):
     # TODO FOR TRISTAN: Consider adding similar functions for describing N mineralization/organization in the soil?
 
     #TP@state
-    def _C_hexose_soil(self, C_hexose_soil, water_volume, hexose_degradation, hexose_exudation,
+    def _C_hexose_soil(self, C_hexose_soil, soil_moisture, voxel_volume, hexose_degradation, hexose_exudation,
                              phloem_hexose_exudation, hexose_uptake_from_soil, phloem_hexose_uptake_from_soil):
-        balance = C_hexose_soil + (self.time_step_in_seconds / water_volume) * (
+        balance = C_hexose_soil + (self.time_step_in_seconds / (soil_moisture * voxel_volume)) * (
             hexose_exudation
             + phloem_hexose_exudation
             - hexose_uptake_from_soil
@@ -484,8 +387,8 @@ class RhizoInputsSoilModel(Model):
         return balance
 
     #TP@state
-    def _Cs_mucilage_soil(self, Cs_mucilage_soil, water_volume, mucilage_secretion, mucilage_degradation):
-        balance = Cs_mucilage_soil + (self.time_step_in_seconds / water_volume) * (
+    def _Cs_mucilage_soil(self, Cs_mucilage_soil, soil_moisture, voxel_volume, mucilage_secretion, mucilage_degradation):
+        balance = Cs_mucilage_soil + (self.time_step_in_seconds / (soil_moisture * voxel_volume)) * (
             mucilage_secretion
             - mucilage_degradation
         )
@@ -493,25 +396,13 @@ class RhizoInputsSoilModel(Model):
         return balance
     
     #TP@state
-    def _Cs_cells_soil(self, Cs_cells_soil, water_volume, cells_release, cells_degradation):
-        balance = Cs_cells_soil + (self.time_step_in_seconds / water_volume) * (
+    def _Cs_cells_soil(self, Cs_cells_soil, soil_moisture, voxel_volume, cells_release, cells_degradation):
+        balance = Cs_cells_soil + (self.time_step_in_seconds / (soil_moisture * voxel_volume)) * (
                 cells_release
                 - cells_degradation
         )
         balance[balance < 0.] = 0.
         return balance
-
-    @state
-    def _water_volume(self, water_volume):
-        return water_volume - 0
-    
-    @state
-    def _soil_moisture_content(self, voxel_volume, water_volume):
-        return water_volume / voxel_volume
-    
-    @state
-    def _water_potential_soil(self, voxel_volume, water_volume):
-        return - 315.28 * (water_volume / voxel_volume) ** -3.415
 
     def temperature_modification(self, soil_temperature=15, process_at_T_ref=1., T_ref=0., A=-0.05, B=3., C=1.):
         """

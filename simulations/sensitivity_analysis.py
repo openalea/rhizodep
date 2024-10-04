@@ -1,17 +1,14 @@
 # Public packages
-import os, sys, time
+import os
 import numpy as np
-import multiprocessing as mp
 from SALib.analyze import sobol
 # Model packages
-from root_bridges.root_bridges import Model
 # Utility packages
 from log.logging import Logger
-from analyze.analyze import analyze_data
 from initialize.initialize import MakeScenarios as ms
 from initialize.initialize import read_table
 import matplotlib.pyplot as plt
-from simulations.simulation import simulate_scenarios
+from simulations.single_plant.simulation import simulate_scenarios
 
 
 def sobol_analysis(problem, results_dirpath, scenarios_names, times=[], outputs=[]):
