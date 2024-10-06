@@ -1,3 +1,4 @@
+# Public packages
 import numpy as np
 from dataclasses import dataclass
 
@@ -48,7 +49,7 @@ class RhizoInputsSoilModel(Model):
                                        min_value="", max_value="", variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
 
 
-    # --- INITIALIZE MODEL STATE VARIABLES ---
+    # --- STATE VARIABLES ---
     # Temperature
     soil_temperature: float = declare(default=7.8, unit="°C", unit_comment="", description="soil temperature in contact with roots",
                                                  value_comment="Derived from Swinnen et al. 1994 C inputs, estimated from a labelling experiment starting 3rd of March, with average temperature at 7.8 °C", references="Swinnen et al. 1994", DOI="",
@@ -79,7 +80,7 @@ class RhizoInputsSoilModel(Model):
                                         value_comment="", references="", DOI="",
                                        min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="extensive", edit_by="user")
 
-    # --- INITIALIZES MODEL PARAMETERS ---
+    # --- PARAMETERS ---
 
     # Temperature
     process_at_T_ref: float = declare(default=1., unit="adim", unit_comment="", description="Proportion of maximal process intensity occuring at T_ref", 
@@ -167,8 +168,9 @@ class RhizoInputsSoilModel(Model):
         self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.voxels, compartment="soil")
         self.vertices = self.g.vertices(scale=self.g.max_scale())
 
-        self.link_self_to_mtg()
-        
+        self.link_self_to_mtg()    
+
+    # SERVICE FUNCTIONS
 
     # Just ressource for now
     def initiate_voxel_soil(self):
@@ -200,11 +202,9 @@ class RhizoInputsSoilModel(Model):
         self.voxels["z2"] = self.voxels["z1"] + voxel_height
 
         self.voxel_grid_to_self("voxel_volume", voxel_volume)
-        self.voxel_grid_to_self("water_volume", voxel_volume * self.soil_moisture_content)
-        self.voxel_grid_to_self("dry_weight", voxel_volume * self.bulk_density)
 
         for name in self.state_variables + self.inputs:
-            if name not in ("voxel_volume", "water_volume"):
+            if name != "voxel_volume":
                 self.voxel_grid_to_self(name, init_value=getattr(self, name))
 
 
@@ -291,7 +291,8 @@ class RhizoInputsSoilModel(Model):
         self.apply_to_voxel()
         self.choregrapher(module_family=self.family, *args)
         self.get_from_voxel()
-
+    
+    # MODEL EAQUATIONS
 
     #TP@rate
     def _hexose_degradation(self, C_hexose_soil, root_exchange_surface, soil_temperature):
