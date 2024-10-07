@@ -97,6 +97,9 @@ class RootGrowthModel(Model):
     struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+    root_hair_struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
     thermal_time_since_emergence: float = declare(default=0, unit="°C", unit_comment="", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
@@ -168,7 +171,7 @@ class RootGrowthModel(Model):
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
     # C supply for elongation
-    growing_zone_factor: float = declare(default=8 * 2., unit="adim", unit_comment="", description="Proportionality factor between the radius and the length of the root apical zone in which C can sustain root elongation", 
+    growing_zone_factor: float = declare(default=21., unit="adim", unit_comment="", description="Proportionality factor between the radius and the length of the root apical zone in which C can sustain root elongation", 
                                                     min_value="", max_value="", value_comment="", references="According to illustrations by Kozlova et al. (2020), the length of the growing zone corresponding to the root cap, meristem and elongation zones is about 8 times the diameter of the tip.", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
@@ -319,8 +322,8 @@ class RootGrowthModel(Model):
         if g is None:
             self.g = self.initiate_mtg()
         else:
+            input_mtg = True
             self.g = g
-            self.initiate_heterogeneous_variables()
 
         self.props = self.g.properties()
         self.time_step_in_seconds = time_step_in_seconds
@@ -333,6 +336,9 @@ class RootGrowthModel(Model):
                 self.props.setdefault(name, {})
                 self.props[name].update({key: getattr(self, name) for key in self.vertices})
             setattr(self, name, self.props[name])
+
+        if input_mtg:
+            self.initiate_heterogeneous_variables()
 
     def initiate_mtg(self):
         """
@@ -636,7 +642,9 @@ class RootGrowthModel(Model):
             n.volume = self.volume_from_radius_and_length(n, n.radius, n.length)
             n.struct_mass = n.volume * self.new_root_tissue_density
 
+        algo.orders(self.g)
         self.update_distance_from_tip()
+        self.initiate_heterogeneous_struct_mass_production()
     
     # SUBDIVISIONS OF THE SCHEDULING LOOP
     # -----------------------------------
@@ -2330,11 +2338,6 @@ class RootGrowthModel(Model):
         :return: the MTG with an updated property 'distance_from_tip'
         """
 
-        # We initialize an empty dictionary for to_tips:
-        to_tips = {}
-        # We use the property "length" of each vertex based on the function "length":
-        length = self.g.property('length')
-
         # We define "root" as the starting point of the loop below:
         root_gen = self.g.component_roots_at_scale_iter(self.g.root, scale=1)
         root = next(root_gen)
@@ -2632,3 +2635,98 @@ class RootGrowthModel(Model):
 
         # We return a modified version of the MTG "g" with the updated property "distance_from_tip":
         return growth_duration
+
+
+    def initiate_heterogeneous_struct_mass_production(self):
+        """
+        This function initializes the struct mass production zones related to elongation, root hair development, mother costs related to lateral elongation.
+        It also initializes the root hair on existing architecture
+        """
+        # We define "root" as the starting point of the loop below:
+        root_gen = self.g.component_roots_at_scale_iter(self.g.root, scale=1)
+        root = next(root_gen)
+
+        # We travel in the MTG from the root tips to the base:
+        for vid in post_order(self.g, root):
+            n = self.g.node(vid)
+
+            # If at root tip, for every axis based on its radius we...
+            if len(self.g.children(vid)) == 0:
+                # ... Initialize a cumulative
+                processed_length = 0.
+                processed_root_hair_length = 0.
+                # ... Compute the elongation zone length and the supposed uniform struct mass production along it
+                elongation_zone_length = n.radius * self.growing_zone_factor                
+                uniform_struct_mass_production = (np.pi * n.radius ** 2) * (self.EL * n.radius * self.root_tissue_density) / elongation_zone_length
+
+                # .. Then handle the consumption by elongating laterals branched on this axis 
+                emergence_period = n.radius * self.EL * self.emergence_delay
+                lateral_sustaining_root_length = n.radius * self.growing_zone_factor # NOTE : it is the same length as the main root elongation zone, which is normal, as the relative rate of elongation is the same between the main root and the lateral root
+                max_lateral_root_struct_mass_production = np.pi * (n.radius * self.RMD) ** 2 * (self.EL * n.radius * self.RMD) * self.root_tissue_density / lateral_sustaining_root_length
+                k_sustaining_laterals = max_lateral_root_struct_mass_production / lateral_sustaining_root_length
+
+            # IF WE ARE IN THE ELONGATION ZONE
+            if processed_length < elongation_zone_length:
+                # If this is the last segment being partly partly affected by elongation
+                if processed_length + n.length > elongation_zone_length:
+                    n.struct_mass_produced = uniform_struct_mass_production * (elongation_zone_length - processed_length)
+                    
+                    # Here we begin recording for root hair zone length and uniform struct mass production along as it relies on the local radius
+                    root_hair_elongation_zone_length = (n.radius * self.EL) * (self.root_hair_max_length / (self.root_hairs_elongation_rate * self.root_hair_radius))
+                    uniform_root_hair_stuct_mass_production = self.root_tissue_density * (
+                        self.root_hair_radius ** 2 * np.pi * (self.root_hairs_elongation_rate * self.root_hair_radius)) * (
+                            self.root_hairs_density * n.radius * root_hair_elongation_zone_length) / root_hair_elongation_zone_length
+                    # Additionnaly we record the struct mass produced for root hair along with core segment structural mass
+                    n.root_hair_struct_mass_produced = uniform_root_hair_stuct_mass_production * (n.length + processed_length - elongation_zone_length)
+                    n.total_root_hairs_number = self.root_hairs_density * n.radius * (n.length + processed_length - elongation_zone_length)
+                    processed_root_hair_length = n.length + processed_length - elongation_zone_length
+                    n.root_hair_length = self.root_hair_max_length * (processed_root_hair_length / 2) / root_hair_elongation_zone_length
+
+                # Otherwise it affects the whole segment length
+                else:
+                    n.struct_mass_produced = uniform_struct_mass_production * n.length
+
+                    # IF WE ARE AT RECENT LATERAL BRANCHING ZONES (OPTION 2, SEE 1 BELLOW)
+                    parent = n.parent()
+                    if parent.order == n.order-1:
+                        parent.struct_mass_produced = uniform_struct_mass_production * (elongation_zone_length - processed_length - n.length)
+
+                # In any case, no root hair are formed in elongation zone
+                n.total_root_hairs_number = 0.
+                n.root_hair_length = 0.
+
+            else:
+                # IF WE ARE IN THE ROOT HAIR ELONGATION ZONE
+                if processed_length < elongation_zone_length + root_hair_elongation_zone_length:
+                    # If this is the last segment being partly partly affected by root_hair elongation
+                    if processed_length + n.length > elongation_zone_length + root_hair_elongation_zone_length:
+                        n.root_hair_struct_mass_produced = uniform_root_hair_stuct_mass_production * (elongation_zone_length + root_hair_elongation_zone_length - processed_length)
+                        
+                        # Computing root hair average length on the remaining section of the segment
+                        segment_growing_length = elongation_zone_length + root_hair_elongation_zone_length - processed_length
+                        n.root_hair_length = (
+                            segment_growing_length * self.root_hair_max_length * (processed_root_hair_length + (segment_growing_length / 2.)) / root_hair_elongation_zone_length + 
+                            (n.length - segment_growing_length) * self.root_hair_max_length
+                                                ) / n.length
+                        
+                    # Otherwise it affects the whole segment length
+                    else:
+                        n.root_hair_struct_mass_produced = uniform_root_hair_stuct_mass_production * n.length
+                        
+                        # Computing the average root hair length on the whole segment
+                        n.root_hair_length = self.root_hair_max_length * (processed_root_hair_length + (n.length / 2.)) / root_hair_elongation_zone_length
+                        processed_root_hair_length += n.length
+                
+                else:
+                    # In this case, root hair have reached their maximal length
+                    n.root_hair_length = self.root_hair_max_length
+
+                # In all case, the root hair density is the same
+                n.total_root_hairs_number = self.root_hairs_density * n.radius * n.length
+                    
+                # IF WE ARE AT RECENT LATERAL BRANCHING ZONES (OPTION 1, commented because of wrong order numbering a collar with RSML inputs)
+                # elif n.order == 1 and processed_length < emergence_period + elongation_zone_length:
+                #     n.struct_mass_produced = max(0., max_lateral_root_struct_mass_production - k_sustaining_laterals * ((n.distance_from_tip - emergence_period)%emergence_period))
+
+            processed_length += n.length
+
