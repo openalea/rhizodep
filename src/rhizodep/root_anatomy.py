@@ -227,17 +227,20 @@ class RootAnatomy(Model):
             # Note: As the transition between 100% conductance and 0% for both endodermis and exodermis is described by a
             # Gompertz function involving a double exponential, we avoid unnecessary long calculations when the content of
             # the exponential is too high/low:
-            #if self.endodermis_b - self.endodermis_c * age > 1000:
-            #    endodermis_conductance_factor = 1.
-            #else:
-            #    endodermis_conductance_factor = (100 - self.endodermis_a * np.exp(
-            #        -np.exp(self.endodermis_b - self.endodermis_c * age))) / 100.
+            # #if self.endodermis_b - self.endodermis_c * age > 1000:
+            # #    endodermis_conductance_factor = 1.
+            # #else:
+            # #    endodermis_conductance_factor = (100 - self.endodermis_a * np.exp(
+            # #        -np.exp(self.endodermis_b - self.endodermis_c * age))) / 100.
+            # endodermis_conductance_factor = (100 - self.endodermis_a * np.exp(-np.exp(self.endodermis_b / (60.*60.*24.) - self.endodermis_c * age))) / 100.
 
-            #if self.exodermis_b - self.exodermis_c * age > 1000:
-            #    exodermis_conductance_factor = 1.
-            #else:
-            #    exodermis_conductance_factor = (100 - self.exodermis_a * np.exp(
-            #        -np.exp(self.exodermis_b - self.exodermis_c * age))) / 100.
+
+            # #if self.exodermis_b - self.exodermis_c * age > 1000:
+            # #    exodermis_conductance_factor = 1.
+            # #else:
+            # #    exodermis_conductance_factor = (100 - self.exodermis_a * np.exp(
+            # #        -np.exp(self.exodermis_b - self.exodermis_c * age))) / 100.
+            # exodermis_conductance_factor = (100 - self.exodermis_a * np.exp(-np.exp(self.exodermis_b / (60. * 60. * 24.) - self.exodermis_c * age))) / 100.
 
             # DISTANCE WISE APPARITION OF ENDODERMIS AND exodermis DIFFERENTIATION BOUNDARIES
             # We define the distances from apex where barriers start/end:
