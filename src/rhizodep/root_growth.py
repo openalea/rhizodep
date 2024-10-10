@@ -275,7 +275,7 @@ class RootGrowthModel(Model):
     random: bool = declare(default=True, unit="adim", unit_comment="", description="Allow random processes in growth", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
-    ArchiSimple: bool = declare(default=False, unit="adim", unit_comment="", description="Allow growth according to the original Archisimple model", 
+    simple_growth_duration: bool = declare(default=False, unit="adim", unit_comment="", description="Allow growth according to the original Archisimple model", 
                                                     min_value="", max_value="", value_comment="", references="(Pagès et al., 2014)", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
     initial_segment_length: float = declare(default=1e-3, unit="m", unit_comment="", description="Initial segment length", 
@@ -302,7 +302,7 @@ class RootGrowthModel(Model):
     adventitious_roots_events_file: str = declare(default="adventitious_roots_inputs.csv", unit="adim", unit_comment="", description="Filepath pointing to input table to plan adventitious root emergence event", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
-    radial_growth: str = declare(default="Possible", unit="adim", unit_comment="", description="equivalent to a Boolean expliciting whether radial growth should be considered or not", 
+    radial_growth: str = declare(default=True, unit="adim", unit_comment="", description="equivalent to a Boolean expliciting whether radial growth should be considered or not", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
     nodules: bool = declare(default=False, unit="adim", unit_comment="", description="a Boolean expliciting whether nodules could be formed or not", 
@@ -761,7 +761,7 @@ class RootGrowthModel(Model):
                                                               C_hexose_root=apex.growing_zone_C_hexose_root,
                                                               elongation_time_in_seconds=apex.thermal_potential_time_since_emergence)
                 # Last, if ArchiSimple has been chosen as the growth model:
-                if self.ArchiSimple:
+                if self.simple_growth_duration:
                     # Then we automatically allow the root to emerge, without consideration of C limitation:
                     apex.type = "Normal_root_after_emergence"
             # In any case, the time since primordium formation is incremented, as usual:
@@ -796,7 +796,7 @@ class RootGrowthModel(Model):
                                                               elongation_time_in_seconds=apex.thermal_potential_time_since_emergence)
 
                 # If ArchiSimple has been chosen as the growth model:
-                if self.ArchiSimple:
+                if self.simple_growth_duration:
                     apex.type = "Normal_root_after_emergence"
                     new_apex.append(apex)
                     # And the function returns this new apex and stops here:
@@ -959,7 +959,7 @@ class RootGrowthModel(Model):
         """
         
         # If we keep the classical ArchiSimple rule:
-        if self.ArchiSimple:
+        if self.simple_growth_duration:
             # Then the elongation is calculated following the rules of Pages et al. (2014):
             elongation = self.EL * 2. * radius * elongation_time_in_seconds
         else:
@@ -1164,15 +1164,21 @@ class RootGrowthModel(Model):
         # CHECKING WHETHER THE APEX OF THE ROOT AXIS HAS STOPPED GROWING:
         # ---------------------------------------------------------------
 
-        # We look at the apex of the axis to which the segment belongs (i.e. we get the last element of all the Descendants):
-        index_apex = self.g.Descendants(segment.index())[-1]
+        # We look at the apex of the axis to which the segment belongs (i.e. we get the last element of the axis):
+        index_apex = g.Axis(segment.index())[-1]
         apex = self.g.node(index_apex)
-        # print("For segment", segment.index(), "the terminal index is", index_apex, "and has the type", apex.label)
+        # print("For segment", segment.index(), "the terminal index is", index_apex, "and has the type", apex.type)
+        if apex.label != "Apex":
+            print("ERROR: when trying to access the terminal apex of the axis of the segment", segment.index(),
+                "we obtained the element", index_apex," that is a", apex.label, "!!!")
+
         # Depending on the type of the apex, we adjust the type of the segment on the same axis:
         if apex.type == "Just_stopped":
             segment.type = "Just_stopped"
+            # print("The segment", segment.index(), "has been considered as just stopped as the apex", index_apex, "has just stopped.")
         elif apex.type == "Stopped":
             segment.type = "Stopped"
+            # print("The segment", segment.index(), "has been considered as stopped as the apex", index_apex, "has stopped.")
 
         # CHECKING POSSIBLE ROOT SEGMENT DEATH:
         # -------------------------------------
@@ -1220,7 +1226,7 @@ class RootGrowthModel(Model):
         # REGULATION OF RADIAL GROWTH BY AVAILABLE CARBON:
         # ------------------------------------------------
         # If the radial growth is possible:
-        if self.radial_growth == "Possible":
+        if self.radial_growth:
             # The radius of the root segment is defined according to the pipe model.
             # In ArchiSimp9, the radius is increased by considering the sum of the sections of all the children,
             # by adding a fraction (SGC) of this sum of sections to the current section of the parent segment,
@@ -1231,7 +1237,7 @@ class RootGrowthModel(Model):
                 # Then the potential radius is set to the initial radius:
                 segment.theoretical_radius = segment.initial_radius
             # If we consider simple ArchiSimple rules:
-            if self.ArchiSimple:
+            if self.simple_growth_duration:
                 # Then the potential radius to form is equal to the theoretical one determined by geometry:
                 segment.potential_radius = segment.theoretical_radius
             # Otherwise, if we don't strictly follow simple ArchiSimple rules and if there can be an increase in radius:
@@ -2624,7 +2630,7 @@ class RootGrowthModel(Model):
         """
 
         # If we only want to apply original ArchiSimple rules:
-        if self.ArchiSimple:
+        if self.simple_growth_duration:
             # Then the growth duration of the apex is proportional to the square diameter of the apex:
             growth_duration = self.GDs * (2. * radius) ** 2
         # Otherwise, we define the growth duration as a fixed value, randomly chosen between three possibilities:

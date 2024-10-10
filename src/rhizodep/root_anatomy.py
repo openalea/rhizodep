@@ -308,8 +308,8 @@ class RootAnatomy(Model):
                     t_since_endodermis_was_disrupted = t
                     if t_since_endodermis_was_disrupted < t_max_endo:
                         # We increase the relative conductance of endodermis according to the age of the lateral root,
-                        # considering that the barrier starts at 1 and linearily decreases with time until reaching 0. However,
-                        # if the barrier was not completely formed initially, we should not set it to zero, and therefore
+                        # considering that the conductance starts at 1 and linearily decreases with time until reaching 0.
+                        # However, if the barrier was not completely formed initially, we should not set it to zero, and therefore
                         # define the new conductance as the maximal value between the original conductance and the new one:
                         new_conductance = max(endodermis_conductance_factor,
                                             (t_max_endo - t_since_endodermis_was_disrupted) / t_max_endo)
@@ -325,9 +325,9 @@ class RootAnatomy(Model):
                         # If this time is small enough, the exodermis barrier may have been compromised:
                         if t_since_exodermis_was_disrupted < t_max_exo:
                             # We increase the relative conductance of exodermis according to the time elapsed since the lateral
-                            # root crossed the exodermis, considering that the barrier starts at 1 and linearily decreases with
-                            # time until reaching 0. However, if the barrier was not completely formed initially, we should not
-                            # set it to zero, and we therefore define the new conductance as the maximal value between the
+                            # root crossed the exodermis, considering that the conductance starts at 1 and linearily decreases
+                            # with time until reaching 0. However, if the barrier was not completely formed initially, we should
+                            # not set it to zero, and we therefore define the new conductance as the maximal value between the
                             # original conductance and the new one:
                             new_conductance = max(exodermis_conductance_factor,
                                                 (t_max_exo - t_since_exodermis_was_disrupted) / t_max_exo)
