@@ -119,6 +119,9 @@ class RootCarbonModel(Model):
     hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth", 
                                                  min_value="", max_value="", value_comment="", references="", DOI="",
                                                   variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
+    hexose_consumption_rate_by_fungus: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by fungus", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="input", by="model_growth", state_variable_type="extensive", edit_by="user")
     distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
                                       min_value="", max_value="", value_comment="", references="", DOI="",
                                        variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
@@ -930,7 +933,7 @@ class RootCarbonModel(Model):
     @state
     def _C_hexose_root(self, C_hexose_root, struct_mass, living_root_hairs_struct_mass, hexose_exudation, hexose_uptake_from_soil,
                            mucilage_secretion, cells_release, maintenance_respiration,
-                           hexose_consumption_by_growth, hexose_diffusion_from_phloem,
+                           hexose_consumption_by_growth, hexose_consumption_by_fungus, hexose_diffusion_from_phloem,
                            hexose_active_production_from_phloem, sucrose_loading_in_phloem,
                            hexose_mobilization_from_reserve, hexose_immobilization_as_reserve, deficit_hexose_root):
         return C_hexose_root + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
@@ -940,6 +943,7 @@ class RootCarbonModel(Model):
                 - cells_release
                 - maintenance_respiration / 6.
                 - hexose_consumption_by_growth
+                - hexose_consumption_by_fungus 
                 + hexose_diffusion_from_phloem
                 + hexose_active_production_from_phloem
                 - 2. * sucrose_loading_in_phloem

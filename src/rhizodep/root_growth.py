@@ -88,6 +88,9 @@ class RootGrowthModel(Model):
     hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth is coupled to a root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+    hexose_consumption_rate_by_fungus: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by fungus", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user") 
     distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
@@ -676,6 +679,8 @@ class RootGrowthModel(Model):
             n.hexose_growth_demand = 0.
             n.actual_elongation = 0.
             n.actual_elongation_rate = 0.
+
+            n.hexose_consumption_rate_by_fungus = 0.
 
             # We make sure that the initial values of length, radius and struct_mass are correctly initialized:
             n.initial_length = n.length
