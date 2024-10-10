@@ -97,7 +97,7 @@ class RootGrowthModel(Model):
     struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
-    root_hair_struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
+    root_hairs_struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
     thermal_time_since_emergence: float = declare(default=0, unit="°C", unit_comment="", description="", 
@@ -199,6 +199,12 @@ class RootGrowthModel(Model):
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     relative_root_thickening_rate_max: float = declare(default=5. / 100. / (24. * 60. * 60.), unit="s-1", unit_comment="", description="Maximal rate of relative increase in root radius", 
                                                     min_value="", max_value="", value_comment="", references="We consider that the radius can't increase by more than 5% every day (??)", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    C_hexose_min_for_elongation : float = declare(default=1e-5, unit="mol.g-1", unit_comment="in mol of hexose per g of structural mass", description="Treshold hexose concentration for elongation", 
+                                                    min_value="", max_value="", value_comment="", references="?", DOI="",
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
+    C_hexose_min_for_thickening: float = declare(default=1e-5, unit="mol.g-1", unit_comment="in mol of hexose per g of structural mass", description="Treshold hexose concentration for thikening", 
+                                                    min_value="", max_value="", value_comment="", references="?", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     Km_thickening: float = declare(default=1250 * 1e-6 / 6., unit="mol.g-1", unit_comment="of hexose", description="Affinity constant for root thickening", 
                                                     min_value="", max_value="", value_comment="Km_elongation", references="We assume that the Michaelis-Menten constant for thickening is the same as for root elongation. (??)", DOI="",
@@ -952,7 +958,7 @@ class RootGrowthModel(Model):
         else:
             # Otherwise, we additionally consider a limitation of the elongation according to the local concentration of hexose,
             # based on a Michaelis-Menten formalism:
-            if C_hexose_root > 0.:
+            if C_hexose_root > self.C_hexose_min_for_elongation:
                 elongation = self.EL * 2. * radius * C_hexose_root / (
                         self.Km_elongation + C_hexose_root) * elongation_time_in_seconds
             else:
@@ -1222,7 +1228,8 @@ class RootGrowthModel(Model):
                 # Then the potential radius to form is equal to the theoretical one determined by geometry:
                 segment.potential_radius = segment.theoretical_radius
             # Otherwise, if we don't strictly follow simple ArchiSimple rules and if there can be an increase in radius:
-            elif segment.length > 0. and segment.theoretical_radius > segment.radius:
+            elif segment.length > 0. and segment.theoretical_radius > segment.radius \
+                    and segment.C_hexose_root > self.C_hexose_min_for_thickening:
                 # We calculate the maximal increase in radius that can be achieved over this time step,
                 # based on a Michaelis-Menten formalism that regulates the maximal rate of increase
                 # according to the amount of hexose available:
@@ -1362,35 +1369,49 @@ class RootGrowthModel(Model):
             # ---------------------------------------------------------
 
             # We initialize each amount of hexose available for growth:
-            hexose_possibly_required_for_elongation = 0.
+            hexose_available_for_elongation = 0.
             hexose_available_for_thickening = 0.
 
             # If elongation is possible:
             if n.potential_length > n.length:
-                hexose_possibly_required_for_elongation = n.hexose_possibly_required_for_elongation
+                # TODO: Check how useful it is to limit the growth so that the concentration does not go below a treshold.
+                # NEW - We calculate the actual amount of hexose that can be used for growth according to the treshold
+                # concentration below which no growth process is authorized:
+                hexose_available_for_elongation \
+                    = n.hexose_possibly_required_for_elongation \
+                    - n.struct_mass_contributing_to_elongation * self.C_hexose_min_for_elongation
+                if hexose_available_for_elongation <0.:
+                    hexose_available_for_elongation = 0.
                 list_of_elongation_supporting_elements = n.list_of_elongation_supporting_elements
                 list_of_elongation_supporting_elements_hexose = n.list_of_elongation_supporting_elements_hexose
                 list_of_elongation_supporting_elements_mass = n.list_of_elongation_supporting_elements_mass
 
             # If radial growth is possible:
             if n.potential_radius > n.radius:
-                # We only consider the amount of hexose immediately available in the element that can increase in radius:
-                hexose_available_for_thickening = n.hexose_available_for_thickening
+                # We only consider the amount of hexose immediately available in the element that can increase in radius.
+                # TODO: Check how useful it is to limit the growth so that the concentration does not go below a treshold.
+                # NEW - We calculate the actual amount of hexose that can be used for thickening according to the treshold
+                # concentration below which no thickening is authorized:
+                hexose_available_for_thickening = n.hexose_available_for_thickening \
+                                                - n.struct_mass * self.C_hexose_min_for_thickening
+                if hexose_available_for_thickening <0.:
+                    hexose_available_for_thickening = 0.
+
 
             # In case no hexose is available at all:
-            if (hexose_possibly_required_for_elongation + hexose_available_for_thickening) <= 0.:
+            if (hexose_available_for_elongation + hexose_available_for_thickening) <= 0.:
                 # Then we move to the next element in the main loop:
                 continue
 
             # We initialize the temporary variable "remaining_hexose" that computes the amount of hexose left for growth:
-            remaining_hexose_for_elongation = hexose_possibly_required_for_elongation
+            remaining_hexose_for_elongation = hexose_available_for_elongation 
             remaining_hexose_for_thickening = hexose_available_for_thickening
 
             # ACTUAL ELONGATION IS FIRST CONSIDERED:
             # ---------------------------------------
 
             # We calculate the maximal possible length of the root element according to all the hexose available for elongation:
-            volume_max = initial_volume + hexose_possibly_required_for_elongation * 6. \
+            volume_max = initial_volume + hexose_available_for_elongation  * 6. \
                          / (n.root_tissue_density * self.struct_mass_C_content) * self.yield_growth
             length_max = volume_max / (pi * n.initial_radius ** 2)
 
@@ -1422,10 +1443,10 @@ class RootGrowthModel(Model):
                         index = list_of_elongation_supporting_elements[i]
                         supplying_element = self.g.node(index)
                         # We define the actual contribution of the current element based on total hexose consumption by growth
-                        # of element n and the relative contribution of the current element to the pool of the available hexose:
+                        # of element n and the relative contribution of the current element to the pool of the potentially available hexose:
                         hexose_actual_contribution_to_elongation = hexose_consumption_by_elongation \
                                                                    * list_of_elongation_supporting_elements_hexose[
-                                                                       i] / hexose_possibly_required_for_elongation
+                                                                       i] / n.hexose_possibly_required_for_elongation
                         # The amount of hexose used for growth in this element is increased:
                         supplying_element.hexose_consumption_by_growth_amount += hexose_actual_contribution_to_elongation
                         supplying_element.hexose_consumption_by_growth += hexose_actual_contribution_to_elongation / self.time_step_in_seconds
@@ -2677,7 +2698,7 @@ class RootGrowthModel(Model):
                         self.root_hair_radius ** 2 * np.pi * (self.root_hairs_elongation_rate * self.root_hair_radius)) * (
                             self.root_hairs_density * n.radius * root_hair_elongation_zone_length) / root_hair_elongation_zone_length
                     # Additionnaly we record the struct mass produced for root hair along with core segment structural mass
-                    n.root_hair_struct_mass_produced = uniform_root_hair_stuct_mass_production * (n.length + processed_length - elongation_zone_length)
+                    n.root_hairs_struct_mass_produced = uniform_root_hair_stuct_mass_production * (n.length + processed_length - elongation_zone_length)
                     n.total_root_hairs_number = self.root_hairs_density * n.radius * (n.length + processed_length - elongation_zone_length)
                     processed_root_hair_length = n.length + processed_length - elongation_zone_length
                     n.root_hair_length = self.root_hair_max_length * (processed_root_hair_length / 2) / root_hair_elongation_zone_length
@@ -2687,9 +2708,9 @@ class RootGrowthModel(Model):
                     n.struct_mass_produced = uniform_struct_mass_production * n.length
 
                     # IF WE ARE AT RECENT LATERAL BRANCHING ZONES (OPTION 2, SEE 1 BELLOW)
-                    parent = n.parent()
-                    if parent.order == n.order-1:
-                        parent.struct_mass_produced = uniform_struct_mass_production * (elongation_zone_length - processed_length - n.length)
+                    # parent = n.parent()
+                    # if parent.order == n.order-1:
+                    #     parent.struct_mass_produced = uniform_struct_mass_production * (elongation_zone_length - processed_length - n.length)
 
                 # In any case, no root hair are formed in elongation zone
                 n.total_root_hairs_number = 0.
@@ -2700,7 +2721,7 @@ class RootGrowthModel(Model):
                 if processed_length < elongation_zone_length + root_hair_elongation_zone_length:
                     # If this is the last segment being partly partly affected by root_hair elongation
                     if processed_length + n.length > elongation_zone_length + root_hair_elongation_zone_length:
-                        n.root_hair_struct_mass_produced = uniform_root_hair_stuct_mass_production * (elongation_zone_length + root_hair_elongation_zone_length - processed_length)
+                        n.root_hairs_struct_mass_produced = uniform_root_hair_stuct_mass_production * (elongation_zone_length + root_hair_elongation_zone_length - processed_length)
                         
                         # Computing root hair average length on the remaining section of the segment
                         segment_growing_length = elongation_zone_length + root_hair_elongation_zone_length - processed_length
@@ -2711,7 +2732,7 @@ class RootGrowthModel(Model):
                         
                     # Otherwise it affects the whole segment length
                     else:
-                        n.root_hair_struct_mass_produced = uniform_root_hair_stuct_mass_production * n.length
+                        n.root_hairs_struct_mass_produced = uniform_root_hair_stuct_mass_production * n.length
                         
                         # Computing the average root hair length on the whole segment
                         n.root_hair_length = self.root_hair_max_length * (processed_root_hair_length + (n.length / 2.)) / root_hair_elongation_zone_length
@@ -2725,8 +2746,8 @@ class RootGrowthModel(Model):
                 n.total_root_hairs_number = self.root_hairs_density * n.radius * n.length
                     
                 # IF WE ARE AT RECENT LATERAL BRANCHING ZONES (OPTION 1, commented because of wrong order numbering a collar with RSML inputs)
-                # elif n.order == 1 and processed_length < emergence_period + elongation_zone_length:
-                #     n.struct_mass_produced = max(0., max_lateral_root_struct_mass_production - k_sustaining_laterals * ((n.distance_from_tip - emergence_period)%emergence_period))
+                if processed_length < emergence_period + elongation_zone_length:
+                    n.struct_mass_produced = max(0., max_lateral_root_struct_mass_production - k_sustaining_laterals * ((n.distance_from_tip - emergence_period)%emergence_period))
 
             processed_length += n.length
 
