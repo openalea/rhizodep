@@ -302,7 +302,7 @@ class RootGrowthModel(Model):
     adventitious_roots_events_file: str = declare(default="adventitious_roots_inputs.csv", unit="adim", unit_comment="", description="Filepath pointing to input table to plan adventitious root emergence event", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
-    radial_growth: str = declare(default=True, unit="adim", unit_comment="", description="equivalent to a Boolean expliciting whether radial growth should be considered or not", 
+    radial_growth: bool = declare(default=True, unit="adim", unit_comment="", description="equivalent to a Boolean expliciting whether radial growth should be considered or not", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
     nodules: bool = declare(default=False, unit="adim", unit_comment="", description="a Boolean expliciting whether nodules could be formed or not", 
@@ -1165,7 +1165,7 @@ class RootGrowthModel(Model):
         # ---------------------------------------------------------------
 
         # We look at the apex of the axis to which the segment belongs (i.e. we get the last element of the axis):
-        index_apex = g.Axis(segment.index())[-1]
+        index_apex = self.g.Axis(segment.index())[-1]
         apex = self.g.node(index_apex)
         # print("For segment", segment.index(), "the terminal index is", index_apex, "and has the type", apex.type)
         if apex.label != "Apex":
