@@ -8,9 +8,14 @@ import pickle
 import time
 
 def initiate_mycorrhizal_fungus():
+    """
+    This function initiates a new fungus MTG.
+    :return: the new fungus
+    """
     # We initiate a fungus as an empty MTG:
     fungus = MTG()
-    # We set the intial properties:
+
+    # We set the initial properties:
     fungus.struct_mass = 0.
     fungus.root_exchange_surface = 0.
     fungus.C_hexose_fungus = 0.
@@ -25,6 +30,11 @@ def initiate_mycorrhizal_fungus():
     return fungus
 
 def reinitializing_fungus_growth(fungus):
+    """
+    This function resets the values of different variables within a given fungus.
+    :param fungus:
+    :return:
+    """
 
     fungus.hexose_consumption_for_growth = 0.
     fungus.struct_mass_increment = 0.
@@ -35,6 +45,15 @@ def reinitializing_fungus_growth(fungus):
     return
 
 def root_infection_by_fungus(root_MTG, fungus, step, time_step_in_seconds):
+    """
+    This function computes the possible new infection of all root elements of a given root MTG by the fungus
+    and updates the infection severity and the new exchange severity between the fungus and the root elements.
+    :param root_MTG:
+    :param fungus:
+    :param step:
+    :param time_step_in_seconds:
+    :return:
+    """
 
     g = root_MTG
     # We initialize different counters on the whole root system for characterizing the fungal infection:
@@ -188,6 +207,13 @@ def root_infection_by_fungus(root_MTG, fungus, step, time_step_in_seconds):
     return g
 
 def root_fungus_exchange_rate(root_MTG, fungus):
+    """
+    This function computes the new exchange rate of hexose between each root element and the fungus,
+     and updates the corresponding hexose cost in the root element.
+    :param root_MTG:
+    :param fungus:
+    :return:
+    """
 
     g = root_MTG
     for vid in g.vertices_iter(scale=1):
@@ -204,8 +230,11 @@ def root_fungus_exchange_rate(root_MTG, fungus):
             # hexose concentration:
             exchanged_hexose_rate = param.fungus_permeability * (C_hexose_root - C_hexose_fungus) * exchange_surface
 
-            # We record the rate of exchange in both the root element and the fungus:
+            # We record the rate of exchange in both the root element and the fungus, assuming that all hexose taken
+            # by the fungus is used for growth:
+            # TODO: WATCH OUT - we should include also a cost for maintenance of the fungus and for mycodeposition.
             root_element.hexose_consumption_rate_by_fungus = exchanged_hexose_rate
+            root_element.hexose_consumption_by_growth_rate += exchanged_hexose_rate
             fungus.hexose_input_rate_from_root += exchanged_hexose_rate
         else:
             exchanged_hexose_rate = 0.
@@ -213,6 +242,13 @@ def root_fungus_exchange_rate(root_MTG, fungus):
     return
 
 def fungus_expansion(fungus, time_step_in_seconds):
+    """
+    This function calculates the new surface of the fungus based on the available hexose,
+    which will help to propagate the infection within the root system in the function "root_infction_by_fungus".
+    :param fungus:
+    :param time_step_in_seconds:
+    :return:
+    """
 
     # We calculate the current amount of hexose available for growth, including the new input of hexose:
     available_hexose_for_growth = (fungus.C_hexose_fungus - param.C_hexose_fungus_min) * fungus.struct_mass \
@@ -254,6 +290,13 @@ def fungus_expansion(fungus, time_step_in_seconds):
 
 def fungus_mass_balance(fungus, time_step_in_seconds):
 
+    """
+    This function performs a mass balance on the fungus and resets the concentration of hexose and/or the deficit.
+    :param fungus:
+    :param time_step_in_seconds:
+    :return:
+    """
+
     if fungus.struct_mass >0. and fungus.hexose_input_rate_from_root != 0.:
         print(">>> Before fungal growth, its concentration is", fungus.C_hexose_fungus)
         fungus.C_hexose_fungus += \
@@ -269,6 +312,15 @@ def fungus_mass_balance(fungus, time_step_in_seconds):
     return
 
 def mycorrhizal_interaction(root_MTG, fungus, step, time_step_in_seconds):
+    """
+    This function calls successively all other mycorrhizal functions to have the fungus infecting different root
+    elements, take some hexose and extends.
+    :param root_MTG:
+    :param fungus:
+    :param step:
+    :param time_step_in_seconds:
+    :return:
+    """
 
     # We reinitialize growth-related variables and initial mass and surface of the fungus:
     reinitializing_fungus_growth(fungus)
@@ -308,7 +360,7 @@ def mycorrhizal_interaction(root_MTG, fungus, step, time_step_in_seconds):
 # filename = os.path.join(inputs_dir_path, ROOT_MTG_FILE)
 # if not os.path.exists(filename):
 #     print("!!! ERROR: the file", ROOT_MTG_FILE,"could not be found in the folder", inputs_dir_path, "!!!")
-#     print("The simulation stops here!")
+#     print("The scenarios stops here!")
 #     simulation_allowed=False
 # else:
 #     # We load the MTG file and name it "g":
@@ -322,7 +374,7 @@ def mycorrhizal_interaction(root_MTG, fungus, step, time_step_in_seconds):
 #         pickle.dump(g, output, protocol=2)
 #     print("The initial MTG file has been saved in the outputs.")
 #
-# # We perform the simulation:
+# # We perform the scenarios:
 #
 # f = initiate_mycorrhizal_fungus()
 #

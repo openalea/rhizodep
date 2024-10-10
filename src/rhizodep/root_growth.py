@@ -424,6 +424,8 @@ class RootGrowthModel(Model):
 
         # Fluxes:
         # --------
+        base_segment.struct_mass_produced = 0.
+        base_segment.resp_maintenance = 0.
         base_segment.resp_growth = 0.
         base_segment.hexose_growth_demand = 0.
         base_segment.hexose_possibly_required_for_elongation = 0.
@@ -2288,7 +2290,10 @@ class RootGrowthModel(Model):
             if n.type == "Support_for_seminal_root" or n.type == "Support_for_adventitious_root":
                 # Then we pass to the next element in the iteration:
                 continue
-
+            
+            # We initialize the initial volume of the root element:
+            initial_volume = n.volume
+            
             # We perform each type of growth according to the satisfaction coefficient SC:
             if SC > 1.:
                 relative_growth_increase = 1.
@@ -2316,6 +2321,7 @@ class RootGrowthModel(Model):
             n.volume = self.volume_from_radius_and_length(n, n.radius, n.length)
             # The new dry structural struct_mass of the element is calculated from its new volume:
             n.struct_mass = n.volume * n.root_tissue_density
+            n.struct_mass_produced = (n.volume - initial_volume) * n.root_tissue_density
 
             # In case where the root element corresponds to an apex, the distance to the last ramification is increased:
             if n.label == "Apex":
