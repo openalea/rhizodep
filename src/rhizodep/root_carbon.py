@@ -957,7 +957,14 @@ class RootCarbonModel(Model):
     @state
     def _deficit_sucrose_root(self, C_sucrose_root, struct_mass, living_root_hairs_struct_mass):
         if C_sucrose_root < 0:
-            return - C_sucrose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_step
+            deficit = - C_sucrose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_step
+            
+            # To avoid registering much too low values:
+            if deficit < 1e-20:
+                deficit = 0.
+
+            return deficit
+            
         else:
             # TODO : or None could be more efficient?
             return 0.
@@ -966,7 +973,13 @@ class RootCarbonModel(Model):
     @state
     def _deficit_hexose_reserve(self, C_hexose_reserve, struct_mass, living_root_hairs_struct_mass):
         if C_hexose_reserve < 0:
-            return - C_hexose_reserve * (struct_mass + living_root_hairs_struct_mass) / self.time_step
+            deficit = - C_hexose_reserve * (struct_mass + living_root_hairs_struct_mass) / self.time_step
+            
+            # To avoid registering much too low values:
+            if deficit < 1e-20:
+                deficit = 0.
+
+            return deficit
         else:
             return 0.
 
@@ -974,7 +987,14 @@ class RootCarbonModel(Model):
     @state
     def _deficit_hexose_root(self, C_hexose_root, struct_mass, living_root_hairs_struct_mass):
         if C_hexose_root < 0:
-            return - C_hexose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_step
+            deficit = - C_hexose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_step
+        
+            # To avoid registering much too low values:
+            if deficit < 1e-20:
+                deficit = 0.
+
+            return deficit
+
         else:
             return 0.
 
