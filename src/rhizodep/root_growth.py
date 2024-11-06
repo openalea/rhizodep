@@ -57,6 +57,9 @@ class RootGrowthModel(Model):
     type: str = declare(default="Normal_root_after_emergence", unit="", unit_comment="", description="Example segment type provided by root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    root_order: int = declare(default=1, unit="", unit_comment="", description="Example root segment's axis order computed by the initiate_mtg method or provided as input", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
     radius: float = declare(default=3.5e-4, unit="m", unit_comment="", description="Example root segment radius", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
@@ -88,7 +91,7 @@ class RootGrowthModel(Model):
     hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth is coupled to a root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
-    hexose_consumption_rate_by_fungus: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by fungus", 
+    hexose_consumption_by_fungus: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by fungus", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user") 
     distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
@@ -331,7 +334,6 @@ class RootGrowthModel(Model):
         if g is None:
             self.g = self.initiate_mtg()
         else:
-            input_mtg = True
             self.g = g
 
         self.props = self.g.properties()
@@ -346,7 +348,7 @@ class RootGrowthModel(Model):
                 self.props[name].update({key: getattr(self, name) for key in self.vertices})
             setattr(self, name, self.props[name])
 
-        if input_mtg:
+        if g is None:
             self.initiate_heterogeneous_variables()
 
     def initiate_mtg(self):
@@ -682,7 +684,7 @@ class RootGrowthModel(Model):
             n.actual_elongation = 0.
             n.actual_elongation_rate = 0.
 
-            n.hexose_consumption_rate_by_fungus = 0.
+            n.hexose_consumption_by_fungus = 0.
 
             # We make sure that the initial values of length, radius and struct_mass are correctly initialized:
             n.initial_length = n.length
@@ -1618,7 +1620,7 @@ class RootGrowthModel(Model):
 
         # We make sure that stored vertices are well updated with the new ones
         self.vertices = self.g.vertices(scale=self.g.max_scale())
-        self.post_growth_updating()
+        
 
     def segmentation_and_primordium_formation(self, apex):
         """
@@ -1687,6 +1689,7 @@ class RootGrowthModel(Model):
         initial_hexose_growth_demand = apex.hexose_growth_demand
         initial_hexose_consumption_by_growth_amount = apex.hexose_consumption_by_growth_amount
         initial_hexose_consumption_by_growth = apex.hexose_consumption_by_growth
+        initial_hexose_consumption_by_fungus = apex.hexose_consumption_by_fungus
         # TODO deficits old = new or * mass fraction when segmentation (Deficits, rates, fluxes)
 
         # We record the type of the apex, as it may correspond to an apex that has stopped (or even died):
@@ -1788,6 +1791,7 @@ class RootGrowthModel(Model):
                 apex.hexose_growth_demand = initial_hexose_growth_demand * mass_fraction
                 apex.hexose_consumption_by_growth_amount = initial_hexose_consumption_by_growth_amount * mass_fraction
                 apex.hexose_consumption_by_growth = initial_hexose_consumption_by_growth * mass_fraction
+                apex.hexose_consumption_by_fungus = initial_hexose_consumption_by_fungus * mass_fraction
 
                 # CALCULATING THE TIME SINCE ROOT CELLS FORMATION IN THE NEW SEGMENT:
                 # We update the time since root cells have formed, based on the elongation rate and on the principle that
@@ -1897,6 +1901,7 @@ class RootGrowthModel(Model):
             apex.hexose_growth_demand = initial_hexose_growth_demand * mass_fraction
             apex.hexose_consumption_by_growth_amount = initial_hexose_consumption_by_growth_amount * mass_fraction
             apex.hexose_consumption_by_growth = initial_hexose_consumption_by_growth * mass_fraction
+            apex.hexose_consumption_by_fungus = initial_hexose_consumption_by_fungus * mass_fraction
 
             # CALCULATING THE TIME SINCE ROOT CELLS FORMATION IN THE NEW SEGMENT:
             # We update the time since root cells have formed, based on the elongation rate:
@@ -2489,6 +2494,7 @@ class RootGrowthModel(Model):
                                                  hexose_growth_demand=0.,
                                                  hexose_consumption_by_growth_amount=0.,
                                                  hexose_consumption_by_growth=0.,
+                                                 hexose_consumption_by_fungus=0.,
                                                  hexose_possibly_required_for_elongation=0.,
                                                  # Time indications:
                                                  # ------------------
@@ -2574,6 +2580,7 @@ class RootGrowthModel(Model):
                                                  hexose_possibly_required_for_elongation=mother_element.hexose_possibly_required_for_elongation,
                                                  hexose_consumption_by_growth_amount=mother_element.hexose_consumption_by_growth_amount,
                                                  hexose_consumption_by_growth=mother_element.hexose_consumption_by_growth,
+                                                 hexose_consumption_by_fungus=mother_element.hexose_consumption_by_fungus,
                                                  # Time indications:
                                                  # ------------------
                                                  soil_temperature=mother_element.soil_temperature,

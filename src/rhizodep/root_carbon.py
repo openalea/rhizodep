@@ -119,12 +119,15 @@ class RootCarbonModel(Model):
     hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth", 
                                                  min_value="", max_value="", value_comment="", references="", DOI="",
                                                   variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
-    hexose_consumption_rate_by_fungus: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by fungus", 
+    hexose_consumption_by_fungus: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by fungus", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="input", by="model_growth", state_variable_type="extensive", edit_by="user")
     distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
                                       min_value="", max_value="", value_comment="", references="", DOI="",
                                        variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
+    vertex_index: int = declare(default=1, unit="mol.s-1", unit_comment="", description="Unique vertex identifier stored for ease of value access", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="input", by="model_growth", state_variable_type="extensive", edit_by="user")
 
     # FROM SHOOT MODEL
     sucrose_input_rate: float = declare(default=1e-10, unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", 
@@ -907,119 +910,70 @@ class RootCarbonModel(Model):
     # These methods calculate the time derivative (dQ/dt) of the amount in each pool, for a given root element, based on
     # a C balance.
         
-    @potential
     @state
-    def _C_sucrose_root(self, C_sucrose_root, struct_mass, living_root_hairs_struct_mass, hexose_diffusion_from_phloem,
+    def _C_sucrose_root(self, vertex_index, C_sucrose_root, struct_mass, living_root_hairs_struct_mass, hexose_diffusion_from_phloem,
                             hexose_active_production_from_phloem, phloem_hexose_exudation, sucrose_loading_in_phloem,
                             phloem_hexose_uptake_from_soil, deficit_sucrose_root):
-        return C_sucrose_root + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
+        balance = C_sucrose_root + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
                 - hexose_diffusion_from_phloem / 2.
                 - hexose_active_production_from_phloem / 2.
                 - phloem_hexose_exudation / 2.
                 + sucrose_loading_in_phloem
                 + phloem_hexose_uptake_from_soil / 2.
                 - deficit_sucrose_root)
+        
+        if balance < 0:
+            deficit = - balance * (struct_mass + living_root_hairs_struct_mass) / self.time_step
+            self.deficit_sucrose_root[vertex_index] = deficit if deficit > 1e-20 else 0.
+            return 0.
+        else:
+            self.deficit_sucrose_root[vertex_index] = 0. 
+            return balance
     
-    @potential
     @state
-    def _C_hexose_reserve(self, C_hexose_reserve, struct_mass, living_root_hairs_struct_mass, hexose_immobilization_as_reserve,
+    def _C_hexose_reserve(self, vertex_index, C_hexose_reserve, struct_mass, living_root_hairs_struct_mass, hexose_immobilization_as_reserve,
                               hexose_mobilization_from_reserve, deficit_hexose_reserve):
-        return C_hexose_reserve + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
+        balance = C_hexose_reserve + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
                 hexose_immobilization_as_reserve
                 - hexose_mobilization_from_reserve
                 - deficit_hexose_reserve)
+        
+        if balance < 0:
+            deficit = - balance * (struct_mass + living_root_hairs_struct_mass) / self.time_step
+            self.deficit_hexose_reserve[vertex_index] = deficit if deficit > 1e-20 else 0.
+            return 0.
+        else:
+            self.deficit_hexose_reserve[vertex_index] = 0. 
+            return balance
 
-    @potential
     @state
-    def _C_hexose_root(self, C_hexose_root, struct_mass, living_root_hairs_struct_mass, hexose_exudation, hexose_uptake_from_soil,
+    def _C_hexose_root(self, vertex_index, C_hexose_root, struct_mass, living_root_hairs_struct_mass, hexose_exudation, hexose_uptake_from_soil,
                            mucilage_secretion, cells_release, maintenance_respiration,
                            hexose_consumption_by_growth, hexose_consumption_by_fungus, hexose_diffusion_from_phloem,
                            hexose_active_production_from_phloem, sucrose_loading_in_phloem,
                            hexose_mobilization_from_reserve, hexose_immobilization_as_reserve, deficit_hexose_root):
-        return C_hexose_root + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
+        balance = C_hexose_root + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
                 - hexose_exudation
                 + hexose_uptake_from_soil
                 - mucilage_secretion
                 - cells_release
                 - maintenance_respiration / 6.
                 - hexose_consumption_by_growth
-                - hexose_consumption_by_fungus 
+                - hexose_consumption_by_fungus
                 + hexose_diffusion_from_phloem
                 + hexose_active_production_from_phloem
                 - 2. * sucrose_loading_in_phloem
                 + hexose_mobilization_from_reserve
                 - hexose_immobilization_as_reserve
                 - deficit_hexose_root)
-
-    # This function adjusts possibly negative concentrations by setting them to 0 and by recording the corresponding deficit.
-    # WATCH OUT: This function must be called once the concentrations have already been calculated with the previous deficits!
-    @deficit
-    @state
-    def _deficit_sucrose_root(self, C_sucrose_root, struct_mass, living_root_hairs_struct_mass):
-        if C_sucrose_root < 0:
-            deficit = - C_sucrose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_step
-            
-            # To avoid registering much too low values:
-            if deficit < 1e-20:
-                deficit = 0.
-
-            return deficit
-            
-        else:
-            # TODO : or None could be more efficient?
-            return 0.
-
-    @deficit
-    @state
-    def _deficit_hexose_reserve(self, C_hexose_reserve, struct_mass, living_root_hairs_struct_mass):
-        if C_hexose_reserve < 0:
-            deficit = - C_hexose_reserve * (struct_mass + living_root_hairs_struct_mass) / self.time_step
-            
-            # To avoid registering much too low values:
-            if deficit < 1e-20:
-                deficit = 0.
-
-            return deficit
-        else:
-            return 0.
-
-    @deficit
-    @state
-    def _deficit_hexose_root(self, C_hexose_root, struct_mass, living_root_hairs_struct_mass):
-        if C_hexose_root < 0:
-            deficit = - C_hexose_root * (struct_mass + living_root_hairs_struct_mass) / self.time_step
         
-            # To avoid registering much too low values:
-            if deficit < 1e-20:
-                deficit = 0.
-
-            return deficit
-
-        else:
+        if balance < 0:
+            deficit = - balance * (struct_mass + living_root_hairs_struct_mass) / self.time_step
+            self.deficit_hexose_root[vertex_index] = deficit if deficit > 1e-20 else 0.
             return 0.
-
-    # NOTE : double names in methods are forbiden as they will be overwritten in Choregrapher's resolution
-    # However, it is a behavios of interest when inheriting the class to edit it.
-    @actual
-    @state
-    def _threshold_C_sucrose_root(self):
-        for vid in self.props["focus_elements"]:
-            if self.C_sucrose_root[vid] < 0.:
-                self.C_sucrose_root[vid] = 0.
-    
-    @actual
-    @state
-    def _threshold_C_hexose_reserve(self):
-        for vid in self.props["focus_elements"]:
-            if self.C_hexose_reserve[vid] < 0.:
-                self.C_hexose_reserve[vid] = 0.
-
-    @actual
-    @state
-    def _threshold_C_hexose_root(self):
-        for vid in self.props["focus_elements"]:
-            if self.C_hexose_root[vid] < 0.:
-                self.C_hexose_root[vid] = 0.
+        else:
+            self.deficit_hexose_root[vertex_index] = 0. 
+            return balance
     
 
     def check_balance(self):

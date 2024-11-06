@@ -186,6 +186,10 @@ class RhizoInputsSoilModel(Model):
         voxel_height = 1e-2
         voxel_volume = voxel_height * voxel_width * voxel_width
         scene_xy_range = 4e-1
+
+        self.delta_z = voxel_height
+        self.voxels_Z_section_area = voxel_width * voxel_width
+
         self.voxel_number_xy = int(scene_xy_range / voxel_width)
         # We want the plant to be centered
         if self.voxel_number_xy%2 == 0:

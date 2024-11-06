@@ -31,8 +31,8 @@ RootCarbonModel:
       distance_from_tip: 1.0
     hexose_consumption_by_growth:
       hexose_consumption_by_growth: 1.0
-    hexose_consumption_rate_by_fungus:
-      hexose_consumption_rate_by_fungus: 1.0
+    hexose_consumption_by_fungus:
+      hexose_consumption_by_fungus: 1.0
     initial_struct_mass:
       initial_struct_mass: 1.0
     length:
@@ -45,6 +45,8 @@ RootCarbonModel:
       struct_mass: 1.0
     type:
       type: 1.0
+    vertex_index:
+      vertex_index: 1.0
   SoilModel:
     C_hexose_soil:
       C_hexose_soil: 1.0
