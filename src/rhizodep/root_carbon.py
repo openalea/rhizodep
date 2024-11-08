@@ -537,7 +537,8 @@ class RootCarbonModel(Model):
 
     # Calculating the net input of sucrose by the aerial parts into the root system:
     # ------------------------------------------------------------------------------
-    @totalstate
+    #@totalstate
+    @stepinit
     def shoot_sucrose_supply_and_spreading(self):
         """
         This function calculates the new root sucrose concentration (mol of sucrose per gram of dry root structural mass)
