@@ -556,6 +556,7 @@ class RootCarbonModel(Model):
         # We use a global variable recorded outside this function that corresponds to the possible deficit of sucrose
         # (in moles of sucrose) of the whole root system calculated at the previous time_step:
         # Note that this value is stored in the base node of the root system.
+
         if self.global_sucrose_deficit[1] > 0.:
             print("!!! Before homogenizing sucrose concentration, the global deficit in sucrose was",
                   self.global_sucrose_deficit[1])
@@ -563,6 +564,7 @@ class RootCarbonModel(Model):
         C_sucrose_root_after_supply = (self.total_sucrose_root[1] + (
                     self.sucrose_input_rate[1] * self.time_step) - self.global_sucrose_deficit[1]) \
                                       / self.total_living_struct_mass[1]
+        
         # This new concentration includes the amount of sucrose from element that have just died,
         # but excludes the mass of these dead elements!
 
@@ -578,7 +580,7 @@ class RootCarbonModel(Model):
                   self.global_sucrose_deficit[1])
             # We defined the new concentration of sucrose as 0:
             new_C_sucrose_root = 0.
-
+        
         # We go through the MTG to modify the sugars concentrations:
         for vid in self.g.vertices_iter(scale=1):
             # If the element has not emerged yet, it doesn't contain any sucrose yet;
@@ -588,6 +590,7 @@ class RootCarbonModel(Model):
             else:
                 # The local sucrose concentration in the root is calculated from the new sucrose concentration calculated above:
                 self.C_sucrose_root[vid] = new_C_sucrose_root
+                
             # AND BECAUSE THE LOCAL DEFICITS OF SUCROSE HAVE BEEN ALREADY INCLUDED IN THE TOTAL SUCROSE CALCULATION,
             # WE RESET ALL LOCAL DEFICITS TO 0:
             self.deficit_sucrose_root[vid] = 0.
