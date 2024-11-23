@@ -351,6 +351,17 @@ class RootGrowthModel(Model):
         if g is None:
             self.initiate_heterogeneous_variables()
 
+        # for input variables, initialize homogeneous values on each vertices. 
+        # This behavior will be overwritten in case of module providing the input variable
+        for name in self.inputs:
+            if name in self.props.keys() and len(self.props[name]) == len(self.vertices):
+                setattr(self, name, self.props[name])
+            # if it is not provided by mtg file, Use by default value everywhere
+            else:
+                self.props.setdefault(name, {})
+                self.props[name].update({key: getattr(self, name) for key in self.vertices})
+                setattr(self, name, self.props[name])
+
     def initiate_mtg(self):
         """
         This functions generates a root MTG from nothing, containing only one segment of a specific length,

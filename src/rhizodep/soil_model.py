@@ -291,6 +291,7 @@ class RhizoInputsSoilModel(Model):
 
 
     def __call__(self, *args):
+        self.pull_available_inputs()
         self.compute_mtg_voxel_neighbors()
         self.apply_to_voxel()
         self.choregrapher(module_family=self.family, *args)
