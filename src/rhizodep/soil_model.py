@@ -182,8 +182,9 @@ class RhizoInputsSoilModel(Model):
         self.props["voxel_neighbor"].update({key: None for key in self.vertices})
         setattr(self, "voxel_neighbor", self.props["voxel_neighbor"])
 
-        voxel_width = 1e-2
-        voxel_height = 1e-2
+        cubic_length = 3e-2
+        voxel_width = cubic_length
+        voxel_height = cubic_length
         voxel_volume = voxel_height * voxel_width * voxel_width
         scene_xy_range = 5e-1
 
