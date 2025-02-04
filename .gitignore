@@ -1,6 +1,15 @@
 # Python files
 *.py[cod]
 
+Other_works/
+Other_works/*
+
+saved_outputs/
+saved_outputs/*
+
+*/outputs/
+*/outputs/*
+
 # C extensions
 *.so
 *.dll
@@ -16,7 +25,6 @@
 
 # Packages
 *.egg
-.eggs
 *.egg-info
 dist
 build
@@ -66,5 +74,14 @@ nosetests.xml
 # temporary files
 *._icon.png
 
-# temporary dirs for Mac OS X
+# Mac dirs
 .DS_Store
+saving_outputs
+/src/rhizodep/model_old.py
+/src/rhizodep/simulation_old.py
+/simulations/running_scenarios/outputs
+/saved_outputs
+/Other_works
+/src/rhizodep/scenarios/outputs
+/src/rhizodep/scenarios/running_example/outputs
+/test/outputs
