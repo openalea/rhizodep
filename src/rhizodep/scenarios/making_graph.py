@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from math import exp, trunc
 from matplotlib.ticker import StrMethodFormatter
+import matplotlib.font_manager as font_manager
 
 plt.rcdefaults()
 
@@ -50,24 +51,24 @@ def treating_z_dataframe(directory='outputs',
             # We create a new "net" column that will contain the net production of struct_mass for a given z-range:
             df[new_name] = df[name] - df.shift(1)[name]
 
-    # We create a copy of df for calculating cumulative values:
-    df_cum = df.copy(deep=True)
-    # We calculate cumulative values for each variable in the columns:
-    for col in df.columns:
-        new_var = 'cum_' + col
-        df_cum[new_var] = np.cumsum(df[col])
-    # We remove unnecessary cumulative time columns:
-    df_cum = df_cum.drop(columns=['cum_time_in_days', 'cum_day_number'])
-    # We select only the lines where a new day is reached:
-    df_cum = df_cum.loc[df_cum['time_in_days'] == df_cum['day_number']]
-    # # We remove the column 'day_number':
-    # df_cum = df_cum.drop(columns=['day_number'])
-    # We move the column 'time_in_days' at the beginning of the file:
-    first_column = df_cum.pop('time_in_days')
-    df_cum.insert(0, 'time_in_days', first_column)
-    # We record the table in a new csv file:
-    cum_by_day_path=os.path.join(directory, 'z_classification_cum_by_day.csv')
-    df_cum.to_csv(cum_by_day_path, na_rep='NA', index=False, header=True)
+    # # We create a copy of df for calculating cumulative values:
+    # df_cum = df.copy(deep=True)
+    # # We calculate cumulative values for each variable in the columns:
+    # for col in df.columns:
+    #     new_var = 'cum_' + col
+    #     df_cum[new_var] = np.cumsum(df[col])
+    # # We remove unnecessary cumulative time columns:
+    # df_cum = df_cum.drop(columns=['cum_time_in_days', 'cum_day_number'])
+    # # We select only the lines where a new day is reached:
+    # df_cum = df_cum.loc[df_cum['time_in_days'] == df_cum['day_number']]
+    # # # We remove the column 'day_number':
+    # # df_cum = df_cum.drop(columns=['day_number'])
+    # # We move the column 'time_in_days' at the beginning of the file:
+    # first_column = df_cum.pop('time_in_days')
+    # df_cum.insert(0, 'time_in_days', first_column)
+    # # We record the table in a new csv file:
+    # cum_by_day_path=os.path.join(directory, 'z_classification_cum_by_day.csv')
+    # df_cum.to_csv(cum_by_day_path, na_rep='NA', index=False, header=True)
 
     # We group by day_number and sum each variable:
     df_sum = df.groupby(by=['day_number'], as_index=False).sum()
@@ -114,7 +115,7 @@ def treating_z_dataframe(directory='outputs',
         df2 = pd.DataFrame(df_sum[grouping_z_columns_by_property("net_struct_mass")])
         df3 = pd.DataFrame(df_sum[grouping_z_columns_by_property("net_root_necromass")])
         df4 = pd.DataFrame(df_sum[grouping_z_columns_by_property("net_hexose_exudation")])
-        df5 = pd.DataFrame(df_sum[grouping_z_columns_by_property("total_rhizodeposition")])
+        df5 = pd.DataFrame(df_sum[grouping_z_columns_by_property("total_net_rhizodeposition")])
 
         # We convert the inputs into the proper units (gC m-2):
         df2 = df2 * 0.44 * plants_per_m2
@@ -157,7 +158,8 @@ def treating_z_dataframe(directory='outputs',
 
 # Creating a bar plot:
 # ---------------------
-def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=1e-12, value_max=1e0, log=True, title="",
+def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=0, value_max=40, value_step=10,
+                       log=False, title="",
                        format_x='%.2E', label=None, color=None):
 
     # Default values
@@ -166,7 +168,7 @@ def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=1e-1
     if color is None:
         color = ["blue", "green"]
 
-    fig, ax = plt.subplots(figsize=(8, 6))  # Create the figure
+    fig, ax = plt.subplots(figsize=(12, 12))  # Create the figure
     # fig.subplots_adjust(left=0.115, right=0.88)
     y_pos = np.arange(len(categories))
     values = np.array(values)
@@ -186,17 +188,27 @@ def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=1e-1
             y_start = values_cum[:, x] - values[:, x]
             ax.barh(y_pos, y, left=y_start, log=log, align='center', color=color[x], height=1, label=legend_name)
 
+        font_legend = font_manager.FontProperties(family='Times New Roman',
+                                                  weight='bold',
+                                                  style='normal', size=30)
+
         ax.set_yticks(y_pos)
-        ax.set_yticklabels(categories)
+        ax.set_yticklabels(categories, fontname = "Times New Roman", fontweight="bold", size=30)
         ax.invert_yaxis()  # labels read top-to-bottom
-        ax.set_xlabel(title)
-        ax.set_xlim(value_min, value_max)
+        ax.tick_params(length=10, width=4, left=False)
+        ax.set_xlabel(title, fontname = "Times New Roman", fontweight="bold", size=30)
+        if log:
+            ax.set_xlim(value_min, value_max)
+        else:
+            ax.xaxis.set_ticks(range(value_min,value_max+value_step,value_step))
+            ax.set_xticklabels(range(value_min,value_max+value_step,value_step), fontname = "Times New Roman", fontweight="bold", size=30)
+        ax.spines['left'].set_linewidth(4)
+        ax.spines['bottom'].set_linewidth(4)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.patch.set_facecolor('white')
-        # ax.xaxis.set_major_formatter(plt.FormatStrFormatter('%.2E'))
         ax.xaxis.set_major_formatter(plt.FormatStrFormatter(format_x))
-        ax.legend(loc="lower right")
+        ax.legend(loc="lower right", prop=font_legend, frameon=False)
         plt.tight_layout()
 
     else:
@@ -206,17 +218,24 @@ def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=1e-1
         # ax.barh(y_pos, values, 0.3, align='center', color='green')
         ax.barh(y_pos, values, log=log, align='center', color=color[0], height=1)
         ax.set_yticks(y_pos)
-        ax.set_yticklabels(categories)
+        ax.set_yticklabels(categories, fontname="Times New Roman", fontweight="bold", size=30)
         ax.invert_yaxis()  # labels read top-to-bottom
-        ax.set_xlabel(title)
-        ax.set_xlim(value_min, value_max)
+        ax.tick_params(length=10, width=4, left=False)
+        ax.set_xlabel(title, fontname="Times New Roman", fontweight="bold", size=30)
+        if log:
+            ax.set_xlim(value_min, value_max)
+        else:
+            ax.xaxis.set_ticks(range(value_min, value_max + value_step, value_step))
+            ax.set_xticklabels(range(value_min, value_max + value_step, value_step), fontname="Times New Roman",
+                               fontweight="bold", size=30)
+        ax.spines['left'].set_linewidth(4)
+        ax.spines['bottom'].set_linewidth(4)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.patch.set_facecolor('white')
         ax.xaxis.set_major_formatter(plt.FormatStrFormatter(format_x))
-        # plt.gca().ticklabel_format(axis='x', style='sci', scilimits=(0,0), useOffset=False)
+        ax.legend(loc="lower right", prop=font_legend, frameon=False)
         plt.tight_layout()
-        # ax.set_title(title)
 
     return
 
@@ -304,9 +323,10 @@ def plotting_on_z_stacked(input_file_path='z_classification.csv',
                           label=None,
                           title="",
                           color=None,
-                          z_min=0., z_max=1., z_interval=0.1,
+                          z_min=0., z_max=1., z_interval=0.1, z_offset = 0., starting_at_0 = True,
                           value_min=1e-12,
                           value_max=1e0,
+                          value_step=0,
                           format_x='%.2E',
                           log=True,
                           recording_images=True,
@@ -341,7 +361,10 @@ def plotting_on_z_stacked(input_file_path='z_classification.csv',
     categories_z = []
     name_values_z = []
     # We initialize an empty Numpy array:
-    n_z_categories = trunc((z_max - z_min) / z_interval)
+    if starting_at_0:
+        n_z_categories = trunc((z_max - z_min + z_offset) / z_interval)
+    else:
+        n_z_categories = trunc((z_max - z_min) / z_interval)
     values = np.zeros([n_z_categories, len(property)])
 
     # For each line of the data frame that contains information on sucrose input:
@@ -351,22 +374,28 @@ def plotting_on_z_stacked(input_file_path='z_classification.csv',
         index_z = 0
         # For each interval of z values to be considered:
         for z_start in np.arange(z_min, z_max, z_interval):
-            # We recreate the exact name of the category to display on the graph:
-            # name_category_z = str(z_start) + "-" + str(z_start + z_interval) + " m"
-            part_1 = '{:.2f}'.format(z_start)
-            part_2 = '{:.2f}'.format(z_start + z_interval)
-            name_category_z = part_1 + "-" + part_2 + " m"
+            # We make sure that when taking into account a possible offset, the soil depth will start at 0:
+            if starting_at_0 and z_start+z_offset < 0.:
+                continue
+            # We recreate the name of the category to display on the graph, taking into account a possible offset:
+            # part_1 = '{:.2f}'.format(z_start + z_offset)
+            # part_2 = '{:.2f}'.format(z_start + z_interval + z_offset)
+            part_1 = str(int(z_start*100 + z_offset*100))
+            part_2 = str(int(z_start*100 + z_interval*100 + z_offset*100))
+            name_category_z = part_1 + " - " + part_2 + " cm"
             categories_z.append(name_category_z)
-            # We recreate the exact name of the header where to read the value
+            # For each property x to be considered:
             for x in range(0, len(property)):
+                # We recreate the exact name of the header where to read the value
                 name_x = property[x] + "_" + str(round(z_start, 3)) + "-" + str(round(z_start + z_interval, 3)) + "_m"
                 name_values_z.append(name_x)
-                # np.append(values, df.loc[i, name_values_z[x]], x)
+                # We add the values to be displayed:
                 values[index_z][x] = df.loc[i, name_values_z[-1]]
             index_z += 1
 
         # Creating the chart for this time step:
-        making_a_bar_graph(categories=categories_z, values=values, stacked_barplot=True, value_min=value_min, value_max=value_max,
+        making_a_bar_graph(categories=categories_z, values=values, stacked_barplot=True,
+                           value_min=value_min, value_max=value_max, value_step=value_step,
                            format_x=format_x, log=log, title=title, label=label, color=color)
 
         # figure_name = 'graph_' + str(i) + '.png'
@@ -440,52 +469,58 @@ def plotting_on_z_stacked(input_file_path='z_classification.csv',
 #                       recording_images=True
 #                       )
 
-# # For creating plots of cumulated inputs over time:
-# # -------------------------------------------------
-#
-# targeted_path=os.path.join('outputs', 'Scenario_0001')
-#
+# For creating plots of cumulated inputs over time:
+# -------------------------------------------------
+
+targeted_path=os.path.join('C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185')
+
 # treating_z_dataframe(directory=targeted_path,
-#                      z_min=0., z_max=1., z_interval=0.1,
-#                      plants_per_m2=35,
+#                      z_min=0., z_max=0.5, z_interval=0.05,
+#                      plants_per_m2=240,
 #                      input_treatment=True)
-# plotting_on_z_stacked(input_file_path=os.path.join(targeted_path,'z_classification_cum_input_by_day.csv'),
-#                       property=['cum_net_hexose_exudation', 'cum_net_root_necromass'],
-#                       label=['Exudates', 'Dead roots'],
-#                       color=['royalblue', 'darkkhaki'],
-#                       title="\n Cumulated root-derived C inputs (gC m-2) per 5-cm layer",
-#                       z_min=0., z_max=1., z_interval=0.1,
-#                       value_min=0,
-#                       value_max=0.6,
-#                       log=False,
-#                       recording_images=True,
-#                       outputs_path=targeted_path
-#                       )
+plotting_on_z_stacked(input_file_path=os.path.join(targeted_path,'z_classification_cum_input_by_day.csv'),
+                      property=['cum_total_net_rhizodeposition', 'cum_net_root_necromass'],
+                      label=['Rhizodeposits', 'Dead roots'],
+                      color=['royalblue', 'darkkhaki'],
+                      title="\n Cumulative root-derived C inputs to soil \n (gC per square meter per 5-cm layer)",
+                      z_min=0., z_max=0.5, z_interval=0.05,
+                      # WATCH OUT: below we consider an offset of 10 cm!
+                      z_offset = -0.1, starting_at_0 = True,
+                      value_min=0,
+                      value_max=40,
+                      value_step=10,
+                      # format_x='%.2E', # Scientific notation (see: https://realpython.com/python-string-formatting/)
+                      # format_x='%.2f', # Floating point
+                      format_x='%i', # Integer
+                      log=False,
+                      recording_images=True,
+                      outputs_path=targeted_path
+                      )
 
-# For creating plots of cumulated inputs over time for a list of scenarios:
-# -------------------------------------------------------------------------
-scenario_numbers=[1]
-for i in scenario_numbers:
-
-    scenario_name = 'Scenario_%.4d' % i
-    targeted_path=os.path.join('outputs', scenario_name)
-
-    treating_z_dataframe(directory=targeted_path,
-                         z_min=0., z_max=0.5, z_interval=0.05,
-                         plants_per_m2=240,
-                         input_treatment=True)
-    plotting_on_z_stacked(input_file_path=os.path.join(targeted_path,'z_classification_cum_input_by_day.csv'),
-                          property=['cum_total_rhizodeposition', 'cum_net_root_necromass'],
-                          label=['Rhizodeposits', 'Dead roots'],
-                          color=['royalblue', 'darkkhaki'],
-                          title="\n Cumulated root-derived C inputs (gC m-2) per 5-cm layer",
-                          z_min=0., z_max=0.5, z_interval=0.05,
-                          value_min=0,
-                          value_max=1.,
-                          log=False,
-                          recording_images=True,
-                          outputs_path=targeted_path
-                          )
+# # For creating plots of cumulated inputs over time for a list of scenarios:
+# # -------------------------------------------------------------------------
+# scenario_numbers=[1]
+# for i in scenario_numbers:
+#
+#     scenario_name = 'Scenario_%.4d' % i
+#     targeted_path=os.path.join('outputs', scenario_name)
+#
+#     treating_z_dataframe(directory=targeted_path,
+#                          z_min=0., z_max=0.5, z_interval=0.05,
+#                          plants_per_m2=240,
+#                          input_treatment=True)
+#     plotting_on_z_stacked(input_file_path=os.path.join(targeted_path,'z_classification_cum_input_by_day.csv'),
+#                           property=['cum_total_rhizodeposition', 'cum_net_root_necromass'],
+#                           label=['Rhizodeposits', 'Dead roots'],
+#                           color=['royalblue', 'darkkhaki'],
+#                           title="\n Cumulated root-derived C inputs (gC m-2) per 5-cm layer",
+#                           z_min=0., z_max=0.5, z_interval=0.05,
+#                           value_min=0,
+#                           value_max=1.,
+#                           log=False,
+#                           recording_images=True,
+#                           outputs_path=targeted_path
+#                           )
 
 # # For plotting the SOM pools over time:
 # # --------------------------------------

@@ -299,7 +299,7 @@ def transport_barriers(g, n, computation_with_age=True, computation_with_distanc
     # We assume that the relative conductance of cell walls is either homogeneously reduced over the length of the
     # meristem zone, or is maximal elsewhere, i.e. equal to 1.
     # TODO: Consider a progressive reduction of the conductance of cell walls with high root cells age?
-    # If the current element encompasses part of all of the meristem zone:
+    # If the current element encompasses a part of the meristem zone:
     if (distance_from_tip - length) < meristem_zone_length:
         # Then we calculate the fraction of the length of the current element where the meristem is present:
         fraction_of_meristem_zone = 1 - (distance_from_tip - length) / meristem_zone_length
@@ -498,6 +498,7 @@ def update_surfaces_and_volumes(g):
         n.non_vascular_exchange_surface_with_soil_solution = S_exch_without_phloem
         n.phloem_exchange_surface_with_soil_solution = S_exch_phloem
         n.total_exchange_surface_with_soil_solution = S_exch_without_phloem + S_exch_phloem
+        n.root_exchange_surface_per_cm = (S_exch_without_phloem + S_exch_phloem) / (n.length*100)
 
     return g
 
@@ -1782,10 +1783,10 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
               "we obtained the element", index_apex," that is a", apex.label, "!!!")
     # Depending on the type of the apex, we adjust the type of the segment on the same axis:
     if apex.type == "Just_stopped":
-        segment.type == "Just_stopped"
+        segment.type = "Just_stopped"
         # print("The segment", segment.index(), "has been considered as just stopped as the apex", index_apex, "has just stopped.")
     elif apex.type == "Stopped":
-        segment.type == "Stopped"
+        segment.type = "Stopped"
         # print("The segment", segment.index(), "has been considered as stopped as the apex", index_apex, "has stopped.")
 
     # CHECKING POSSIBLE ROOT SEGMENT DEATH:
@@ -3792,7 +3793,7 @@ def root_sugars_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warni
 
 # Uptake of hexose from the soil by the root:
 # -------------------------------------------
-def root_hexose_uptake_from_soil_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
+def root_sugars_uptake_from_soil_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
     """
     This function computes the rate of hexose uptake by roots from the soil. This influx of hexose is represented
     as an active process with a substrate-limited relationship (Michaelis-Menten function) depending on the hexose
@@ -4351,7 +4352,7 @@ def calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius,
     # Transfer of hexose from the root to the soil:
     root_sugars_exudation_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Transfer of hexose from the soil to the root:
-    root_hexose_uptake_from_soil_rate(n, soil_temperature_in_Celsius, printing_warnings)
+    root_sugars_uptake_from_soil_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Consumption of hexose in the soil:
     hexose_degradation_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Secretion of mucilage into the soil:
@@ -4403,7 +4404,9 @@ def calculating_extra_variables(n, time_step_in_seconds):
     # n.phloem_surfacic_unloading_rate = n.net_sucrose_unloading_rate / n.phloem_surface
     n.phloem_surfacic_unloading_rate = n.hexose_production_from_phloem_rate / 2. / n.phloem_surface
     # print("For element", n.index(), "the surfacic phloem unloading rate is", "{:.2E}".format(n.phloem_surfacic_unloading_rate), "mol of sucrose per m2 per second.")
-
+    # We calculate the net rhizodeposition rates expressed in gC per cm per day:
+    n.net_unloading_rate_per_day_per_cm = \
+        n.net_sucrose_unloading_rate * 24. * 60. * 60. * 12. * 12.01 / n.length / 100
     # We calculate the net exudation of hexose (in mol of hexose):
     n.net_hexose_exudation = n.hexose_exudation + n.phloem_hexose_exudation - n.hexose_uptake_from_soil - n.phloem_hexose_uptake_from_soil
     # We calculate the total net rhizodeposition (i.e. subtracting the uptake of hexose from soil by roots),
@@ -5171,12 +5174,8 @@ def summing_and_possibly_homogenizing(g,
             total_length += n.length
             total_struct_mass += n.struct_mass + n.root_hairs_struct_mass
             total_living_struct_mass += n.struct_mass + n.living_root_hairs_struct_mass
-            # total_surface += volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["external_surface"]
+            total_surface += volume_and_external_surface_from_radius_and_length(g, n, n.radius, n.length)["external_surface"]
             # # NOTE: living root hairs are NOT included in the total external surface of living roots!
-            try:
-                total_surface +=  n.total_exchange_surface_with_soil_solution
-            except:
-                print("Hmmm...")
             # NOTE: living root hairs are included in the total exchange surface with soil solution!
             # Additionaly, we calculate the total surface of living root hairs:
             total_living_root_hairs_surface +=  n.living_root_hairs_external_surface

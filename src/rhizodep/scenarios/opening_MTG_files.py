@@ -1363,7 +1363,7 @@ if __name__ == "__main__":
     #                                  focal_x=apex.x2, focal_y=apex.y2, focal_z=apex.z2)
 
     # # CREATING AVERAGE MTG:
-    # averaging_through_a_series_of_MTGs(MTG_directory='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0179/MTG_files_to_average/',
+    # averaging_through_a_series_of_MTGs(MTG_directory='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/MTG_files_to_average/',
     #                                    # list_of_properties=['struct_mass', 'length',
     #                                    #                     'C_hexose_root',
     #                                    #                     'total_exchange_surface_with_soil_solution',
@@ -1373,10 +1373,10 @@ if __name__ == "__main__":
     #                                    list_of_properties=[],
     #                                    odd_number_of_MTGs_for_averaging=7,
     #                                    recording_averaged_MTG=True,
-    #                                    recording_directory='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0179/averaged_axis_MTG_files/'
+    #                                    recording_directory='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/averaged_axis_MTG_files/'
     #                                    )
-    # # Recording MTG properties:
-    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0179/',
+    # Recording MTG properties:
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
     #                   MTG_directory="averaged_axis_MTG_files",
     #                   opening_list=True,
     #                   plotting_with_PlantGL=False,
@@ -1387,9 +1387,9 @@ if __name__ == "__main__":
     #                   printing_sum=False,
     #                   recording_sum=False,
     #                   recording_g_properties=True,
-    #                   MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0179/averaged_axis_MTG_properties/',
+    #                   MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/averaged_axis_MTG_properties/',
     #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
-    # print("Done!")
+    # # print("Done!")
 
     # # PLOTTING ONLY ONE AXIS:
     # list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
@@ -1448,44 +1448,44 @@ if __name__ == "__main__":
     #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
     # print("Done!")
 
-    # Plotting a series of MTG with normal Pyvista function:
-    loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0183/',
-                      MTG_directory="MTG_files",
-                      opening_list=True,
-                      # single_MTG_filename="root00599.pckl",
-                      # list_of_MTG_ID=range(2,4318,6),
-                      # list_of_MTG_ID=range(3935, 3941),
-                      list_of_MTG_ID=[2003],
-                      adding_images_on_plot=False,
-                      recording_images=True,
-                      normal_plotting_with_pyvista=True,
-                      fast_plotting_with_pyvista=False,
-                      closing_window=True,
-                      factor_of_higher_resolution=2,
-                      # property="C_hexose_root",
-                      # vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
-                      property="net_rhizodeposition_rate_per_day_per_cm",
-                      vmin=1e-7, vmax=1e-4, log_scale=True, cmap='jet',
-                      # property="root_order",
-                      # vmin=1, vmax=5, log_scale=False, cmap='jet',
-                      # property=None,
-                      # width=800, height=800,
-                      width=400, height=800,
-                      # x_center=0, y_center=0, z_center=-0.20,
-                      # x_cam=0.4, y_cam=0, z_cam=-0.15,
-                      x_center=0, y_center=0, z_center=-0.2,
-                      x_cam=1.2, y_cam=0, z_cam=-0.2,
-                      step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-                      background_color=[94, 76, 64],
-                      root_hairs_display=True,
-                      mycorrhizal_fungus_display=False,
-                      images_directory="root_images_specific",
-                      printing_sum=False,
-                      recording_sum=False,
-                      recording_g_properties=False,
-                      # MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-05/Scenario_0163/MTG_properties/',
-                      z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
-    print("Done!")
+    # # Plotting a series of MTG with normal Pyvista function:
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
+    #                   MTG_directory="MTG_files",
+    #                   opening_list=True,
+    #                   # single_MTG_filename="root00599.pckl",
+    #                   # list_of_MTG_ID=range(2,4318,6),
+    #                   # list_of_MTG_ID=range(3935, 3941),
+    #                   list_of_MTG_ID=range(0,4318,6),
+    #                   adding_images_on_plot=False,
+    #                   recording_images=True,
+    #                   normal_plotting_with_pyvista=True,
+    #                   fast_plotting_with_pyvista=False,
+    #                   closing_window=True,
+    #                   factor_of_higher_resolution=2,
+    #                   # property="C_hexose_root",
+    #                   # vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
+    #                   property="net_rhizodeposition_rate_per_day_per_cm",
+    #                   vmin=1e-7, vmax=1e-4, log_scale=True, cmap='jet',
+    #                   # property="root_order",
+    #                   # vmin=1, vmax=5, log_scale=False, cmap='jet',
+    #                   # property=None,
+    #                   width=800, height=800,
+    #                   # width=400, height=800,
+    #                   x_center=0, y_center=0, z_center=-0.20,
+    #                   x_cam=0.4, y_cam=0, z_cam=-0.15,
+    #                   # x_center=0, y_center=0, z_center=-0.2,
+    #                   # x_cam=1.2, y_cam=0, z_cam=-0.2,
+    #                   step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+    #                   background_color=[94, 76, 64],
+    #                   root_hairs_display=True,
+    #                   mycorrhizal_fungus_display=False,
+    #                   images_directory="root_images",
+    #                   printing_sum=False,
+    #                   recording_sum=False,
+    #                   recording_g_properties=False,
+    #                   # MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-05/Scenario_0163/MTG_properties/',
+    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1/24.)
+    # print("Done!")
 
     # # (Re-)plotting the original MTG files from MTG_properties only:
     # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0161/',
@@ -1520,42 +1520,62 @@ if __name__ == "__main__":
     #                   # MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0161/axis_MTG_properties_new/',
     #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
 
-    # # PLOTTING ONLY ONE AXIS:
-    # # list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
-    # # list_of_MTG = list(range(30*24-4,30*24+4)) + list(range(60*24-4,60*24+4)) + list(range(90*24-4,90*24+4)) + list(range(120*24-4,120*24+4)) + list(range(150*24-4,150*24+4))
-    # list_of_MTG = list(range(85 * 24, 95 * 24))
-    #
+    # PLOTTING ONLY ONE AXIS:
+    # list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
+    # list_of_MTG = list(range(30*24-4,30*24+4)) + list(range(60*24-4,60*24+4)) + list(range(90*24-4,90*24+4)) + list(range(120*24-4,120*24+4)) + list(range(150*24-4,150*24+4))
+    list_of_MTG = list(range(55 * 24 + 1, 65 * 24-1))
+
     # property_name = "net_rhizodeposition_rate_per_day_per_cm"
     # vmin = 1e-8
-    # vmax = 1e-5
+    # vmax = 1e-4
     # lognorm = True
-    #
-    # showing_one_axis(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0179/',
-    #                  opening_list=True,
-    #                  file_extension='pckl',
-    #                  MTG_directory="MTG_files",
-    #                  # file_extension='csv',
-    #                  # MTG_directory="MTG_properties",
-    #                  list_of_MTG_ID=list_of_MTG,
-    #                  starting_string_of_axes_to_remove="Ax00001-Se00001-",
-    #                  targeted_apex_axis_ID="Ax00001-Ap00000",
-    #                  maximal_string_length_of_axis_ID=-1, # Here we consider all lateral roots
-    #                  # maximal_string_length_of_axis_ID=15, # Here we select only the elements on the main axis, not the lateral ones
-    #                  recording_new_MTG_files=True,
-    #                  new_MTG_files_folder=os.path.join('new_axis_MTG_files'),
-    #                  recording_new_MTG_properties = True,
-    #                  new_MTG_properties_folder = os.path.join('new_axis_MTG_properties'),
-    #                  plotting=True,
-    #                  # property_name="net_rhizodeposition_rate_per_day_per_cm",
-    #                  # vmin=1e-8, vmax=1e-5, lognorm=True, cmap='jet',
-    #                  # property_name="C_hexose_root",
-    #                  # vmin=1e-6, vmax=1e-3, lognorm=True, cmap='jet',
-    #                  # property_name="total_exchange_surface_with_soil_solution",
-    #                  # vmin=5e-5, vmax=3.5e-4, lognorm=False, cmap='jet',
-    #                  property_name=property_name,
-    #                  # vmin=1e-4, vmax=8e-4, lognorm=False, cmap='jet',
-    #                  # property_name="net_sucrose_unloading_per_cm_per_day",
-    #                  # vmin=1e-9, vmax=1e-5, lognorm=True, cmap='jet',
-    #                  vmin=vmin, vmax=vmax, lognorm=lognorm, cmap='jet',
-    #                  images_directory="new_axis_images"
-    #                  )
+
+    # property_name = "total_net_rhizodeposition"
+    # vmin = 1e-12
+    # vmax = 1e-9
+    # lognorm = True
+
+    # property_name = "net_sucrose_unloading_rate"
+    # vmin = 1e-14
+    # vmax = 1e-11
+    # lognorm = True
+
+    # property_name = "net_unloading_rate_per_day_per_cm"
+    # vmin = 1e-8
+    # vmax = 1e-4
+    # lognorm = True
+
+    property_name = "root_exchange_surface_per_cm"
+    vmin = 1e-4
+    vmax = 8e-4
+    lognorm = False
+
+    showing_one_axis(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0202/',
+                     opening_list=True,
+                     file_extension='pckl',
+                     MTG_directory="MTG_files",
+                     # file_extension='csv',
+                     # MTG_directory="MTG_properties",
+                     list_of_MTG_ID=list_of_MTG,
+                     # starting_string_of_axes_to_remove="Ax00001-Se00001-",
+                     targeted_apex_axis_ID="Ax00001-Ap00000",
+                     maximal_string_length_of_axis_ID=-1, # Here we consider all lateral roots
+                     # maximal_string_length_of_axis_ID=15, # Here we select only the elements on the main axis, not the lateral ones
+                     recording_new_MTG_files=False,
+                     # new_MTG_files_folder=os.path.join('axis_MTG_files'),
+                     recording_new_MTG_properties = False,
+                     # new_MTG_properties_folder = os.path.join('axis_85-95_days_MTG_properties'),
+                     plotting=True,
+                     # property_name="net_rhizodeposition_rate_per_day_per_cm",
+                     # vmin=1e-8, vmax=1e-5, lognorm=True, cmap='jet',
+                     # property_name="C_hexose_root",
+                     # vmin=1e-6, vmax=1e-3, lognorm=True, cmap='jet',
+                     # property_name="total_exchange_surface_with_soil_solution",
+                     # vmin=5e-5, vmax=3.5e-4, lognorm=False, cmap='jet',
+                     property_name=property_name,
+                     # vmin=1e-4, vmax=8e-4, lognorm=False, cmap='jet',
+                     # property_name="net_sucrose_unloading_per_cm_per_day",
+                     # vmin=1e-9, vmax=1e-5, lognorm=True, cmap='jet',
+                     vmin=vmin, vmax=vmax, lognorm=lognorm, cmap='jet',
+                     images_directory="axis_55-65_days_images"
+                     )
