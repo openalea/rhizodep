@@ -10,8 +10,7 @@ from os.path import join as pj
 from setuptools import setup, find_namespace_packages
 
 short_descr = "RhizoDeposition"
-readme = open('README.rst').read()
-history = open('HISTORY.rst').read()
+readme = open('README.md').read()
 
 # find packages
 pkgs = packages = find_namespace_packages(where='src', include=['openalea.*'])
@@ -40,7 +39,7 @@ setup_kwds = dict(
     name='openalea.rhizodep',
     version=_version,
     description=short_descr,
-    long_description=readme + '\n\n' + history,
+    long_description=readme,
     author="Frederic Rees",
     author_email="frederic.rees@inrae.fr",
     url='https://github.com/openalea/rhizodep',
