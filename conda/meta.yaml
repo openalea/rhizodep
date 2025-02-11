@@ -34,9 +34,9 @@ test:
   imports:
     - openalea.rhizodep
   source_files:
-    - share/data/**
     - test/**
-    - test/data/**
+    - test/inputs/**
+    - test/reference/**
   commands:
     - cd test
     - pytest -v --ignore=test_aml.py  --ignore=test_stat.py
