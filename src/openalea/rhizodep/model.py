@@ -64,7 +64,7 @@ from scipy.integrate import solve_ivp
 from openalea.mtg import *
 from openalea.mtg.traversal import pre_order, post_order
 
-import rhizodep.parameters as param
+from . import parameters as param
 
 # To display more than 5 columns when printing a Panda datframe:
 pd.set_option('display.max_columns',20)

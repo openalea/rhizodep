@@ -8,7 +8,7 @@ import numpy as np
 from openalea.mtg import *
 from openalea.mtg.traversal import pre_order, post_order
 from openalea.mtg import turtle as turt
-from rhizodep.tools import get_root_visitor, my_colormap
+from .tools import get_root_visitor, my_colormap
 
 import pandas as pd
 
