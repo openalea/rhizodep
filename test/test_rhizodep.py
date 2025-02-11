@@ -2,9 +2,9 @@
 import numpy as np
 import pandas as pd
 import os
-import rhizodep.model as model
-import rhizodep.run_simulation as run_simulation
-import rhizodep.scenarios.run_scenarios as run_scenarios
+import openalea.rhizodep.model as model
+import openalea.rhizodep.run_simulation as run_simulation
+import openalea.rhizodep.scenarios.run_scenarios as run_scenarios
 
 ########################################################################################################################
 # DEFINING INPUT/OUTPUT FOLDERS AND SPECIFIC PARAMETERS FOR THE TEST:
@@ -74,7 +74,7 @@ def run_reference_simulation(run_test_scenario=True, scenario_ID=1, outputs_path
     if run_test_scenario:
         # OPTION 1: We run a default scenario, starting from an already existing root MTG:
         run_scenarios.run_one_scenario(scenario_id=scenario_ID,
-                                       inputs_dir_path="C:/Users/frees/rhizodep/test/inputs",
+                                       inputs_dir_path="inputs",
                                        outputs_dir_path=outputs_path,
                                        scenarios_list="scenario_test.xlsx")
     else:
@@ -199,5 +199,5 @@ if __name__ == '__main__':
 
     test_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
              run_test_scenario=True, scenario_ID=1,
-             reference_path="C:/Users/frees/rhizodep/test/reference", reference_file='desired_simulation_results.csv',
-             outputs_path="C:/Users/frees/rhizodep/test/outputs/", results_file='simulation_results.csv')
+             reference_path="reference", reference_file='desired_simulation_results.csv',
+             outputs_path="outputs/", results_file='simulation_results.csv')
