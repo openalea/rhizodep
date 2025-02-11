@@ -8,14 +8,15 @@ from os import walk
 from os.path import abspath, normpath, splitext
 from os.path import join as pj
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_namespace_packages
 
 short_descr = "RhizoDeposition"
 readme = open('README.rst').read()
 history = open('HISTORY.rst').read()
 
 # find packages
-pkgs = find_packages('src')
+pkgs = packages = find_namespace_packages(where='src')#, include=['openalea.*'])
+
 
 pkg_data = {}
 
@@ -29,6 +30,12 @@ for root, dnames, fnames in walk("src/rhizodep"):
             data_files.append(data_rel_pth(pj(root, name)))
 
 pkg_data['rhizodep'] = data_files
+
+# find version number in src/openalea/rhizodep/version.py
+_version = {}
+with open("src/rhizodep/version.py") as fp:
+    exec(fp.read(), _version)
+
 
 setup_kwds = dict(
     name='rhizodep',
