@@ -34,10 +34,11 @@ _version = {}
 with open("src/openalea/rhizodep/version.py") as fp:
     exec(fp.read(), _version)
 
+version = _version['__version__']
 
 setup_kwds = dict(
     name='openalea.rhizodep',
-    version=_version,
+    version=version,
     description=short_descr,
     long_description=readme,
     author="Frederic Rees",
