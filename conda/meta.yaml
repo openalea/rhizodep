@@ -1,0 +1,48 @@
+{% set data = load_setup_py_data() %}
+
+package:
+  name: openalea.rhizodep
+  version: {{ data.get('version') }}
+
+source:
+  path: ..
+
+build:
+  noarch: python
+  preserve_egg_dir: True
+  number: 2
+  script: {{PYTHON}} setup.py install 
+requirements:
+  build:
+    - python {{PY_VER}}
+    - setuptools
+  run:
+    - python >=3.8
+    - openalea.plantgl
+    - openalea.mtg
+    - matplotlib
+    - pandas
+    - numpy
+    - scipy
+    - pyvista
+    - pillow
+    - imageio
+
+test:
+  requires:
+    - pytest
+  imports:
+    - openalea.rhizodep
+  source_files:
+    - test/**
+    - test/inputs/**
+    - test/reference/**
+  commands:
+    - cd test
+    - pytest -v --ignore=test_aml.py  --ignore=test_stat.py
+
+about:
+  home: {{ data.get('url') }}
+  license: CeCILL-C
+  summary: {{ data.get('description') }}
+

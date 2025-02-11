@@ -15,9 +15,10 @@
 import os
 from decimal import Decimal
 from math import pi, cos, sin, floor, ceil, trunc, log10
+from copy import deepcopy # Allows to make a copy of a dictionnary and change it without modifying the original, whatever it is
+
 import numpy as np
 import pandas as pd
-from copy import deepcopy # Allows to make a copy of a dictionnary and change it without modifying the original, whatever it is
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -28,7 +29,7 @@ from openalea.mtg.plantframe import color
 from openalea.mtg.traversal import pre_order, post_order
 import openalea.plantgl.all as pgl
 
-import rhizodep.parameters as param
+from . import parameters as param
 
 
 # FUNCTIONS FOR DATA PREPROCESSING :

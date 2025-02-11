@@ -9,8 +9,6 @@
 """
 
 import os
-import sys
-import getopt
 import pandas as pd
 import numpy as np
 import multiprocessing as mp
@@ -18,11 +16,11 @@ import shutil
 import time
 import pickle
 
-import rhizodep.model as model
-import rhizodep.run_simulation as run_simulation
-import rhizodep.parameters as param
-import rhizodep.tools as tools
-import rhizodep.mycorrhizae as mycorrhizae
+from openalea.rhizodep import model
+from openalea.rhizodep import run_simulation 
+from openalea.rhizodep import parameters as param
+from openalea.rhizodep import tools 
+from openalea.rhizodep import mycorrhizae 
 
 ########################################################################################################################
 
