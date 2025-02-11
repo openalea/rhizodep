@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from statistics import mean
 import os, os.path
-from path import Path
+from pathlib import Path
 import timeit
 import copy
 
