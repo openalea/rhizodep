@@ -16,7 +16,6 @@ requirements:
   build:
     - python {{PY_VER}}
     - setuptools
-    - openalea.deploy
   run:
     - python >=3.8
     - openalea.plantgl
