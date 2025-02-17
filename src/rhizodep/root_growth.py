@@ -60,6 +60,9 @@ class RootGrowthModel(Model):
     root_order: int = declare(default=1, unit="", unit_comment="", description="Example root segment's axis order computed by the initiate_mtg method or provided as input", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+    vertex_index: int = declare(default=1, unit="mol.s-1", unit_comment="", description="Unique vertex identifier stored for ease of value access", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
     radius: float = declare(default=3.5e-4, unit="m", unit_comment="", description="Example root segment radius", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
@@ -277,46 +280,46 @@ class RootGrowthModel(Model):
     # initiate MTG
     random: bool = declare(default=True, unit="adim", unit_comment="", description="Allow random processes in growth", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     simple_growth_duration: bool = declare(default=False, unit="adim", unit_comment="", description="Allow growth according to the original Archisimple model", 
                                                     min_value="", max_value="", value_comment="", references="(Pagès et al., 2014)", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     initial_segment_length: float = declare(default=1e-3, unit="m", unit_comment="", description="Initial segment length", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     initial_apex_length: float = declare(default=1e-4, unit="m", unit_comment="", description="Initial apex length", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     initial_C_hexose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="", description="Initial hexose concentration of root segments", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     input_file_path: str = declare(default="C:/Users/frees/rhizodep/src/rhizodep/", unit="m", unit_comment="", description="Filepath for input files", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     forcing_seminal_roots_events: bool = declare(default=False, unit="m", unit_comment="", description="a Boolean expliciting if seminal root events should be forced", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     seminal_roots_events_file: str = declare(default="seminal_roots_inputs.csv", unit="m", unit_comment="", description="Filepath pointing to input table to plan seminal root emergence event", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     forcing_adventitious_roots_events: bool = declare(default=False, unit="m", unit_comment="", description="a Boolean expliciting if adventicious root events should be forced", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     adventitious_roots_events_file: str = declare(default="adventitious_roots_inputs.csv", unit="adim", unit_comment="", description="Filepath pointing to input table to plan adventitious root emergence event", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     radial_growth: bool = declare(default=True, unit="adim", unit_comment="", description="equivalent to a Boolean expliciting whether radial growth should be considered or not", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     nodules: bool = declare(default=False, unit="adim", unit_comment="", description="a Boolean expliciting whether nodules could be formed or not", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     root_order_limitation: bool = declare(default=False, unit="adim", unit_comment="", description="a Boolean expliciting whether lateral roots should be prevented above a certain root order", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     root_order_treshold: int = declare(default=2, unit="adim", unit_comment="", description="the root order above which new lateral roots cannot be formed", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="simulation_parameter", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
     def __init__(self, g=None, time_step_in_seconds: int=3600, **scenario: dict):
         """
@@ -2786,3 +2789,13 @@ class RootGrowthModel(Model):
 
             processed_length += n.length
 
+    def post_growth_updating(self):
+        for vid in self.vertices:
+            if vid not in self.vertex_index:
+                # We also increment the vertex identifiers to be accesses in deficits
+                self.vertex_index[vid] = vid
+
+    def __call__(self, *args, external_variables={}):
+        super().__call__(*args)
+        self.post_growth_updating()
+    

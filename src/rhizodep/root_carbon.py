@@ -66,7 +66,7 @@ from metafspm.component import Model, declare
 from metafspm.component_factory import *
 
 
-family = "metabolic"
+family = "C_metabolic"
 
 
 @dataclass
@@ -461,8 +461,22 @@ class RootCarbonModel(Model):
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
         self.apply_scenario(**scenario)
         self.link_self_to_mtg()
+        self.initiate_heterogeneous_variables() # TODO Transfer to root growth or condition by only if root system is created
 
         self.previous_C_amount_in_the_root_system = self.compute_root_system_C_content()
+
+    def initiate_heterogeneous_variables(self):
+        # We cover all the vertices in the MTG:
+        for vid in self.g.vertices_iter(scale=1):
+            # n represents the vertex:
+            n = self.g.node(vid)
+            # According to Ogawa et al. 2005
+            # We define a different linear increase on the first cm to account for reported increase just after root tip
+            if n.distance_from_tip <= 0.01:
+                n.C_hexose_root = 0.0071 * n.distance_from_tip + 0.0002
+            # After this first cm, a decrease towards a plateau has been described by several authors 
+            else:
+                n.C_hexose_root = max(0.0002 * np.exp(-7.857 * n.distance_from_tip), 2e-5)
 
     def post_growth_updating(self):
         """
