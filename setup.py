@@ -9,7 +9,7 @@ from os.path import join as pj
 
 from setuptools import setup, find_namespace_packages
 
-short_descr = "RhizoDeposition"
+short_descr = "RhizoDep"
 readme = open('README.md').read()
 
 # find packages

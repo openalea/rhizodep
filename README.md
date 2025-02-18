@@ -17,7 +17,7 @@
 
 ### Description
 
-RhizoDep corresponds to a model intended to simulate rhizodeposition processes, i.e. the release of organic materials by the root system into the soil. As a first step, the focus is made on the exudation of hexose sugars (glucose and fructose) depending on the concentration of sugars inside the root. An exudation flux is therefore defined for each root segment or apex as a function of the gradient of hexose concentration inside and outside the root element.
+RhizoDep is a functional-structural root model aiming to simulate root growth, respiration and rhizodeposition along the whole root system. Root growth is based on a potential growth model adapted from ArchiSimple model, which is regulated by the local balance of carbon in each root segment. This local carbon balance also enables to simulate root respiration, which originates from growth and maintenance, and rhizodeposition, which has been represented as the net exudation of hexose, the secretion of mucilage and the release of cap cells. The model depends on i) the input of carbon allocated from the shoots to the roots, ii) the temperature of the soil, iii) the dynamics of rhizodeposits at the root-soil interface, which is currently simulated by a simple soil degradation function.
 
 ### Installation
 

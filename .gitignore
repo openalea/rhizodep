@@ -85,3 +85,5 @@ saving_outputs
 /src/rhizodep/scenarios/outputs
 /src/rhizodep/scenarios/running_example/outputs
 /test/outputs
+/src/rhizodep/scenarios/inputs/sucrose_input_Swinnen_et_al_1994_ArchiSimple_185.csv
+/src/rhizodep/scenarios/inputs/sucrose_input_Swinnen_et_al_1994_starting_at_55_days.csv

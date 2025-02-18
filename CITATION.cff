@@ -4,8 +4,8 @@
 cff-version: 1.2.0
 title: RhizoDep
 message: >-
-  Rhizodep is a model designed to simulate root architecture
-  and rhizodeposition processes 
+  RhizoDep is a model designed to simulate root architecture
+  and rhizodeposition processes according to root carbone balance
 type: software
 authors:
   - given-names: Frédéric
