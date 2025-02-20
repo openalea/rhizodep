@@ -1,3 +1,13 @@
+# -*- coding: latin-1 -*-
+
+"""
+    This script allows to load MTG (Multiscale Tree Graphs) files from .pckl or .csv files for calculating new variables
+     and/or (re)plotting graphs.
+
+    :copyright: see AUTHORS.
+    :license: see LICENSE for details.
+"""
+
 from math import sqrt, pi, trunc, floor, cos, sin
 from decimal import Decimal
 import time
@@ -25,14 +35,14 @@ from rhizodep.alternative_plotting import plotting_roots_with_pyvista, fast_plot
 import pickle
 
 ########################################################################################################################
-# DEFINING ADDTIONAL FUNCTIONS FOR DISPLAYING THE MTG IN A 3D GRAPH WITH PLANTGL
+# DEFINING USEFUL FONCTIONS FOR CREATING/IMPROVING IMAGES
 ########################################################################################################################
 
 # Function creating an image containing a text:
 #----------------------------------------------
 def drawing_text(text="TEXT !", image_name="text.png", length=220, height=110, font_size=100):
     """
-    This function enables to create and save an image containing showing a text on a transparent background.
+    This function enables to create and save an image showing a text on a transparent background.
     :param text: the text to add
     :param image_name: the name of the image file
     :param length: length of the image
@@ -126,10 +136,8 @@ def add_margin(image, top, right, bottom, left, color):
     return result
 
 ########################################################################################################################
+# DEFINING FUNCTIONS FOR COMPUTING THE DISTRUBUTION OF PROPERTIES ALONG SOIL DEPTH
 ########################################################################################################################
-
-# Useful functions for calculating on MTG files:
-################################################
 
 # Calculation of the length of a root element intercepted between two z coordinates:
 # ----------------------------------------------------------------------------------
@@ -190,7 +198,7 @@ def classifying_on_z(g, z_min=0, z_max=1, z_interval=0.1):
     """
     This function calculates the distribution of certain characteristics of a MTG g according to the depth z.
     For each z-layer between z_min and z_max and each root segment, specific variables are computed, depending on the
-    length within the segment that is intercepted between the upper and lower horizontal plane [use of 'sub_length' functino].
+    length within the segment that is intercepted between the upper and lower horizontal plane [see 'sub_length' function].
     :param g: the MTG on which calculations are made
     :param z_min: the depth to which we start computing
     :param z_max: the maximal depth to which we stop computing
@@ -275,8 +283,17 @@ def classifying_on_z(g, z_min=0, z_max=1, z_interval=0.1):
     return final_dictionnary
 
 ########################################################################################################################
-# SIMPLE FUNCTION FOR RECREATING A MTG FROM THE CSV FILES CONTAINING ITS PROPERTIES:
+# CREATING A MTG FROM RECORDED FILES AND PERFORMING CALCULATIONS ON IT
+########################################################################################################################
+
+# Function for loading a MTG from its properties written in a .csv file:
 def create_MTG_from_csv_file(csv_filename='MTG_00003.csv'):
+
+    """
+    This function reads a .csv file containing all properties of a MTG to recreate the MTG structure within OpenAlea.
+    :param csv_filename: the name of the .csv file to read
+    :return: the recreated MTG structure
+    """
 
     # We first read the csv file where all the properties of each vertex has been previously recorded:
     try:
@@ -323,8 +340,8 @@ def create_MTG_from_csv_file(csv_filename='MTG_00003.csv'):
 
     return g
 
-########################################################################################################################
-# MAIN FUNCTION FOR LOADING AND DISPLAYING/EXTRACTING PROPERTIES FROM MTG FILES
+# MAIN FUNCTION FOR LOADING AND DISPLAYING/EXTRACTING PROPERTIES FROM MTG FILES:
+################################################################################
 def loading_MTG_files(my_path='',
                       opening_list=False,
                       file_extension='pckl',
@@ -641,7 +658,6 @@ def loading_MTG_files(my_path='',
             print("   > Plot made!")
             print("")
 
-
         # For recording the properties of g in a csv file:
         # ------------------------------------------------
         if recording_g_properties:
@@ -665,8 +681,6 @@ def loading_MTG_files(my_path='',
 
     return g
 
-
-########################################################################################################################
 ########################################################################################################################
 # MAIN FUNCTIONS FOR AVERAGING SEVERAL MTG INTO ONE
 ########################################################################################################################
@@ -678,7 +692,7 @@ def averaging_a_list_of_MTGs(list_of_MTG_numbers=[143, 167, 191], list_of_proper
                              averaged_MTG_name=None,
                              recording_directory = 'averaged_MTG_files'):
     """
-    This function calculate an "averaged" MTG that attributes for the property of a given node the mean value of that
+    This function calculate an "averaged" MTG that, for the property of a given node, attributes the mean value of that
     property value for the same node found in a list of MTG. This is especially useful for calculating mean values over
     a time range.
     :param list_of_MTG_numbers: a list containing the ID number of each MTG to be opened (each MTG name is assumed to be in the format 'rootXXXXX.pckl')
@@ -871,7 +885,6 @@ def averaging_through_a_series_of_MTGs(MTG_directory='MTG_files', list_of_proper
 #                                    recording_directory='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0097/averaged_MTG_files')
 
 ########################################################################################################################
-########################################################################################################################
 # # ISOLATING A FRACTION OF THE MTG BASED ON TOPOLOGICAL COORDINATES
 ########################################################################################################################
 
@@ -880,10 +893,10 @@ def subsampling_a_MTG(g, string_of_axis_ID_to_remove="Ax1-S1-", expected_startin
                       maximal_string_length_of_axis_ID=-1,
                       create_a_new_MTG = False):
     """
-    This function aims to provide a MTG for showing only a few axes from it, based on the property 'axis_ID'
+    This function aims to provide a root MTG for showing only a few axes from it, based on the property 'axis_ID'
     that corresponds to a chain of characters describing the position of each root element in the topology of the MTG.
-    The function will look for a specific chain of character starting at a specific position within the string "axis_ID',
-    and will either remove all coreesponding axes, or reduce their length to 0 so that they are not shown.
+    The function will look for a specific chain of characters starting at a specific position within the string "axis_ID',
+    and will either remove all corresponding axes, or reduce their length to 0 so that they are not shown.
     :param g: the root MTG to subsample
     :param string_of_axis_ID_to_remove: specific chain of characters to detect within 'axis_ID' for removing axes
     :param expected_starting_index_of_string: starting index of the chain of characters to detect within 'axis_ID'
@@ -959,35 +972,37 @@ def showing_one_axis(my_path='',
                      images_directory="axis_images"):
 
     """
-
-    :param my_path:
-    :param opening_list:
-    :param file_extension:
-    :param MTG_directory:
-    :param single_MTG_filename:
-    :param list_of_MTG_ID:
-    :param starting_string_of_axes_to_remove:
-    :param targeted_apex_axis_ID:
-    :param maximal_string_length_of_axis_ID:
-    :param recording_new_MTG_file:
-    :param new_MTG_file_path:
-    :param plotting:
-    :param property_name:
-    :param vmin:
-    :param vmax:
-    :param lognorm:
-    :param cmap:
-    :param final_image_filepath:
-    :return:
+    This function enables to reduce a MTG to only one axis, e.g. for illustrating how variables vary along it.
+    :param my_path: the path of the main directory
+    :param opening_list: if True, the function will look at a list of different files to be opened
+    :param file_extension: the extension of the file for loading the MTG (either 'pckl' or 'csv')
+    :param MTG_directory: the name of the folder where MTG files are stored
+    :param single_MTG_filename: if opening_list is False, this corresponds to the name of the MTG file to open
+    :param list_of_MTG_ID: if opening_list is True, this corresponds to the list of MTG names to open
+    :param starting_string_of_axes_to_remove: the starting characters common to all axes to be removed
+    :param targeted_apex_axis_ID: the axis_ID of the apex corresponding to the axis to keep
+    :param maximal_string_length_of_axis_ID: the maximal number of characters within axis_ID to be kept, so that elements with a higher numbers (e.g. lateral roots) will be removed
+    :param recording_new_MTG_files: if True, the new single-axis MTG files will be recorded as pickle files
+    :param new_MTG_files_folder: the name of the folder where new single-axis MTG should be recorded
+    :param recording_new_MTG_properties: if True, all properties from each new single-axis MTG files will be recorded in a .csv file
+    :param new_MTG_properties_folder: the name of the folder where the properties of new single-axis MTG should be recorded
+    :param plotting: if True, the new single-axis MTG files will be displayed
+    :param property_name: the name of the property of the new MTG files to be displayed
+    :param vmin: the minimal value shown on the colorbar
+    :param vmax: the maximal value shown on the colorbar
+    :param lognorm: if True, the colorbar will be displayed in log-scale
+    :param cmap: the name of the color distribution within the colorbar
+    :param images_directory: the name of the folder where the images of new single-axis MTG should be recorded
     """
 
+    # If a list of MTG files is to be opened:
     if opening_list:
         # We define the directory "MTG_files":
         g_dir = os.path.join(my_path, MTG_directory)
     else:
         g_dir = my_path
     print("Loading the MTG file located in", g_dir,"...")
-
+    # If plots are to be printed:
     if plotting:
         # We define the directory "video"
         video_dir = os.path.join(my_path, images_directory)
@@ -1521,9 +1536,6 @@ if __name__ == "__main__":
     #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
 
     # PLOTTING ONLY ONE AXIS:
-    # list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
-    # list_of_MTG = list(range(30*24-4,30*24+4)) + list(range(60*24-4,60*24+4)) + list(range(90*24-4,90*24+4)) + list(range(120*24-4,120*24+4)) + list(range(150*24-4,150*24+4))
-    list_of_MTG = list(range(55 * 24 + 1, 65 * 24-1))
 
     # property_name = "net_rhizodeposition_rate_per_day_per_cm"
     # vmin = 1e-8
@@ -1550,7 +1562,11 @@ if __name__ == "__main__":
     vmax = 8e-4
     lognorm = False
 
-    showing_one_axis(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0202/',
+    # list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
+    # list_of_MTG = list(range(30*24-4,30*24+4)) + list(range(60*24-4,60*24+4)) + list(range(90*24-4,90*24+4)) + list(range(120*24-4,120*24+4)) + list(range(150*24-4,150*24+4))
+    list_of_MTG = list(range(0, 24))
+
+    showing_one_axis(my_path='outputs/Scenario_0001/',
                      opening_list=True,
                      file_extension='pckl',
                      MTG_directory="MTG_files",

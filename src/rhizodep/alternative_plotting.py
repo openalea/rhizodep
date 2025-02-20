@@ -1,3 +1,12 @@
+# -*- coding: latin-1 -*-
+
+"""
+    This script allows to create graphs showing a root MTG with its properties, based on other tools than PlantGL.
+
+    :copyright: see AUTHORS.
+    :license: see LICENSE for details.
+"""
+
 import pyvista as pv
 import pyvistaqt as pvqt
 import pickle

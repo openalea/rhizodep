@@ -1,10 +1,7 @@
 #  -*- coding: utf-8 -*-
 
 """
-    rhizodep.scenarios
-    ~~~~~~~~~~~~~
-
-    The module :mod:`rhizodep.scenarios` is the front-end to run the RhizoDep model.
+    This script 'run_simulation' enables to run a complete simulation with the model RhizoDep.
 
     :copyright: see AUTHORS.
     :license: see LICENSE for details.
@@ -14,10 +11,8 @@ from math import trunc
 from decimal import Decimal
 import pandas as pd
 import os
-import time
 
 import openalea.plantgl.all as pgl
-from openalea.mtg import turtle as turt
 import rhizodep.model as model
 import rhizodep.tools as tools
 import rhizodep.alternative_plotting as alternative_plotting
@@ -40,7 +35,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     renewal_of_soil_solution=False, interval_between_renewal_events=1.*60.*60.*24.,
                     constant_soil_temperature_in_Celsius=20,
                     nodules=False,
-                    mycorrhizal_fungus=True,
+                    mycorrhizal_fungus=False,
                     fungus_MTG=None,
                     root_order_limitation=False,
                     root_order_treshold=2,
@@ -235,13 +230,21 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 for file in files:
                     os.remove(os.path.join(root, file))
 
+    # If the camera is supposed to move around the MTG:
+    if camera_rotation:
+        # We record the initial distance of the camera from the center:
+        initial_camera_distance = max(x_cam, y_cam)
+        camera_distance = initial_camera_distance
+        # We initialize the index for reading each coordinates:
+        index_camera = 0
+        # We calculate the coordinates of the camera on the circle around the center:
+        x_coordinates, y_coordinates, z_coordinates = tools.circle_coordinates(z_center=z_cam,
+                                                                               radius=camera_distance,
+                                                                               n_points=n_rotation_points)
+
     # READING THE INPUT FILE:
     # -----------------------
     if input_file != "None" and not forcing_constant_inputs:  # and (constant_sucrose_input_rate <= 0 or constant_soil_temperature_in_Celsius <= 0):
-        # # We first define the path and the file to read as a .csv:
-        # PATH = os.path.join('.', input_file)
-        # # Then we read the file and copy it in a dataframe "df":
-        # input_frame = pd.read_csv(PATH, sep=',')
         # We use the function 'formatted inputs' to create a table containing the input data (soil temperature and sucrose input)
         # for each required step, depending on the chosen time step:
         input_frame = tools.formatted_inputs(original_input_file=input_file,
@@ -270,30 +273,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     # We display the MTG on PlantGL and possibly record it:
 
-    # visitor = tools.get_root_visitor()
-    # # We initialize a turtle in PlantGL:
-    # turtle_for_roots = turt.PglTurtle()
-    # turtle_for_hairs = turt.PglTurtle()
-    # turtle_for_fungus = turt.PglTurtle()
-    # # We make the graph upside down:
-    # turtle_for_roots.down(180)
-    # turtle_for_hairs.down(180)
-    # turtle_for_fungus.down(180)
-    # # We initialize the scene with the MTG g:
-    # scene_for_roots = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_roots, gc=False)
-    # scene_for_hairs = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_hairs, gc=False)
-    # scene_for_fungus = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_fungus, gc=False)
-
-    # x_cam = camera_distance
-    # y_cam = 0
-    # z_cam = z_cam
-    # tools.prepareScene(scene_for_roots, width=width, height=height,
-    #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
-    # tools.prepareScene(scene_for_hairs, width=width, height=height,
-    #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
-    # tools.prepareScene(scene_for_fungus, width=width, height=height,
-    #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
-
     # If the rotation of the camera around the root system is required:
     if camera_rotation:
         index_camera=0
@@ -301,14 +280,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         y_cam = y_coordinates[index_camera]
         z_cam = z_coordinates[index_camera]
 
-        # # We prepare the scene with the specified position of the center of the graph and the camera:
-        # initial_scene = pgl.Scene()
-        # tools.prepareScene(initial_scene, width=width, height=height,
-        #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
-        #                    background_color=background_color)
-
         sc = tools.plot_mtg(g,
-                            # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
                             prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                             vmax=displayed_vmax, cmap=cmap,
                             root_hairs_display=root_hairs_display,
@@ -330,7 +302,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
         # We call the function plot_MTG so that the (x,y,z) coordinates of each root element is recorded:
         sc = tools.plot_mtg(g,
-                            # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
                             prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                             vmax=displayed_vmax, cmap=cmap,
                             root_hairs_display=root_hairs_display,
@@ -901,16 +872,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             # PLOTTING THE MTG:
             # ------------------
 
-            # visitor = tools.get_root_visitor()
-            # # We initialize a turtle in PlantGL:
-            # turtle = turt.PglTurtle()
-            # # We make the graph upside down:
-            # turtle.down(180)
-            # # We initialize the scene with the MTG g:
-            # scene_for_roots = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
-            # scene_for_hairs = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
-            # scene_for_fungus = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
-
             # If the rotation of the camera around the root system is required:
             if camera_rotation:
                 index_camera = 0
@@ -924,8 +885,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 #                    z_cam=z_cam)
 
                 sc = tools.plot_mtg(g,
-                                    # scene=scene_for_roots, scene_for_hairs=scene_for_hairs,
-                                    scene_for_fungus=scene_for_fungus,
                                     prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                                     vmax=displayed_vmax, cmap=cmap,
                                     root_hairs_display=root_hairs_display,
@@ -944,18 +903,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
             # Otherwise, the camera will stay on a fixed direction:
             else:
-                # x_cam = camera_distance
-                # y_cam = 0
-                # z_cam = z_cam
-
-                # # We prepare the scene with the specified position of the center of the graph and the camera:
-                # tools.prepareScene(scene_for_roots, width=width, height=height,
-                #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam,
-                #                    z_cam=z_cam)
 
                 sc = tools.plot_mtg(g,
-                                    # scene=scene_for_roots, scene_for_hairs=scene_for_hairs,
-                                    # scene_for_fungus=scene_for_fungus,
                                     prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                                     vmax=displayed_vmax, cmap=cmap,
                                     root_hairs_display=root_hairs_display,

@@ -1,3 +1,13 @@
+# -*- coding: latin-1 -*-
+
+"""
+    This script allows to create videos from existing graphs. It is especially useful for showing the evolution
+    of the root system over time or soil depth.
+
+    :copyright: see AUTHORS.
+    :license: see LICENSE for details.
+"""
+
 import imageio
 from PIL import Image, ImageDraw, ImageFont
 import os
@@ -10,11 +20,6 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 
 from rhizodep.tools import colorbar, sci_notation
-
-# Use LaTeX as text renderer to get text in true LaTeX
-# If the two following lines are left out, Mathtext will be used
-# import matplotlib as mpl
-# mpl.rc('text', usetex=True)
 
 ########################################################################################################################
 
@@ -33,8 +38,7 @@ def resizing_and_film_making(outputs_path='outputs',
                              ticks=[],
                              vmin=1e-6, vmax=1e0,
                              time_printing=True, time_position=1,
-                             time_step_in_days=1., sampling_frequency=1, fps=24,
-                             title=""):
+                             time_step_in_days=1., sampling_frequency=1, fps=24):
 
     """
     This function enables to resize some images, add a time indication and a colorbar on them, and create a movie from it.
@@ -59,7 +63,6 @@ def resizing_and_film_making(outputs_path='outputs',
     :param time_step_in_days: the original time step at which MTG images were generated
     :param sampling_frequency: the frequency at which images should be picked up and included in the transformation/movie (i.e. 1 image every X images)
     :param fps: frames per second for the .gif movie to create
-    :param title: the name of the movie file
     :return:
     """
 
@@ -93,6 +96,10 @@ def resizing_and_film_making(outputs_path='outputs',
             new_size = (1200, 200)
             bar = bar.resize(new_size)
             box_colorbar = (-120, 870)
+        elif colorbar_position==3:
+            new_size = (800, 133)
+            bar = bar.resize(new_size)
+            box_colorbar = (-100, 750)
         else:
             new_size = (1500, 250)
             bar = bar.resize(new_size)
@@ -256,8 +263,7 @@ def resizing_and_film_making_for_scenarios(general_outputs_folder='outputs',
                                            ticks=[],
                                            vmin=1e-6, vmax=1e0,
                                            time_printing=True, time_position=1,
-                                           time_step_in_days=1., sampling_frequency=1, frames_per_second=24,
-                                           title=""
+                                           time_step_in_days=1., sampling_frequency=1, frames_per_second=24
                                            ):
 
     """
@@ -267,9 +273,9 @@ def resizing_and_film_making_for_scenarios(general_outputs_folder='outputs',
     :param resized_images_folder: the image of the transformed images folder in each scenario
     :param scenario_numbers: a list of numbers corresponding to the different scenarios to consider
     :[other parameters]: [cf the parameters from the function 'resizing_and_film_making']
-    :return:
     """
 
+    # We cover each scenario:
     for i in scenario_numbers:
 
         scenario_name = 'Scenario_%.4d' % i
@@ -292,8 +298,7 @@ def resizing_and_film_making_for_scenarios(general_outputs_folder='outputs',
                                  colorbar_cmap=colorbar_cmap, colorbar_lognorm=colorbar_lognorm,
                                  ticks=ticks,
                                  vmin=vmin, vmax=vmax,
-                                 resizing=resizing, dividing_size_by=dividing_size_by,
-                                 title=title)
+                                 resizing=resizing, dividing_size_by=dividing_size_by)
 
     return
 
@@ -330,11 +335,10 @@ if __name__ == "__main__":
     # vmax = 1e-4
     # lognorm = True
 
-    # bar_title = "Actual root exchange surface (m2 per cm)"
-    # bar_filename = os.path.join(main_folder_path, "colorbar_exchange_surface_per_cm.png")
-    # vmin = 1e-4
-    # vmax = 8e-4
-    # lognorm = False
+    bar_title = "Actual root exchange surface (m2 per cm)"
+    vmin = 1e-4
+    vmax = 8e-4
+    lognorm = False
 
     # bar_title = "Net sucrose unloading rate (gC per day per cm)"
     # bar_filename = "colorbar_unloading.png"
@@ -345,9 +349,7 @@ if __name__ == "__main__":
     # bar = colorbar(title="Root mobile hexose concentration (mol of hexose per gDW of structural mass)", cmap='jet',
     # bar = colorbar(title="Root exchange surface with soil solution (square meter per cm of root)", cmap='jet',
     # bar = colorbar(title="Net unloading rate from phloem (moles of sucrose per cm of root per day)", cmap='jet',
-
     # bar = colorbar(title=bar_title, cmap='jet', lognorm=lognorm, ticks=[], vmin=vmin, vmax=vmax)
-
     # bar = colorbar(title=bar_title, cmap='jet', lognorm=lognorm, ticks=[2e-4,4e-4, 6e-4], vmin=vmin, vmax=vmax)
 
     # We save it in the output directory:
@@ -361,55 +363,53 @@ if __name__ == "__main__":
     # # Creating a new movie from root systems for one given scenario:
     # ################################################################
 
-    # FROM ORIGINAL GRAPHS - classic:
-    resizing_and_film_making(outputs_path='C:/Users/frees/SIMBAL/simulation/outputs',
-                             # outputs_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185',
-                             # outputs_path='C:/Users/frees/SIMBAL/simulation/outputs',
-                             # images_folder='root_images_net_rhizodeposition',
-                             # images_folder='root_images',
-                             images_folder='plots',
-                             # images_folder='new_axis_images',
-                             # resized_images_folder='root_images_resized',
-                             resized_images_folder='plots_resized',
-                             # resized_images_folder='new_root_images_resized',
-                             film_making=True,
-                             film_name="root_movie.gif",
-                             image_transforming=True,
-                             resizing=False, dividing_size_by=1.,
-                             colorbar_option=False, colorbar_position=1,
-                             colorbar_title="Net rhizodeposition rate (gC per day per cm)",
-                             # colorbar_title=bar_title,
-                             # colorbar_cmap='jet', colorbar_lognorm=lognorm,
-                             # ticks=[],
-                             # vmin=vmin, vmax=vmax,
-                             # time_printing=True, time_position=1,
-                             time_printing=True,
-                             # time_step_in_days=6/24., sampling_frequency=1, fps=24,
-                             time_step_in_days=1 / 24., sampling_frequency=1, fps=24,
-                             title="")
-
-    # # FROM AXIS GRAPHS:
-    # resizing_and_film_making(outputs_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0202',
+    # # FROM ORIGINAL GRAPHS - classic:
+    # resizing_and_film_making(outputs_path='C:/Users/frees/SIMBAL/simulation/outputs',
+    #                          # outputs_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185',
     #                          # outputs_path='C:/Users/frees/SIMBAL/simulation/outputs',
     #                          # images_folder='root_images_net_rhizodeposition',
-    #                          images_folder='axis_55-65_days_images_surface',
+    #                          # images_folder='root_images',
+    #                          images_folder='plots',
     #                          # images_folder='new_axis_images',
-    #                          resized_images_folder='axis_55-65_days_images_resized',
+    #                          # resized_images_folder='root_images_resized',
+    #                          resized_images_folder='plots_resized',
     #                          # resized_images_folder='new_root_images_resized',
     #                          film_making=True,
-    #                          film_name="axis_55-65_days_movie.gif",
+    #                          film_name="root_movie.gif",
     #                          image_transforming=True,
     #                          resizing=False, dividing_size_by=1.,
-    #                          colorbar_option=True, colorbar_position=3,
-    #                          colorbar_title=bar_title,
-    #                          colorbar_cmap='jet', colorbar_lognorm=lognorm,
+    #                          colorbar_option=False, colorbar_position=1,
+    #                          colorbar_title="Net rhizodeposition rate (gC per day per cm)",
+    #                          # colorbar_title=bar_title,
+    #                          # colorbar_cmap='jet', colorbar_lognorm=lognorm,
     #                          # ticks=[],
-    #                          vmin=vmin, vmax=vmax,
+    #                          # vmin=vmin, vmax=vmax,
     #                          # time_printing=True, time_position=1,
     #                          time_printing=True,
     #                          # time_step_in_days=6/24., sampling_frequency=1, fps=24,
     #                          time_step_in_days=1 / 24., sampling_frequency=1, fps=24,
     #                          title="")
+
+    # FROM AXIS GRAPHS:
+    resizing_and_film_making(outputs_path='outputs/Scenario_0001',
+                             # images_folder='root_images_net_rhizodeposition',
+                             images_folder='axis_55-65_days_images',
+                             # images_folder='new_axis_images',
+                             resized_images_folder='axis_55-65_days_images_resized',
+                             # resized_images_folder='new_root_images_resized',
+                             film_making=True,
+                             film_name="axis_55-65_days_movie.gif",
+                             image_transforming=True,
+                             resizing=False, dividing_size_by=1.,
+                             colorbar_option=True, colorbar_position=3,
+                             colorbar_title=bar_title,
+                             colorbar_cmap='jet', colorbar_lognorm=lognorm,
+                             # ticks=[],
+                             vmin=vmin, vmax=vmax,
+                             # time_printing=True, time_position=1,
+                             time_printing=True,
+                             # time_step_in_days=6/24., sampling_frequency=1, fps=24,
+                             time_step_in_days=1 / 24., sampling_frequency=1, fps=12)
 
     # # FROM REDRAWN GRAPHS:
     # resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0088'),
@@ -469,7 +469,6 @@ if __name__ == "__main__":
 
     # # Creating a new movie from z-barplots for one scenario:
     # ########################################################
-    #
     # outputs_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185'
     # resizing_and_film_making(outputs_path=outputs_path,
     #                          images_folder='z_barplots',

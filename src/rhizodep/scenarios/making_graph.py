@@ -1,3 +1,13 @@
+# -*- coding: latin-1 -*-
+
+"""
+    This script allows to create additional tables and graphs from the output files of RhizoDep. It is especially useful
+    for displaying the outputs as a function of soil depth.
+
+    :copyright: see AUTHORS.
+    :license: see LICENSE for details.
+"""
+
 import os
 import pandas as pd
 import numpy as np
@@ -6,6 +16,7 @@ from math import exp, trunc
 from matplotlib.ticker import StrMethodFormatter
 import matplotlib.font_manager as font_manager
 
+# This line resets the default parameters of Matplotlib:
 plt.rcdefaults()
 
 # Transforming dataset:
@@ -15,9 +26,25 @@ def treating_z_dataframe(directory='outputs',
                          plants_per_m2=35,
                          input_treatment=False):
 
-    # Then we read the file and copy it in a dataframe "df":
+    """
+    This function allows to create new csv files showing how different variables can be summarized according to time
+    (day number) and soil depth.
+    :param directory: the main directory to read the output file and save new files
+    :param z_min: the soil depth from which we start to integrate (in meters)
+    :param z_max: the soil depth at which to stop intergrating (in meters)
+    :param z_interval: the thickness of each soil layer to consider within z_min and z_max (in meters)
+    :param plants_per_m2: the density of plants per square meter, when converting results per plant to results per m2 of soil
+    :param input_treatment: if True, additional calculations are performed on the initial outputs (e.g. conversion per m2 of soil)
+    :return: different new csv files
+    """
+
+    # We read the file and copy it in a dataframe "df":
     input_file_path=os.path.join(directory, 'z_classification.csv')
-    df = pd.read_csv(input_file_path, sep=',', header=0)
+    try:
+        df = pd.read_csv(input_file_path, sep=',', header=0)
+    except:
+        print("ERROR: the file", input_file_path,"cannot be accessed!")
+        return
 
     # We will use a function that gives a list containing the useful names of the variables with each z range:
     def grouping_z_columns_by_property(property):
@@ -37,11 +64,12 @@ def treating_z_dataframe(directory='outputs',
             list.append(name_values_z)
         return list
 
-    # We create a new variable containing the number of the current day:
+    # We create a new variable from the column of time in day, containing only the number of the current day:
     df['day_number'] = np.trunc(df['time_in_days'])
 
+    # If required, we calculate net inputs from cumulated values of root structural mass and necromass:
     if input_treatment:
-        # Calculating net inputs from cumulated values:!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # Calculating net inputs from cumulated values:
         for name in grouping_z_columns_by_property("struct_mass"):
             new_name = "net_" + name
             # We create a new "net" column that will contain the net production of struct_mass for a given z-range:
@@ -155,30 +183,48 @@ def treating_z_dataframe(directory='outputs',
 
     return
 
-
 # Creating a bar plot:
 # ---------------------
-def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=0, value_max=40, value_step=10,
+def making_a_bar_graph(categories, values, stacked_barplot=False,
+                       value_min=0, value_max=40, value_step=10,
                        log=False, title="",
                        format_x='%.2E', label=None, color=None):
 
-    # Default values
+    """
+    This function allows to plot a standard horizontal bar graph, with various options.
+    :param categories: the name of the categories to compare on the graph
+    :param values: the absolute values to be displayed among categories
+    :param stacked_barplot: if True, values from different categories will be piled on the top of each other
+    :param value_min: minimal value on the horizontal axis
+    :param value_max: maximal value on the horizontal axis
+    :param value_step: interval of values to be displayed on the horizontal axis
+    :param log: if True, a log-scale will be used
+    :param title: title of the horizontal axis
+    :param format_x: the format of number to be displayed on the horizontal axis
+    :param label: name of the categories to be displayed
+    :param color: a list of color names corresponding to the categories
+    :return:
+    """
+
+    # We define default values:
     if label is None:
         label = [""]
     if color is None:
         color = ["blue", "green"]
 
-    fig, ax = plt.subplots(figsize=(12, 12))  # Create the figure
+    # We create the actual frame of the plot:
+    fig, ax = plt.subplots(figsize=(12, 12))
     # fig.subplots_adjust(left=0.115, right=0.88)
     y_pos = np.arange(len(categories))
     values = np.array(values)
     values_cum = values.cumsum(axis=1)
 
+    # If the plot is to be stacked:
     if stacked_barplot:
 
         y = 0
         # Stacked horizontal bar plot:
-        # ---------------------
+        # ----------------------------
         for x in range(0, len(values[0, :])):
             # legend_name= label[x]
             # y += values[:, x]
@@ -214,7 +260,7 @@ def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=0, v
     else:
 
         # Horizontal bar plot:
-        # ---------------------
+        # --------------------
         # ax.barh(y_pos, values, 0.3, align='center', color='green')
         ax.barh(y_pos, values, log=log, align='center', color=color[0], height=1)
         ax.set_yticks(y_pos)
@@ -240,8 +286,8 @@ def making_a_bar_graph(categories, values, stacked_barplot=False, value_min=0, v
     return
 
 
-# Plotting several graphs:
-# -------------------------
+# Plotting the evolution of a property across soil depth:
+# -------------------------------------------------------
 def plotting_on_z(input_file_path='z_classification.csv',
                   property='hexose_exudation',
                   title="",
@@ -254,7 +300,25 @@ def plotting_on_z(input_file_path='z_classification.csv',
                   outputs_path='outputs'
                   ):
 
-    # Default value
+    """
+    This function allows to plot a bar graph showing the evolution of a property (horizontal axis) over soil depth
+    (vertical axis).
+    :param input_file_path: name or path of the file where the classification of the property over soil depth is written
+    :param property: the name of the property to be displayed on the graph
+    :param title: the title of the horizontal axis
+    :param color: the name of the color of the bars
+    :param z_min: minimal soil depth to show (m)
+    :param z_max: maximal soil depth to show (m)
+    :param z_interval: soil layer thickness (m)
+    :param value_min: minimal value of the horizontal axis
+    :param value_max: maximal value of the horizontal axis
+    :param log: if True, a log-scale will be used on the horizontal axis
+    :param recording_images: if True, the plot will be recorded as an image
+    :param outputs_path: path of the directory containg the new plots
+    :return:
+    """
+
+    # We define the default color:
     if color is None:
         color = ['green']
 
@@ -316,8 +380,8 @@ def plotting_on_z(input_file_path='z_classification.csv',
     return
 
 
-# Plotting several graphs:
-# -------------------------
+# Plotting the evolution of a property across soil depth:
+# -------------------------------------------------------
 def plotting_on_z_stacked(input_file_path='z_classification.csv',
                           property=None,
                           label=None,
@@ -333,7 +397,29 @@ def plotting_on_z_stacked(input_file_path='z_classification.csv',
                           outputs_path='outputs'
                           ):
 
-    # Default values
+    """
+    This function allows to plot a stacked bar graph showing the evolution of different properties stacked together
+    (horizontal axis) over soil depth (vertical axis).
+    :param input_file_path: name or path of the file where the classification of the property over soil depth is written
+    :param property: the name of the property to be displayed on the graph
+    :param title: the title of the horizontal axis
+    :param color: the name of the color of the bars
+    :param z_min: minimal soil depth to show (m)
+    :param z_max: maximal soil depth to show (m)
+    :param z_interval: soil layer thickness (m)
+    :param z_offset: possible offset of soil depth to consider (e.g. if the base of the plant is not located at z = 0 m)
+    :param starting_at_0: if True, the function will use the offset to reposition the base of the root system at z = 0 m
+    :param value_min: minimal value of the horizontal axis
+    :param value_max: maximal value of the horizontal axis
+    :param value_step: interval of values to be shown on the horizontal axis
+    :param format_x: number format to be used on the horizontal axis
+    :param log: if True, a log-scale will be used on the horizontal axis
+    :param recording_images: if True, the plot will be recorded as an image
+    :param outputs_path: path of the directory containg the new plots
+    :return:
+    """
+
+    # We specify default values for color, label and property if they have not been given:
     if color is None:
         color = ['blue', 'green']
     if label is None:
@@ -417,146 +503,149 @@ def plotting_on_z_stacked(input_file_path='z_classification.csv',
 ########################################################################################################################
 ########################################################################################################################
 
-# ACTUAL COMPUTING:
-###################
+# MAIN PROGRAM:
+###############
 
-# Plotting the evolution of one rate over time:
-# ----------------------------------------------
-# treating_z_dataframe(file_name='z_classification.csv')
-# plotting_on_z(file_name='z_classification_sum_by_day.csv',
-#               property='net_hexose_exudation',
-#               title= "Net hexose exudation (mol of hexose per day)",
-#               color='royalblue',
-#               value_min=0, value_max=1e-5,
-#               z_min=0.00, z_max=1., z_interval=0.05,
-#               log=False)
+if __name__ == '__main__':
+    # (Note: this condition avoids launching automatically the program when imported in another file)
+
+    # Plotting the evolution of one rate over time:
+    # ----------------------------------------------
+    # treating_z_dataframe(file_name='z_classification.csv')
+    # plotting_on_z(file_name='z_classification_sum_by_day.csv',
+    #               property='net_hexose_exudation',
+    #               title= "Net hexose exudation (mol of hexose per day)",
+    #               color='royalblue',
+    #               value_min=0, value_max=1e-5,
+    #               z_min=0.00, z_max=1., z_interval=0.05,
+    #               log=False)
 
 
-# # For creating plots of net inputs over time:
-# #---------------------------------------------
-# treating_z_dataframe(file_name='z_classification.csv',
-#                      z_min=0., z_max=1., z_interval=0.05,
-#                      plants_per_m2=35,
-#                      input_treatment=True)
-# plotting_on_z_stacked(file_name='z_classification_input_by_day.csv',
-#                       property=['net_hexose_exudation', 'net_root_necromass'],
-#                       label = ['Exudates', 'Dead roots'],
-#                       color=['royalblue', 'darkkhaki'],
-#                       title="\n Net root-derived C inputs (gC m-2 day-1) per 5-cm layer",
-#                       z_min=0., z_max=1., z_interval=0.05,
-#                       value_min=0,
-#                       value_max=0.02,
-#                       log=False,
-#                       recording_images=True
-#                       )
+    # # For creating plots of net inputs over time:
+    # #---------------------------------------------
+    # treating_z_dataframe(file_name='z_classification.csv',
+    #                      z_min=0., z_max=1., z_interval=0.05,
+    #                      plants_per_m2=35,
+    #                      input_treatment=True)
+    # plotting_on_z_stacked(file_name='z_classification_input_by_day.csv',
+    #                       property=['net_hexose_exudation', 'net_root_necromass'],
+    #                       label = ['Exudates', 'Dead roots'],
+    #                       color=['royalblue', 'darkkhaki'],
+    #                       title="\n Net root-derived C inputs (gC m-2 day-1) per 5-cm layer",
+    #                       z_min=0., z_max=1., z_interval=0.05,
+    #                       value_min=0,
+    #                       value_max=0.02,
+    #                       log=False,
+    #                       recording_images=True
+    #                       )
 
-# # For creating plots of root surface over time:
-# #----------------------------------------------
-# treating_z_dataframe(file_name='z_classification.csv',
-#                      z_min=0., z_max=1., z_interval=0.05,
-#                      plants_per_m2=350,
-#                      input_treatment=True)
-# plotting_on_z_stacked(file_name='z_classification_max_by_day.csv',
-#                       property=['surface'],
-#                       label = ['Root surface'],
-#                       color=['brown'],
-#                       title="\n Root surface (m-2) produced over time per 5-cm layer",
-#                       z_min=0., z_max=1, z_interval=0.05,
-#                       value_min=0,
-#                       value_max=0.005,
-#                       format_x='%.3f',
-#                       log=False,
-#                       recording_images=True
-#                       )
+    # # For creating plots of root surface over time:
+    # #----------------------------------------------
+    # treating_z_dataframe(file_name='z_classification.csv',
+    #                      z_min=0., z_max=1., z_interval=0.05,
+    #                      plants_per_m2=350,
+    #                      input_treatment=True)
+    # plotting_on_z_stacked(file_name='z_classification_max_by_day.csv',
+    #                       property=['surface'],
+    #                       label = ['Root surface'],
+    #                       color=['brown'],
+    #                       title="\n Root surface (m-2) produced over time per 5-cm layer",
+    #                       z_min=0., z_max=1, z_interval=0.05,
+    #                       value_min=0,
+    #                       value_max=0.005,
+    #                       format_x='%.3f',
+    #                       log=False,
+    #                       recording_images=True
+    #                       )
 
-# For creating plots of cumulated inputs over time:
-# -------------------------------------------------
+    # For creating plots of cumulated inputs over time:
+    # -------------------------------------------------
 
-targeted_path=os.path.join('C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185')
+    targeted_path=os.path.join('C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185')
 
-# treating_z_dataframe(directory=targeted_path,
-#                      z_min=0., z_max=0.5, z_interval=0.05,
-#                      plants_per_m2=240,
-#                      input_treatment=True)
-plotting_on_z_stacked(input_file_path=os.path.join(targeted_path,'z_classification_cum_input_by_day.csv'),
-                      property=['cum_total_net_rhizodeposition', 'cum_net_root_necromass'],
-                      label=['Rhizodeposits', 'Dead roots'],
-                      color=['royalblue', 'darkkhaki'],
-                      title="\n Cumulative root-derived C inputs to soil \n (gC per square meter per 5-cm layer)",
-                      z_min=0., z_max=0.5, z_interval=0.05,
-                      # WATCH OUT: below we consider an offset of 10 cm!
-                      z_offset = -0.1, starting_at_0 = True,
-                      value_min=0,
-                      value_max=40,
-                      value_step=10,
-                      # format_x='%.2E', # Scientific notation (see: https://realpython.com/python-string-formatting/)
-                      # format_x='%.2f', # Floating point
-                      format_x='%i', # Integer
-                      log=False,
-                      recording_images=True,
-                      outputs_path=targeted_path
-                      )
+    # treating_z_dataframe(directory=targeted_path,
+    #                      z_min=0., z_max=0.5, z_interval=0.05,
+    #                      plants_per_m2=240,
+    #                      input_treatment=True)
+    plotting_on_z_stacked(input_file_path=os.path.join(targeted_path,'z_classification_cum_input_by_day.csv'),
+                          property=['cum_total_net_rhizodeposition', 'cum_net_root_necromass'],
+                          label=['Rhizodeposits', 'Dead roots'],
+                          color=['royalblue', 'darkkhaki'],
+                          title="\n Cumulative root-derived C inputs to soil \n (gC per square meter per 5-cm layer)",
+                          z_min=0., z_max=0.5, z_interval=0.05,
+                          # WATCH OUT: below we consider an offset of 10 cm!
+                          z_offset = -0.1, starting_at_0 = True,
+                          value_min=0,
+                          value_max=40,
+                          value_step=10,
+                          # format_x='%.2E', # Scientific notation (see: https://realpython.com/python-string-formatting/)
+                          # format_x='%.2f', # Floating point
+                          format_x='%i', # Integer
+                          log=False,
+                          recording_images=True,
+                          outputs_path=targeted_path
+                          )
 
-# # For creating plots of cumulated inputs over time for a list of scenarios:
-# # -------------------------------------------------------------------------
-# scenario_numbers=[1]
-# for i in scenario_numbers:
-#
-#     scenario_name = 'Scenario_%.4d' % i
-#     targeted_path=os.path.join('outputs', scenario_name)
-#
-#     treating_z_dataframe(directory=targeted_path,
-#                          z_min=0., z_max=0.5, z_interval=0.05,
-#                          plants_per_m2=240,
-#                          input_treatment=True)
-#     plotting_on_z_stacked(input_file_path=os.path.join(targeted_path,'z_classification_cum_input_by_day.csv'),
-#                           property=['cum_total_rhizodeposition', 'cum_net_root_necromass'],
-#                           label=['Rhizodeposits', 'Dead roots'],
-#                           color=['royalblue', 'darkkhaki'],
-#                           title="\n Cumulated root-derived C inputs (gC m-2) per 5-cm layer",
-#                           z_min=0., z_max=0.5, z_interval=0.05,
-#                           value_min=0,
-#                           value_max=1.,
-#                           log=False,
-#                           recording_images=True,
-#                           outputs_path=targeted_path
-#                           )
+    # # For creating plots of cumulated inputs over time for a list of scenarios:
+    # # -------------------------------------------------------------------------
+    # scenario_numbers=[1]
+    # for i in scenario_numbers:
+    #
+    #     scenario_name = 'Scenario_%.4d' % i
+    #     targeted_path=os.path.join('outputs', scenario_name)
+    #
+    #     treating_z_dataframe(directory=targeted_path,
+    #                          z_min=0., z_max=0.5, z_interval=0.05,
+    #                          plants_per_m2=240,
+    #                          input_treatment=True)
+    #     plotting_on_z_stacked(input_file_path=os.path.join(targeted_path,'z_classification_cum_input_by_day.csv'),
+    #                           property=['cum_total_rhizodeposition', 'cum_net_root_necromass'],
+    #                           label=['Rhizodeposits', 'Dead roots'],
+    #                           color=['royalblue', 'darkkhaki'],
+    #                           title="\n Cumulated root-derived C inputs (gC m-2) per 5-cm layer",
+    #                           z_min=0., z_max=0.5, z_interval=0.05,
+    #                           value_min=0,
+    #                           value_max=1.,
+    #                           log=False,
+    #                           recording_images=True,
+    #                           outputs_path=targeted_path
+    #                           )
 
-# # For plotting the SOM pools over time:
-# # --------------------------------------
-# treating_z_dataframe(file_name='SOM_dynamics_by_z_RAPE_50_without_priming.csv')
-# plotting_on_z_stacked(file_name='z_classification_max_by_day.csv',
-#                       property=['exudates','dead_roots','POM','MAOM'],
-#                       # property=['POM','MAOM'],
-#                       label = ['Exudates','Dead roots','POM','MAOM'],
-#                       # label=['POM','MAOM'],
-#                       color=['royalblue', 'darkkhaki', 'gold','saddlebrown'],
-#                       # color=['royalblue', 'brown'],
-#                       title="Soil organic C (gC m-2) per 5-cm layer",
-#                       z_min=0., z_max=1., z_interval=0.05,
-#                       value_min=0,
-#                       value_max=10,
-#                       log=False,
-#                       recording_images=True
-#                       )
+    # # For plotting the SOM pools over time:
+    # # --------------------------------------
+    # treating_z_dataframe(file_name='SOM_dynamics_by_z_RAPE_50_without_priming.csv')
+    # plotting_on_z_stacked(file_name='z_classification_max_by_day.csv',
+    #                       property=['exudates','dead_roots','POM','MAOM'],
+    #                       # property=['POM','MAOM'],
+    #                       label = ['Exudates','Dead roots','POM','MAOM'],
+    #                       # label=['POM','MAOM'],
+    #                       color=['royalblue', 'darkkhaki', 'gold','saddlebrown'],
+    #                       # color=['royalblue', 'brown'],
+    #                       title="Soil organic C (gC m-2) per 5-cm layer",
+    #                       z_min=0., z_max=1., z_interval=0.05,
+    #                       value_min=0,
+    #                       value_max=10,
+    #                       log=False,
+    #                       recording_images=True
+    #                       )
 
-# Plotting the accumulation over time:
-# -------------------------------------
+    # Plotting the accumulation over time:
+    # -------------------------------------
 
-# # Exudation:
-# plotting_on_z(file_name='z_classification_cum.csv',
-#               property='cum_net_hexose_exudation',
-#               title= "Cumulated net hexose exudation (mol of hexose)",
-#               color='green',
-#               value_min=0, value_max=1e-3,
-#               z_min=0.00, z_max=1., z_interval=0.05,
-#               log=False)
-#
-# # Root biomass:
-# plotting_on_z(file_name='z_classification_cum.csv',
-#               property='struct_mass',
-#               title= "Root biomass (g)",
-#               color='brown',
-#               value_min=0, value_max=1e-1,
-#               z_min=0.00, z_max=1., z_interval=0.05,
-#               log=False)
+    # # Exudation:
+    # plotting_on_z(file_name='z_classification_cum.csv',
+    #               property='cum_net_hexose_exudation',
+    #               title= "Cumulated net hexose exudation (mol of hexose)",
+    #               color='green',
+    #               value_min=0, value_max=1e-3,
+    #               z_min=0.00, z_max=1., z_interval=0.05,
+    #               log=False)
+    #
+    # # Root biomass:
+    # plotting_on_z(file_name='z_classification_cum.csv',
+    #               property='struct_mass',
+    #               title= "Root biomass (g)",
+    #               color='brown',
+    #               value_min=0, value_max=1e-1,
+    #               z_min=0.00, z_max=1., z_interval=0.05,
+    #               log=False)

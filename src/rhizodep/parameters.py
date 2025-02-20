@@ -1,17 +1,16 @@
 #  -*- coding: utf-8 -*-
 
 """
-    rhizodep.parameters
-    ~~~~~~~~~~~~~~~~~~~~~~
+    This script contains all RhizoDep parameters with their default values.
 
-    The module :mod:`rhizodep.parameters` defines the constant parameters of the model.
-
+    :copyright: see AUTHORS.
+    :license: see LICENSE for details.
 """
 
 from math import pi
 
-# We set the random seed, so that the same scenarios can be repeted with the same seed:
-random_choice = 8
+# Fixing the random seed for reproducing the same random trends:
+random_choice = 1
 
 #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # ArchiSimple parameters for root growth:
@@ -471,7 +470,7 @@ gamma_secretion = 1
 # Maximal surfacic concentration of mucilage at the soil-root interface, above which no mucilage secretion is possible:
 #----------------------------------------------------------------------------------------------------------------------
 # (in mol of equivalent-hexose per m2 of external surface):
-Cs_mucilage_soil_max = 10. # TODO: do a real estimation!
+Cs_mucilage_soil_max = 10.
 
 #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Parameters for root cells release:
@@ -499,7 +498,7 @@ surfacic_cells_release_rate_C = 1
 # Maximal surfacic concentration of root cells in soil, above which no release of cells is possible
 #--------------------------------------------------------------------------------------------------
 # (in mol of equivalent-hexose per m2 of root external surface):
-Cs_cells_soil_max = 10 # TODO: do a real estimation!
+Cs_cells_soil_max = 10
 
 #xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Parameters for soil degradation of root-released materials:
@@ -665,10 +664,9 @@ exodermis_c = 1.11 / (60.*60.*24.) # This parameter reflects the slope of the in
 max_thermal_time_since_endodermis_disruption = 6 * 60. * 60. # We assume that after 6h, no disruption is observed anymore!
 max_thermal_time_since_exodermis_disruption = 48 * 60. * 60. # We assume that after 48h, no disruption is observed anymore!
 
-########################################################################################################################
-
-# FOR MYCORRHIZAL FUNGI
-#######################
+#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# Parameters for mycorrhizal interactions:
+#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # Hyphal tissue density (in gram of structural mass per cubic meter):
 #------------------------------------------------------------------

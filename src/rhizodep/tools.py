@@ -1,10 +1,7 @@
 #  -*- coding: utf-8 -*-
 
 """
-    rhizodep.tools
-    ~~~~~~~~~~~~~
-
-    The module :mod:`rhizodep.tools` defines useful functions for data preprocessing, graph making...
+    The script 'tools' contains useful functions for data processing or graph making.
 
     :copyright: see AUTHORS.
     :license: see LICENSE for details.
@@ -453,7 +450,6 @@ def circle_coordinates(x_center=0., y_center=0., z_center=0., radius=1., n_point
 
 
 def plot_mtg(g,
-             # scene, scene_for_hairs, scene_for_fungus,
              prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-12, vmax=3e-7,
              root_hairs_display=True,
              mycorrhizal_fungus_display=True,
