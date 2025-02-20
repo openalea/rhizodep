@@ -5,10 +5,11 @@
 [![Anaconda-Server Badge](https://anaconda.org/openalea3/openalea.rhizodep/badges/platforms.svg)](https://anaconda.org/openalea3/openalea.rhizodep)
 [![Anaconda-Server Badge](https://anaconda.org/openalea3/openalea.rhizodep/badges/license.svg)](https://anaconda.org/openalea3/openalea.rhizodep)
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14900673.svg)](https://doi.org/10.5281/zenodo.14900673)
+
 # OpenAlea.RhizoDep : a Functional-Structural Root Model to simulate rhizodeposition
 
-**Authors:** Frederic Rees, Tristan Gerault, Marion Gauthier, Christophe Pradal
-
+**Authors:** Frederic Rees, Tristan Gerault, Marion Gauthier, Christophe Pradal3
 **Licence:** [CeCILL-C](http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html)  
 
 **Status:** An OpenAlea Python package
