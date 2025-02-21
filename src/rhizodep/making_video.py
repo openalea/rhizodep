@@ -11,15 +11,9 @@
 import imageio
 from PIL import Image, ImageDraw, ImageFont
 import os
-import numpy as np
-# from pygifsicle import optimize
-from openalea.mtg.plantframe import color
 from path import Path
-from math import floor, ceil, trunc, log10
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-
-from rhizodep.tools import colorbar, sci_notation
+from math import floor
+from rhizodep.tools import colorbar
 
 ########################################################################################################################
 
@@ -248,7 +242,7 @@ def resizing_and_film_making(outputs_path='outputs',
 
     return
 
-# Definition of a function that can create a similar movie for different scenarios' outputs
+# Definition of a function that can create a similar movie for different tutorial' outputs
 #-------------------------------------------------------------------------------------------
 def resizing_and_film_making_for_scenarios(general_outputs_folder='outputs',
                                            images_folder="root_images",
@@ -267,11 +261,11 @@ def resizing_and_film_making_for_scenarios(general_outputs_folder='outputs',
                                            ):
 
     """
-    This function creates the same type of movie in symetric outputs generated from different scenarios.
-    :param general_outputs_folder: the path of the general foleder, in which respective output folders from different scenarios have been recorded
+    This function creates the same type of movie in symetric outputs generated from different tutorial.
+    :param general_outputs_folder: the path of the general foleder, in which respective output folders from different tutorial have been recorded
     :param images_folder: the name of the images folder in each scenario
     :param resized_images_folder: the image of the transformed images folder in each scenario
-    :param scenario_numbers: a list of numbers corresponding to the different scenarios to consider
+    :param scenario_numbers: a list of numbers corresponding to the different tutorial to consider
     :[other parameters]: [cf the parameters from the function 'resizing_and_film_making']
     """
 
@@ -449,7 +443,7 @@ if __name__ == "__main__":
     #                          time_step_in_days=1. / 24., sampling_frequency=1, fps=6,
     #                          title="")
 
-    # # Creating a new movie from root systems for a set of scenarios:
+    # # Creating a new movie from root systems for a set of tutorial:
     # ################################################################
     # resizing_and_film_making_for_scenarios(general_outputs_folder='outputs',
     #                                        images_folder="root_images",
@@ -482,7 +476,7 @@ if __name__ == "__main__":
     #                          time_step_in_days=1., sampling_frequency=1, fps=12,
     #                          title="")
 
-    # # Creating a new movie from z-barplots for a set of scenarios:
+    # # Creating a new movie from z-barplots for a set of tutorial:
     # ##############################################################
     # resizing_and_film_making_for_scenarios(general_outputs_folder='outputs',
     #                                        images_folder="z_barplots",

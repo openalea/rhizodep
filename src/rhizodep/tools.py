@@ -58,7 +58,7 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
             previous_file = pd.read_csv(PATH2, sep=',', header=0)
 
             if len(previous_file['step_number']) == n_steps:
-                print("There is already an 'input_file.csv' of proper length for this scenarios, "
+                print("There is already an 'input_file.csv' of proper length for this tutorial, "
                       "we therefore did not create a new input file here (if you wish to do so, please select 'do_not_execute_if_file_with_suitable_size_exists=False').")
                 return previous_file
 
@@ -90,7 +90,7 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
             # For each line of the data frame that contains information on sucrose input:
             for i in range(0, len(df['time_in_days'])):
 
-                # If the current cumulated time is below the time step of the main scenarios:
+                # If the current cumulated time is below the time step of the main tutorial:
                 if (cumulated_time_in_days + original_time_step_in_days) < 0.9999 * final_time_step_in_days:
                     # Then the amount of time elapsed here is the initial time step:
                     net_elapsed_time_in_days = original_time_step_in_days
@@ -156,7 +156,7 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
             # For each line of the final table:
             for j in range(0, n_steps):
 
-                # If the current cumulated time is below the time step of the main scenarios:
+                # If the current cumulated time is below the time step of the main tutorial:
                 if cumulated_time_in_days + final_time_step_in_days < 0.9999 * original_time_step_in_days:
                     # Then the amount of time elapsed here is the initial time step:
                     net_elapsed_time_in_days = final_time_step_in_days

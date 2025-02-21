@@ -13,7 +13,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from math import exp, trunc
-from matplotlib.ticker import StrMethodFormatter
 import matplotlib.font_manager as font_manager
 
 # This line resets the default parameters of Matplotlib:
@@ -586,7 +585,7 @@ if __name__ == '__main__':
                           outputs_path=targeted_path
                           )
 
-    # # For creating plots of cumulated inputs over time for a list of scenarios:
+    # # For creating plots of cumulated inputs over time for a list of tutorial:
     # # -------------------------------------------------------------------------
     # scenario_numbers=[1]
     # for i in scenario_numbers:

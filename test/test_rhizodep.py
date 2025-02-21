@@ -12,14 +12,14 @@ import numpy as np
 import pandas as pd
 import os
 from rhizodep.model import initiate_mtg
-from rhizodep.run_simulation import main_simulation
-from rhizodep.scenarios.running_scenarios import run_one_scenario
+from rhizodep.running_simulation import main_simulation
+from tutorial.running_scenarios import run_one_scenario
 
 ########################################################################################################################
 # DEFINING INPUT/OUTPUT FOLDERS AND SPECIFIC PARAMETERS FOR THE TEST:
 ########################################################################################################################
 
-# Defining the tolerance when comparing the results of the scenarios with the expected results:
+# Defining the tolerance when comparing the results of the tutorial with the expected results:
 PRECISION = 6
 RELATIVE_TOLERANCE = 10 ** -PRECISION
 ABSOLUTE_TOLERANCE = RELATIVE_TOLERANCE
@@ -28,17 +28,17 @@ ABSOLUTE_TOLERANCE = RELATIVE_TOLERANCE
 # DEFINING THE FUNCTIONS
 ########################################################################################################################
 
-# Function for comparing the results of the scenarios with the expected results:
+# Function for comparing the results of the tutorial with the expected results:
 #--------------------------------------------------------------------------------
 def compare_actual_to_desired(desired_data_path, actual_data_path, overwrite_desired_data=False):
     """
-    Function that compares the actual scenarios results to desired scenarios results.
+    Function that compares the actual tutorial results to desired tutorial results.
     An exception is raised if the actual results do not matched the desired ones.
 
-    :param str data_dirpath: The directory path were the scenarios results are stored.
-    :param str desired_data_filename: The filename of the desired scenarios results.
-    :param str actual_data_filename: The filename of the actual scenarios results.
-    :param bool overwrite_desired_data: If True, the desired scenarios results are overwritten by the actual scenarios results.
+    :param str data_dirpath: The directory path were the tutorial results are stored.
+    :param str desired_data_filename: The filename of the desired tutorial results.
+    :param str actual_data_filename: The filename of the actual tutorial results.
+    :param bool overwrite_desired_data: If True, the desired tutorial results are overwritten by the actual tutorial results.
     """
     # We read the desired results:
     desired_data_df = pd.read_csv(desired_data_path)
@@ -69,19 +69,19 @@ def compare_actual_to_desired(desired_data_path, actual_data_path, overwrite_des
 
     return
 
-# Function for running the test scenarios:
+# Function for running the test tutorial:
 #------------------------------------------
 def run_reference_simulation(run_test_scenario=True, scenario_ID=1,
                              outputs_path='outputs',
                              ArchiSimple_results_file = "simulation_results_test_1.csv",
                              images_path='root_images', MTG_path='MTG_files', MTG_properties_path='MTG_properties'):
     """
-    This function performs the actual scenarios for the test, either using the default value of parameters with an
+    This function performs the actual tutorial for the test, either using the default value of parameters with an
     input file, or following the instructions of a test scenario read from an Excel file.
     :param bool run_test_scenario: if True, the test is based on the instructions from 'scenario_test.xlsx'
     """
 
-    # We launch the main scenarios program:
+    # We launch the main tutorial program:
     print("Simulation starts ...")
 
     if run_test_scenario:
@@ -98,7 +98,7 @@ def run_reference_simulation(run_test_scenario=True, scenario_ID=1,
         OUTPUTS_DIRPATH = 'outputs'
         # We initiate the properties of the MTG "g":
         g = initiate_mtg(random=True)
-        # We run the scenarios by specifying here the input conditions and the duration:
+        # We run the tutorial by specifying here the input conditions and the duration:
         main_simulation(g, simulation_period_in_days=5., time_step_in_days=1./24.,
                         radial_growth="Possible", ArchiSimple=True, ArchiSimple_C_fraction=0.10,
                         outputs_directory=outputs_path,
@@ -132,9 +132,9 @@ def test_run(overwrite_desired_data=False, run_test_scenario=True, scenario_ID=1
              reference_path='reference', reference_file='desired_simulation_results.csv',
              outputs_path='outputs', results_file='simulation_results.csv'):
     """
-    This function performs a test that compares the results of a reference scenarios of RhizoDep to the desired,
-    expected scenarios results. An exception is raised if the actual results do not matched the desired ones.
-    :param bool overwrite_desired_data: If True, the desired scenarios results are overwritten by the actual scenarios results.
+    This function performs a test that compares the results of a reference tutorial of RhizoDep to the desired,
+    expected tutorial results. An exception is raised if the actual results do not matched the desired ones.
+    :param bool overwrite_desired_data: If True, the desired tutorial results are overwritten by the actual tutorial results.
     """
 
     # 1. Organizing the files and the folders:
@@ -180,10 +180,10 @@ def test_run(overwrite_desired_data=False, run_test_scenario=True, scenario_ID=1
             for file in files:
                 os.remove(os.path.join(root, file))
 
-    # 2. Running the new scenarios:
+    # 2. Running the new tutorial:
     #-------------------------------
 
-    # We run the reference scenarios:
+    # We run the reference tutorial:
     run_reference_simulation(run_test_scenario=run_test_scenario, scenario_ID=scenario_ID,
                              outputs_path=outputs_path, ArchiSimple_results_file = "simulation_results_test_1.csv",
                              images_path=IMAGES_DIRPATH, MTG_path=MTG_DIRPATH, MTG_properties_path=MTG_PROP_DIRPATH)

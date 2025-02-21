@@ -115,26 +115,6 @@ def showing_image(image_name="text.png",
     # Viewer.display(shape)
     return shape
 
-# Function positionning some margins:
-#------------------------------------
-def add_margin(image, top, right, bottom, left, color):
-    """
-    This function adds some margins around a specific image.
-    :param image: the image object to which margins are added
-    :param top: width of the top margin
-    :param right: width of the right margin
-    :param bottom: width of the bottom margin
-    :param left: width of the left margin
-    :param color: color of the margins
-    :return:
-    """
-    width, height = image.size
-    new_width = width + right + left
-    new_height = height + top + bottom
-    result = Image.new(image.mode, (new_width, new_height), color)
-    result.paste(image, (left, top))
-    return result
-
 ########################################################################################################################
 # DEFINING FUNCTIONS FOR COMPUTING THE DISTRUBUTION OF PROPERTIES ALONG SOIL DEPTH
 ########################################################################################################################

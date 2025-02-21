@@ -23,7 +23,7 @@ import pickle
 
 # TODO: explicitly add 'surfaces_and_volumes()' in the sequence of modelling!
 
-# We define the main scenarios program:
+# We define the main tutorial program:
 def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     radial_growth=False, ArchiSimple=False, ArchiSimple_C_fraction=0.10,
                     simple_growth_duration=True,
@@ -68,16 +68,16 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     background_color = [0,0,0]):
 
     """
-    This general function controls the actual scenarios of root growth and C fluxes over the whole scenarios period.
+    This general function controls the actual tutorial of root growth and C fluxes over the whole tutorial period.
     :param g: the root MTG to consider
-    :param simulation_period_in_days: the length of the scenarios period (days)
-    :param time_step_in_days: the regular time step over the scenarios (days)
+    :param simulation_period_in_days: the length of the tutorial period (days)
+    :param time_step_in_days: the regular time step over the tutorial (days)
     :param radial_growth: if True, radial growth will be enabled
     :param ArchiSimple: if True, only original ArchiSimple rules will be used, without C fluxes
     :param ArchiSimple_C_fraction: in case of ArchiSimple only, this fraction is used to determine the fraction of the incoming C that us actually used to produce “root biomass”
     :param input_file: the path/name of the CSV file where inputs (sucrose and temperature) are read
     :param input_file_time_step_in_days: the time step used in the input file (days)
-    :param outputs_directory: the name of the folder where scenarios outputs will be registered
+    :param outputs_directory: the name of the folder where tutorial outputs will be registered
     :param forcing_constant_inputs: if True, input file will be ignored and a constant sucrose input rate and a constant soil temperature will be applied as inputs
     :param constant_sucrose_input_rate: input of sucrose applied at every time step (mol of sucrose per second per plant)
     :param constant_soil_temperature_in_Celsius: soil temperature applied to every root at every time step (degree Celsius)
@@ -87,7 +87,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     :param using_solver: if True, a solver will be used to compute C fluxes and concentrations
     :param printing_solver_outputs: if True, the intermediate calculations of the solver will be printed for each root element
     :param simulation_results_file: the name of the CSV file where outputs will be written
-    :param recording_interval_in_days: the time interval of distinct recordings of the current scenarios (useful for checking the outputs while the scenarios is still running)
+    :param recording_interval_in_days: the time interval of distinct recordings of the current tutorial (useful for checking the outputs while the tutorial is still running)
     :param recording_images: if True, every PlantGL graph will be recorded as an image
     :param root_images_directory: the name of the folder where root images will be registered
     :param z_classification: if True, root variables will be intercepted and summed within distinct z-layers of the soil
@@ -104,7 +104,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     :param g_properties_directory: the name of the folder where MTG properties are recorded
     :param random: if True, stochastic data will be simulated (e.g. variations of angles and diameters)
     :param plotting: if True, a PlantGL graph is generated and displayed at each time step
-    :param scenario_id: indicates the scenario identifier to which the current printing relates (useful when running different scenarios in parallel)
+    :param scenario_id: indicates the scenario identifier to which the current printing relates (useful when running different tutorial in parallel)
     :param displayed_property: name of the property to be displayed on the PlantGL graph
     :param displayed_vmin: the minimum value of the scale used to display the property in the PlantGL graph
     :param displayed_vmax: the maximum value of the scale used to display the property in the PlantGL graph
@@ -124,9 +124,9 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     # We convert the time step in seconds:
     time_step_in_seconds = time_step_in_days * 60. * 60. * 24.
-    # We calculate the number of steps necessary to reach the end of the scenarios period:
+    # We calculate the number of steps necessary to reach the end of the tutorial period:
     if simulation_period_in_days == 0. or time_step_in_days == 0.:
-        print("WATCH OUT: No scenarios was done, as time input was 0.")
+        print("WATCH OUT: No tutorial was done, as time input was 0.")
         n_steps = 0
     else:
         n_steps = trunc(simulation_period_in_days / time_step_in_days)
@@ -442,7 +442,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     # ------------------------------------------------------------------------------------------------------------------
     # We create an internal function for saving the sum properties, the MTG file and the z_classification_file (if any)
-    # over the course of the scenarios:
+    # over the course of the tutorial:
     def recording_attempt():
 
         # In any case, we record the MTG file:
@@ -857,7 +857,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                               "{:.2E}".format(Decimal(theoretical_current_C_in_the_system)), "mol of C")
                         print("This corresponds to a net disappearance of C of",
                               "{:.2E}".format(Decimal(theoretical_current_C_in_the_system - current_C_in_the_system)),
-                              "mol of C, and the cumulated difference since the start of the scenarios and the current one is",
+                              "mol of C, and the cumulated difference since the start of the tutorial and the current one is",
                               "{:.2E}".format(
                                   Decimal(theoretical_cumulated_C_in_the_system - current_C_in_the_system)),
                               "mol of C.")
@@ -965,15 +965,15 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
             # If the current iteration correspond to the time where one full time interval for recording has been reached:
             if step in recording_steps_list:
-                # Then we record the current scenarios results:
+                # Then we record the current tutorial results:
                 print("")
-                print("Recording the scenarios results obtained so far (until time t = {:.2f}".format(
+                print("Recording the tutorial results obtained so far (until time t = {:.2f}".format(
                     Decimal((step+1) * time_step_in_days)), "days)...")
                 recording_attempt()
 
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    # At the end of the scenarios (or just before an error is about to interrupt the program!):
+    # At the end of the tutorial (or just before an error is about to interrupt the program!):
     # -------------------------------------------------------------------------------------------
     finally:
         print("")

@@ -4688,7 +4688,7 @@ class Differential_Equation_System(object):
         # We keep this information in the "self":
         self.y_variables_mapping = y_mapping
 
-        # We create a time grid of the scenarios that will be used by the solver (NOTE: here it only contains 0 and the
+        # We create a time grid of the tutorial that will be used by the solver (NOTE: here it only contains 0 and the
         # final time at the end of the time step, but we could add more intermediate values):
         self.time_grid_in_seconds = np.array([0.0, self.time_step_in_seconds])
 
@@ -4734,7 +4734,7 @@ class Differential_Equation_System(object):
                 self.n.C_hexose_root = 0.
                 self.n.C_hexose_reserve = 0.
                 self.n.C_hexose_soil = 0.
-                # In the case the element did not emerge (i.e. its age is higher that the normal scenarios time step),
+                # In the case the element did not emerge (i.e. its age is higher that the normal tutorial time step),
                 # there must have been a problem:
                 if self.n.actual_time_since_emergence > param.time_step_in_days * (24. * 60. * 60.):
                     print("!!! For element", self.n.index(),
@@ -4755,7 +4755,7 @@ class Differential_Equation_System(object):
             # growth is finished and sucrose is supplied there!
             self.n.Cs_mucilage_soil = 0.
             self.n.Cs_cells_soil = 0.
-            # In the case the element did not emerge (i.e. its age is higher that the normal scenarios time step),
+            # In the case the element did not emerge (i.e. its age is higher that the normal tutorial time step),
             # there must have been a problem:
             if self.n.actual_time_since_emergence > param.time_step_in_days * (24. * 60. * 60.):
                 print("!!! For element", self.n.index(),
