@@ -234,8 +234,8 @@ def _buildDic(keyList, val, dic):
 
 def buildDic(dict_scenario, dic=None):
     """
-    Function that build a nested dictionary (dict of dict), which is used in simulations/scenario_parameters/main_one_scenario.py
-    e.g. buildDic({'a:b:c': 1, 'a:b:d': 2}) returns {'a': {'b': {'c': 1, 'd': 2}}}
+    Function that build a nested dictionary (dict of dict), e.g. buildDic({'a:b:c': 1, 'a:b:d': 2})
+    returns {'a': {'b': {'c': 1, 'd': 2}}}
     """
     if not dic:
         dic = {}
