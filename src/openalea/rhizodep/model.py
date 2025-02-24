@@ -1,17 +1,12 @@
 #  -*- coding: utf-8 -*-
 
 """
-    rhizodep.model
-    ~~~~~~~~~~~~~
-
-    The module :mod:`rhizodep.model` defines the equations of root functioning.
+    This script 'model' contains all functions necessary for running the model RhizoDep.
 
     :copyright: see AUTHORS.
     :license: see LICENSE for details.
 """
 
-# TODO: Check again whether concentrations relate to living or dead root mass or surface (e.g. with root hairs!)
-# TODO: Check the calculation of "Structural mass produced (g)"
 # TODO: Update ArchiSimple option (e.g. with the new way to represent Seminal/Adventitious roots?)
 # TODO: Add a general upper scale for the whole root system, in which the properties about phloem sucrose could be stored?
 # TODO: Introduce explicit threshold concentration for limiting processes, rather than "0"
@@ -77,9 +72,11 @@ pd.set_option('display.max_columns',20)
 def volume_and_external_surface_from_radius_and_length(g, element, radius, length):
     """
     This function computes the volume (m3) of a root element and its external surface (excluding possible root hairs)
-    based on the properties radius (m) and length (m) and possibly on its type.
+    based on the properties radius (m) and length (m) - and possibly on its type.
     :param g: the investigated MTG
     :param element: the investigated node of the MTG
+    :param radius: the radius of the element (m)
+    :param length: the length of the element (m)
     :return: a dictionary containing the volume and the external surface of the given element
     """
 
@@ -4691,7 +4688,7 @@ class Differential_Equation_System(object):
         # We keep this information in the "self":
         self.y_variables_mapping = y_mapping
 
-        # We create a time grid of the scenarios that will be used by the solver (NOTE: here it only contains 0 and the
+        # We create a time grid of the tutorial that will be used by the solver (NOTE: here it only contains 0 and the
         # final time at the end of the time step, but we could add more intermediate values):
         self.time_grid_in_seconds = np.array([0.0, self.time_step_in_seconds])
 
@@ -4737,7 +4734,7 @@ class Differential_Equation_System(object):
                 self.n.C_hexose_root = 0.
                 self.n.C_hexose_reserve = 0.
                 self.n.C_hexose_soil = 0.
-                # In the case the element did not emerge (i.e. its age is higher that the normal scenarios time step),
+                # In the case the element did not emerge (i.e. its age is higher that the normal tutorial time step),
                 # there must have been a problem:
                 if self.n.actual_time_since_emergence > param.time_step_in_days * (24. * 60. * 60.):
                     print("!!! For element", self.n.index(),
@@ -4758,7 +4755,7 @@ class Differential_Equation_System(object):
             # growth is finished and sucrose is supplied there!
             self.n.Cs_mucilage_soil = 0.
             self.n.Cs_cells_soil = 0.
-            # In the case the element did not emerge (i.e. its age is higher that the normal scenarios time step),
+            # In the case the element did not emerge (i.e. its age is higher that the normal tutorial time step),
             # there must have been a problem:
             if self.n.actual_time_since_emergence > param.time_step_in_days * (24. * 60. * 60.):
                 print("!!! For element", self.n.index(),
@@ -4925,7 +4922,7 @@ class Differential_Equation_System(object):
 
 # Performing a complete C balance on each root element:
 #------------------------------------------------------
-# NOTE: The function alls all processes of C exchange between pools on each root element and performs a new C balance,
+# NOTE: The function calls all processes of C exchange between pools on each root element and performs a new C balance,
 # with or without using a solver:
 def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
                                                                    time_step_in_seconds=1. * (60. * 60. * 24.),

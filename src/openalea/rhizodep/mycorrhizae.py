@@ -1,3 +1,13 @@
+#  -*- coding: utf-8 -*-
+
+"""
+    This script 'mycorrhizae' contains functions for simulations mycorrhizal interactions using RhizoDep.
+
+    :copyright: see AUTHORS.
+    :license: see LICENSE for details.
+"""
+
+
 import numpy as np
 from openalea.mtg import *
 import openalea.plantgl.all as pgl
@@ -344,71 +354,77 @@ def mycorrhizal_interaction(root_MTG, fungus, step, time_step_in_seconds):
 ########################################################################################################################
 
 # MAIN SIMULATION:
-#-----------------
+##################
 
-# # 1. We load an existing root MTG:
-# ##################################
-#
-# inputs_dir_path = 'C://Users//frees//rhizodep//simulations//running_scenarios//inputs'
-# outputs_dir_path = 'C://Users//frees//rhizodep//simulations//running_scenarios//outputs'
-# ROOT_MTG_FILE = 'initial_root_MTG_0099.pckl'
-# root_images_directory = 'C://Users//frees//rhizodep//simulations//running_scenarios//outputs//root_images'
-#
-# # We get the targeted root MTG:
-# filename = os.path.join(inputs_dir_path, ROOT_MTG_FILE)
-# if not os.path.exists(filename):
-#     print("!!! ERROR: the file", ROOT_MTG_FILE,"could not be found in the folder", inputs_dir_path, "!!!")
-#     print("The scenarios stops here!")
-#     simulation_allowed=False
-# else:
-#     # We load the MTG file and name it "g":
-#     f = open(filename, 'rb')
-#     g = pickle.load(f)
-#     f.close()
-#     print("The MTG", ROOT_MTG_FILE,"has been loaded!")
-#     # And by precaution we save the initial MTG in the outputs:
-#     g_file_name = os.path.join(outputs_dir_path, 'initial_root_MTG.pckl')
-#     with open(g_file_name, 'wb') as output:
-#         pickle.dump(g, output, protocol=2)
-#     print("The initial MTG file has been saved in the outputs.")
-#
-# # We perform the scenarios:
-#
-# f = initiate_mycorrhizal_fungus()
-#
-# final_step=100
-# for step in range(1,final_step+1):
-#     print("For time step", step, ":")
-#
-#     # print("    Considering infection evolution...")
-#     root_infection_by_fungus(g, fungus=f, step=step, time_step_in_seconds=3600)
-#
-#     # print("    Considering exchange with the root system...")
-#     root_fungus_exchange_rate(g,fungus=f)
-#
-#     # print("    Considering fungal growth...")
-#     fungus_mass_growth(fungus=f, time_step_in_seconds = 3600)
-#
-#     print("")
-#
-#     # We print the plot:
-#     sc = tools.plot_mtg(g, prop_cmap='C_hexose_root', lognorm=True, vmin=1e-6,
-#                         vmax=1e-3, cmap='jet',
-#                         root_hairs_display=True,
-#                         width=1200,
-#                         height=1200,
-#                         x_center=0.,
-#                         y_center=0.,
-#                         z_center=-0.1,
-#                         x_cam=0.4,
-#                         y_cam=0,
-#                         z_cam=0.2)
-#
-#     # We finally display the MTG on PlantGL and possibly record it:
-#     pgl.Viewer.display(sc)
-#     # If needed, we wait for a few seconds so that the graph is well positioned:
-#     time.sleep(0.5)
-#
-#     image_name = os.path.join(root_images_directory, 'root%.5d.png')
-#     pgl.Viewer.saveSnapshot(image_name % (step + 1))
+
+if __name__ == '__main__':
+    # (Note: this condition avoids launching automatically the program when imported in another file)
+
+    print("Considering mycorrhizal interactions...")
+
+    # # 1. We load an existing root MTG:
+    # ##################################
+    #
+    # inputs_dir_path = 'C://Users//frees//rhizodep//simulations//running_scenarios//inputs'
+    # outputs_dir_path = 'C://Users//frees//rhizodep//simulations//running_scenarios//outputs'
+    # ROOT_MTG_FILE = 'initial_root_MTG_0099.pckl'
+    # root_images_directory = 'C://Users//frees//rhizodep//simulations//running_scenarios//outputs//root_images'
+    #
+    # # We get the targeted root MTG:
+    # filename = os.path.join(inputs_dir_path, ROOT_MTG_FILE)
+    # if not os.path.exists(filename):
+    #     print("!!! ERROR: the file", ROOT_MTG_FILE,"could not be found in the folder", inputs_dir_path, "!!!")
+    #     print("The tutorial stops here!")
+    #     simulation_allowed=False
+    # else:
+    #     # We load the MTG file and name it "g":
+    #     f = open(filename, 'rb')
+    #     g = pickle.load(f)
+    #     f.close()
+    #     print("The MTG", ROOT_MTG_FILE,"has been loaded!")
+    #     # And by precaution we save the initial MTG in the outputs:
+    #     g_file_name = os.path.join(outputs_dir_path, 'initial_root_MTG.pckl')
+    #     with open(g_file_name, 'wb') as output:
+    #         pickle.dump(g, output, protocol=2)
+    #     print("The initial MTG file has been saved in the outputs.")
+    #
+    # # We perform the tutorial:
+    #
+    # f = initiate_mycorrhizal_fungus()
+    #
+    # final_step=100
+    # for step in range(1,final_step+1):
+    #     print("For time step", step, ":")
+    #
+    #     # print("    Considering infection evolution...")
+    #     root_infection_by_fungus(g, fungus=f, step=step, time_step_in_seconds=3600)
+    #
+    #     # print("    Considering exchange with the root system...")
+    #     root_fungus_exchange_rate(g,fungus=f)
+    #
+    #     # print("    Considering fungal growth...")
+    #     fungus_mass_growth(fungus=f, time_step_in_seconds = 3600)
+    #
+    #     print("")
+    #
+    #     # We print the plot:
+    #     sc = tools.plot_mtg(g, prop_cmap='C_hexose_root', lognorm=True, vmin=1e-6,
+    #                         vmax=1e-3, cmap='jet',
+    #                         root_hairs_display=True,
+    #                         width=1200,
+    #                         height=1200,
+    #                         x_center=0.,
+    #                         y_center=0.,
+    #                         z_center=-0.1,
+    #                         x_cam=0.4,
+    #                         y_cam=0,
+    #                         z_cam=0.2)
+    #
+    #     # We finally display the MTG on PlantGL and possibly record it:
+    #     pgl.Viewer.display(sc)
+    #     # If needed, we wait for a few seconds so that the graph is well positioned:
+    #     time.sleep(0.5)
+    #
+    #     image_name = os.path.join(root_images_directory, 'root%.5d.png')
+    #     pgl.Viewer.saveSnapshot(image_name % (step + 1))
 
