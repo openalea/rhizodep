@@ -16,19 +16,12 @@ import shutil
 import time
 import pickle
 
-<<<<<<<< HEAD:src/openalea/rhizodep/scenarios/run_scenarios.py
 from openalea.rhizodep import model
-from openalea.rhizodep import run_simulation 
+from openalea.rhizodep import running_simulation 
 from openalea.rhizodep import parameters as param
 from openalea.rhizodep import tools 
 from openalea.rhizodep import mycorrhizae 
-========
-import rhizodep.model as model
-import rhizodep.running_simulation as running_simulation
-import rhizodep.parameters as param
-import rhizodep.tools as tools
-import rhizodep.mycorrhizae as mycorrhizae
->>>>>>>> develop:tutorial/running_scenarios.py
+
 
 ########################################################################################################################
 
