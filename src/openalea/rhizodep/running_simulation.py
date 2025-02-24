@@ -13,20 +13,9 @@ from math import trunc
 from decimal import Decimal
 
 import pandas as pd
-<<<<<<<< HEAD:src/openalea/rhizodep/run_simulation.py
 
 import openalea.plantgl.all as pgl
 from openalea.mtg import turtle as turt
-========
-import os
-
-import openalea.plantgl.all as pgl
-import rhizodep.model as model
-import rhizodep.tools as tools
-import rhizodep.alternative_plotting as alternative_plotting
-import rhizodep.parameters as param
-import rhizodep.mycorrhizae as mycorrhizae
->>>>>>>> develop:src/openalea/rhizodep/running_simulation.py
 
 from . import model
 from . import tools
