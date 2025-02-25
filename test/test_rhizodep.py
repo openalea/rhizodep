@@ -16,7 +16,7 @@ from pathlib import Path
 from openalea.rhizodep import model 
 from openalea.rhizodep import running_simulation
 
-#import openalea.rhizodep.scenarios.run_scenarios as run_scenarios
+from openalea.rhizodep.tool.running_scenarios import run_one_scenario
 
 ########################################################################################################################
 # DEFINING INPUT/OUTPUT FOLDERS AND SPECIFIC PARAMETERS FOR THE TEST:
@@ -133,8 +133,8 @@ def run_reference_simulation(run_test_scenario=True, scenario_ID=1,
 
 # Function for testing the run:
 #------------------------------
-def test_run(overwrite_desired_data=False, run_test_scenario=True, scenario_ID=1,
-             reference_path='reference', reference_file='desired_simulation_results.csv',
+def my_run(overwrite_desired_data=False, run_test_scenario=True, scenario_ID=1,
+             reference_path='reference', reference_file='desired_simulation_results_1.csv',
              outputs_path='outputs', results_file='simulation_results.csv'):
     """
     This function performs a test that compares the results of a reference tutorial of RhizoDep to the desired,
@@ -200,13 +200,27 @@ def test_run(overwrite_desired_data=False, run_test_scenario=True, scenario_ID=1
                               overwrite_desired_data)
     print("CONGRATULATIONS! The test is passed! The new results are consistent with the reference results!")
 
-    return
 
+def test_run1():
+    CREATING_NEW_REFERENCE_DATA=False
+    my_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
+             run_test_scenario=False,
+             reference_path="reference", reference_file='desired_simulation_results_1.csv',
+             outputs_path="outputs", results_file='simulation_results_test_1.csv')
+    
+def test_run2():
+    CREATING_NEW_REFERENCE_DATA=False
+    my_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
+             run_test_scenario=True, scenario_ID=1,
+             reference_path="reference", reference_file='desired_simulation_results_2.csv',
+             outputs_path="outputs", results_file='simulation_results.csv')
 ########################################################################################################################
 ########################################################################################################################
 
 # MAIN PROGRAM:
 ###############
+
+
 
 if __name__ == '__main__':
 
@@ -215,14 +229,14 @@ if __name__ == '__main__':
 
     # TEST 1 WITH A SIMULATION CREATING A NEW ROOT MTG:
     print("\nStarting Test 1...")
-    test_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
+    my_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
              run_test_scenario=False,
              reference_path="reference", reference_file='desired_simulation_results_1.csv',
              outputs_path="outputs", results_file='simulation_results_test_1.csv')
 
     # TEST 2 WITH ONE SCENARIO LOADING AN EXISTING MTG:
     print("\nStarting Test 2...")
-    test_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
+    my_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
              run_test_scenario=True, scenario_ID=1,
-             reference_path="reference", reference_file='desired_simulation_results.csv',
+             reference_path="reference", reference_file='desired_simulation_results_2.csv',
              outputs_path="outputs", results_file='simulation_results.csv')
