@@ -1,8 +1,3 @@
-<<<<<<<< HEAD:src/openalea/rhizodep/scenarios/opening_MTG_files.py
-import os, os.path
-from pathlib import Path
-import copy
-========
 # -*- coding: latin-1 -*-
 
 """
@@ -13,7 +8,10 @@ import copy
     :license: see LICENSE for details.
 """
 
->>>>>>>> develop:src/openalea/rhizodep/opening_and_recomputing_MTG_files.py
+import os, os.path
+from pathlib import Path
+import copy
+
 from math import sqrt, pi, trunc, floor, cos, sin
 
 import pickle

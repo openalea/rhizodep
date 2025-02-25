@@ -1,4 +1,13 @@
-<<<<<<<< HEAD:src/openalea/rhizodep/scenarios/making_video.py
+# -*- coding: latin-1 -*-
+
+"""
+    This script allows to create videos from existing graphs. It is especially useful for showing the evolution
+    of the root system over time or soil depth.
+
+    :copyright: see AUTHORS.
+    :license: see LICENSE for details.
+"""
+
 import os
 from math import floor, ceil, trunc, log10
 
@@ -13,30 +22,12 @@ import matplotlib as mpl
 
 from openalea.mtg.plantframe import color
 
-from openalea.rhizodep.tools import colorbar, sci_notation
+from openalea.rhizodep.tools import colorbar
 
 # Use LaTeX as text renderer to get text in true LaTeX
 # If the two following lines are left out, Mathtext will be used
 # import matplotlib as mpl
 # mpl.rc('text', usetex=True)
-========
-# -*- coding: latin-1 -*-
-
-"""
-    This script allows to create videos from existing graphs. It is especially useful for showing the evolution
-    of the root system over time or soil depth.
-
-    :copyright: see AUTHORS.
-    :license: see LICENSE for details.
-"""
-
-import imageio
-from PIL import Image, ImageDraw, ImageFont
-import os
-from path import Path
-from math import floor
-from rhizodep.tools import colorbar
->>>>>>>> develop:src/openalea/rhizodep/making_video.py
 
 ########################################################################################################################
 
