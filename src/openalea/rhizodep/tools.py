@@ -348,7 +348,7 @@ def my_colormap(g, property_name, cmap='jet', vmin=None, vmax=None, lognorm=True
     norm = color.Normalize(vmin, vmax) if not lognorm else color.LogNorm(vmin, vmax)
     values = norm(values)
     colors = (_cmap(values)[:, 0:3]) * 255
-    colors = np.array(colors, dtype=np.int).tolist()
+    colors = np.array(colors, dtype=np.int16).tolist()
 
     # In case no color values could be calculated from the given information:
     if len(colors) == 0:
@@ -356,7 +356,7 @@ def my_colormap(g, property_name, cmap='jet', vmin=None, vmax=None, lognorm=True
         prop = g.property("label")
         keys = prop.keys()
         colors = [[250,150,100]]*len(keys)
-        colors = np.array(colors, dtype=np.int).tolist()
+        colors = np.array(colors, dtype=np.int16).tolist()
 
     # Finally, the property "color" is created/updated with the new computed values:
     g.properties()['color'] = dict(zip(keys, colors))
