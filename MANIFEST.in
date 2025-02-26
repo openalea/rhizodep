@@ -1,9 +1,8 @@
 # {# pkglts, pysetup
 
-include AUTHORS.rst
-include CONTRIBUTING.rst
-include HISTORY.rst
-include README.rst
+include AUTHORS.md
+include CONTRIBUTING.md
+include README.md
 
 include LICENSE
 include requirements.txt

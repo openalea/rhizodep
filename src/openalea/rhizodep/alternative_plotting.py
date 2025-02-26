@@ -8,7 +8,11 @@
 """
 
 import pyvista as pv
-import pyvistaqt as pvqt
+try:
+    import pyvistaqt as pvqt
+except ModuleNotFoundError:
+    pvqt = None
+
 import pickle
 from math import floor
 import time
@@ -17,7 +21,7 @@ import numpy as np
 from openalea.mtg import *
 from openalea.mtg.traversal import pre_order, post_order
 from openalea.mtg import turtle as turt
-from rhizodep.tools import get_root_visitor, my_colormap
+from .tools import get_root_visitor, my_colormap
 
 import pandas as pd
 

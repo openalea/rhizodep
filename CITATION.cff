@@ -1,0 +1,39 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: RhizoDep
+message: >-
+  RhizoDep is a model designed to simulate root architecture
+  and rhizodeposition processes according to root carbone balance
+type: software
+authors:
+  - given-names: Frédéric
+    family-names: Rees
+    orcid: 'https://orcid.org/0000-0002-4827-4452'
+    affiliation: INRAE
+  - given-names: Tristan
+    family-names: Gérault
+    affiliation: INRAE
+    email: tristan.gerault@inrae.fr
+  - given-names: Marion
+    family-names: Gauthier
+    orcid: 'https://orcid.org/0000-0001-7671-5406'
+  - given-names: Christophe
+    family-names: Pradal
+    affiliation: CIRAD / inria
+    orcid: 'https://orcid.org/0000-0002-2555-761X'
+repository-code: 'https://github.com/openalea/rhizodep'
+abstract: >-
+  RhizoDep is a functional-structural root model that
+  simulates 3D root growth, respiration, and rhizodeposition
+  based on C balance and root morphology at the individual
+  root segment level.
+keywords:
+  - openalea
+  - FSPM
+  - rhizodeposition
+  - root system architecture
+  - carbon
+  - wheat
+license: CECILL-C

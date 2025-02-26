@@ -7,14 +7,13 @@
     :license: see LICENSE for details.
 """
 
-import os
+
 import numpy as np
 from openalea.mtg import *
 import openalea.plantgl.all as pgl
-import rhizodep.parameters as param
-import rhizodep.tools as tools
-import pickle
-import time
+
+from . import parameters as param
+from . import tools 
 
 def initiate_mycorrhizal_fungus():
     """

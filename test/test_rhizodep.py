@@ -8,12 +8,15 @@
     :license: see LICENSE for details.
 """
 
+import os
 import numpy as np
 import pandas as pd
-import os
-from rhizodep.model import initiate_mtg
-from rhizodep.running_simulation import main_simulation
-from tutorial.running_scenarios import run_one_scenario
+from pathlib import Path
+
+from openalea.rhizodep import model 
+from openalea.rhizodep import running_simulation
+
+from openalea.rhizodep.tool.running_scenarios import run_one_scenario
 
 ########################################################################################################################
 # DEFINING INPUT/OUTPUT FOLDERS AND SPECIFIC PARAMETERS FOR THE TEST:
@@ -88,7 +91,7 @@ def run_reference_simulation(run_test_scenario=True, scenario_ID=1,
         # OPTION 1: We run a default scenario for RhizoDep, starting from an already existing root MTG,
         # using the instructions read in the input file, using 'run_one_scenario' without multiprocessing:
         run_one_scenario(scenario_id=scenario_ID,
-                         inputs_dir_path="C:/Users/frees/rhizodep/test/inputs",
+                         inputs_dir_path="inputs",
                          outputs_dir_path=outputs_path,
                          scenarios_list="scenario_test.xlsx")
         print("Simulation done!")
@@ -97,39 +100,41 @@ def run_reference_simulation(run_test_scenario=True, scenario_ID=1,
         # with all the parameters indicated in parameters.py and using the function 'main_simulation':
         OUTPUTS_DIRPATH = 'outputs'
         # We initiate the properties of the MTG "g":
-        g = initiate_mtg(random=True)
+        g = model.initiate_mtg(random=True)
         # We run the tutorial by specifying here the input conditions and the duration:
-        main_simulation(g, simulation_period_in_days=5., time_step_in_days=1./24.,
-                        radial_growth="Possible", ArchiSimple=True, ArchiSimple_C_fraction=0.10,
-                        outputs_directory=outputs_path,
-                        forcing_constant_inputs=True, constant_sucrose_input_rate=1e-10,
-                        constant_soil_temperature_in_Celsius=20,
-                        root_order_limitation=False,
-                        simulation_results_file=ArchiSimple_results_file,
-                        recording_interval_in_days=5,
-                        recording_images=True,
-                        root_images_directory=images_path,
-                        z_classification=False,
-                        printing_sum=False,
-                        recording_sum=True,
-                        printing_warnings=False,
-                        recording_g=False,
-                        g_directory=MTG_path,
-                        recording_g_properties=True,
-                        g_properties_directory=MTG_properties_path,
-                        random=True,
-                        plotting=False,
-                        displayed_property="length", displayed_vmin=0, displayed_vmax=0.01,
-                        log_scale=False, cmap='copper',
-                        width=800, height=800,
-                        x_center=0, y_center=0, z_center=0.08, x_cam=0.2, y_cam=0.2, z_cam=-0.15)
+        running_simulation.main_simulation(
+            g, simulation_period_in_days=5., time_step_in_days=1./24.,
+            radial_growth="Possible", ArchiSimple=True, ArchiSimple_C_fraction=0.10,
+            outputs_directory=outputs_path,
+            forcing_constant_inputs=True, constant_sucrose_input_rate=1e-10,
+            constant_soil_temperature_in_Celsius=20,
+            root_order_limitation=False,
+            simulation_results_file=ArchiSimple_results_file,
+            recording_interval_in_days=5,
+            recording_images=True,
+            root_images_directory=images_path,
+            z_classification=False,
+            printing_sum=False,
+            recording_sum=True,
+            printing_warnings=False,
+            recording_g=False,
+            g_directory=MTG_path,
+            recording_g_properties=True,
+            g_properties_directory=MTG_properties_path,
+            random=True,
+            plotting=True,
+            displayed_property="length", displayed_vmin=0, displayed_vmax=0.01,
+            log_scale=False, cmap='copper',
+            width=800, height=800,
+            x_center=0, y_center=0, z_center=0.08, x_cam=0.2, y_cam=0.2, z_cam=-0.15
+            )
 
     return
 
 # Function for testing the run:
 #------------------------------
-def test_run(overwrite_desired_data=False, run_test_scenario=True, scenario_ID=1,
-             reference_path='reference', reference_file='desired_simulation_results.csv',
+def my_run(overwrite_desired_data=False, run_test_scenario=True, scenario_ID=1,
+             reference_path='reference', reference_file='desired_simulation_results_1.csv',
              outputs_path='outputs', results_file='simulation_results.csv'):
     """
     This function performs a test that compares the results of a reference tutorial of RhizoDep to the desired,
@@ -148,37 +153,34 @@ def test_run(overwrite_desired_data=False, run_test_scenario=True, scenario_ID=1
         actual_data_path = os.path.join(outputs_path, results_file)
 
     # Defining the root images' directory path:
-    IMAGES_DIRPATH = os.path.join(outputs_path, 'root_images')
-    if not os.path.exists(IMAGES_DIRPATH):
+    IMAGES_DIRPATH = Path(outputs_path) / 'root_images'
+    if not IMAGES_DIRPATH.exists():
         # Then we create it:
-        os.mkdir(IMAGES_DIRPATH)
+        IMAGES_DIRPATH.mkdir(parents=True, exist_ok=True)
     else:
         # Otherwise, we delete all the images that are already present inside:
-        for root, dirs, files in os.walk(IMAGES_DIRPATH):
-            for file in files:
-                os.remove(os.path.join(root, file))
+        for file in IMAGES_DIRPATH.glob('*'):
+            file.unlink()
 
     # Defining the MTG files' directory path:
-    MTG_DIRPATH = os.path.join(outputs_path, 'MTG_files')
-    if not os.path.exists(MTG_DIRPATH):
+    MTG_DIRPATH = Path(outputs_path) / 'MTG_files'
+    if not MTG_DIRPATH.exists():
         # Then we create it:
-        os.mkdir(MTG_DIRPATH)
+        MTG_DIRPATH.mkdir(parents=True, exist_ok=True)
     else:
-        # Otherwise, we delete all the images that are already present inside:
-        for root, dirs, files in os.walk(MTG_DIRPATH):
-            for file in files:
-                os.remove(os.path.join(root, file))
+        # Otherwise, we delete all the files that are already present inside:
+        for file in MTG_DIRPATH.glob('*'):
+            file.unlink()
 
     # Defining the MTG properties' directory path:
-    MTG_PROP_DIRPATH = os.path.join(outputs_path, 'MTG_properties')
-    if not os.path.exists(MTG_PROP_DIRPATH):
+    MTG_PROP_DIRPATH = Path(outputs_path) / 'MTG_properties'
+    if not MTG_PROP_DIRPATH.exists():
         # Then we create it:
-        os.mkdir(MTG_PROP_DIRPATH)
+        MTG_PROP_DIRPATH.mkdir(parents=True, exist_ok=True)
     else:
-        # Otherwise, we delete all the images that are already present inside:
-        for root, dirs, files in os.walk(MTG_PROP_DIRPATH):
-            for file in files:
-                os.remove(os.path.join(root, file))
+        # Otherwise, we delete all the files that are already present inside:
+        for file in MTG_PROP_DIRPATH.glob('*'):
+            file.unlink()
 
     # 2. Running the new tutorial:
     #-------------------------------
@@ -186,7 +188,7 @@ def test_run(overwrite_desired_data=False, run_test_scenario=True, scenario_ID=1
     # We run the reference tutorial:
     run_reference_simulation(run_test_scenario=run_test_scenario, scenario_ID=scenario_ID,
                              outputs_path=outputs_path, ArchiSimple_results_file = "simulation_results_test_1.csv",
-                             images_path=IMAGES_DIRPATH, MTG_path=MTG_DIRPATH, MTG_properties_path=MTG_PROP_DIRPATH)
+                             images_path=str(IMAGES_DIRPATH), MTG_path=str(MTG_DIRPATH), MTG_properties_path=str(MTG_PROP_DIRPATH))
 
     # 3. Comparing the new results with the reference results:
     #---------------------------------------------------------
@@ -198,13 +200,27 @@ def test_run(overwrite_desired_data=False, run_test_scenario=True, scenario_ID=1
                               overwrite_desired_data)
     print("CONGRATULATIONS! The test is passed! The new results are consistent with the reference results!")
 
-    return
 
+def test_run1():
+    CREATING_NEW_REFERENCE_DATA=False
+    my_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
+             run_test_scenario=False,
+             reference_path="reference", reference_file='desired_simulation_results_1.csv',
+             outputs_path="outputs", results_file='simulation_results_test_1.csv')
+    
+def test_run2():
+    CREATING_NEW_REFERENCE_DATA=False
+    my_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
+             run_test_scenario=True, scenario_ID=1,
+             reference_path="reference", reference_file='desired_simulation_results_2.csv',
+             outputs_path="outputs", results_file='simulation_results.csv')
 ########################################################################################################################
 ########################################################################################################################
 
 # MAIN PROGRAM:
 ###############
+
+
 
 if __name__ == '__main__':
 
@@ -213,18 +229,14 @@ if __name__ == '__main__':
 
     # TEST 1 WITH A SIMULATION CREATING A NEW ROOT MTG:
     print("\nStarting Test 1...")
-    test_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
+    my_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
              run_test_scenario=False,
-             reference_path="C:/Users/frees/rhizodep/test/reference", reference_file='desired_simulation_results_1.csv',
-             outputs_path="C:/Users/frees/rhizodep/test/outputs/", results_file='simulation_results_test_1.csv')
+             reference_path="reference", reference_file='desired_simulation_results_1.csv',
+             outputs_path="outputs", results_file='simulation_results_test_1.csv')
 
     # TEST 2 WITH ONE SCENARIO LOADING AN EXISTING MTG:
     print("\nStarting Test 2...")
-    test_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
+    my_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
              run_test_scenario=True, scenario_ID=1,
-             reference_path="C:/Users/frees/rhizodep/test/reference", reference_file='desired_simulation_results_2.csv',
-             outputs_path="C:/Users/frees/rhizodep/test/outputs/", results_file='simulation_results.csv')
-
-    print("\nCONCLUSION: Both tests have been successfully passed!")
-
-
+             reference_path="reference", reference_file='desired_simulation_results_2.csv',
+             outputs_path="outputs", results_file='simulation_results.csv')

@@ -7,19 +7,22 @@
     :license: see LICENSE for details.
 """
 
+import os
+import pickle
 from math import trunc
 from decimal import Decimal
+
 import pandas as pd
-import os
 
 import openalea.plantgl.all as pgl
-import rhizodep.model as model
-import rhizodep.tools as tools
-import rhizodep.alternative_plotting as alternative_plotting
-import rhizodep.parameters as param
-import rhizodep.mycorrhizae as mycorrhizae
+from openalea.mtg import turtle as turt
 
-import pickle
+from . import model
+from . import tools
+from . import alternative_plotting
+from . import parameters as param
+from . import mycorrhizae
+
 
 # TODO: explicitly add 'surfaces_and_volumes()' in the sequence of modelling!
 
