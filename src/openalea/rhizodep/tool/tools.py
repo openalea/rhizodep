@@ -23,11 +23,11 @@ from matplotlib.ticker import LogFormatter
 
 from openalea.mtg import turtle as turt
 from openalea.mtg.plantframe import color
-from openalea.mtg.traversal import pre_order, post_order
+from openalea.mtg import *
 import openalea.plantgl.all as pgl
 
 from openalea.rhizodep import parameters as param
-
+from openalea.rhizodep import model as model
 
 # FUNCTIONS FOR DATA PREPROCESSING :
 ####################################
@@ -1008,15 +1008,15 @@ def creating_a_spatial_scale_MTG(total_length=0.5, length_increment=0.05, line_t
     segment.z2 = starting_z - length_increment
 
     # And we add a lateral segment that will materialize graduations along the vertical axis:
-    lateral = ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Segment',
-                             type='',
-                             root_order=1,
-                             angle_down=90,
-                             angle_roll=0,
-                             length=line_thickness * 5,
-                             radius=line_thickness,
-                             identical_properties=False,
-                             nil_properties=True)
+    lateral = model.ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Segment',
+                                   type='',
+                                   root_order=1,
+                                   angle_down=90,
+                                   angle_roll=0,
+                                   length=line_thickness * 5,
+                                   radius=line_thickness,
+                                   identical_properties=False,
+                                   nil_properties=True)
     lateral.x1 = 0
     lateral.y1 = 0
     lateral.z1 = starting_z - length_increment
@@ -1031,15 +1031,15 @@ def creating_a_spatial_scale_MTG(total_length=0.5, length_increment=0.05, line_t
     for i in range(1, n_steps+1):
 
         # We form one new vertical segment:
-        segment = ADDING_A_CHILD(mother_element=segment, edge_type='<', label='Segment',
-                                 type='',
-                                 root_order=1,
-                                 angle_down=0,
-                                 angle_roll=0,
-                                 length=length_increment,
-                                 radius=line_thickness,
-                                 identical_properties=False,
-                                 nil_properties=True)
+        segment = model.ADDING_A_CHILD(mother_element=segment, edge_type='<', label='Segment',
+                                       type='',
+                                       root_order=1,
+                                       angle_down=0,
+                                       angle_roll=0,
+                                       length=length_increment,
+                                       radius=line_thickness,
+                                       identical_properties=False,
+                                       nil_properties=True)
         segment.x1 = 0
         segment.y1 = 0
         segment.z1 = starting_z - length_increment * i
@@ -1048,15 +1048,15 @@ def creating_a_spatial_scale_MTG(total_length=0.5, length_increment=0.05, line_t
         segment.z2 = starting_z - length_increment * 2 * i
 
         # We form one new horizontal graduation:
-        lateral = ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Segment',
-                                 type='',
-                                 root_order=1,
-                                 angle_down=90,
-                                 angle_roll=0,
-                                 length=line_thickness*5,
-                                 radius=line_thickness,
-                                 identical_properties=False,
-                                 nil_properties=True)
+        lateral = model.ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Segment',
+                                       type='',
+                                       root_order=1,
+                                       angle_down=90,
+                                       angle_roll=0,
+                                       length=line_thickness*5,
+                                       radius=line_thickness,
+                                       identical_properties=False,
+                                       nil_properties=True)
         lateral.x1 = 0
         lateral.y1 = 0
         lateral.z1 = starting_z - length_increment * 2 * i
