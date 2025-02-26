@@ -24,10 +24,10 @@ import openalea.plantgl.all as pgl
 from openalea.plantgl.all import *
 from PIL import Image, ImageDraw, ImageFont
 
-from openalea.rhizodep.model import recording_MTG_properties
-from openalea.rhizodep.tool.tools import (my_colormap, circle_coordinates, plot_mtg,
+from ..model import recording_MTG_properties
+from .tools import (my_colormap, circle_coordinates, plot_mtg,
                                           indexing_root_MTG, creating_a_spatial_scale_MTG)
-from openalea.rhizodep.tool.alternative_plotting import plotting_roots_with_pyvista, fast_plotting_roots_with_pyvista
+from .alternative_plotting import plotting_roots_with_pyvista, fast_plotting_roots_with_pyvista
 
 
 ########################################################################################################################
