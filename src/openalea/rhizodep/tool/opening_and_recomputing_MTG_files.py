@@ -12,26 +12,22 @@ import os, os.path
 from pathlib import Path
 import copy
 
-from math import sqrt, pi, trunc, floor, cos, sin
+from math import floor
 
 import pickle
-from statistics import mean
 
 import numpy as np
 import pandas as pd
 
 from openalea.mtg import *
-from openalea.mtg import turtle as turt
-from openalea.mtg.plantframe import color
-from openalea.mtg.traversal import pre_order, post_order
 import openalea.plantgl.all as pgl
 from openalea.plantgl.all import *
 from PIL import Image, ImageDraw, ImageFont
 
 from openalea.rhizodep.model import recording_MTG_properties
-from openalea.rhizodep.tools import (my_colormap, get_root_visitor, prepareScene, circle_coordinates, plot_mtg,
-                            colorbar, sci_notation, indexing_root_MTG)
-from openalea.rhizodep.alternative_plotting import plotting_roots_with_pyvista, fast_plotting_roots_with_pyvista
+from openalea.rhizodep.tool.tools import (my_colormap, circle_coordinates, plot_mtg,
+                                          indexing_root_MTG)
+from openalea.rhizodep.tool.alternative_plotting import plotting_roots_with_pyvista, fast_plotting_roots_with_pyvista
 
 
 ########################################################################################################################

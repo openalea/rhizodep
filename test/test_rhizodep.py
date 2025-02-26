@@ -122,12 +122,13 @@ def run_reference_simulation(run_test_scenario=True, scenario_ID=1,
             recording_g_properties=True,
             g_properties_directory=MTG_properties_path,
             random=True,
-            plotting=True,
+            plotting=False,
             displayed_property="length", displayed_vmin=0, displayed_vmax=0.01,
             log_scale=False, cmap='copper',
             width=800, height=800,
             x_center=0, y_center=0, z_center=0.08, x_cam=0.2, y_cam=0.2, z_cam=-0.15
             )
+        print("Simulation done!")
 
     return
 
@@ -204,16 +205,16 @@ def my_run(overwrite_desired_data=False, run_test_scenario=True, scenario_ID=1,
 def test_run1():
     CREATING_NEW_REFERENCE_DATA=False
     my_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
-             run_test_scenario=False,
-             reference_path="reference", reference_file='desired_simulation_results_1.csv',
-             outputs_path="outputs", results_file='simulation_results_test_1.csv')
-    
+           run_test_scenario=False,
+           reference_path="reference", reference_file='desired_simulation_results_1.csv',
+           outputs_path="outputs", results_file='simulation_results_test_1.csv')
+
 def test_run2():
     CREATING_NEW_REFERENCE_DATA=False
     my_run(overwrite_desired_data=CREATING_NEW_REFERENCE_DATA,
-             run_test_scenario=True, scenario_ID=1,
-             reference_path="reference", reference_file='desired_simulation_results_2.csv',
-             outputs_path="outputs", results_file='simulation_results.csv')
+           run_test_scenario=True, scenario_ID=1,
+           reference_path="reference", reference_file='desired_simulation_results_2.csv',
+           outputs_path="outputs", results_file='simulation_results.csv')
 ########################################################################################################################
 ########################################################################################################################
 

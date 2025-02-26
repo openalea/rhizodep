@@ -15,15 +15,10 @@ except ModuleNotFoundError:
 
 import pickle
 from math import floor
-import time
-import os, os.path
 import numpy as np
 from openalea.mtg import *
-from openalea.mtg.traversal import pre_order, post_order
-from openalea.mtg import turtle as turt
-from .tools import get_root_visitor, my_colormap
-
-import pandas as pd
+from openalea.mtg.traversal import pre_order
+from openalea.rhizodep.tool.tools import my_colormap
 
 
 ########################################################################################################################

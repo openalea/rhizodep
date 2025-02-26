@@ -9,20 +9,15 @@
 """
 
 import os
-from math import floor, ceil, trunc, log10
+from math import floor
 
 import imageio
 from PIL import Image, ImageDraw, ImageFont
 
-import numpy as np
 from pathlib import Path
-import matplotlib.pyplot as plt
-import matplotlib as mpl
 # from pygifsicle import optimize
 
-from openalea.mtg.plantframe import color
-
-from openalea.rhizodep.tools import colorbar
+from openalea.rhizodep.tool.tools import colorbar
 
 # Use LaTeX as text renderer to get text in true LaTeX
 # If the two following lines are left out, Mathtext will be used

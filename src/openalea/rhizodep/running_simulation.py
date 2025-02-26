@@ -15,11 +15,9 @@ from decimal import Decimal
 import pandas as pd
 
 import openalea.plantgl.all as pgl
-from openalea.mtg import turtle as turt
 
 from . import model
-from . import tools
-from . import alternative_plotting
+from .tool import alternative_plotting, tools
 from . import parameters as param
 from . import mycorrhizae
 

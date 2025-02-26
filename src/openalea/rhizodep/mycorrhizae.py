@@ -10,10 +10,9 @@
 
 import numpy as np
 from openalea.mtg import *
-import openalea.plantgl.all as pgl
 
 from . import parameters as param
-from . import tools 
+
 
 def initiate_mycorrhizal_fungus():
     """

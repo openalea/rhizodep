@@ -20,7 +20,7 @@ import pickle
 from openalea.rhizodep import model
 from openalea.rhizodep import running_simulation 
 from openalea.rhizodep import parameters as param
-from openalea.rhizodep import tools 
+from openalea.rhizodep.tool import tools
 from openalea.rhizodep import mycorrhizae 
 
 
