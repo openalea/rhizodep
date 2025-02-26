@@ -5587,6 +5587,7 @@ def control_of_anomalies(g):
 
     return
 
+
 # Initialization of the root system:
 #-----------------------------------
 def initiate_mtg(random=True,
@@ -5966,4 +5967,3 @@ def initiate_mtg(random=True,
     apex.initial_living_root_hairs_external_surface = apex.living_root_hairs_external_surface
 
     return g
-

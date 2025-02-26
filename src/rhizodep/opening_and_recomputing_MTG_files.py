@@ -29,7 +29,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from rhizodep.model import recording_MTG_properties
 from rhizodep.tools import (my_colormap, get_root_visitor, prepareScene, circle_coordinates, plot_mtg,
-                            colorbar, sci_notation, indexing_root_MTG)
+                            colorbar, sci_notation, indexing_root_MTG, creating_a_spatial_scale_MTG)
 from rhizodep.alternative_plotting import plotting_roots_with_pyvista, fast_plotting_roots_with_pyvista
 
 import pickle
@@ -546,7 +546,7 @@ def loading_MTG_files(my_path='',
                       single_MTG_filename='root00001.pckl',
                       list_of_MTG_ID=None,
                       plotting_with_PlantGL=False,
-                      normal_plotting_with_pyvista=False,
+                      normal_plotting_with_pyvista=False, show_Pyvista_axes=False,
                       fast_plotting_with_pyvista=False,
                       closing_window=False,
                       factor_of_higher_resolution=3,
@@ -778,7 +778,8 @@ def loading_MTG_files(my_path='',
                                             plot_width=width, plot_height=height,
                                             camera_x=x_cam, camera_y=y_cam, camera_z=z_cam,
                                             focal_x=x_center, focal_y=y_center, focal_z=z_center,
-                                            closing_window=closing_window)
+                                            closing_window=closing_window,
+                                            show_axes=show_Pyvista_axes)
             else:
                 # We plot the current file:
                 fast_plotting_roots_with_pyvista(g, displaying_root_hairs=root_hairs_display,
@@ -1457,26 +1458,70 @@ if __name__ == "__main__":
     # # im_new.save('colorbar_new.png', quality=95)
 
     # # (RE-)PLOTTING ONE ORIGINAL MTG FILE:
-    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/Other_works/',
-    #                   opening_list=False,
-    #                   # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
-    #                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
-    #                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
-    #                   # property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True, cmap='jet',
-    #                   property="length", vmin=0., vmax=1., log_scale=False, cmap='jet',
-    #                   width=1200, height=1200,
-    #                   x_center=0, y_center=0, z_center=-0.1,
-    #                   x_cam=0, y_cam=0, z_cam=-0.2,
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
+    #                   MTG_directory="MTG_files",
+    #                   opening_list=True,
+    #                   # single_MTG_filename="root00599.pckl",
+    #                   # list_of_MTG_ID=range(2,4318,6),
+    #                   list_of_MTG_ID=[720],
+    #                   recording_images=True,
+    #                   normal_plotting_with_pyvista=True, show_Pyvista_axes=False,
+    #                   fast_plotting_with_pyvista=False,
+    #                   closing_window=True,
+    #                   factor_of_higher_resolution=2,
+    #                   # property="C_hexose_root",
+    #                   # vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
+    #                   property="net_rhizodeposition_rate_per_day_per_cm",
+    #                   vmin=1e-7, vmax=1e-4, log_scale=True, cmap='jet',
+    #                   # property="root_order",
+    #                   # vmin=1, vmax=5, log_scale=False, cmap='jet',
+    #                   # property=None,
+    #                   width=800, height=800,
+    #                   # width=400, height=800,
+    #                   x_center=0, y_center=0, z_center=-0.20,
+    #                   x_cam=0.4, y_cam=0, z_cam=-0.15,
+    #                   # x_center=0, y_center=0, z_center=-0.2,
+    #                   # x_cam=1.2, y_cam=0, z_cam=-0.2,
     #                   step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-    #                   # x_center=0, y_center=0, z_center=-0, z_cam=-0,
-    #                   # camera_distance=1, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-    #                   adding_images_on_plot=False,
-    #                   recording_images=False,
-    #                   images_directory="original_root_images",
+    #                   background_color=[94, 76, 64],
+    #                   root_hairs_display=True,
+    #                   mycorrhizal_fungus_display=False,
+    #                   images_directory="new_images_with_axes",
     #                   printing_sum=False,
     #                   recording_sum=False,
     #                   recording_g_properties=False,
-    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
+    #                   # MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-05/Scenario_0163/MTG_properties/',
+    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1 / 24.)
+    # print("Done!")
+
+    # PLOTTING A SPATIAL SCALE TO PUT ON A GRAPH:
+    # We create a MTG file corresponding to the spatial scale we want to plot:
+    g = creating_a_spatial_scale_MTG(total_length=0.50, length_increment=0.1, line_thickness=0.002, starting_z=-0.1)
+    # We record the MTG:
+    g_file_name = 'C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/spatial_scale/root00000.pckl'
+    with open(g_file_name, 'wb') as output:
+        pickle.dump(g, output, protocol=2)
+    # We plot it:
+    loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
+                      MTG_directory="spatial_scale",
+                      opening_list=True,
+                      recording_images=True,
+                      normal_plotting_with_pyvista=True, show_Pyvista_axes=False,
+                      closing_window=False,
+                      factor_of_higher_resolution=2,
+                      width=800, height=800,
+                      property="length", vmin=0, vmax=0.1, log_scale=False,
+                      x_center=0, y_center=0, z_center=-0.20,
+                      x_cam=0.4, y_cam=0, z_cam=-0.15,
+                      background_color=[94, 76, 64],
+                      root_hairs_display=False,
+                      images_directory="new_images_with_axes",
+                      printing_sum=False,
+                      recording_sum=False,
+                      recording_g_properties=False,
+                      z_classification=False)
+    print("Done!")
+
 
     # # (RE-)PLOTTING A SERIES OF ORIGINAL MTG FILES FROM ONE SCENARIO:
     # loading_MTG_files(my_path='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0097/',
@@ -1491,8 +1536,6 @@ if __name__ == "__main__":
     #                   width=1200, height=1200,
     #                   x_center=0, y_center=0, z_center=-0.1, z_cam=-0.2,
     #                   camera_distance=0.4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-    #                   # x_center=0, y_center=0, z_center=-0, z_cam=-0,
-    #                   # camera_distance=1, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
     #                   adding_images_on_plot=False,
     #                   recording_images=True,
     #                   images_directory="original_root_images",
@@ -1660,25 +1703,25 @@ if __name__ == "__main__":
     #                  images_directory="axis_55-65_days_images"
     #                  )
 
-    # COMPUTING PROPERTIES ON DIFFERENT CLASSES OF ROOTS:
-    #####################################################
-
-    loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
-                      opening_list=True,
-                      MTG_directory="MTG_files",
-                      # list_of_MTG_ID=range(0,741),
-                      file_extension='pckl',
-                      plotting_with_PlantGL=False,
-                      normal_plotting_with_pyvista=False,
-                      fast_plotting_with_pyvista=False,
-                      computing_on_different_roots=True, comparing_distance_from_tip=True, distance_treshold=0.04,
-                      properties_to_compute=["total_net_rhizodeposition",
-                                             "net_rhizodeposition_rate_per_day_per_cm",
-                                             "length",
-                                             "total_exchange_surface_with_soil_solution"],
-                      summing_different_roots=True, averaging_different_roots=True,
-                      printing_sum=False,
-                      recording_sum=False,
-                      printing_warnings=True,
-                      recording_g_properties=False)
+    # # COMPUTING PROPERTIES ON DIFFERENT CLASSES OF ROOTS:
+    # #####################################################
+    #
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
+    #                   opening_list=True,
+    #                   MTG_directory="MTG_files",
+    #                   # list_of_MTG_ID=range(0,741),
+    #                   file_extension='pckl',
+    #                   plotting_with_PlantGL=False,
+    #                   normal_plotting_with_pyvista=False,
+    #                   fast_plotting_with_pyvista=False,
+    #                   computing_on_different_roots=True, comparing_distance_from_tip=True, distance_treshold=0.04,
+    #                   properties_to_compute=["total_net_rhizodeposition",
+    #                                          "net_rhizodeposition_rate_per_day_per_cm",
+    #                                          "length",
+    #                                          "total_exchange_surface_with_soil_solution"],
+    #                   summing_different_roots=True, averaging_different_roots=True,
+    #                   printing_sum=False,
+    #                   recording_sum=False,
+    #                   printing_warnings=True,
+    #                   recording_g_properties=False)
 

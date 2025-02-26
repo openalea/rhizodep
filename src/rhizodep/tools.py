@@ -974,6 +974,99 @@ def colorbar(title="Radius (m)", cmap='jet', lognorm=True, vmin=1e-12, vmax=1e3,
     print("The colorbar has been made!")
     return fig
 
+
+# Creating of an artifical MTG showing z-axis graduations:
+#---------------------------------------------------------
+def creating_a_spatial_scale_MTG(total_length=0.5, length_increment=0.05, line_thickness=0.01, starting_z = 0):
+
+    """
+    This function generates a root MTG that corresponds to a z-axis with graduations, which can then be plotted
+    as a normal root MTG to illustrate a spatial scale on a PlantGL or Pyvista plot.
+    :param total_length: the total length of the z-axis to create
+    :param length_increment: the length interval between two graduations
+    :param line_thickness: the thickness of the z-axis and graduations to display
+    :param starting_z: the absolute z-coordinate from which to start the z-axis
+    :return: a MTG file corresponding to the z-axis to be displayed
+    """
+
+    print("Creating an MTG corresponding to a spatial scale to be displayed along the z-axis...")
+
+    # We create a new MTG called g:
+    g = MTG()
+
+    # We first add one initial vertical segment:
+    id_segment = g.add_component(g.root, label='Segment')
+    segment = g.node(id_segment)
+    segment.radius = line_thickness
+    segment.length = length_increment
+    segment.x1 = 0
+    segment.y1 = 0
+    segment.z1 = starting_z
+    segment.x2 = 0
+    segment.y2 = 0
+    segment.z2 = starting_z - length_increment
+
+    # And we add a lateral segment that will materialize graduations along the vertical axis:
+    lateral = ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Segment',
+                             type='',
+                             root_order=1,
+                             angle_down=90,
+                             angle_roll=0,
+                             length=line_thickness * 5,
+                             radius=line_thickness,
+                             identical_properties=False,
+                             nil_properties=True)
+    lateral.x1 = 0
+    lateral.y1 = 0
+    lateral.z1 = starting_z - length_increment
+    lateral.x2 = 0
+    lateral.y2 = 0 + line_thickness * 5
+    lateral.z2 = starting_z - length_increment
+
+    # We calculate the number of steps for building the scale axis iteratively:
+    n_steps = int(np.floor(total_length/length_increment))-1
+
+    # For each seminal root that can emerge at this emergence event:
+    for i in range(1, n_steps+1):
+
+        # We form one new vertical segment:
+        segment = ADDING_A_CHILD(mother_element=segment, edge_type='<', label='Segment',
+                                 type='',
+                                 root_order=1,
+                                 angle_down=0,
+                                 angle_roll=0,
+                                 length=length_increment,
+                                 radius=line_thickness,
+                                 identical_properties=False,
+                                 nil_properties=True)
+        segment.x1 = 0
+        segment.y1 = 0
+        segment.z1 = starting_z - length_increment * i
+        segment.x2 = 0
+        segment.y2 = 0
+        segment.z2 = starting_z - length_increment * 2 * i
+
+        # We form one new horizontal graduation:
+        lateral = ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Segment',
+                                 type='',
+                                 root_order=1,
+                                 angle_down=90,
+                                 angle_roll=0,
+                                 length=line_thickness*5,
+                                 radius=line_thickness,
+                                 identical_properties=False,
+                                 nil_properties=True)
+        lateral.x1 = 0
+        lateral.y1 = 0
+        lateral.z1 = starting_z - length_increment * 2 * i
+        lateral.x2 = 0
+        lateral.y2 = line_thickness * 5
+        lateral.z2 = starting_z - length_increment * 2 * i
+
+    print("> Scale axis MTG has been made!")
+
+    return g
+
 ########################################################################################################################
 
 # Function for defining each element according to its axis ID:

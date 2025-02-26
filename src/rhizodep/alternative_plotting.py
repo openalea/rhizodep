@@ -123,6 +123,7 @@ def plotting_roots_with_pyvista(g, displaying_root_hairs = True,
                                 plot_width=1000, plot_height=750,
                                 camera_x=0.3, camera_y=0., camera_z=-0.07,
                                 focal_x=0., focal_y=0., focal_z=-0.07,
+                                show_axes = False,
                                 closing_window=False):
     """
     This functions aims to plot a root system with Pyvista, creating step by step every shape.
@@ -266,8 +267,9 @@ def plotting_roots_with_pyvista(g, displaying_root_hairs = True,
     p.camera_set = True
 
     # SETTING AXES:
-    # p.add_axes()
-    # p.add_axes_at_origin()
+    if show_axes:
+        # p.add_axes()
+        p.add_axes_at_origin()
 
     # DIVERSE SETTINGS:
     # We set the background color of the plot:
