@@ -1,7 +1,7 @@
 # -*- coding: latin-1 -*-
 
 """
-    This script allows to run RhizoDep over one scenario or a list of tutorial, using a specific set of parameters and
+    This script allows to run RhizoDep over one scenario or a list of scenarios, using a specific set of parameters and
     options, which are specified in an input file.
 
     :copyright: see AUTHORS.
@@ -40,7 +40,7 @@ def run_one_scenario(scenario_id=1,
     The outputs of the simulation for this scenario are recorded in a folder 'Scenario_XXXX' (the simulation will erase
     any existing folder with the same scenario number).
 
-    :param int scenario_id: the number of the scenario to be read in the file containing the list of tutorial
+    :param int scenario_id: the number of the scenario to be read in the file containing the list of scenarios
     :param str inputs_dir_path: the path of the directory containing the file [scenarios_list]
     :param str outputs_dir_path: the path of the directory where outputs of RhizoDep will be saved
     :param str scenarios_list: the name of the .csv or .xlsx file where scenario's instructions are written
@@ -218,7 +218,7 @@ def run_one_scenario(scenario_id=1,
         SCENARIO_INPUT_FILE = os.path.join(INPUTS_DIRPATH, SCENARIO_INPUT_FILENAME)
     else:
         SCENARIO_INPUT_FILE = None
-    # If the instructions are to start the tutorial(s) at a specific time step in the input file:
+    # If the instructions are to start the scenario(s) at a specific time step in the input file:
     if SCENARIO_INPUT_FILE != None and STARTING_TIME_IN_DAYS > 0:
         # Then we read the file and copy it in a dataframe "df":
         original_input_frame = pd.read_csv(SCENARIO_INPUT_FILE, sep=',')
@@ -232,14 +232,14 @@ def run_one_scenario(scenario_id=1,
         SCENARIO_INPUT_FILE = os.path.join(OUTPUTS_DIRPATH, new_input_file_name)
 
     # LOOKING AT THE INITIAL ROOT MTG:
-    # We initalize a Boolean for authorizing the tutorial:
+    # We initalize a Boolean for allowing to run the scenario:
     simulation_allowed = True
     # If we decide to start from a given root MTG to be loaded:
     if START_FROM_A_KNOWN_ROOT_MTG:
         filename = os.path.join(inputs_dir_path, ROOT_MTG_FILE)
         if not os.path.exists(filename):
             print("!!! ERROR: the file", ROOT_MTG_FILE,"could not be found in the folder", inputs_dir_path, "!!!")
-            print("The tutorial stops here!")
+            print("The scenario stops here!")
             simulation_allowed=False
         else:
             # We load the MTG file and name it "g":
@@ -275,9 +275,9 @@ def run_one_scenario(scenario_id=1,
         f = None
 
     # LAUNCHING THE SIMULATION:
-    # If the tutorial has been allowed (i.e. the MTG "g" has been defined):
+    # If the scenario has been allowed (i.e. the MTG "g" has been defined):
     if simulation_allowed:
-        # We launch the main tutorial program:
+        # We launch the main scenario program:
         running_simulation.main_simulation(g, simulation_period_in_days=SIMULATION_PERIOD, time_step_in_days=TIME_STEP,
                                        radial_growth=RADIAL_GROWTH,
                                        ArchiSimple=ARCHISIMPLE_OPTION,
@@ -329,12 +329,12 @@ def run_one_scenario(scenario_id=1,
 
 
 
-# Function for running several tutorial in parallel:
+# Function for running several scenarios in parallel:
 #----------------------------------------------------
 def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx", input_path='inputs', output_path='outputs'):
 
     """
-    This function runs RhizoDep simultaneously for different tutorial read in the file [scenarios_list],
+    This function runs RhizoDep simultaneously for different scenarios read in the file [scenarios_list],
     by parallelizing the function 'run_one_scenario' using multiprocessing.
     The input file can either be a .csv file or a .xlsx file.
     For missing instructions, default values (e.g. those defined in 'parameters.py') will be used.
@@ -345,39 +345,39 @@ def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx", input_path='inp
     """
 
     # READING SCENARIO INSTRUCTIONS:
-    # FROM A CSV FILE where tutorial are present in different lines:
+    # FROM A CSV FILE where scenarios are present in different lines:
     if os.path.splitext(scenarios_list)[1] == ".csv":
-        # We read the data frame containing the different tutorial to be simulated:
-        print("Loading the instructions of tutorial...")
+        # We read the data frame containing the different scenarios to be simulated:
+        print("Loading the instructions of scenarios...")
         scenarios_df = pd.read_csv(os.path.join(input_path, scenarios_list), index_col='Scenario')
-        # We copy the list of tutorial' properties in the 'outputs' directory:
+        # We copy the list of scenarios' properties in the 'outputs' directory:
         scenarios_df.to_csv(os.path.join(output_path, 'scenarios_list.csv'), na_rep='NA', index=False, header=True)
         # We record the number of each scenario to be simulated:
         scenarios_df['Scenario'] = scenarios_df.index
         scenarios = scenarios_df.Scenario
-    # FROM AN EXCEL FILE where tutorial are present in different columns:
+    # FROM AN EXCEL FILE where scenarios are present in different columns:
     elif os.path.splitext(scenarios_list)[1] == ".xlsx":
-        # We read the data frame containing the different tutorial to be simulated:
+        # We read the data frame containing the different scenarios to be simulated:
         print("Loading the instructions of scenario(s)...")
         scenarios_df = pd.read_excel(os.path.join(input_path, scenarios_list), sheet_name="scenarios_as_columns")
-        # We get a list of the names of the columns, which correspond to the tutorial' numbers:
+        # We get a list of the names of the columns, which correspond to the scenarios' numbers:
         scenarios = list(scenarios_df.columns)
-        # We remove the unnecessary names of the first 4 columns, so that tutorial only contains the scenario numbers:
+        # We remove the unnecessary names of the first 4 columns, so that scenarios only contains the scenario numbers:
         del scenarios[0:4]
 
-    # We record the starting time of the tutorial:
+    # We record the starting time:
     t_start = time.time()
     # We look at the maximal number of parallel processes that can be run at the same time:
     num_processes = mp.cpu_count()
-    # We compare this to the number of tutorial:
-    print("The list of tutorial to be run is", str(list(scenarios)),
+    # We compare this to the number of scenarios:
+    print("The list of scenarios to be run is", str(list(scenarios)),
           "and the maximal number of parallel processes is", num_processes, "...")
     if num_processes < len(list(scenarios)):
-        print(" !!! WATCH OUT: it is currently not possible to run all tutorial at the same time, "
+        print(" !!! WATCH OUT: it is currently not possible to run all scenarios at the same time, "
               "the maximal number of processes is", num_processes, "!!!")
     print("Please check which scenario folders have actually been created in the outputs, some may be missing!")
 
-    # We run all tutorial in parallel:
+    # We run all scenarios in parallel:
     # If the parameters are not the default one, we need to give the real parameters to
     # run_one _scenario
 
@@ -470,7 +470,7 @@ if __name__ == '__main__':
     output_dir = tuto_dir / 'outputs'
     
     previous_outputs_clearing(output_path=str(output_dir))
-    # We run the tutorial in parallel :
+    # We run the scenarios in parallel :
     # WATCH OUT: you will still need to manually modify the default arguments of 'run_one_scenarios',
     # e.g. the name of the file where to read scenario instructions, even if you have entered it below!
     run_multiple_scenarios(scenarios_list="scenarios_list.xlsx",

@@ -18,7 +18,7 @@ from math import floor
 import numpy as np
 from openalea.mtg import *
 from openalea.mtg.traversal import pre_order
-from .tools import my_colormap
+from openalea.rhizodep.tool.tools import my_colormap
 
 
 ########################################################################################################################

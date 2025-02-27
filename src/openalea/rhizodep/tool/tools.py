@@ -26,8 +26,8 @@ from openalea.mtg.plantframe import color
 from openalea.mtg import *
 import openalea.plantgl.all as pgl
 
-from .. import parameters as param
-from .. import model
+from openalea.rhizodep import parameters as param
+from openalea.rhizodep import model
 
 # FUNCTIONS FOR DATA PREPROCESSING :
 ####################################

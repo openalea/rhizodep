@@ -16,9 +16,13 @@
 
 ## About
 
-### Description
+### Model description
 
 RhizoDep is a functional-structural root model aiming to simulate root growth, respiration and rhizodeposition along the whole root system. Root growth is based on a potential growth model adapted from ArchiSimple model, which is regulated by the local balance of carbon in each root segment. This local carbon balance also enables to simulate root respiration, which originates from growth and maintenance, and rhizodeposition, which has been represented as the net exudation of hexose, the secretion of mucilage and the release of cap cells. The model depends on i) the input of carbon allocated from the shoots to the roots, ii) the temperature of the soil, iii) the dynamics of rhizodeposits at the root-soil interface, which is currently simulated by a simple soil degradation function.
+
+### Package description
+
+The folder ‘src/openalea/rhizodep’ contains the main files for running RhizoDep, including ‘model.py’ that contains the main code of the model, ‘parameters.py’ that contains default values of parameters, and ‘running_simulation.py’ that allows to run a complete simulation. Additional scripts in the subfolder ‘tool’ allow plotting the root system computing different variables within the root system. The file ‘running_scenarios.py’ allows in particular to run different scenarios, on the basis of the input file ‘scenarios.list’ that is located in tutorial/inputs. A rapid test of the model can be launched with the file ‘test_rhizodep.py’ in the folder ‘test’.
 
 ### Installation
 

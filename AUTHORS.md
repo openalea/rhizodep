@@ -11,5 +11,5 @@
 
 * Christophe Pradal (@pradal) : Model development, OpenAlea integration, MTG and the like
 * Tristan Gérault : Model development
-* Marion Gauthier : Addition of a numerical solver
+* Marion Gauthier : Addition of a numerical solver & multiprocessing options
 
