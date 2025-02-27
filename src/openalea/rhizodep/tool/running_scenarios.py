@@ -9,19 +9,20 @@
 """
 
 import os
-import pandas as pd
-import numpy as np
-import multiprocessing as mp
 import shutil
 import time
 import pickle
+import multiprocessing as mp
+from pathlib import Path
 
+import pandas as pd
+import numpy as np
 
-from .. import model
-from .. import running_simulation 
-from .. import parameters as param
-from . import tools
-from .. import mycorrhizae 
+from openalea.rhizodep import model
+from openalea.rhizodep import running_simulation 
+from openalea.rhizodep import parameters as param
+from openalea.rhizodep.tool import tools
+from openalea.rhizodep import mycorrhizae 
 
 
 ########################################################################################################################
@@ -326,7 +327,7 @@ def run_one_scenario(scenario_id=1,
                                        camera_distance=CAMERA_DISTANCE, step_back_coefficient=STEP_BACK_COEFFICIENT,
                                        camera_rotation=CAMERA_ROTATION_OPTION, n_rotation_points=CAMERA_ROTATION_N_POINTS)
 
-    return
+
 
 # Function for running several tutorial in parallel:
 #----------------------------------------------------
@@ -377,10 +378,13 @@ def run_multiple_scenarios(scenarios_list="scenarios_list.xlsx", input_path='inp
     print("Please check which scenario folders have actually been created in the outputs, some may be missing!")
 
     # We run all tutorial in parallel:
+    # If the parameters are not the default one, we need to give the real parameters to
+    # run_one _scenario
+
+    from functools import partial
+
     p = mp.Pool(num_processes)
-    p.map(run_one_scenario, list(scenarios))
-    # WATCH OUT: p.map does not allow to have multiple arguments in the function to be run in parallel !!!
-    # Arguments of 'run_one_scenario' should be modifed directly in the default parameters of the function!
+    p.map(partial(run_one_scenario, inputs_dir_path=input_path, outputs_dir_path=output_path, scenarios_list=scenarios_list), list(scenarios))
     p.terminate()
     p.join()
 
@@ -455,10 +459,21 @@ if __name__ == '__main__':
     # CASE 2 - CALLING MULTIPLE SCENARIOS:
     ######################################
     # We can clear the folder containing previous outputs:
-    previous_outputs_clearing(output_path="outputs")
+
+    current_dir = Path(__file__).parent.absolute()
+
+    print(current_dir)
+    tuto_dir = (current_dir.parent.parent.parent.parent / 'tutorial').absolute()
+    print(tuto_dir)
+
+    input_dir = tuto_dir / 'inputs'
+    output_dir = tuto_dir / 'outputs'
+    
+    previous_outputs_clearing(output_path=str(output_dir))
     # We run the tutorial in parallel :
     # WATCH OUT: you will still need to manually modify the default arguments of 'run_one_scenarios',
     # e.g. the name of the file where to read scenario instructions, even if you have entered it below!
     run_multiple_scenarios(scenarios_list="scenarios_list.xlsx",
-                           input_path="inputs",
-                           output_path="outputs")
+                           input_path=str(input_dir),
+                           output_path=str(output_dir))
+    
