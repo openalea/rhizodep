@@ -1,37 +1,44 @@
+# -*- coding: latin-1 -*-
+
+"""
+    This script allows to load MTG (Multiscale Tree Graphs) files from .pckl or .csv files for calculating new variables
+     and/or (re)plotting graphs.
+
+    :copyright: see AUTHORS.
+    :license: see LICENSE for details.
+"""
+
 import os, os.path
 from pathlib import Path
 import copy
-from math import sqrt, pi, trunc, floor, cos, sin
+
+from math import floor
 
 import pickle
-from statistics import mean
 
 import numpy as np
 import pandas as pd
 
 from openalea.mtg import *
-from openalea.mtg import turtle as turt
-from openalea.mtg.plantframe import color
-from openalea.mtg.traversal import pre_order, post_order
 import openalea.plantgl.all as pgl
 from openalea.plantgl.all import *
 from PIL import Image, ImageDraw, ImageFont
 
-from openalea.rhizodep.model import recording_MTG_properties
-from openalea.rhizodep.tools import (my_colormap, get_root_visitor, prepareScene, circle_coordinates, plot_mtg,
-                            colorbar, sci_notation, indexing_root_MTG)
-from openalea.rhizodep.alternative_plotting import plotting_roots_with_pyvista, fast_plotting_roots_with_pyvista
+from ..model import recording_MTG_properties
+from .tools import (my_colormap, circle_coordinates, plot_mtg,
+                                          indexing_root_MTG, creating_a_spatial_scale_MTG)
+from .alternative_plotting import plotting_roots_with_pyvista, fast_plotting_roots_with_pyvista
 
 
 ########################################################################################################################
-# DEFINING ADDTIONAL FUNCTIONS FOR DISPLAYING THE MTG IN A 3D GRAPH WITH PLANTGL
+# DEFINING USEFUL FONCTIONS FOR CREATING/IMPROVING IMAGES
 ########################################################################################################################
 
 # Function creating an image containing a text:
 #----------------------------------------------
 def drawing_text(text="TEXT !", image_name="text.png", length=220, height=110, font_size=100):
     """
-    This function enables to create and save an image containing showing a text on a transparent background.
+    This function enables to create and save an image showing a text on a transparent background.
     :param text: the text to add
     :param image_name: the name of the image file
     :param length: length of the image
@@ -82,10 +89,10 @@ def showing_image(image_name="text.png",
     # We define a list of indices:
     indices = [(0, 1, 2, 3)]
     # We define a zone that will correspond to these coordinates:
-    carre = QuadSet(points, indices)
+    carre = pgl.QuadSet(points, indices)
     # We load an image as a texture material:
     my_path = os.path.join("../../simulations/running_scenarios/", image_name)
-    tex = ImageTexture(my_path)
+    tex = pgl.ImageTexture(my_path)
     # We define the texture coordinates that we will use:
     # texCoord = [(0,0),
     #             (0,1),
@@ -100,35 +107,13 @@ def showing_image(image_name="text.png",
     # We finally display the new image:
     carre.texCoordList = texCoord
     carre.texCoordIndexList = texCoordIndices
-    shape = Shape(carre, tex)
+    shape = pgl.Shape(carre, tex)
     # Viewer.display(shape)
     return shape
 
-# Function positionning some margins:
-#------------------------------------
-def add_margin(image, top, right, bottom, left, color):
-    """
-    This function adds some margins around a specific image.
-    :param image: the image object to which margins are added
-    :param top: width of the top margin
-    :param right: width of the right margin
-    :param bottom: width of the bottom margin
-    :param left: width of the left margin
-    :param color: color of the margins
-    :return:
-    """
-    width, height = image.size
-    new_width = width + right + left
-    new_height = height + top + bottom
-    result = Image.new(image.mode, (new_width, new_height), color)
-    result.paste(image, (left, top))
-    return result
-
 ########################################################################################################################
+# DEFINING FUNCTIONS FOR COMPUTING THE DISTRUBUTION OF PROPERTIES ALONG SOIL DEPTH
 ########################################################################################################################
-
-# Useful functions for calculating on MTG files:
-################################################
 
 # Calculation of the length of a root element intercepted between two z coordinates:
 # ----------------------------------------------------------------------------------
@@ -189,7 +174,7 @@ def classifying_on_z(g, z_min=0, z_max=1, z_interval=0.1):
     """
     This function calculates the distribution of certain characteristics of a MTG g according to the depth z.
     For each z-layer between z_min and z_max and each root segment, specific variables are computed, depending on the
-    length within the segment that is intercepted between the upper and lower horizontal plane [use of 'sub_length' functino].
+    length within the segment that is intercepted between the upper and lower horizontal plane [see 'sub_length' function].
     :param g: the MTG on which calculations are made
     :param z_min: the depth to which we start computing
     :param z_max: the maximal depth to which we stop computing
@@ -273,9 +258,240 @@ def classifying_on_z(g, z_min=0, z_max=1, z_interval=0.1):
 
     return final_dictionnary
 
+
+# Function for summing or averaging properties for specific groups of root elements, e.g. depending on root order
+# or distance from tip:
+def computing_data_on_different_roots(g, properties_to_compare=["total_net_rhizodeposition"],
+                                      comparing_distance_from_tip=False, distance_treshold=0.04,
+                                      summing=True, averaging=False):
+    """
+    This function enables to compare different groups of roots, which are distinguished by their root order and possibly
+    through the distance from root tip. For each root class, the function computes the sum and possibly the mean and the standard deviation
+    of the values corresponding to a set of properties of the root MTG.
+    :param g: the root MTG to work on
+    :param properties_to_compare: a list containing the names of the properties to be considered by the function
+    :param comparing_distance_from_tip: if True, roots will be discriminated according to the distance of a root element from the tip of its axis, for each root order
+    :param distance_treshold: the critical distance from root tip to consider when segregating roots according to this distance
+    :param summing: if True, the function returns the sum of each property within each root class
+    :param averaging: if True, the function returns the mean value of each property for a root element within each root class, and its standard deviation
+    :return: a dictionnary containing the names of the property x root class x calculation as keys, and the corresponding values
+    """
+
+    # -------------------------------------------------------------------------------------------------------------------
+    # We quickly define a function that will return the mean value from the items in a list, or 0 if the list is empty,
+    # as the traditional functions 'mean' and 'np.mean' throw an error if the list is empty:
+    def averaging(list):
+        mean_value = sum(list) / len(list) if list else 0.
+        return mean_value
+
+    # We do the same for computing standard deviation, even for an empty list:
+    def sd(list):
+        standard_deviation = np.std(list) if list else 0.
+        return standard_deviation
+
+    # -------------------------------------------------------------------------------------------------------------------
+
+    # For preparing the final dictionnary containing the results, we initialize a list of keys and a list of values:
+    keys = []
+    values = []
+
+    # 1) CREATING LISTS OF SPECIFIC ELEMENTS:
+    #########################################
+
+    # We define a list of root elements with positive length for each root order class:
+    list_of_elements_all = [vid for vid in g.vertices_iter(scale=1)
+                            if g.node(vid).length > 0]
+    list_of_elements_order_1 = [vid for vid in g.vertices_iter(scale=1)
+                                if g.node(vid).root_order == 1 and g.node(vid).length > 0]
+    list_of_elements_order_2 = [vid for vid in g.vertices_iter(scale=1)
+                                if g.node(vid).root_order == 2 and g.node(vid).length > 0]
+    list_of_elements_higher_orders = [vid for vid in g.vertices_iter(scale=1)
+                                      if g.node(vid).root_order > 2 and g.node(vid).length > 0]
+    # In addition, if a distinction according to the distance from root tip is to be made:
+    if comparing_distance_from_tip:
+        # For each root order class, we distinguish a list of root elements close to the root tip from the other elements:
+        list_of_elements_all_apical = [vid for vid in list_of_elements_all
+                                       if g.node(vid).distance_from_tip <= distance_treshold]
+        list_of_elements_all_basal = [vid for vid in list_of_elements_all
+                                      if g.node(vid).distance_from_tip > distance_treshold]
+        list_of_elements_order_1_apical = [vid for vid in list_of_elements_order_1
+                                           if g.node(vid).distance_from_tip <= distance_treshold]
+        list_of_elements_order_1_basal = [vid for vid in list_of_elements_order_1
+                                          if g.node(vid).distance_from_tip > distance_treshold]
+        list_of_elements_order_2_apical = [vid for vid in list_of_elements_order_2
+                                           if g.node(vid).distance_from_tip <= distance_treshold]
+        list_of_elements_order_2_basal = [vid for vid in list_of_elements_order_2
+                                          if g.node(vid).distance_from_tip > distance_treshold]
+        list_of_elements_higher_orders_apical = [vid for vid in list_of_elements_higher_orders
+                                                 if g.node(vid).distance_from_tip <= distance_treshold]
+        list_of_elements_higher_orders_basal = [vid for vid in list_of_elements_higher_orders
+                                                if g.node(vid).distance_from_tip > distance_treshold]
+
+    # 2) COMPUTING PROPERTIES ON EACH LIST:
+    #######################################
+
+    # First of all, we record the number of elements in each list:
+    n_all = len(list_of_elements_all)
+    n_1 = len(list_of_elements_order_1)
+    n_2 = len(list_of_elements_order_2)
+    n_higher = len(list_of_elements_higher_orders)
+    # We add the corresponding keys and values for the final results dictionnary:
+    keys.extend(["n_all", "n_root_order_1", "n_root_order_2", "n_higher_orders"])
+    values.extend([n_all, n_1, n_2, n_higher])
+    # In addition, if a distinction according to the distance from root tip is to be made:
+    if comparing_distance_from_tip:
+        n_all_apical = len(list_of_elements_all_apical)
+        n_all_basal = len(list_of_elements_all_basal)
+        n_1_apical = len(list_of_elements_order_1_apical)
+        n_1_basal = len(list_of_elements_order_1_basal)
+        n_2_apical = len(list_of_elements_order_2_apical)
+        n_2_basal = len(list_of_elements_order_2_basal)
+        n_higher_apical = len(list_of_elements_higher_orders_apical)
+        n_higher_basal = len(list_of_elements_higher_orders_basal)
+        # We add the corresponding keys and values for the final results dictionnary:
+        keys.extend(["n_all_apical", "n_all_basal",
+                     "n_root_order_1_apical", "n_root_order_1_basal",
+                     "n_root_order_2_apical", "n_root_order_2_basal",
+                     "n_higher_orders_apical", "n_higher_orders_basal"])
+        values.extend([n_all_apical, n_all_basal, n_1_apical, n_1_basal,
+                       n_2_apical, n_2_basal, n_higher_apical, n_higher_basal])
+
+    # Then, for each property to consider:
+    for property in properties_to_compare:
+
+        # If the property is to be summed within each list:
+        if summing:
+            # We sum the property's values of each element within each list of root orders:
+            sum_all = sum([g.properties()[property][vid] for vid in list_of_elements_all])
+            sum_1 = sum([g.properties()[property][vid] for vid in list_of_elements_order_1])
+            sum_2 = sum([g.properties()[property][vid] for vid in list_of_elements_order_2])
+            sum_higher = sum([g.properties()[property][vid] for vid in list_of_elements_higher_orders])
+            # We add the corresponding keys and values for the final results dictionnary:
+            keys.extend([property + "_all_sum",
+                         property + "_root_order_1_sum",
+                         property + "_root_order_2_sum",
+                         property + "_higher_orders_sum"])
+            values.extend([sum_all, sum_1, sum_2, sum_higher])
+            # In addition, if a distinction according to the distance from root tip is to be made:
+            if comparing_distance_from_tip:
+                # We sum the property's values of each element within each list segragated with distance from tip:
+                sum_all_apical = sum([g.properties()[property][vid] for vid in list_of_elements_all_apical])
+                sum_all_basal = sum([g.properties()[property][vid] for vid in list_of_elements_all_basal])
+                sum_1_apical = sum([g.properties()[property][vid] for vid in list_of_elements_order_1_apical])
+                sum_1_basal = sum([g.properties()[property][vid] for vid in list_of_elements_order_1_basal])
+                sum_2_apical = sum([g.properties()[property][vid] for vid in list_of_elements_order_2_apical])
+                sum_2_basal = sum([g.properties()[property][vid] for vid in list_of_elements_order_2_basal])
+                sum_higher_apical = sum(
+                    [g.properties()[property][vid] for vid in list_of_elements_higher_orders_apical])
+                sum_higher_basal = sum([g.properties()[property][vid] for vid in list_of_elements_higher_orders_basal])
+                # We add the corresponding keys and values for the final results dictionnary:
+                keys.extend([property + "_all_apical_sum",
+                             property + "_all_basal_sum",
+                             property + "_root_order_1_apical_sum",
+                             property + "_root_order_1_basal_sum",
+                             property + "_root_order_2_apical_sum",
+                             property + "_root_order_2_basal_sum",
+                             property + "_higher_orders_apical_sum",
+                             property + "_higher_orders_basal_sum", ])
+                values.extend([sum_all_apical, sum_all_basal,
+                               sum_1_apical, sum_1_basal,
+                               sum_2_apical, sum_2_basal,
+                               sum_higher_apical, sum_higher_basal])
+
+        # If the property is to be averaged within each list:
+        if averaging:
+
+            # a) Computing mean values:
+            mean_all = averaging([g.properties()[property][vid] for vid in list_of_elements_all])
+            mean_1 = averaging([g.properties()[property][vid] for vid in list_of_elements_order_1])
+            mean_2 = averaging([g.properties()[property][vid] for vid in list_of_elements_order_2])
+            mean_higher = averaging([g.properties()[property][vid] for vid in list_of_elements_higher_orders])
+            # We add the corresponding keys and values for the final results dictionnary:
+            keys.extend([property + "_all_mean",
+                         property + "_root_order_1_mean",
+                         property + "_root_order_2_mean",
+                         property + "_higher_orders_mean"])
+            values.extend([mean_all, mean_1, mean_2, mean_higher])
+            # In addition, if a distinction according to the distance from root tip is to be made:
+            if comparing_distance_from_tip:
+                mean_all_apical = averaging([g.properties()[property][vid] for vid in list_of_elements_all_apical])
+                mean_all_basal = averaging([g.properties()[property][vid] for vid in list_of_elements_all_basal])
+                mean_1_apical = averaging([g.properties()[property][vid] for vid in list_of_elements_order_1_apical])
+                mean_1_basal = averaging([g.properties()[property][vid] for vid in list_of_elements_order_1_basal])
+                mean_2_apical = averaging([g.properties()[property][vid] for vid in list_of_elements_order_2_apical])
+                mean_2_basal = averaging([g.properties()[property][vid] for vid in list_of_elements_order_2_basal])
+                mean_higher_apical = averaging(
+                    [g.properties()[property][vid] for vid in list_of_elements_higher_orders_apical])
+                mean_higher_basal = averaging(
+                    [g.properties()[property][vid] for vid in list_of_elements_higher_orders_basal])
+                # We add the corresponding keys and values for the final results dictionnary:
+                keys.extend([property + "_all_apical_mean",
+                             property + "_all_basal_mean",
+                             property + "_root_order_1_apical_mean",
+                             property + "_root_order_1_basal_mean",
+                             property + "_root_order_2_apical_mean",
+                             property + "_root_order_2_basal_mean",
+                             property + "_higher_orders_apical_mean",
+                             property + "_higher_orders_basal_mean", ])
+                values.extend([mean_all_apical, mean_all_basal,
+                               mean_1_apical, mean_1_basal,
+                               mean_2_apical, mean_2_basal,
+                               mean_higher_apical, mean_higher_basal])
+
+            # b) Computing standard deviations:
+            sd_all = sd([g.properties()[property][vid] for vid in list_of_elements_all])
+            sd_1 = sd([g.properties()[property][vid] for vid in list_of_elements_order_1])
+            sd_2 = sd([g.properties()[property][vid] for vid in list_of_elements_order_2])
+            sd_higher = sd([g.properties()[property][vid] for vid in list_of_elements_higher_orders])
+            # We add the corresponding keys and values for the final results dictionnary:
+            keys.extend([property + "_all_sd",
+                         property + "_root_order_1_sd",
+                         property + "_root_order_2_sd",
+                         property + "_higher_orders_sd"])
+            values.extend([sd_all, sd_1, sd_2, sd_higher])
+            # In addition, if a distinction according to the distance from root tip is to be made:
+            if comparing_distance_from_tip:
+                sd_all_apical = sd([g.properties()[property][vid] for vid in list_of_elements_all_apical])
+                sd_all_basal = sd([g.properties()[property][vid] for vid in list_of_elements_all_basal])
+                sd_1_apical = sd([g.properties()[property][vid] for vid in list_of_elements_order_1_apical])
+                sd_1_basal = sd([g.properties()[property][vid] for vid in list_of_elements_order_1_basal])
+                sd_2_apical = sd([g.properties()[property][vid] for vid in list_of_elements_order_2_apical])
+                sd_2_basal = sd([g.properties()[property][vid] for vid in list_of_elements_order_2_basal])
+                sd_higher_apical = sd([g.properties()[property][vid] for vid in list_of_elements_higher_orders_apical])
+                sd_higher_basal = sd([g.properties()[property][vid] for vid in list_of_elements_higher_orders_basal])
+                # We add the corresponding keys and values for the final results dictionnary:
+                keys.extend([property + "_all_apical_sd",
+                             property + "_all_basal_sd",
+                             property + "_root_order_1_apical_sd",
+                             property + "_root_order_1_basal_sd",
+                             property + "_root_order_2_apical_sd",
+                             property + "_root_order_2_basal_sd",
+                             property + "_higher_orders_apical_sd",
+                             property + "_higher_orders_basal_sd", ])
+                values.extend([sd_all_apical, sd_all_basal,
+                               sd_1_apical, sd_1_basal,
+                               sd_2_apical, sd_2_basal,
+                               sd_higher_apical, sd_higher_basal])
+
+    # 3) RECORDING THE RESULTS:
+    # We record the results of the computation in a dictionnary:
+    dictionary = dict(zip(keys, values))
+    dictionnary = {keys[i]: values[i] for i in range(len(keys))}
+
+    return dictionnary
+
 ########################################################################################################################
-# SIMPLE FUNCTION FOR RECREATING A MTG FROM THE CSV FILES CONTAINING ITS PROPERTIES:
+# CREATING A MTG FROM RECORDED FILES AND PERFORMING CALCULATIONS ON IT
+########################################################################################################################
+
+# Function for loading a MTG from its properties written in a .csv file:
 def create_MTG_from_csv_file(csv_filename='MTG_00003.csv'):
+
+    """
+    This function reads a .csv file containing all properties of a MTG to recreate the MTG structure within OpenAlea.
+    :param csv_filename: the name of the .csv file to read
+    :return: the recreated MTG structure
+    """
 
     # We first read the csv file where all the properties of each vertex has been previously recorded:
     try:
@@ -322,8 +538,8 @@ def create_MTG_from_csv_file(csv_filename='MTG_00003.csv'):
 
     return g
 
-########################################################################################################################
-# MAIN FUNCTION FOR LOADING AND DISPLAYING/EXTRACTING PROPERTIES FROM MTG FILES
+# MAIN FUNCTION FOR LOADING AND DISPLAYING/EXTRACTING PROPERTIES FROM MTG FILES:
+################################################################################
 def loading_MTG_files(my_path='',
                       opening_list=False,
                       file_extension='pckl',
@@ -331,7 +547,7 @@ def loading_MTG_files(my_path='',
                       single_MTG_filename='root00001.pckl',
                       list_of_MTG_ID=None,
                       plotting_with_PlantGL=False,
-                      normal_plotting_with_pyvista=False,
+                      normal_plotting_with_pyvista=False, show_Pyvista_axes=False,
                       fast_plotting_with_pyvista=False,
                       closing_window=False,
                       factor_of_higher_resolution=3,
@@ -347,6 +563,9 @@ def loading_MTG_files(my_path='',
                       recording_images=False,
                       images_directory='root_new_images',
                       z_classification=False, z_min=0.0, z_max=1., z_interval=0.1, time_step_in_days=1 / 24.,
+                      computing_on_different_roots=False, comparing_distance_from_tip = False, distance_treshold = 0.04,
+                      properties_to_compute=["total_net_rhizodeposition", "length"],
+                      summing_different_roots=False, averaging_different_roots=False,
                       printing_sum=True,
                       recording_sum=True,
                       printing_warnings=True,
@@ -371,6 +590,12 @@ def loading_MTG_files(my_path='',
     :param z_max: the maximal depth to which we stop computing
     :param z_interval: the thickness of each layer to consider between z_min and z_max
     :param time_step_in_days: the time step at which is MTG file was generated (used to display time on the images)
+    :param computing_on_different_roots: if True, calculations will be done on different root classes
+    :param comparing_distance_from_tip: if True, root classes will be based not only on root orders, but also according to the distance from root tip
+    :param distance_treshold: the critical distance from root tip to consider when segregating roots according to this distance
+    :param properties_to_compute: a list containing the names of the properties to be considered by the function
+    :param summing_different_roots: if True, the function returns the sum of each property within each root class
+    :param averaging_different_roots: if True, the function returns the mean value of each property for a root element within each root class, and its standard deviation
     :param printing_sum: if True, properties summed over the whole MTG(s) will be shown in the console
     :param recording_sum: if True, properties summed over the whole MTG(s) will be recorded
     :param printing_warnings: if True, warnings will be displayed
@@ -425,16 +650,16 @@ def loading_MTG_files(my_path='',
         # and add it to the list:
         for filename in filenames:
             if file_extension == 'pckl':
-                MTG_ID = int(filename[-10:-5])
+                MTG_ID = int(str(filename)[-10:-5])
             else:
-                MTG_ID = int(filename[-9:-4])
+                MTG_ID = int(str(filename)[-9:-4])
             list_of_MTG_numbers.append(MTG_ID)
     # If the instructions are to open a specific list:
     elif opening_list and list_of_MTG_ID:
         list_of_MTG_numbers =  list_of_MTG_ID
     # Otherwise, we open a single file:
     else:
-        list_of_MTG_numbers = [int(single_MTG_filename[-10:-5])]
+        list_of_MTG_numbers = [int(str(single_MTG_filename)[-10:-5])]
 
     if recording_g_properties:
         # We define the directory "MTG_properties"
@@ -471,6 +696,10 @@ def loading_MTG_files(my_path='',
     if z_classification:
         # We create an empty dataframe that will contain the results of z classification:
         z_dictionnary_series = []
+
+    if computing_on_different_roots:
+        # We create an empty dataframe that will contain the results of computing:
+        computing_dictionnary_series = []
 
     # If the camera is supposed to move around the MTG:
     if camera_rotation:
@@ -550,7 +779,8 @@ def loading_MTG_files(my_path='',
                                             plot_width=width, plot_height=height,
                                             camera_x=x_cam, camera_y=y_cam, camera_z=z_cam,
                                             focal_x=x_center, focal_y=y_center, focal_z=z_center,
-                                            closing_window=closing_window)
+                                            closing_window=closing_window,
+                                            show_axes=show_Pyvista_axes)
             else:
                 # We plot the current file:
                 fast_plotting_roots_with_pyvista(g, displaying_root_hairs=root_hairs_display,
@@ -640,7 +870,6 @@ def loading_MTG_files(my_path='',
             print("   > Plot made!")
             print("")
 
-
         # For recording the properties of g in a csv file:
         # ------------------------------------------------
         if recording_g_properties:
@@ -650,22 +879,55 @@ def loading_MTG_files(my_path='',
         # For integrating root variables on the z axis:
         # ----------------------------------------------
         if z_classification:
+            # We perform the classification for the current MTG, which generates a dictionnary:
             z_dictionnary = classifying_on_z(g, z_min=z_min, z_max=z_max, z_interval=z_interval)
+            # We add a new item in the dictionnary containing the time to which this MTG corresponds:
             z_dictionnary["time_in_days"] = time_step_in_days * ID
+            # We add the dictionnary to the dataframe containing the results of z-classfication for all MTG files:
             z_dictionnary_series.append(z_dictionnary)
+
+        # For computing variables among different types of roots:
+        # -------------------------------------------------------
+        if computing_on_different_roots:
+            # We perform the computing for the current MTG, which generates a dictionnary:
+            dictionnary = computing_data_on_different_roots(g, properties_to_compare=properties_to_compute,
+                                                            comparing_distance_from_tip=comparing_distance_from_tip,
+                                                            distance_treshold=distance_treshold,
+                                                            summing=summing_different_roots,
+                                                            averaging=averaging_different_roots)
+            # We add a new item in the dictionnary containing the time to which this MTG corresponds:
+            dictionnary["time_in_days"] = time_step_in_days * ID
+            # We add the dictionnary to the dataframe containing the results of computing for all MTG files:
+            computing_dictionnary_series.append(dictionnary)
+
+    #-------------------------------------------------------------------------------------------------------------------
 
     # At the end of the loop, we can record the classification according to z:
     if z_classification:
         # We create a data_frame from the vectors generated in the main program up to this point:
         data_frame_z = pd.DataFrame.from_dict(z_dictionnary_series)
+        # For clarity, we move the last column "time_in_days" to the first column:
+        col = data_frame_z.pop('time_in_days')
+        data_frame_z.insert(0, col.name, col)
         # We save the data_frame in a CSV file:
-        data_frame_z.to_csv('z_classification.csv', na_rep='NA', index=False, header=True)
+        z_file_path = os.path.join(my_path, 'z_classification.csv')
+        data_frame_z.to_csv(z_file_path, na_rep='NA', index=False, header=True)
         print("   > A new file 'z_classification.csv' has been saved.")
+
+    # And we can record the computing among different root classes:
+    if computing_on_different_roots:
+        # We create a data_frame from the vectors generated in the main program up to this point:
+        data_frame_computing = pd.DataFrame.from_dict(computing_dictionnary_series)
+        # For clarity, we move the last column "time_in_days" to the first column:
+        col = data_frame_computing.pop('time_in_days')
+        data_frame_computing.insert(0, col.name, col)
+        # We save the data_frame in a CSV file:
+        computing_file_path = os.path.join(my_path, 'computing_different_root_classes.csv')
+        data_frame_computing.to_csv(computing_file_path, na_rep='NA', index=False, header=True)
+        print("   > A new file 'computing_different_root_classes.csv' has been saved.")
 
     return g
 
-
-########################################################################################################################
 ########################################################################################################################
 # MAIN FUNCTIONS FOR AVERAGING SEVERAL MTG INTO ONE
 ########################################################################################################################
@@ -677,7 +939,7 @@ def averaging_a_list_of_MTGs(list_of_MTG_numbers=[143, 167, 191], list_of_proper
                              averaged_MTG_name=None,
                              recording_directory = 'averaged_MTG_files'):
     """
-    This function calculate an "averaged" MTG that attributes for the property of a given node the mean value of that
+    This function calculate an "averaged" MTG that, for the property of a given node, attributes the mean value of that
     property value for the same node found in a list of MTG. This is especially useful for calculating mean values over
     a time range.
     :param list_of_MTG_numbers: a list containing the ID number of each MTG to be opened (each MTG name is assumed to be in the format 'rootXXXXX.pckl')
@@ -870,7 +1132,6 @@ def averaging_through_a_series_of_MTGs(MTG_directory='MTG_files', list_of_proper
 #                                    recording_directory='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0097/averaged_MTG_files')
 
 ########################################################################################################################
-########################################################################################################################
 # # ISOLATING A FRACTION OF THE MTG BASED ON TOPOLOGICAL COORDINATES
 ########################################################################################################################
 
@@ -879,10 +1140,10 @@ def subsampling_a_MTG(g, string_of_axis_ID_to_remove="Ax1-S1-", expected_startin
                       maximal_string_length_of_axis_ID=-1,
                       create_a_new_MTG = False):
     """
-    This function aims to provide a MTG for showing only a few axes from it, based on the property 'axis_ID'
+    This function aims to provide a root MTG for showing only a few axes from it, based on the property 'axis_ID'
     that corresponds to a chain of characters describing the position of each root element in the topology of the MTG.
-    The function will look for a specific chain of character starting at a specific position within the string "axis_ID',
-    and will either remove all coreesponding axes, or reduce their length to 0 so that they are not shown.
+    The function will look for a specific chain of characters starting at a specific position within the string "axis_ID',
+    and will either remove all corresponding axes, or reduce their length to 0 so that they are not shown.
     :param g: the root MTG to subsample
     :param string_of_axis_ID_to_remove: specific chain of characters to detect within 'axis_ID' for removing axes
     :param expected_starting_index_of_string: starting index of the chain of characters to detect within 'axis_ID'
@@ -958,35 +1219,37 @@ def showing_one_axis(my_path='',
                      images_directory="axis_images"):
 
     """
-
-    :param my_path:
-    :param opening_list:
-    :param file_extension:
-    :param MTG_directory:
-    :param single_MTG_filename:
-    :param list_of_MTG_ID:
-    :param starting_string_of_axes_to_remove:
-    :param targeted_apex_axis_ID:
-    :param maximal_string_length_of_axis_ID:
-    :param recording_new_MTG_file:
-    :param new_MTG_file_path:
-    :param plotting:
-    :param property_name:
-    :param vmin:
-    :param vmax:
-    :param lognorm:
-    :param cmap:
-    :param final_image_filepath:
-    :return:
+    This function enables to reduce a MTG to only one axis, e.g. for illustrating how variables vary along it.
+    :param my_path: the path of the main directory
+    :param opening_list: if True, the function will look at a list of different files to be opened
+    :param file_extension: the extension of the file for loading the MTG (either 'pckl' or 'csv')
+    :param MTG_directory: the name of the folder where MTG files are stored
+    :param single_MTG_filename: if opening_list is False, this corresponds to the name of the MTG file to open
+    :param list_of_MTG_ID: if opening_list is True, this corresponds to the list of MTG names to open
+    :param starting_string_of_axes_to_remove: the starting characters common to all axes to be removed
+    :param targeted_apex_axis_ID: the axis_ID of the apex corresponding to the axis to keep
+    :param maximal_string_length_of_axis_ID: the maximal number of characters within axis_ID to be kept, so that elements with a higher numbers (e.g. lateral roots) will be removed
+    :param recording_new_MTG_files: if True, the new single-axis MTG files will be recorded as pickle files
+    :param new_MTG_files_folder: the name of the folder where new single-axis MTG should be recorded
+    :param recording_new_MTG_properties: if True, all properties from each new single-axis MTG files will be recorded in a .csv file
+    :param new_MTG_properties_folder: the name of the folder where the properties of new single-axis MTG should be recorded
+    :param plotting: if True, the new single-axis MTG files will be displayed
+    :param property_name: the name of the property of the new MTG files to be displayed
+    :param vmin: the minimal value shown on the colorbar
+    :param vmax: the maximal value shown on the colorbar
+    :param lognorm: if True, the colorbar will be displayed in log-scale
+    :param cmap: the name of the color distribution within the colorbar
+    :param images_directory: the name of the folder where the images of new single-axis MTG should be recorded
     """
 
+    # If a list of MTG files is to be opened:
     if opening_list:
         # We define the directory "MTG_files":
         g_dir = os.path.join(my_path, MTG_directory)
     else:
         g_dir = my_path
     print("Loading the MTG file located in", g_dir,"...")
-
+    # If plots are to be printed:
     if plotting:
         # We define the directory "video"
         video_dir = os.path.join(my_path, images_directory)
@@ -1182,6 +1445,10 @@ if __name__ == "__main__":
 
     print("Considering opening and treating recorded MTG files...")
 
+    # PLOTTING MTG FILES:
+    #####################
+
+    # # CREATING A NEW COLORBAR:
     # # If we want to add time and colorbar:
     # # image_path = os.path.join("./", 'colobar.png')
     # im = Image.open('colorbar.png')
@@ -1191,58 +1458,73 @@ if __name__ == "__main__":
     # im_resized.save('colorbar_new.png', quality=95)
     # # im_new.save('colorbar_new.png', quality=95)
 
-    # # To open a list:
-    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-01/Scenario_0151',
-    #                   plotting_with_pyvista=True,
+    # # (RE-)PLOTTING ONE ORIGINAL MTG FILE:
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
+    #                   MTG_directory="MTG_files",
     #                   opening_list=True,
-    #                   MTG_directory='MTG_files',
-    #                   list_of_MTG_ID=range(3002, 3003),
-    #                   # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
-    #                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
-    #                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
-    #                   property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True,
-    #                   # property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True,
-    #                   cmap='jet',
-    #                   width=800, height=800,
-    #                   # x_center=0.0, y_center=0.0, z_center=-0.1,
-    #                   # x_cam=0.4, y_cam=0.4, z_cam=-0.1,
-    #                   x_center=0.0, y_center=0.0, z_center=-0.15,
-    #                   x_cam=0.3, y_cam=0.0, z_cam=-0.15,
-    #                   background_color=[94,76,64],
-    #                   root_hairs_display=False,
-    #                   mycorrhizal_fungus_display=False,
-    #                   step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-    #                   adding_images_on_plot=False,
+    #                   # single_MTG_filename="root00599.pckl",
+    #                   # list_of_MTG_ID=range(2,4318,6),
+    #                   list_of_MTG_ID=[720],
     #                   recording_images=True,
-    #                   images_directory="new_root_image_test",
-    #                   printing_sum=False,
-    #                   recording_sum=False,
-    #                   recording_g_properties=False,
-    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
-
-    # # (Re-)plotting one original MTG file:
-    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/Other_works/',
-    #                   opening_list=False,
-    #                   # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
-    #                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
-    #                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
-    #                   # property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True, cmap='jet',
-    #                   property="length", vmin=0., vmax=1., log_scale=False, cmap='jet',
-    #                   width=1200, height=1200,
-    #                   x_center=0, y_center=0, z_center=-0.1,
-    #                   x_cam=0, y_cam=0, z_cam=-0.2,
+    #                   normal_plotting_with_pyvista=True, show_Pyvista_axes=False,
+    #                   fast_plotting_with_pyvista=False,
+    #                   closing_window=True,
+    #                   factor_of_higher_resolution=2,
+    #                   # property="C_hexose_root",
+    #                   # vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
+    #                   property="net_rhizodeposition_rate_per_day_per_cm",
+    #                   vmin=1e-7, vmax=1e-4, log_scale=True, cmap='jet',
+    #                   # property="root_order",
+    #                   # vmin=1, vmax=5, log_scale=False, cmap='jet',
+    #                   # property=None,
+    #                   width=800, height=800,
+    #                   # width=400, height=800,
+    #                   x_center=0, y_center=0, z_center=-0.20,
+    #                   x_cam=0.4, y_cam=0, z_cam=-0.15,
+    #                   # x_center=0, y_center=0, z_center=-0.2,
+    #                   # x_cam=1.2, y_cam=0, z_cam=-0.2,
     #                   step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-    #                   # x_center=0, y_center=0, z_center=-0, z_cam=-0,
-    #                   # camera_distance=1, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-    #                   adding_images_on_plot=False,
-    #                   recording_images=False,
-    #                   images_directory="original_root_images",
+    #                   background_color=[94, 76, 64],
+    #                   root_hairs_display=True,
+    #                   mycorrhizal_fungus_display=False,
+    #                   images_directory="new_images_with_axes",
     #                   printing_sum=False,
     #                   recording_sum=False,
     #                   recording_g_properties=False,
-    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
+    #                   # MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-05/Scenario_0163/MTG_properties/',
+    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1 / 24.)
+    # print("Done!")
 
-    # # (Re-)plotting the original MTG files:
+    # PLOTTING A SPATIAL SCALE TO PUT ON A GRAPH:
+    # We create a MTG file corresponding to the spatial scale we want to plot:
+    g = creating_a_spatial_scale_MTG(total_length=0.50, length_increment=0.1, line_thickness=0.002, starting_z=-0.1)
+    # We record the MTG:
+    g_file_name = 'C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/spatial_scale/root00000.pckl'
+    with open(g_file_name, 'wb') as output:
+        pickle.dump(g, output, protocol=2)
+    # We plot it:
+    loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
+                      MTG_directory="spatial_scale",
+                      opening_list=True,
+                      recording_images=True,
+                      normal_plotting_with_pyvista=True, show_Pyvista_axes=False,
+                      closing_window=False,
+                      factor_of_higher_resolution=2,
+                      width=800, height=800,
+                      property="length", vmin=0, vmax=0.1, log_scale=False,
+                      x_center=0, y_center=0, z_center=-0.20,
+                      x_cam=0.4, y_cam=0, z_cam=-0.15,
+                      background_color=[94, 76, 64],
+                      root_hairs_display=False,
+                      images_directory="new_images_with_axes",
+                      printing_sum=False,
+                      recording_sum=False,
+                      recording_g_properties=False,
+                      z_classification=False)
+    print("Done!")
+
+
+    # # (RE-)PLOTTING A SERIES OF ORIGINAL MTG FILES FROM ONE SCENARIO:
     # loading_MTG_files(my_path='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0097/',
     #                   opening_list=True,
     #                   MTG_directory="MTG_files",
@@ -1255,8 +1537,6 @@ if __name__ == "__main__":
     #                   width=1200, height=1200,
     #                   x_center=0, y_center=0, z_center=-0.1, z_cam=-0.2,
     #                   camera_distance=0.4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-    #                   # x_center=0, y_center=0, z_center=-0, z_cam=-0,
-    #                   # camera_distance=1, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
     #                   adding_images_on_plot=False,
     #                   recording_images=True,
     #                   images_directory="original_root_images",
@@ -1264,15 +1544,18 @@ if __name__ == "__main__":
     #                   recording_sum=False,
     #                   recording_g_properties=False,
     #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
-    #
-    # # Calculating average MTG:
+
+    # AVERAGING MTG FILES:
+    ######################
+
+    # # CREATING NEW MTG FILES WITH AVERAGE PROPERTIES FROM DIFFERENT MTG FILES:
     # averaging_through_a_series_of_MTGs(MTG_directory='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0100/MTG_files',
     #                                    list_of_properties=['length', 'C_hexose_root', 'net_rhizodeposition_rate_per_day_per_cm'],
     #                                    odd_number_of_MTGs_for_averaging=7,
     #                                    recording_averaged_MTG=True,
     #                                    recording_directory='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0100/averaged_MTG_files')
     #
-    # # Plotting the averaged MTG files:
+    # # PLOTTING THE NEW AVERAGED MTG FILES:
     # loading_MTG_files(my_path='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0100/',
     #                   opening_list=True,
     #                   MTG_directory="averaged_MTG_files",
@@ -1295,8 +1578,8 @@ if __name__ == "__main__":
     #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
     # print("Done!")
 
-    # SHOWING ONLY ONE AXIS:
-    ########################
+    # PLOTTING AND COMPUTING ON ONE ROOT AXIS ONLY:
+    ###############################################
 
     # # We load a root MTG that was previously recorded:
     # print("Loading the MTG file...")
@@ -1323,9 +1606,8 @@ if __name__ == "__main__":
     #                                    # maximal_string_length_of_axis_ID=15,
     #                                    create_a_new_MTG = True)
     #
-    # # PLOTTING THE NEW MTG:
+    # # PLOTTING THE NEW SUBSAMPLED MTG FILE:
     # print("Plotting...")
-    #
     # # In case it has not been done so far - we define the colors in g according to a specific property:
     # my_colormap(MTG_to_display,
     #             property_name="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, lognorm=True, cmap='jet')
@@ -1336,7 +1618,7 @@ if __name__ == "__main__":
     # apex = MTG_to_display.node(vid)
     # print("The coordinates of the apex are", apex.x2, apex.y2, apex.z2,)
     #
-    # # # PLOTTING WITH PLANTGL:
+    # # # > PLOTTING WITH PLANTGL:
     # # # We create the plot, by centering it on the lower end of the apex:
     # # sc = plot_mtg(MTG_to_display,
     # #               prop_cmap="C_hexose_root", lognorm=True, vmin=1e-6,vmax=1e-2, cmap='jet',
@@ -1352,7 +1634,7 @@ if __name__ == "__main__":
     # # image_name = os.path.join('C:/Users/frees/rhizodep/saved_outputs/', 'plot.png')
     # # pgl.Viewer.saveSnapshot(image_name)
     #
-    # # PLOTTING WITH PYVISTA:
+    # # > PLOTTING WITH PYVISTA:
     # fast_plotting_roots_with_pyvista(MTG_to_display, displaying_root_hairs=True,
     #                                  showing=True, recording_image=True, closing_window=False,
     #                                  image_file='C:/Users/frees/rhizodep/saved_outputs/plot_with_pyvista.png',
@@ -1361,168 +1643,7 @@ if __name__ == "__main__":
     #                                  camera_x=apex.x2+0.2, camera_y=apex.y2, camera_z=apex.z2-0.1,
     #                                  focal_x=apex.x2, focal_y=apex.y2, focal_z=apex.z2)
 
-    # # CREATING AVERAGE MTG:
-    # averaging_through_a_series_of_MTGs(MTG_directory='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/MTG_files_to_average/',
-    #                                    # list_of_properties=['struct_mass', 'length',
-    #                                    #                     'C_hexose_root',
-    #                                    #                     'total_exchange_surface_with_soil_solution',
-    #                                    #                     'net_sucrose_unloading_rate',
-    #                                    #                     'net_rhizodeposition_rate_per_day_per_cm'
-    #                                    #                     ],
-    #                                    list_of_properties=[],
-    #                                    odd_number_of_MTGs_for_averaging=7,
-    #                                    recording_averaged_MTG=True,
-    #                                    recording_directory='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/averaged_axis_MTG_files/'
-    #                                    )
-    # Recording MTG properties:
-    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
-    #                   MTG_directory="averaged_axis_MTG_files",
-    #                   opening_list=True,
-    #                   plotting_with_PlantGL=False,
-    #                   normal_plotting_with_pyvista=False,
-    #                   fast_plotting_with_pyvista=False,
-    #                   adding_images_on_plot=False,
-    #                   recording_images=False,
-    #                   printing_sum=False,
-    #                   recording_sum=False,
-    #                   recording_g_properties=True,
-    #                   MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/averaged_axis_MTG_properties/',
-    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
-    # # print("Done!")
-
-    # # PLOTTING ONLY ONE AXIS:
-    # list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
-    # list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
-    # MTG_folder_path = 'C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0161/MTG_files/'
-    # new_MTG_folder_path = 'C:/Users/frees/rhizodep/saved_outputs/axis_MTG_files'
-    # images_folder_path = 'C:/Users/frees/rhizodep/saved_outputs/axis_images/'
-    #
-    # vmin = 1e-4
-    # vmax = 8e-4
-    # lognorm = False
-    #
-    # # bar = colorbar(title="Root mobile hexose concentration (mol of hexose per gDW of structural mass)", cmap='jet',
-    # bar = colorbar(title="Root exchange surface with soil solution (square meter per cm of root)", cmap='jet',
-    # # bar = colorbar(title="Net unloading rate from phloem (moles of sucrose per cm of root per day)", cmap='jet',
-    # # bar = colorbar(title="Net rhizodeposition rate (gC per day per cm)", cmap='jet',
-    #                lognorm=lognorm, ticks=[], vmin=vmin, vmax=vmax)
-    # # We save it in the output directory:
-    # bar_name = os.path.join(images_folder_path, "colorbar.png")
-    # bar.savefig(bar_name, facecolor="None", edgecolor="None")
-    #
-    # for i in list_of_MTG:
-    #
-    #     showing_one_axis(MTG_filepath=os.path.join(MTG_folder_path, 'root%.5d.pckl' % i),
-    #                      starting_string_of_axes_to_remove="Ax00001-Se00001-",
-    #                      targeted_apex_axis_ID="Ax00001-Ap00000",
-    #                      maximal_string_length_of_axis_ID=15, # Here we select only the elements on the main axis, not the lateral ones
-    #                      recording_new_MTG_file=True,
-    #                      new_MTG_file_path=os.path.join(new_MTG_folder_path,'root%.5d.pckl' % i),
-    #                      plotting=True,
-    #                      # property_name="net_rhizodeposition_rate_per_day_per_cm",
-    #                      # vmin=1e-8, vmax=1e-5, lognorm=True, cmap='jet',
-    #                      # property_name="C_hexose_root",
-    #                      # vmin=1e-6, vmax=1e-3, lognorm=True, cmap='jet',
-    #                      # property_name="total_exchange_surface_with_soil_solution",
-    #                      # vmin=5e-5, vmax=3.5e-4, lognorm=False, cmap='jet',
-    #                      property_name="exchange_surface_per_cm",
-    #                      # vmin=1e-4, vmax=8e-4, lognorm=False, cmap='jet',
-    #                      # property_name="net_sucrose_unloading_per_cm_per_day",
-    #                      # vmin=1e-9, vmax=1e-5, lognorm=True, cmap='jet',
-    #                      vmin=vmin, vmax=vmax, lognorm=lognorm, cmap='jet',
-    #                      final_image_filepath=os.path.join(images_folder_path, 'root%.5d.png' % i)
-    #                      )
-
-    # # Recording MTG properties:
-    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0161/',
-    #                   MTG_directory="axis_MTG_files",
-    #                   opening_list=True,
-    #                   adding_images_on_plot=False,
-    #                   recording_images=False,
-    #                   # images_directory="averaged_root_images",
-    #                   printing_sum=False,
-    #                   recording_sum=False,
-    #                   recording_g_properties=True,
-    #                   MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0161/axis_MTG_properties/',
-    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
-    # print("Done!")
-
-    # # Plotting a series of MTG with normal Pyvista function:
-    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
-    #                   MTG_directory="MTG_files",
-    #                   opening_list=True,
-    #                   # single_MTG_filename="root00599.pckl",
-    #                   # list_of_MTG_ID=range(2,4318,6),
-    #                   # list_of_MTG_ID=range(3935, 3941),
-    #                   list_of_MTG_ID=range(0,4318,6),
-    #                   adding_images_on_plot=False,
-    #                   recording_images=True,
-    #                   normal_plotting_with_pyvista=True,
-    #                   fast_plotting_with_pyvista=False,
-    #                   closing_window=True,
-    #                   factor_of_higher_resolution=2,
-    #                   # property="C_hexose_root",
-    #                   # vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
-    #                   property="net_rhizodeposition_rate_per_day_per_cm",
-    #                   vmin=1e-7, vmax=1e-4, log_scale=True, cmap='jet',
-    #                   # property="root_order",
-    #                   # vmin=1, vmax=5, log_scale=False, cmap='jet',
-    #                   # property=None,
-    #                   width=800, height=800,
-    #                   # width=400, height=800,
-    #                   x_center=0, y_center=0, z_center=-0.20,
-    #                   x_cam=0.4, y_cam=0, z_cam=-0.15,
-    #                   # x_center=0, y_center=0, z_center=-0.2,
-    #                   # x_cam=1.2, y_cam=0, z_cam=-0.2,
-    #                   step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-    #                   background_color=[94, 76, 64],
-    #                   root_hairs_display=True,
-    #                   mycorrhizal_fungus_display=False,
-    #                   images_directory="root_images",
-    #                   printing_sum=False,
-    #                   recording_sum=False,
-    #                   recording_g_properties=False,
-    #                   # MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-05/Scenario_0163/MTG_properties/',
-    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1/24.)
-    # print("Done!")
-
-    # # (Re-)plotting the original MTG files from MTG_properties only:
-    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0161/',
-    #                   opening_list=True,
-    #                   # file_extension='pckl',
-    #                   # MTG_directory="axis_MTG_files",
-    #                   file_extension='csv',
-    #                   MTG_directory="MTG_properties",
-    #                   # list_of_MTG_ID=[720, 1440],
-    #                   normal_plotting_with_pyvista=True,
-    #                   fast_plotting_with_pyvista=False,
-    #                   closing_window=False,
-    #                   factor_of_higher_resolution=2,
-    #                   # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
-    #                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
-    #                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
-    #                   # property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True, cmap='jet',
-    #                   property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
-    #                   background_color=[255,255,255],
-    #                   width=1200, height=1200,
-    #                   x_center=0, y_center=0, z_center=-0.20,
-    #                   x_cam=0.4, y_cam=0, z_cam=-0.15,
-    #                   step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-    #                   # x_center=0, y_center=0, z_center=-0, z_cam=-0,
-    #                   # camera_distance=1, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-    #                   adding_images_on_plot=False,
-    #                   recording_images=True,
-    #                   images_directory="original_root_images",
-    #                   printing_sum=False,
-    #                   recording_sum=False,
-    #                   recording_g_properties=False,
-    #                   # MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-08/Scenario_0161/axis_MTG_properties_new/',
-    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
-
     # PLOTTING ONLY ONE AXIS:
-    # list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
-    # list_of_MTG = list(range(30*24-4,30*24+4)) + list(range(60*24-4,60*24+4)) + list(range(90*24-4,90*24+4)) + list(range(120*24-4,120*24+4)) + list(range(150*24-4,150*24+4))
-    list_of_MTG = list(range(55 * 24 + 1, 65 * 24-1))
 
     # property_name = "net_rhizodeposition_rate_per_day_per_cm"
     # vmin = 1e-8
@@ -1544,37 +1665,63 @@ if __name__ == "__main__":
     # vmax = 1e-4
     # lognorm = True
 
-    property_name = "root_exchange_surface_per_cm"
-    vmin = 1e-4
-    vmax = 8e-4
-    lognorm = False
+    # property_name = "root_exchange_surface_per_cm"
+    # vmin = 1e-4
+    # vmax = 8e-4
+    # lognorm = False
 
-    showing_one_axis(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0202/',
-                     opening_list=True,
-                     file_extension='pckl',
-                     MTG_directory="MTG_files",
-                     # file_extension='csv',
-                     # MTG_directory="MTG_properties",
-                     list_of_MTG_ID=list_of_MTG,
-                     # starting_string_of_axes_to_remove="Ax00001-Se00001-",
-                     targeted_apex_axis_ID="Ax00001-Ap00000",
-                     maximal_string_length_of_axis_ID=-1, # Here we consider all lateral roots
-                     # maximal_string_length_of_axis_ID=15, # Here we select only the elements on the main axis, not the lateral ones
-                     recording_new_MTG_files=False,
-                     # new_MTG_files_folder=os.path.join('axis_MTG_files'),
-                     recording_new_MTG_properties = False,
-                     # new_MTG_properties_folder = os.path.join('axis_85-95_days_MTG_properties'),
-                     plotting=True,
-                     # property_name="net_rhizodeposition_rate_per_day_per_cm",
-                     # vmin=1e-8, vmax=1e-5, lognorm=True, cmap='jet',
-                     # property_name="C_hexose_root",
-                     # vmin=1e-6, vmax=1e-3, lognorm=True, cmap='jet',
-                     # property_name="total_exchange_surface_with_soil_solution",
-                     # vmin=5e-5, vmax=3.5e-4, lognorm=False, cmap='jet',
-                     property_name=property_name,
-                     # vmin=1e-4, vmax=8e-4, lognorm=False, cmap='jet',
-                     # property_name="net_sucrose_unloading_per_cm_per_day",
-                     # vmin=1e-9, vmax=1e-5, lognorm=True, cmap='jet',
-                     vmin=vmin, vmax=vmax, lognorm=lognorm, cmap='jet',
-                     images_directory="axis_55-65_days_images"
-                     )
+    # list_of_MTG = [30*24, 60*24, 90*24, 120*24, 150*24]
+    # list_of_MTG = list(range(30*24-4,30*24+4)) + list(range(60*24-4,60*24+4)) + list(range(90*24-4,90*24+4)) + list(range(120*24-4,120*24+4)) + list(range(150*24-4,150*24+4))
+    # list_of_MTG = list(range(0, 24))
+
+    # showing_one_axis(my_path='outputs/Scenario_0001/',
+    #                  opening_list=True,
+    #                  file_extension='pckl',
+    #                  MTG_directory="MTG_files",
+    #                  # file_extension='csv',
+    #                  # MTG_directory="MTG_properties",
+    #                  list_of_MTG_ID=list_of_MTG,
+    #                  # starting_string_of_axes_to_remove="Ax00001-Se00001-",
+    #                  targeted_apex_axis_ID="Ax00001-Ap00000",
+    #                  maximal_string_length_of_axis_ID=-1, # Here we consider all lateral roots
+    #                  # maximal_string_length_of_axis_ID=15, # Here we select only the elements on the main axis, not the lateral ones
+    #                  recording_new_MTG_files=False,
+    #                  # new_MTG_files_folder=os.path.join('axis_MTG_files'),
+    #                  recording_new_MTG_properties = False,
+    #                  # new_MTG_properties_folder = os.path.join('axis_85-95_days_MTG_properties'),
+    #                  plotting=True,
+    #                  # property_name="net_rhizodeposition_rate_per_day_per_cm",
+    #                  # vmin=1e-8, vmax=1e-5, lognorm=True, cmap='jet',
+    #                  # property_name="C_hexose_root",
+    #                  # vmin=1e-6, vmax=1e-3, lognorm=True, cmap='jet',
+    #                  # property_name="total_exchange_surface_with_soil_solution",
+    #                  # vmin=5e-5, vmax=3.5e-4, lognorm=False, cmap='jet',
+    #                  property_name=property_name,
+    #                  # vmin=1e-4, vmax=8e-4, lognorm=False, cmap='jet',
+    #                  # property_name="net_sucrose_unloading_per_cm_per_day",
+    #                  # vmin=1e-9, vmax=1e-5, lognorm=True, cmap='jet',
+    #                  vmin=vmin, vmax=vmax, lognorm=lognorm, cmap='jet',
+    #                  images_directory="axis_55-65_days_images"
+    #                  )
+
+    # # COMPUTING PROPERTIES ON DIFFERENT CLASSES OF ROOTS:
+    # #####################################################
+    #
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
+    #                   opening_list=True,
+    #                   MTG_directory="MTG_files",
+    #                   list_of_MTG_ID=[740,741],
+    #                   file_extension='pckl',
+    #                   plotting_with_PlantGL=False,
+    #                   normal_plotting_with_pyvista=False,
+    #                   fast_plotting_with_pyvista=False,
+    #                   computing_on_different_roots=True, comparing_distance_from_tip=True, distance_treshold=0.04,
+    #                   properties_to_compute=["total_net_rhizodeposition",
+    #                                          "net_rhizodeposition_rate_per_day_per_cm",
+    #                                          "length",
+    #                                          "total_exchange_surface_with_soil_solution"],
+    #                   summing_different_roots=True, averaging_different_roots=True,
+    #                   printing_sum=False,
+    #                   recording_sum=False,
+    #                   printing_warnings=True,
+    #                   recording_g_properties=False)

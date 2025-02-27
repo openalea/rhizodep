@@ -1,16 +1,24 @@
+# -*- coding: latin-1 -*-
+
+"""
+    This script allows to create graphs showing a root MTG with its properties, based on other tools than PlantGL.
+
+    :copyright: see AUTHORS.
+    :license: see LICENSE for details.
+"""
+
 import pyvista as pv
-import pyvistaqt as pvqt
+try:
+    import pyvistaqt as pvqt
+except ModuleNotFoundError:
+    pvqt = None
+
 import pickle
 from math import floor
-import time
-import os, os.path
 import numpy as np
 from openalea.mtg import *
-from openalea.mtg.traversal import pre_order, post_order
-from openalea.mtg import turtle as turt
-from .tools import get_root_visitor, my_colormap
-
-import pandas as pd
+from openalea.mtg.traversal import pre_order
+from .tools import my_colormap
 
 
 ########################################################################################################################
@@ -114,6 +122,7 @@ def plotting_roots_with_pyvista(g, displaying_root_hairs = True,
                                 plot_width=1000, plot_height=750,
                                 camera_x=0.3, camera_y=0., camera_z=-0.07,
                                 focal_x=0., focal_y=0., focal_z=-0.07,
+                                show_axes = False,
                                 closing_window=False):
     """
     This functions aims to plot a root system with Pyvista, creating step by step every shape.
@@ -257,8 +266,9 @@ def plotting_roots_with_pyvista(g, displaying_root_hairs = True,
     p.camera_set = True
 
     # SETTING AXES:
-    # p.add_axes()
-    # p.add_axes_at_origin()
+    if show_axes:
+        # p.add_axes()
+        p.add_axes_at_origin()
 
     # DIVERSE SETTINGS:
     # We set the background color of the plot:

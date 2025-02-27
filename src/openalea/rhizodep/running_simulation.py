@@ -1,10 +1,7 @@
 #  -*- coding: utf-8 -*-
 
 """
-    rhizodep.scenarios
-    ~~~~~~~~~~~~~
-
-    The module :mod:`rhizodep.scenarios` is the front-end to run the RhizoDep model.
+    This script 'run_simulation' enables to run a complete simulation with the model RhizoDep.
 
     :copyright: see AUTHORS.
     :license: see LICENSE for details.
@@ -18,18 +15,16 @@ from decimal import Decimal
 import pandas as pd
 
 import openalea.plantgl.all as pgl
-from openalea.mtg import turtle as turt
 
 from . import model
-from . import tools
-from . import alternative_plotting
+from .tool import alternative_plotting, tools
 from . import parameters as param
 from . import mycorrhizae
 
 
 # TODO: explicitly add 'surfaces_and_volumes()' in the sequence of modelling!
 
-# We define the main scenarios program:
+# We define the main tutorial program:
 def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     radial_growth=False, ArchiSimple=False, ArchiSimple_C_fraction=0.10,
                     simple_growth_duration=True,
@@ -41,7 +36,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     renewal_of_soil_solution=False, interval_between_renewal_events=1.*60.*60.*24.,
                     constant_soil_temperature_in_Celsius=20,
                     nodules=False,
-                    mycorrhizal_fungus=True,
+                    mycorrhizal_fungus=False,
                     fungus_MTG=None,
                     root_order_limitation=False,
                     root_order_treshold=2,
@@ -74,16 +69,16 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     background_color = [0,0,0]):
 
     """
-    This general function controls the actual scenarios of root growth and C fluxes over the whole scenarios period.
+    This general function controls the actual tutorial of root growth and C fluxes over the whole tutorial period.
     :param g: the root MTG to consider
-    :param simulation_period_in_days: the length of the scenarios period (days)
-    :param time_step_in_days: the regular time step over the scenarios (days)
+    :param simulation_period_in_days: the length of the tutorial period (days)
+    :param time_step_in_days: the regular time step over the tutorial (days)
     :param radial_growth: if True, radial growth will be enabled
     :param ArchiSimple: if True, only original ArchiSimple rules will be used, without C fluxes
     :param ArchiSimple_C_fraction: in case of ArchiSimple only, this fraction is used to determine the fraction of the incoming C that us actually used to produce “root biomass”
     :param input_file: the path/name of the CSV file where inputs (sucrose and temperature) are read
     :param input_file_time_step_in_days: the time step used in the input file (days)
-    :param outputs_directory: the name of the folder where scenarios outputs will be registered
+    :param outputs_directory: the name of the folder where tutorial outputs will be registered
     :param forcing_constant_inputs: if True, input file will be ignored and a constant sucrose input rate and a constant soil temperature will be applied as inputs
     :param constant_sucrose_input_rate: input of sucrose applied at every time step (mol of sucrose per second per plant)
     :param constant_soil_temperature_in_Celsius: soil temperature applied to every root at every time step (degree Celsius)
@@ -93,7 +88,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     :param using_solver: if True, a solver will be used to compute C fluxes and concentrations
     :param printing_solver_outputs: if True, the intermediate calculations of the solver will be printed for each root element
     :param simulation_results_file: the name of the CSV file where outputs will be written
-    :param recording_interval_in_days: the time interval of distinct recordings of the current scenarios (useful for checking the outputs while the scenarios is still running)
+    :param recording_interval_in_days: the time interval of distinct recordings of the current tutorial (useful for checking the outputs while the tutorial is still running)
     :param recording_images: if True, every PlantGL graph will be recorded as an image
     :param root_images_directory: the name of the folder where root images will be registered
     :param z_classification: if True, root variables will be intercepted and summed within distinct z-layers of the soil
@@ -110,7 +105,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     :param g_properties_directory: the name of the folder where MTG properties are recorded
     :param random: if True, stochastic data will be simulated (e.g. variations of angles and diameters)
     :param plotting: if True, a PlantGL graph is generated and displayed at each time step
-    :param scenario_id: indicates the scenario identifier to which the current printing relates (useful when running different scenarios in parallel)
+    :param scenario_id: indicates the scenario identifier to which the current printing relates (useful when running different tutorial in parallel)
     :param displayed_property: name of the property to be displayed on the PlantGL graph
     :param displayed_vmin: the minimum value of the scale used to display the property in the PlantGL graph
     :param displayed_vmax: the maximum value of the scale used to display the property in the PlantGL graph
@@ -130,9 +125,9 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     # We convert the time step in seconds:
     time_step_in_seconds = time_step_in_days * 60. * 60. * 24.
-    # We calculate the number of steps necessary to reach the end of the scenarios period:
+    # We calculate the number of steps necessary to reach the end of the tutorial period:
     if simulation_period_in_days == 0. or time_step_in_days == 0.:
-        print("WATCH OUT: No scenarios was done, as time input was 0.")
+        print("WATCH OUT: No tutorial was done, as time input was 0.")
         n_steps = 0
     else:
         n_steps = trunc(simulation_period_in_days / time_step_in_days)
@@ -236,13 +231,21 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 for file in files:
                     os.remove(os.path.join(root, file))
 
+    # If the camera is supposed to move around the MTG:
+    if camera_rotation:
+        # We record the initial distance of the camera from the center:
+        initial_camera_distance = max(x_cam, y_cam)
+        camera_distance = initial_camera_distance
+        # We initialize the index for reading each coordinates:
+        index_camera = 0
+        # We calculate the coordinates of the camera on the circle around the center:
+        x_coordinates, y_coordinates, z_coordinates = tools.circle_coordinates(z_center=z_cam,
+                                                                               radius=camera_distance,
+                                                                               n_points=n_rotation_points)
+
     # READING THE INPUT FILE:
     # -----------------------
     if input_file != "None" and not forcing_constant_inputs:  # and (constant_sucrose_input_rate <= 0 or constant_soil_temperature_in_Celsius <= 0):
-        # # We first define the path and the file to read as a .csv:
-        # PATH = os.path.join('.', input_file)
-        # # Then we read the file and copy it in a dataframe "df":
-        # input_frame = pd.read_csv(PATH, sep=',')
         # We use the function 'formatted inputs' to create a table containing the input data (soil temperature and sucrose input)
         # for each required step, depending on the chosen time step:
         input_frame = tools.formatted_inputs(original_input_file=input_file,
@@ -271,30 +274,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     # We display the MTG on PlantGL and possibly record it:
 
-    # visitor = tools.get_root_visitor()
-    # # We initialize a turtle in PlantGL:
-    # turtle_for_roots = turt.PglTurtle()
-    # turtle_for_hairs = turt.PglTurtle()
-    # turtle_for_fungus = turt.PglTurtle()
-    # # We make the graph upside down:
-    # turtle_for_roots.down(180)
-    # turtle_for_hairs.down(180)
-    # turtle_for_fungus.down(180)
-    # # We initialize the scene with the MTG g:
-    # scene_for_roots = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_roots, gc=False)
-    # scene_for_hairs = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_hairs, gc=False)
-    # scene_for_fungus = turt.TurtleFrame(g, visitor=visitor, turtle=turtle_for_fungus, gc=False)
-
-    # x_cam = camera_distance
-    # y_cam = 0
-    # z_cam = z_cam
-    # tools.prepareScene(scene_for_roots, width=width, height=height,
-    #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
-    # tools.prepareScene(scene_for_hairs, width=width, height=height,
-    #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
-    # tools.prepareScene(scene_for_fungus, width=width, height=height,
-    #              x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
-
     # If the rotation of the camera around the root system is required:
     if camera_rotation:
         index_camera=0
@@ -302,14 +281,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
         y_cam = y_coordinates[index_camera]
         z_cam = z_coordinates[index_camera]
 
-        # # We prepare the scene with the specified position of the center of the graph and the camera:
-        # initial_scene = pgl.Scene()
-        # tools.prepareScene(initial_scene, width=width, height=height,
-        #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam,
-        #                    background_color=background_color)
-
         sc = tools.plot_mtg(g,
-                            # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
                             prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                             vmax=displayed_vmax, cmap=cmap,
                             root_hairs_display=root_hairs_display,
@@ -331,7 +303,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
         # We call the function plot_MTG so that the (x,y,z) coordinates of each root element is recorded:
         sc = tools.plot_mtg(g,
-                            # scene=scene_for_roots, scene_for_hairs=scene_for_hairs, scene_for_fungus=scene_for_fungus,
                             prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                             vmax=displayed_vmax, cmap=cmap,
                             root_hairs_display=root_hairs_display,
@@ -472,7 +443,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
     # ------------------------------------------------------------------------------------------------------------------
     # We create an internal function for saving the sum properties, the MTG file and the z_classification_file (if any)
-    # over the course of the scenarios:
+    # over the course of the tutorial:
     def recording_attempt():
 
         # In any case, we record the MTG file:
@@ -887,7 +858,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                               "{:.2E}".format(Decimal(theoretical_current_C_in_the_system)), "mol of C")
                         print("This corresponds to a net disappearance of C of",
                               "{:.2E}".format(Decimal(theoretical_current_C_in_the_system - current_C_in_the_system)),
-                              "mol of C, and the cumulated difference since the start of the scenarios and the current one is",
+                              "mol of C, and the cumulated difference since the start of the tutorial and the current one is",
                               "{:.2E}".format(
                                   Decimal(theoretical_cumulated_C_in_the_system - current_C_in_the_system)),
                               "mol of C.")
@@ -902,16 +873,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             # PLOTTING THE MTG:
             # ------------------
 
-            # visitor = tools.get_root_visitor()
-            # # We initialize a turtle in PlantGL:
-            # turtle = turt.PglTurtle()
-            # # We make the graph upside down:
-            # turtle.down(180)
-            # # We initialize the scene with the MTG g:
-            # scene_for_roots = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
-            # scene_for_hairs = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
-            # scene_for_fungus = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
-
             # If the rotation of the camera around the root system is required:
             if camera_rotation:
                 index_camera = 0
@@ -925,8 +886,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 #                    z_cam=z_cam)
 
                 sc = tools.plot_mtg(g,
-                                    # scene=scene_for_roots, scene_for_hairs=scene_for_hairs,
-                                    scene_for_fungus=scene_for_fungus,
                                     prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                                     vmax=displayed_vmax, cmap=cmap,
                                     root_hairs_display=root_hairs_display,
@@ -945,18 +904,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
             # Otherwise, the camera will stay on a fixed direction:
             else:
-                # x_cam = camera_distance
-                # y_cam = 0
-                # z_cam = z_cam
-
-                # # We prepare the scene with the specified position of the center of the graph and the camera:
-                # tools.prepareScene(scene_for_roots, width=width, height=height,
-                #                    x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam,
-                #                    z_cam=z_cam)
 
                 sc = tools.plot_mtg(g,
-                                    # scene=scene_for_roots, scene_for_hairs=scene_for_hairs,
-                                    # scene_for_fungus=scene_for_fungus,
                                     prop_cmap=displayed_property, lognorm=log_scale, vmin=displayed_vmin,
                                     vmax=displayed_vmax, cmap=cmap,
                                     root_hairs_display=root_hairs_display,
@@ -1017,15 +966,15 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
             # If the current iteration correspond to the time where one full time interval for recording has been reached:
             if step in recording_steps_list:
-                # Then we record the current scenarios results:
+                # Then we record the current tutorial results:
                 print("")
-                print("Recording the scenarios results obtained so far (until time t = {:.2f}".format(
+                print("Recording the tutorial results obtained so far (until time t = {:.2f}".format(
                     Decimal((step+1) * time_step_in_days)), "days)...")
                 recording_attempt()
 
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    # At the end of the scenarios (or just before an error is about to interrupt the program!):
+    # At the end of the tutorial (or just before an error is about to interrupt the program!):
     # -------------------------------------------------------------------------------------------
     finally:
         print("")

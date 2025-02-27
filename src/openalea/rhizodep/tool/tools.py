@@ -1,10 +1,7 @@
 #  -*- coding: utf-8 -*-
 
 """
-    rhizodep.tools
-    ~~~~~~~~~~~~~
-
-    The module :mod:`rhizodep.tools` defines useful functions for data preprocessing, graph making...
+    The script 'tools' contains useful functions for data processing or graph making.
 
     :copyright: see AUTHORS.
     :license: see LICENSE for details.
@@ -26,11 +23,11 @@ from matplotlib.ticker import LogFormatter
 
 from openalea.mtg import turtle as turt
 from openalea.mtg.plantframe import color
-from openalea.mtg.traversal import pre_order, post_order
+from openalea.mtg import *
 import openalea.plantgl.all as pgl
 
-from . import parameters as param
-
+from .. import parameters as param
+from .. import model
 
 # FUNCTIONS FOR DATA PREPROCESSING :
 ####################################
@@ -49,7 +46,7 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
     if original_input_file != "None":
 
         # We first define the path and the file to read as a .csv:
-        PATH1 = os.path.join('.', original_input_file)
+        PATH1 = os.path.join('..', original_input_file)
         # Then we read the file and copy it in a dataframe "df":
         df = pd.read_csv(PATH1, sep=',', header=0)
 
@@ -58,11 +55,11 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
         print("The total number of steps is", n_steps)
 
         if do_not_execute_if_file_with_suitable_size_exists:
-            PATH2 = os.path.join('.', 'input_file.csv')
+            PATH2 = os.path.join('..', 'input_file.csv')
             previous_file = pd.read_csv(PATH2, sep=',', header=0)
 
             if len(previous_file['step_number']) == n_steps:
-                print("There is already an 'input_file.csv' of proper length for this scenarios, "
+                print("There is already an 'input_file.csv' of proper length for this tutorial, "
                       "we therefore did not create a new input file here (if you wish to do so, please select 'do_not_execute_if_file_with_suitable_size_exists=False').")
                 return previous_file
 
@@ -94,7 +91,7 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
             # For each line of the data frame that contains information on sucrose input:
             for i in range(0, len(df['time_in_days'])):
 
-                # If the current cumulated time is below the time step of the main scenarios:
+                # If the current cumulated time is below the time step of the main tutorial:
                 if (cumulated_time_in_days + original_time_step_in_days) < 0.9999 * final_time_step_in_days:
                     # Then the amount of time elapsed here is the initial time step:
                     net_elapsed_time_in_days = original_time_step_in_days
@@ -160,7 +157,7 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
             # For each line of the final table:
             for j in range(0, n_steps):
 
-                # If the current cumulated time is below the time step of the main scenarios:
+                # If the current cumulated time is below the time step of the main tutorial:
                 if cumulated_time_in_days + final_time_step_in_days < 0.9999 * original_time_step_in_days:
                     # Then the amount of time elapsed here is the initial time step:
                     net_elapsed_time_in_days = final_time_step_in_days
@@ -238,8 +235,8 @@ def _buildDic(keyList, val, dic):
 
 def buildDic(dict_scenario, dic=None):
     """
-    Function that build a nested dictionary (dict of dict), which is used in simulations/scenario_parameters/main_one_scenario.py
-    e.g. buildDic({'a:b:c': 1, 'a:b:d': 2}) returns {'a': {'b': {'c': 1, 'd': 2}}}
+    Function that build a nested dictionary (dict of dict), e.g. buildDic({'a:b:c': 1, 'a:b:d': 2})
+    returns {'a': {'b': {'c': 1, 'd': 2}}}
     """
     if not dic:
         dic = {}
@@ -351,7 +348,7 @@ def my_colormap(g, property_name, cmap='jet', vmin=None, vmax=None, lognorm=True
     norm = color.Normalize(vmin, vmax) if not lognorm else color.LogNorm(vmin, vmax)
     values = norm(values)
     colors = (_cmap(values)[:, 0:3]) * 255
-    colors = np.array(colors, dtype=np.int).tolist()
+    colors = np.array(colors, dtype=np.int16).tolist()
 
     # In case no color values could be calculated from the given information:
     if len(colors) == 0:
@@ -359,7 +356,7 @@ def my_colormap(g, property_name, cmap='jet', vmin=None, vmax=None, lognorm=True
         prop = g.property("label")
         keys = prop.keys()
         colors = [[250,150,100]]*len(keys)
-        colors = np.array(colors, dtype=np.int).tolist()
+        colors = np.array(colors, dtype=np.int16).tolist()
 
     # Finally, the property "color" is created/updated with the new computed values:
     g.properties()['color'] = dict(zip(keys, colors))
@@ -454,7 +451,6 @@ def circle_coordinates(x_center=0., y_center=0., z_center=0., radius=1., n_point
 
 
 def plot_mtg(g,
-             # scene, scene_for_hairs, scene_for_fungus,
              prop_cmap='hexose_exudation', cmap='jet', lognorm=True, vmin=1e-12, vmax=3e-7,
              root_hairs_display=True,
              mycorrhizal_fungus_display=True,
@@ -978,6 +974,99 @@ def colorbar(title="Radius (m)", cmap='jet', lognorm=True, vmin=1e-12, vmax=1e3,
 
     print("The colorbar has been made!")
     return fig
+
+
+# Creating of an artifical MTG showing z-axis graduations:
+#---------------------------------------------------------
+def creating_a_spatial_scale_MTG(total_length=0.5, length_increment=0.05, line_thickness=0.01, starting_z = 0):
+
+    """
+    This function generates a root MTG that corresponds to a z-axis with graduations, which can then be plotted
+    as a normal root MTG to illustrate a spatial scale on a PlantGL or Pyvista plot.
+    :param total_length: the total length of the z-axis to create
+    :param length_increment: the length interval between two graduations
+    :param line_thickness: the thickness of the z-axis and graduations to display
+    :param starting_z: the absolute z-coordinate from which to start the z-axis
+    :return: a MTG file corresponding to the z-axis to be displayed
+    """
+
+    print("Creating an MTG corresponding to a spatial scale to be displayed along the z-axis...")
+
+    # We create a new MTG called g:
+    g = MTG()
+
+    # We first add one initial vertical segment:
+    id_segment = g.add_component(g.root, label='Segment')
+    segment = g.node(id_segment)
+    segment.radius = line_thickness
+    segment.length = length_increment
+    segment.x1 = 0
+    segment.y1 = 0
+    segment.z1 = starting_z
+    segment.x2 = 0
+    segment.y2 = 0
+    segment.z2 = starting_z - length_increment
+
+    # And we add a lateral segment that will materialize graduations along the vertical axis:
+    lateral = model.ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Segment',
+                                   type='',
+                                   root_order=1,
+                                   angle_down=90,
+                                   angle_roll=0,
+                                   length=line_thickness * 5,
+                                   radius=line_thickness,
+                                   identical_properties=False,
+                                   nil_properties=True)
+    lateral.x1 = 0
+    lateral.y1 = 0
+    lateral.z1 = starting_z - length_increment
+    lateral.x2 = 0
+    lateral.y2 = 0 + line_thickness * 5
+    lateral.z2 = starting_z - length_increment
+
+    # We calculate the number of steps for building the scale axis iteratively:
+    n_steps = int(np.floor(total_length/length_increment))-1
+
+    # For each seminal root that can emerge at this emergence event:
+    for i in range(1, n_steps+1):
+
+        # We form one new vertical segment:
+        segment = model.ADDING_A_CHILD(mother_element=segment, edge_type='<', label='Segment',
+                                       type='',
+                                       root_order=1,
+                                       angle_down=0,
+                                       angle_roll=0,
+                                       length=length_increment,
+                                       radius=line_thickness,
+                                       identical_properties=False,
+                                       nil_properties=True)
+        segment.x1 = 0
+        segment.y1 = 0
+        segment.z1 = starting_z - length_increment * i
+        segment.x2 = 0
+        segment.y2 = 0
+        segment.z2 = starting_z - length_increment * 2 * i
+
+        # We form one new horizontal graduation:
+        lateral = model.ADDING_A_CHILD(mother_element=segment, edge_type='+', label='Segment',
+                                       type='',
+                                       root_order=1,
+                                       angle_down=90,
+                                       angle_roll=0,
+                                       length=line_thickness*5,
+                                       radius=line_thickness,
+                                       identical_properties=False,
+                                       nil_properties=True)
+        lateral.x1 = 0
+        lateral.y1 = 0
+        lateral.z1 = starting_z - length_increment * 2 * i
+        lateral.x2 = 0
+        lateral.y2 = line_thickness * 5
+        lateral.z2 = starting_z - length_increment * 2 * i
+
+    print("> Scale axis MTG has been made!")
+
+    return g
 
 ########################################################################################################################
 

@@ -1,10 +1,8 @@
 # Importation of functions from the system:
 ###########################################
 
-import numpy as np
 import os
 import timeit
-from rhizodep.scenarios import *
 
 # # Setting the randomness in the whole code to reproduce the same root system over different runs:
 # # random_choice = int(round(np.random.normal(100,50)))
@@ -66,7 +64,7 @@ if __name__ == "__main__":
     # We initiate the properties of the MTG "g":
     g = model.initiate_mtg(random=True)
 
-    # We launch the main scenarios program:
+    # We launch the main tutorial program:
     print("Simulation starts ...")
     main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     radial_growth="Impossible", ArchiSimple=False, ArchiSimple_C_fraction=0.10,

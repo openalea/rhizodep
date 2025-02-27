@@ -27,6 +27,8 @@ requirements:
     - pyvista
     - pillow
     - imageio
+    - openpyxl
+    - imageio
 
 test:
   requires:
