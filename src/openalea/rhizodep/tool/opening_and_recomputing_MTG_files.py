@@ -89,10 +89,10 @@ def showing_image(image_name="text.png",
     # We define a list of indices:
     indices = [(0, 1, 2, 3)]
     # We define a zone that will correspond to these coordinates:
-    carre = QuadSet(points, indices)
+    carre = pgl.QuadSet(points, indices)
     # We load an image as a texture material:
     my_path = os.path.join("../../simulations/running_scenarios/", image_name)
-    tex = ImageTexture(my_path)
+    tex = pgl.ImageTexture(my_path)
     # We define the texture coordinates that we will use:
     # texCoord = [(0,0),
     #             (0,1),
@@ -107,7 +107,7 @@ def showing_image(image_name="text.png",
     # We finally display the new image:
     carre.texCoordList = texCoord
     carre.texCoordIndexList = texCoordIndices
-    shape = Shape(carre, tex)
+    shape = pgl.Shape(carre, tex)
     # Viewer.display(shape)
     return shape
 
@@ -652,7 +652,7 @@ def loading_MTG_files(my_path='',
             if file_extension == 'pckl':
                 MTG_ID = int(str(filename)[-10:-5])
             else:
-                MTG_ID = int(st(filename)[-9:-4])
+                MTG_ID = int(str(filename)[-9:-4])
             list_of_MTG_numbers.append(MTG_ID)
     # If the instructions are to open a specific list:
     elif opening_list and list_of_MTG_ID:
@@ -911,7 +911,7 @@ def loading_MTG_files(my_path='',
         data_frame_z.insert(0, col.name, col)
         # We save the data_frame in a CSV file:
         z_file_path = os.path.join(my_path, 'z_classification.csv')
-        data_frame_z.to_csv(file_path, na_rep='NA', index=False, header=True)
+        data_frame_z.to_csv(z_file_path, na_rep='NA', index=False, header=True)
         print("   > A new file 'z_classification.csv' has been saved.")
 
     # And we can record the computing among different root classes:

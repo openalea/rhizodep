@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 # from pygifsicle import optimize
 
-from .tool.tools import colorbar
+from openalea.rhizodep.tool.tools import colorbar
 
 # Use LaTeX as text renderer to get text in true LaTeX
 # If the two following lines are left out, Mathtext will be used
