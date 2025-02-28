@@ -181,6 +181,8 @@ class RhizoInputsSoilModel(Model):
         self.props.setdefault("voxel_neighbor", {})
         self.props["voxel_neighbor"].update({key: None for key in self.vertices})
         setattr(self, "voxel_neighbor", self.props["voxel_neighbor"])
+        
+        self.planting_depth = 5e-2
 
         cubic_length = 3e-2
         voxel_width = cubic_length
@@ -231,8 +233,8 @@ class RhizoInputsSoilModel(Model):
                 testx2 = baricenter[0] <= self.voxels["x2"]
                 testy1 = self.voxels["y1"] <= baricenter[1]
                 testy2 = baricenter[1] <= self.voxels["y2"]
-                testz1 = self.voxels["z1"] <= baricenter[2]
-                testz2 = baricenter[2] <= self.voxels["z2"]
+                testz1 = self.voxels["z1"] <= baricenter[2] + self.planting_depth
+                testz2 = baricenter[2] + self.planting_depth <= self.voxels["z2"]
                 test = testx1 * testx2 * testy1 * testy2 * testz1 * testz2
                 try:
                     self.voxel_neighbor[vid] = [int(v) for v in np.where(test)]

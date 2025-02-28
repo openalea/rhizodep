@@ -128,7 +128,7 @@ class RootCarbonModel(Model):
     vertex_index: int = declare(default=1, unit="mol.s-1", unit_comment="", description="Unique vertex identifier stored for ease of value access", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="input", by="model_growth", state_variable_type="extensive", edit_by="user")
-
+    
     # FROM SHOOT MODEL
     sucrose_input_rate: float = declare(default=1e-10, unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", 
                                        min_value="", max_value="", value_comment="", references="", DOI="",
@@ -154,53 +154,53 @@ class RootCarbonModel(Model):
     # Pools initial size
     C_sucrose_root: float = declare(default=0.01 / 12.01 / 12, unit="mol.g-1", unit_comment="of sucrose", description="Sucrose concentration in root",
                                     min_value="", max_value="", value_comment="", references="0.0025 is a plausible value according to the results of Gauthier (2019, pers. communication), but here, we use a plausible sucrose concentration (10 mgC g-1) in roots according to various experimental results.", DOI="",
-                                    variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
+                                    variable_type="state_variable", by="model_carbon", state_variable_type="massic_concentration", edit_by="user")
     C_hexose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="of labile hexose", description="Hexose concentration in root",
                                   min_value=1e-6, max_value=1e-2, value_comment="", references="", DOI="",
-                                   variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
+                                   variable_type="state_variable", by="model_carbon", state_variable_type="massic_concentration", edit_by="user")
     C_hexose_reserve: float = declare(default=1e-3 * 2., unit="mol.g-1", unit_comment="of reserve hexose", description="Hexose reserve concentration in root",
                                      min_value="", max_value="", value_comment="C_hexose_root * 2",  references="We expect the reserve pool to be two times higher than the mobile one.", DOI="",
-                                      variable_type="state_variable", by="model_carbon", state_variable_type="intensive", edit_by="user")
+                                      variable_type="state_variable", by="model_carbon", state_variable_type="massic_concentration", edit_by="user")
 
     # Transport Processes
     hexose_diffusion_from_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                                  min_value="", max_value="", value_comment="", references="", DOI="",
-                                                  variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                                  variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
     hexose_active_production_from_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                                          min_value="", max_value="", value_comment="", references="", DOI="",
-                                                          variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                                          variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
     sucrose_loading_in_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                               min_value="", max_value="", value_comment="", references="", DOI="",
-                                               variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                               variable_type="state_variable", by="model_carbon", state_variable_type="extensself_rate_stateive", edit_by="user")
     hexose_exudation: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                      min_value="", max_value="", value_comment="", references="", DOI="",
-                                      variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                      variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
     phloem_hexose_exudation: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                             min_value="", max_value="", value_comment="", references="", DOI="",
-                                             variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                             variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
     hexose_uptake_from_soil: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                             min_value="", max_value="", value_comment="", references="", DOI="",
-                                             variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                             variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
     phloem_hexose_uptake_from_soil: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                                    min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
     mucilage_secretion: float = declare(default=0., unit="mol.s-1", unit_comment="of equivalent hexose", description="", 
                                        min_value="", max_value="", value_comment="", references="", DOI="",
-                                        variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                        variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
     cells_release: float = declare(default=0., unit="mol.s-1", unit_comment="of equivalent hexose", description="", 
                                   min_value="", max_value="", value_comment="", references="", DOI="",
-                                   variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                   variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
 
     # Metabolic Processes
     hexose_mobilization_from_reserve: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                                      min_value="", max_value="", value_comment="", references="", DOI="",
-                                                      variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                                      variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
     hexose_immobilization_as_reserve: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                                      min_value="", max_value="", value_comment="", references="", DOI="",
-                                                      variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                                      variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
     maintenance_respiration: float = declare(default=0., unit="mol.s-1", unit_comment="of carbon", description="", 
                                             min_value="", max_value="", value_comment="", references="", DOI="",
-                                             variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                             variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
 
     # Deficits
     deficit_sucrose_root: float = declare(default=0., unit="mol.s-1", unit_comment="of sucrose", description="Sucrose deficit rate in root", 

@@ -56,62 +56,66 @@ class RootGrowthModel(Model):
     # --- INITIALIZE MODEL STATE VARIABLES ---
     type: str = declare(default="Normal_root_after_emergence", unit="", unit_comment="", description="Example segment type provided by root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     root_order: int = declare(default=1, unit="", unit_comment="", description="Example root segment's axis order computed by the initiate_mtg method or provided as input", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     vertex_index: int = declare(default=1, unit="mol.s-1", unit_comment="", description="Unique vertex identifier stored for ease of value access", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     radius: float = declare(default=3.5e-4, unit="m", unit_comment="", description="Example root segment radius", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     z1: float = declare(default=0., unit="m", unit_comment="", description="Depth of the segment tip computed by plantGL, colar side", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     z2: float = declare(default=0., unit="m", unit_comment="", description="Depth of the segment tip computed by plantGL, apex side", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     length: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example root segment length", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Example root segment structural mass", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
-    #TODO parameter!
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     initial_struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     living_root_hairs_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Example root segment living root hairs structural mass", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     root_hair_length: float = declare(default=1.e-3, unit="m", unit_comment="", description="Example root hair length", 
                                                     min_value="", max_value="", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair maximal length for wheat and barley evolves between 0.5 and 1.3 mm.", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     total_root_hairs_number: float = declare(default=30 * (1.6e-4 / 3.5e-4) * 3.e-3 * 1e3, unit="adim", unit_comment="", description="Example root hairs number on segment external surface", 
                                                     min_value="", max_value="", value_comment="30 * (1.6e-4 / radius) * length * 1e3", references=" According to the work of Gahoonia et al. (1997), the root hair density is about 30 hairs per mm for winter wheat, for a root radius of about 0.16 mm.", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth is coupled to a root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     hexose_consumption_by_fungus: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by fungus", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user") 
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user") 
     distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     volume: float = declare(default=1e-9, unit="m3", unit_comment="", description="Initial volume of the collar element", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     root_hairs_struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     thermal_time_since_emergence: float = declare(default=0, unit="°C", unit_comment="", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="intensive", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+    
+    # Total state variable
+    total_living_struct_mass: float =          declare(default=0, unit="g", unit_comment="of dry weight", description="", 
+                                                min_value="", max_value="", value_comment="", references="", DOI="",
+                                                variable_type="plant_scale_state", by="model_growth", state_variable_type="", edit_by="user")
                                                     
 
     # --- INITIALIZES MODEL PARAMETERS ---
@@ -2420,6 +2424,11 @@ class RootGrowthModel(Model):
                 # If there is no successor because the element is an apex or a root nodule:
                 # Then we simply define the distance to the tip as the length of the element:
                 n.distance_from_tip = n.length
+
+    @totalstate
+    def _total_living_struct_mass(self, struct_mass, living_root_hairs_struct_mass):
+        # WARNING, do not parallelize otherwise other pool updates will be based on previous time-step
+        return sum(struct_mass.values()) + sum(living_root_hairs_struct_mass.values())
 
     # Adding a new root element with pre-defined properties:
     def ADDING_A_CHILD(self, mother_element, edge_type='+', label='Apex', type='Normal_root_before_emergence',
