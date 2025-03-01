@@ -87,6 +87,9 @@ class RootGrowthModel(Model):
     living_root_hairs_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Example root segment living root hairs structural mass", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+    living_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Sum of segment and root hair living struct mass", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     root_hair_length: float = declare(default=1.e-3, unit="m", unit_comment="", description="Example root hair length", 
                                                     min_value="", max_value="", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair maximal length for wheat and barley evolves between 0.5 and 1.3 mm.", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
@@ -2436,9 +2439,9 @@ class RootGrowthModel(Model):
                 n.distance_from_tip = n.length
 
     @totalstate
-    def _total_living_struct_mass(self, struct_mass, living_root_hairs_struct_mass):
+    def _total_living_struct_mass(self, living_struct_mass, type):
         # WARNING, do not parallelize otherwise other pool updates will be based on previous time-step
-        return sum(struct_mass.values()) + sum(living_root_hairs_struct_mass.values())
+        return sum([m for m, t in zip(living_struct_mass.values(), type.values()) if (m > 0) and (t not in ("Dead", "Just_dead"))])
 
     # Adding a new root element with pre-defined properties:
     def ADDING_A_CHILD(self, mother_element, edge_type='+', label='Apex', type='Normal_root_before_emergence',

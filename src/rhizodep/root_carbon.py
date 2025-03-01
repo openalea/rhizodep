@@ -107,15 +107,9 @@ class RootCarbonModel(Model):
     length: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example root segment length", 
                            min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
-    struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Example root segment structural mass", 
+    living_struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Example root segment structural mass", 
                                 min_value="", max_value="", value_comment="", references="", DOI="",
                                  variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
-    initial_struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", 
-                                        min_value="", max_value="", value_comment="", references="", DOI="",
-                                         variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
-    living_root_hairs_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Example root segment living root hairs structural mass", 
-                                                  min_value="", max_value="", value_comment="", references="", DOI="",
-                                                   variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth", 
                                                  min_value="", max_value="", value_comment="", references="", DOI="",
                                                   variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
@@ -128,6 +122,9 @@ class RootCarbonModel(Model):
     vertex_index: int = declare(default=1, unit="mol.s-1", unit_comment="", description="Unique vertex identifier stored for ease of value access", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="input", by="model_growth", state_variable_type="extensive", edit_by="user")
+    total_living_struct_mass: float = declare(default=0.001, unit="g", unit_comment="", description="Summed structural mass at root system level", 
+                                            min_value="", max_value="", value_comment="", references="", DOI="",
+                                            variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     
     # FROM SHOOT MODEL
     sucrose_input_rate: float = declare(default=1e-10, unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", 
@@ -217,9 +214,6 @@ class RootCarbonModel(Model):
     total_sucrose_root: float = declare(default=0., unit="mol", unit_comment="of sucrose", description="Summed sucrose root at root system level", 
                                        min_value="", max_value="", value_comment="", references="", DOI="",
                                         variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user")
-    total_living_struct_mass: float = declare(default=0.001, unit="g", unit_comment="", description="Summed structural mass at root system level", 
-                                             min_value="", max_value="", value_comment="", references="", DOI="",
-                                              variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user")
     global_sucrose_deficit: float = declare(default=0., unit="mol.s-1", unit_comment="of sucrose", description="Summed sucrose deficit at root system level", 
                                            min_value="", max_value="", value_comment="", references="", DOI="",
                                             variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user")
@@ -478,48 +472,6 @@ class RootCarbonModel(Model):
             else:
                 n.C_hexose_root = max(0.0002 * np.exp(-7.857 * n.distance_from_tip), 2e-5)
 
-    def post_growth_updating(self):
-        """
-        Description :
-            Extend property dictionary upon new element partitioning and updates concentrations upon structural_mass change
-        """
-        self.vertices = self.g.vertices(scale=self.g.max_scale())
-        already_updated = []
-        for vid in self.vertices:
-            # We ignore already updated elements, e.g. parents of apices
-            if vid in already_updated:
-                continue
-
-            # If we focus on a new element
-            if vid not in list(self.C_sucrose_root.keys()):
-                parent = self.g.parent(vid)
-                for prop in self.state_variables:
-                    # if intensive, equals to parent AFTER it has been updated
-                    if self.__dataclass_fields__[prop].metadata["state_variable_type"] == "intensive":
-                        getattr(self, prop).update({parent: getattr(self, prop)[parent] * (
-                                self.initial_struct_mass[parent] / self.struct_mass[parent])})
-                        getattr(self, prop).update({vid: getattr(self, prop)[parent]})
-                    # if extensive, we need structural mass wise partitioning
-                    else:
-                        # we partition the initial flow in the parent accounting for mass fraction
-                        # We use struct_mass, the resulting structural mass after growth
-                        mass_fraction = self.struct_mass[vid] / (self.struct_mass[vid] + self.struct_mass[parent])
-                        getattr(self, prop).update({vid: getattr(self, prop)[parent] * mass_fraction,
-                                                    parent: getattr(self, prop)[parent] * (1-mass_fraction)})
-                already_updated += [vid, parent]
-
-            # If the element already exists and isn't immediate neighbor of an apex
-            else:
-                # If after growth the element actually grown
-                if self.struct_mass[vid] > 0:
-                    for prop in self.state_variables:
-                        # if intensive, concentrations have to be updated based on new structural mass
-                        if self.__dataclass_fields__[prop].metadata["state_variable_type"] == "intensive":
-                            getattr(self, prop).update({vid: getattr(self, prop)[vid] * (
-                                self.initial_struct_mass[vid] / self.struct_mass[vid])})
-                        # if extensive, it doesn't need to be updated and if parent is segmented,
-
-                already_updated += [vid]
 
     def total_root_sucrose_and_living_struct_mass(self):
         """
@@ -539,15 +491,7 @@ class RootCarbonModel(Model):
                 continue
             else:
                 # We increment the total amount of sucrose in the root system, including dead root elements (if any):
-                self.total_sucrose_root[1] += self.C_sucrose_root[vid] * (
-                            self.struct_mass[vid] + self.living_root_hairs_struct_mass[vid]) \
-                                           - self.deficit_sucrose_root[vid]
-
-                # We only select the elements that have a positive struct_mass and are not dead
-                # (if they have just died, we still include them in the balance):
-                if self.struct_mass[vid] > 0. and self.type[vid] != "Dead" and self.type[vid] != "Just_dead":
-                    # We calculate the total living struct_mass by summing all the local struct_masses:
-                    self.total_living_struct_mass[1] += self.struct_mass[vid] + self.living_root_hairs_struct_mass[vid]
+                self.total_sucrose_root[1] += self.C_sucrose_root[vid] * self.living_struct_mass[vid] - self.deficit_sucrose_root[vid]
 
     # Calculating the net input of sucrose by the aerial parts into the root system:
     # ------------------------------------------------------------------------------
@@ -677,8 +621,7 @@ class RootCarbonModel(Model):
             return max(0.5 * max_loading_rate * phloem_exchange_surface * C_hexose_root / (self.Km_loading + C_hexose_root), 0.)
 
     @rate
-    def _hexose_mobilization_from_reserve(self, length, C_hexose_root, C_hexose_reserve, type, struct_mass,
-                                         living_root_hairs_struct_mass, soil_temperature):
+    def _hexose_mobilization_from_reserve(self, length, C_hexose_root, C_hexose_reserve, type, living_struct_mass, soil_temperature):
         """
         TODO not used??
         CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE
@@ -698,11 +641,11 @@ class RootCarbonModel(Model):
                 return 0.
             else:
                 return corrected_max_mobilization_rate * C_hexose_reserve / (
-                        self.Km_mobilization + C_hexose_reserve) * (struct_mass + living_root_hairs_struct_mass)
+                        self.Km_mobilization + C_hexose_reserve) * living_struct_mass
 
     @rate
     def _hexose_immobilization_as_reserve(self, C_hexose_root, C_hexose_reserve, type,
-                                          struct_mass, living_root_hairs_struct_mass, soil_temperature):
+                                          living_struct_mass, soil_temperature):
         # CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE:
         if C_hexose_root <= self.C_hexose_root_min_for_reserve or C_hexose_reserve >= self.C_hexose_reserve_max \
                 or type == "Just_dead" or type == "Dead":
@@ -716,8 +659,7 @@ class RootCarbonModel(Model):
                                                                         B=self.max_immobilization_rate_B,
                                                                         C=self.max_immobilization_rate_C)
 
-            return corrected_max_immobilization_rate * C_hexose_root / (self.Km_immobilization + C_hexose_root) * (
-                    struct_mass + living_root_hairs_struct_mass)
+            return corrected_max_immobilization_rate * C_hexose_root / (self.Km_immobilization + C_hexose_root) * living_struct_mass
 
     # Function calculating maintenance respiration:
     # ----------------------------------------------
@@ -731,7 +673,7 @@ class RootCarbonModel(Model):
     # concentration of hexose.
 
     @rate
-    def _maintenance_respiration(self, type, C_hexose_root, struct_mass, living_root_hairs_struct_mass, soil_temperature):
+    def _maintenance_respiration(self, type, C_hexose_root, living_struct_mass, soil_temperature):
 
         # CONSIDERING CASES THAT SHOULD BE AVOIDED:
         # We consider that dead elements cannot respire (unless over the first time step following death,
@@ -747,8 +689,7 @@ class RootCarbonModel(Model):
                                                                     B=self.resp_maintenance_max_B,
                                                                     C=self.resp_maintenance_max_C)
 
-            return corrected_resp_maintenance_max * C_hexose_root / (self.Km_maintenance + C_hexose_root) * (
-                    struct_mass + living_root_hairs_struct_mass)
+            return corrected_resp_maintenance_max * C_hexose_root / (self.Km_maintenance + C_hexose_root) * living_struct_mass
 
     # Exudation of hexose from the root into the soil:
     # ------------------------------------------------
@@ -766,7 +707,7 @@ class RootCarbonModel(Model):
     # vascular_exchange_surface = cond_walls * cond_exo * cond_endo * S_vessels
 
     @rate
-    def _hexose_exudation(self, struct_mass, length, root_exchange_surface, symplasmic_volume, C_hexose_root, C_hexose_soil, soil_temperature):
+    def _hexose_exudation(self, living_struct_mass, length, root_exchange_surface, symplasmic_volume, C_hexose_root, C_hexose_soil, soil_temperature):
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
             return 0.
         else:
@@ -783,12 +724,12 @@ class RootCarbonModel(Model):
             #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
             
             corrected_permeability_coeff = corrected_P_max_apex
-            # print("Concentration : ", C_hexose_root * struct_mass / symplasmic_volume, "gradient :", (C_hexose_root * struct_mass / symplasmic_volume) - C_hexose_soil)
-            return max(corrected_permeability_coeff * ((C_hexose_root * struct_mass / symplasmic_volume) - C_hexose_soil) * root_exchange_surface,
+            # print("Concentration : ", C_hexose_root * living_struct_mass / symplasmic_volume, "gradient :", (C_hexose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil)
+            return max(corrected_permeability_coeff * ((C_hexose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil) * root_exchange_surface,
                        0)
         
     @rate
-    def _phloem_hexose_exudation(self, struct_mass, length, symplasmic_volume, root_exchange_surface, C_hexose_root, C_sucrose_root,
+    def _phloem_hexose_exudation(self, living_struct_mass, length, symplasmic_volume, root_exchange_surface, C_hexose_root, C_sucrose_root,
                                         C_hexose_soil, apoplasmic_exchange_surface, soil_temperature):
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
             return 0.
@@ -805,7 +746,7 @@ class RootCarbonModel(Model):
             #     corrected_permeability_coeff = corrected_P_max_apex \
             #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
             corrected_permeability_coeff = corrected_P_max_apex
-            return corrected_permeability_coeff * ((2 * C_sucrose_root * struct_mass / symplasmic_volume) - C_hexose_soil) * apoplasmic_exchange_surface
+            return corrected_permeability_coeff * ((2 * C_sucrose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil) * apoplasmic_exchange_surface
     
     # Uptake of hexose from the soil by the root:
     # -------------------------------------------
@@ -929,10 +870,10 @@ class RootCarbonModel(Model):
     # a C balance.
         
     @state
-    def _C_sucrose_root(self, vertex_index, C_sucrose_root, struct_mass, living_root_hairs_struct_mass, hexose_diffusion_from_phloem,
+    def _C_sucrose_root(self, vertex_index, C_sucrose_root, living_struct_mass, hexose_diffusion_from_phloem,
                             hexose_active_production_from_phloem, phloem_hexose_exudation, sucrose_loading_in_phloem,
                             phloem_hexose_uptake_from_soil, deficit_sucrose_root):
-        balance = C_sucrose_root + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
+        balance = C_sucrose_root + (self.time_step / living_struct_mass) * (
                 - hexose_diffusion_from_phloem / 2.
                 - hexose_active_production_from_phloem / 2.
                 - phloem_hexose_exudation / 2.
@@ -941,7 +882,7 @@ class RootCarbonModel(Model):
                 - deficit_sucrose_root)
         
         if balance < 0:
-            deficit = - balance * (struct_mass + living_root_hairs_struct_mass) / self.time_step
+            deficit = - balance * living_struct_mass / self.time_step
             self.deficit_sucrose_root[vertex_index] = deficit if deficit > 1e-20 else 0.
             return 0.
         else:
@@ -949,15 +890,15 @@ class RootCarbonModel(Model):
             return balance
     
     @state
-    def _C_hexose_reserve(self, vertex_index, C_hexose_reserve, struct_mass, living_root_hairs_struct_mass, hexose_immobilization_as_reserve,
+    def _C_hexose_reserve(self, vertex_index, C_hexose_reserve, living_struct_mass, hexose_immobilization_as_reserve,
                               hexose_mobilization_from_reserve, deficit_hexose_reserve):
-        balance = C_hexose_reserve + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
+        balance = C_hexose_reserve + (self.time_step / living_struct_mass) * (
                 hexose_immobilization_as_reserve
                 - hexose_mobilization_from_reserve
                 - deficit_hexose_reserve)
         
         if balance < 0:
-            deficit = - balance * (struct_mass + living_root_hairs_struct_mass) / self.time_step
+            deficit = - balance * living_struct_mass / self.time_step
             self.deficit_hexose_reserve[vertex_index] = deficit if deficit > 1e-20 else 0.
             return 0.
         else:
@@ -965,12 +906,12 @@ class RootCarbonModel(Model):
             return balance
 
     @state
-    def _C_hexose_root(self, vertex_index, C_hexose_root, struct_mass, living_root_hairs_struct_mass, hexose_exudation, hexose_uptake_from_soil,
+    def _C_hexose_root(self, vertex_index, C_hexose_root, living_struct_mass, hexose_exudation, hexose_uptake_from_soil,
                            mucilage_secretion, cells_release, maintenance_respiration,
                            hexose_consumption_by_growth, hexose_consumption_by_fungus, hexose_diffusion_from_phloem,
                            hexose_active_production_from_phloem, sucrose_loading_in_phloem,
                            hexose_mobilization_from_reserve, hexose_immobilization_as_reserve, deficit_hexose_root):
-        balance = C_hexose_root + (self.time_step / (struct_mass + living_root_hairs_struct_mass)) * (
+        balance = C_hexose_root + (self.time_step / living_struct_mass) * (
                 - hexose_exudation
                 + hexose_uptake_from_soil
                 - mucilage_secretion
@@ -986,7 +927,7 @@ class RootCarbonModel(Model):
                 - deficit_hexose_root)
         
         if balance < 0:
-            deficit = - balance * (struct_mass + living_root_hairs_struct_mass) / self.time_step
+            deficit = - balance * living_struct_mass / self.time_step
             self.deficit_hexose_root[vertex_index] = deficit if deficit > 1e-20 else 0.
             return 0.
         else:
@@ -1028,7 +969,7 @@ class RootCarbonModel(Model):
             self.C_hexose_root.values(), 
             self.C_sucrose_root.values(),
             self.C_hexose_reserve.values(),
-            self.struct_mass.values())])
+            self.living_struct_mass.values())])
 
     # TODO adapt to class structure
     class Differential_Equation_System(object):

@@ -34,9 +34,6 @@ class RootAnatomy(Model):
     distance_from_tip: float = declare(default=1.e-3, unit="m", unit_comment="", description="Example root segment distance from tip", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
-    struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Example root segment structural mass", 
-                            min_value="", max_value="", value_comment="", references="", DOI="",
-                            variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     root_hair_length: float = declare(default=1.e-3, unit="m", unit_comment="", description="Example root hair length", 
                             min_value="", max_value="", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair maximal length for wheat and barley evolves between 0.5 and 1.3 mm.", DOI="",
                             variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
@@ -211,23 +208,6 @@ class RootAnatomy(Model):
         self.link_self_to_mtg()
 
         self.init_cell_layers()
-
-    def post_growth_updating(self):
-        """
-        Description :
-            Extend property dictionary upon new element partitioning
-        """
-        self.vertices = self.g.vertices(scale=self.g.max_scale())
-        for vid in self.vertices:
-            if vid not in list(self.root_exchange_surface.keys()):
-                parent = self.g.parent(vid)
-                mass_fraction = self.struct_mass[vid] / (self.struct_mass[vid] + self.struct_mass[parent])
-                # All surfaces are extensive, so we need structural mass wise partitioning to initialize
-                for prop in self.extensive_variables:
-                    getattr(self, prop).update({vid: getattr(self, prop)[parent] * mass_fraction,
-                                                    parent: getattr(self, prop)[parent] * (1-mass_fraction)})
-                for prop in self.intensive_variables:
-                    getattr(self, prop).update({vid: getattr(self, prop)[parent]})
 
 
     def init_cell_layers(self):
