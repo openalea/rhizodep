@@ -81,6 +81,9 @@ class RootGrowthModel(Model):
     initial_struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+    initial_living_root_hairs_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
     living_root_hairs_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Example root segment living root hairs structural mass", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
@@ -1630,11 +1633,15 @@ class RootGrowthModel(Model):
         :return:
         """
         # We simulate the segmentation of all apices:
+
+        self.step_new_apices = []
+        self.step_elongating_elements = []
+
         for vid in self.vertices:
             n = self.g.node(vid)
             # For each apex in the list of apices that have emerged with a positive length:
             if n.label == 'Apex' and n.type == "Normal_root_after_emergence" and n.length > 0.:
-                self.segmentation_and_primordium_formation(apex=n)
+                self.step_new_apices.append(self.segmentation_and_primordium_formation(apex=n))
 
         # We make sure that stored vertices are well updated with the new ones
         self.vertices = self.g.vertices(scale=self.g.max_scale())
@@ -1702,8 +1709,8 @@ class RootGrowthModel(Model):
         # TODO: the time-related variables associated to root hairs will not be changed here, but rather in the function 'root_hairs_dynamics' - check whether this is OK!
 
         # NOTE: The following is not an error, we also need to record the "initial" structural mass and surfaces before growth!
-        initial_initial_struct_mass = apex.initial_struct_mass
-        initial_initial_living_root_hairs_struct_mass = apex.initial_living_root_hairs_struct_mass
+        initial_struct_mass = apex.initial_struct_mass
+        initial_living_root_hairs_struct_mass = apex.initial_living_root_hairs_struct_mass
         initial_hexose_growth_demand = apex.hexose_growth_demand
         initial_hexose_consumption_by_growth_amount = apex.hexose_consumption_by_growth_amount
         initial_hexose_consumption_by_growth = apex.hexose_consumption_by_growth
@@ -1759,6 +1766,9 @@ class RootGrowthModel(Model):
                 apex.thermal_time_since_cells_formation = (apex.initial_length * Thermal_age_of_non_elongated_part
                                                         + (apex.length - apex.initial_length) * Thermal_age_of_elongated_part) / apex.length
 
+                # Finally we store this elongation information to expose it to other modules
+                self.step_elongating_elements.append(apex.index)
+
         # CASE 2: THE APEX HAS TO BE SEGMENTED
         # -------------------------------------
         # Otherwise, we have to calculate the number of entire segments within the apex.
@@ -1796,8 +1806,8 @@ class RootGrowthModel(Model):
                 # We modify the variables representing total amounts according to this mass fraction:
                 apex.resp_growth = initial_resp_growth * mass_fraction
 
-                apex.initial_struct_mass = initial_initial_struct_mass * mass_fraction
-                apex.initial_living_root_hairs_struct_mass = initial_initial_living_root_hairs_struct_mass * mass_fraction
+                apex.initial_struct_mass = initial_struct_mass * mass_fraction
+                apex.initial_living_root_hairs_struct_mass = initial_living_root_hairs_struct_mass * mass_fraction
                 apex.struct_mass_produced = initial_struct_mass_produced * mass_fraction
 
                 apex.root_hairs_struct_mass = initial_root_hairs_struct_mass * mass_fraction
@@ -1905,8 +1915,8 @@ class RootGrowthModel(Model):
 
             apex.resp_growth = initial_resp_growth * mass_fraction
 
-            apex.initial_struct_mass = initial_initial_struct_mass * mass_fraction
-            apex.initial_living_root_hairs_struct_mass = initial_initial_living_root_hairs_struct_mass * mass_fraction
+            apex.initial_struct_mass = initial_struct_mass * mass_fraction
+            apex.initial_living_root_hairs_struct_mass = initial_living_root_hairs_struct_mass * mass_fraction
 
             apex.struct_mass_produced = initial_struct_mass_produced * mass_fraction
 
@@ -2798,13 +2808,47 @@ class RootGrowthModel(Model):
 
             processed_length += n.length
 
-    def post_growth_updating(self):
-        for vid in self.vertices:
-            if vid not in self.vertex_index:
-                # We also increment the vertex identifiers to be accesses in deficits
-                self.vertex_index[vid] = vid
+    def post_growth_updating(self, modules_to_update):
 
-    def __call__(self, *args, external_variables={}):
+        for module in modules_to_update:
+            setattr(module, "vertices", self.vertices)
+
+        processed_vid = []
+        print(self.step_new_apices)
+        print(self.step_elongating_elements)
+
+        for vid in self.vertices:
+            if vid not in processed_vid:
+                # For every vertex we update the considered living struct_mass for other modules.
+                self.living_struct_mass[vid] = self.struct_mass[vid] + self.living_root_hairs_struct_mass[vid]
+                processed_vid.append(vid)
+                if vid in self.step_new_apices:
+
+                    # We increment the vertex identifiers to be accesses in deficits
+                    self.vertex_index[vid] = vid
+                    # We need to get the parent to compute mass partitionning.
+                    parent = self.g.parent(vid)
+                    self.living_struct_mass[parent] = self.struct_mass[parent] + self.living_root_hairs_struct_mass[parent]
+                    processed_vid.append(parent)
+
+                    mass_fraction = self.struct_mass[vid] / (self.struct_mass[vid] + self.struct_mass[parent])
+                    for module in modules_to_update:
+                        for prop in module.massic_concentration:
+                            initial_metabolite_amount = getattr(module, prop)[parent] * (self.initial_struct_mass[parent] + self.initial_living_root_hairs_struct_mass[parent])
+                            getattr(module, prop).update({vid: initial_metabolite_amount * mass_fraction / self.living_struct_mass[vid],
+                                                        parent: initial_metabolite_amount * (1-mass_fraction) / self.living_struct_mass[parent]})
+                        for prop in module.extensive_variables:
+                            initial_amount = getattr(module, prop)[parent]
+                            getattr(module, prop).update({vid: initial_amount * mass_fraction,
+                                                        parent: initial_amount * (1-mass_fraction)})
+
+                elif vid in self.step_elongating_elements:
+                    for module in modules_to_update:
+                        for prop in module.massic_concentration:
+                            getattr(module, prop)[vid] = getattr(module, prop)[vid] * (self.initial_struct_mass[vid] + self.initial_living_root_hairs_struct_mass[vid]) / self.living_struct_mass[vid]
+
+
+    def __call__(self, *args, modules_to_update=[]):
         super().__call__(*args)
-        self.post_growth_updating()
+        self.post_growth_updating(modules_to_update=modules_to_update)
     
