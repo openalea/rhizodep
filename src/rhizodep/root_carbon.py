@@ -483,7 +483,6 @@ class RootCarbonModel(Model):
         """
         # We initialize the values to 0:
         self.total_sucrose_root[1] = 0.
-        self.total_living_struct_mass[1] = 0.
 
         # We cover all the vertices in the MTG, whether they are dead or not:
         for vid in self.g.vertices_iter(scale=1):

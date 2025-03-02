@@ -1,6 +1,6 @@
 import numpy as np
 from math import pi
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from metafspm.component import Model, declare
 from metafspm.component_factory import *
@@ -93,7 +93,7 @@ class RootAnatomy(Model):
     kr_apoplastic_water: float = declare(default=1., unit="mol.s-1.Pa-1", unit_comment="", description="Apolastic water conductance including the endoderm differentiation blocking this pathway. Considering xylem volume to be equivalent to whole stele apoplasm, we only account for the cumulated resistance of cortex and epidermis cell wals.", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="state_variable", by="model_anatomy", state_variable_type="self_rate_state", edit_by="user")
-
+    
     # Tissue density
     root_tissue_density: float = declare(default=0.10 * 1e6, unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
@@ -173,17 +173,72 @@ class RootAnatomy(Model):
                             variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
     
     # Concentric layering parameters
-    tissue_name: tuple = ("epidermis", "cortex", "stele", "phloem")
-    num_layers: dict = {"epidermis": 1, "cortex": 5, "stele": 5, "phloem": 1}
-    layer_cell_perimeter_toR: dict = {"epidermis": (0.05,), "cortex": (0.15 for _ in range(5)), "stele": (0.04 for _ in range(5)), "phloem": (0.03,)}
-    layer_cross_sectional_surface_toRR: dict = {"epidermis": (0.05), "cortex": (0.15 for _ in range(5)), "stele": (0.04 for _ in range(5)), "phloem": (0.03,)}
-    mean_cell_length_toR: dict = {"epidermis": (0.05), "cortex": (0.15 for _ in range(5)), "stele": (0.04 for _ in range(5)), "phloem": (0.03,)}
-    mean_cell_width_toR: dict = {"epidermis": (0.05), "cortex": (0.15 for _ in range(5)), "stele": (0.04 for _ in range(5)), "phloem": (0.03,)}
-    cell_wall_thickness: dict = {"epidermis": (1e-6), "cortex": (1e-6 for _ in range(5)), "stele": (1e-6 for _ in range(5)), "phloem": (1e-6,)}
-    wall_connectivity_in_layer: dict = {"epidermis": (0.1), "cortex": (0.1 for _ in range(5)), "stele": (0.5 for _ in range(5)), "phloem": (0.5,)}
-    wall_connectivity_with_inner_neighbor: dict = {"epidermis": (0.8,), "cortex": (0.5 for _ in range(5)), "stele": (0.8 for _ in range(5)), "phloem": (0.5)}
-    cell_line_frequency: dict = {"epidermis": (1e4,), "cortex": (1e4 for _ in range(5)), "stele": (1e4 for _ in range(5)), "phloem": (1e4)}
+    tissue_name: tuple = declare(default=("epidermis", "cortex", "stele", "phloem"), unit="m", unit_comment="", description="", 
+                            min_value="", max_value="", value_comment="", references="", DOI="",
+                            variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
+    
+    num_layers: tuple = declare(default= (1, 5, 5, 1), unit="adim", unit_comment="", description="", 
+                            min_value="", max_value="", value_comment="", references="", DOI="",
+                            variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
+    
+    layer_cell_perimeter_toR: tuple = declare(default= ((0.05,), 
+                                                        tuple(0.15 for _ in range(5)), 
+                                                        tuple(0.04 for _ in range(5)), 
+                                                        (0.03,)), 
+                                                unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
+                                                variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
+    
+    layer_cross_sectional_surface_toRR: tuple = declare(default= ((0.05,), 
+                                                        tuple(0.15 for _ in range(5)), 
+                                                        tuple(0.04 for _ in range(5)), 
+                                                        (0.03,)), 
+                                                unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
+                                                variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
+    
+    mean_cell_length_toR: tuple = declare(default= ((0.05,), 
+                                                        tuple(0.15 for _ in range(5)), 
+                                                        tuple(0.04 for _ in range(5)), 
+                                                        (0.03,)), 
+                                                unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
+                                                variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
+    
+    mean_cell_width_toR: tuple = declare(default= ((0.05,), 
+                                                        tuple(0.15 for _ in range(5)), 
+                                                        tuple(0.04 for _ in range(5)), 
+                                                        (0.03,)), 
+                                                unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
+                                                variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
 
+    cell_wall_thickness: tuple = declare(default= ((1e-6,), 
+                                                        tuple(1e-6 for _ in range(5)), 
+                                                        tuple(1e-6 for _ in range(5)), 
+                                                        (1e-6,)), 
+                                                unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
+                                                variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
+    
+    wall_connectivity_in_layer: tuple = declare(default= ((0.1,), 
+                                                        tuple(0.1 for _ in range(5)), 
+                                                        tuple(0.5 for _ in range(5)), 
+                                                        (0.5,)), 
+                                                unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
+                                                variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
+
+    wall_connectivity_with_inner_neighbor: tuple = declare(default= ((0.8,), 
+                                                        tuple(0.5 for _ in range(5)), 
+                                                        tuple(0.8 for _ in range(5)), 
+                                                        (0.5,)), 
+                                                unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
+                                                variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
+    cell_line_frequency: tuple = declare(default= ((1e4,), 
+                                                        tuple(1e4 for _ in range(5)), 
+                                                        tuple(1e4 for _ in range(5)), 
+                                                        (1e4,)), 
+                                                unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
+                                                variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
+
+
+ 
+ 
 
     def __init__(self, g, time_step_in_seconds: int, **scenario: dict):
         """
@@ -215,10 +270,10 @@ class RootAnatomy(Model):
 
         layer_number = 0
         current_bounding_radius = 1
-        for tissue in self.tissue_name:
+        for tissue in range(len(self.tissue_name)):
             for l in range(self.num_layers[tissue]):
 
-                self.cell_layers.append(RootCellLayer(tissue_name=tissue, layer_surface_toS=self.layer_surface_toS[tissue][l], layer_cross_sectionnal_surface_toS=self.layer_cross_sectionnal_surface_toS[tissue][l],
+                self.cell_layers.append(RootCellLayer(tissue_name=self.tissue_name[tissue], layer_cell_perimeter_toR=self.layer_cell_perimeter_toR[tissue][l], layer_cross_sectional_surface_toRR=self.layer_cross_sectional_surface_toRR[tissue][l],
                                                  layer_numbering=layer_number, mean_cell_length_toR=self.mean_cell_length_toR[tissue][l], mean_cell_width_toR=self.mean_cell_width_toR[tissue][l],
                                                  cell_wall_thickness=self.cell_wall_thickness[tissue][l], wall_connectivity_in_layer=self.wall_connectivity_in_layer[tissue][l],
                                                  wall_connectivity_with_inner_neighbor=self.wall_connectivity_with_inner_neighbor[tissue][l], cell_line_frequency=self.cell_line_frequency[tissue][l]))
@@ -478,7 +533,8 @@ class RootAnatomy(Model):
         :return: the volume (m3)
         """
         stele_symplasm_volume = sum([layer.cell_volume(radius, length) for layer in self.cell_layers if layer.tissue_name == "stele"])
-        stele_radius = radius - sum([layer.mean_cell_width_toR * radius + layer.cell_wall_thickness for layer in ("epidermis", "cortex")])
+        stele_radius = radius - sum([layer.mean_cell_width_toR * radius + layer.cell_wall_thickness for layer in self.cell_layers 
+                                     if layer.tissue_name in ("epidermis", "cortex")])
 
         return 2 * pi * stele_radius - stele_symplasm_volume
     
@@ -532,7 +588,7 @@ class RootCellLayer:
     plasmodesmata_conductance: float = 1
     cell_wall_conductivity: float = 1
 
-    def __init__(self, tissue_name, layer_surface_toS, layer_cell_perimeter_toR, layer_cross_sectional_surface_toRR, layer_numbering, 
+    def __init__(self, tissue_name, layer_cell_perimeter_toR, layer_cross_sectional_surface_toRR, layer_numbering, 
                  mean_cell_length_toR, mean_cell_width_toR, cell_wall_thickness, wall_connectivity_in_layer, wall_connectivity_with_inner_neighbor,
                  # Axial aspects
                  cell_line_frequency, 
