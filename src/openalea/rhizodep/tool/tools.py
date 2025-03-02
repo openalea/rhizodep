@@ -7,8 +7,6 @@
     :license: see LICENSE for details.
 """
 
-# TODO: add functions from making_graph.py and video.py
-
 import os
 from decimal import Decimal
 from math import pi, cos, sin, floor, ceil, trunc, log10

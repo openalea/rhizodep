@@ -19,10 +19,7 @@ import openalea.plantgl.all as pgl
 from . import model
 from .tool import alternative_plotting, tools
 from . import parameters as param
-from . import mycorrhizae
 
-
-# TODO: explicitly add 'surfaces_and_volumes()' in the sequence of modelling!
 
 # We define the main tutorial program:
 def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
@@ -599,7 +596,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             else:
                 sucrose_input_rate = input_frame.loc[step - initial_step_number, 'sucrose_input_rate']
 
-            # TODO: WATHC OUT - her we artificially increase the supply of C depending on the mass of the fungus!
             if mycorrhizal_fungus:
                 if fungus_MTG.overall_infection_severity > 0.:
                     sucrose_input_rate =sucrose_input_rate * (1 + fungus_MTG.overall_infection_severity \
@@ -752,7 +748,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                                          printing_warnings=printing_warnings)
                 # WARNING: The function "shoot_sucrose_supply_and_spreading" must be called AFTER the function "balance",
                 # otherwise the deficit in sucrose may be counted twice!!!
-                # TODO: check this affirmation about the position of shoot_sucrose_supply_and_spreading
 
                 # # OPTIONAL: checking of possible anomalies in the root system:
                 # model.control_of_anomalies(g)
