@@ -458,18 +458,17 @@ if __name__ == '__main__':
 
     # CASE 2 - CALLING MULTIPLE SCENARIOS:
     ######################################
-    # We can clear the folder containing previous outputs:
 
+    # The current directory is:
     current_dir = Path(__file__).parent.absolute()
-
-    print(current_dir)
+    # The directory of the tutorial is:
     tuto_dir = (current_dir.parent.parent.parent.parent / 'tutorial').absolute()
-    print(tuto_dir)
-
+    # The directories of the 'inputs' and 'outputs' in this directory are:
     input_dir = tuto_dir / 'inputs'
     output_dir = tuto_dir / 'outputs'
-    
+    # We can clear the folder containing previous outputs:
     previous_outputs_clearing(output_path=str(output_dir))
+
     # We run the scenarios in parallel :
     # WATCH OUT: you will still need to manually modify the default arguments of 'run_one_scenarios',
     # e.g. the name of the file where to read scenario instructions, even if you have entered it below!
