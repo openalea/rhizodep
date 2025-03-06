@@ -162,42 +162,42 @@ class RootCarbonModel(Model):
     # Transport Processes
     hexose_diffusion_from_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                                  min_value="", max_value="", value_comment="", references="", DOI="",
-                                                  variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
+                                                  variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
     hexose_active_production_from_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                                          min_value="", max_value="", value_comment="", references="", DOI="",
-                                                          variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
+                                                          variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
     sucrose_loading_in_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                               min_value="", max_value="", value_comment="", references="", DOI="",
-                                               variable_type="state_variable", by="model_carbon", state_variable_type="extensself_rate_stateive", edit_by="user")
+                                               variable_type="state_variable", by="model_carbon", state_variable_type="extensNonInertialExtensiveive", edit_by="user")
     hexose_exudation: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                      min_value="", max_value="", value_comment="", references="", DOI="",
-                                      variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
+                                      variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
     phloem_hexose_exudation: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                             min_value="", max_value="", value_comment="", references="", DOI="",
-                                             variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
+                                             variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
     hexose_uptake_from_soil: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                             min_value="", max_value="", value_comment="", references="", DOI="",
-                                             variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
+                                             variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
     phloem_hexose_uptake_from_soil: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                                    min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
     mucilage_secretion: float = declare(default=0., unit="mol.s-1", unit_comment="of equivalent hexose", description="", 
                                        min_value="", max_value="", value_comment="", references="", DOI="",
-                                        variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
+                                        variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
     cells_release: float = declare(default=0., unit="mol.s-1", unit_comment="of equivalent hexose", description="", 
                                   min_value="", max_value="", value_comment="", references="", DOI="",
-                                   variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
+                                   variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
 
     # Metabolic Processes
     hexose_mobilization_from_reserve: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                                      min_value="", max_value="", value_comment="", references="", DOI="",
-                                                      variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
+                                                      variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
     hexose_immobilization_as_reserve: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                                      min_value="", max_value="", value_comment="", references="", DOI="",
-                                                      variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
+                                                      variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
     maintenance_respiration: float = declare(default=0., unit="mol.s-1", unit_comment="of carbon", description="", 
                                             min_value="", max_value="", value_comment="", references="", DOI="",
-                                             variable_type="state_variable", by="model_carbon", state_variable_type="self_rate_state", edit_by="user")
+                                             variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
 
     # Deficits
     deficit_sucrose_root: float = declare(default=0., unit="mol.s-1", unit_comment="of sucrose", description="Sucrose deficit rate in root", 

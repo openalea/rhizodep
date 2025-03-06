@@ -56,67 +56,67 @@ class RootGrowthModel(Model):
     # --- INITIALIZE MODEL STATE VARIABLES ---
     type: str = declare(default="Normal_root_after_emergence", unit="", unit_comment="", description="Example segment type provided by root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
     root_order: int = declare(default=1, unit="", unit_comment="", description="Example root segment's axis order computed by the initiate_mtg method or provided as input", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
     vertex_index: int = declare(default=1, unit="mol.s-1", unit_comment="", description="Unique vertex identifier stored for ease of value access", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
     radius: float = declare(default=3.5e-4, unit="m", unit_comment="", description="Example root segment radius", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     z1: float = declare(default=0., unit="m", unit_comment="", description="Depth of the segment tip computed by plantGL, colar side", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     z2: float = declare(default=0., unit="m", unit_comment="", description="Depth of the segment tip computed by plantGL, apex side", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     length: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example root segment length", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Example root segment structural mass", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     initial_struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     initial_living_root_hairs_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Same as struct_mass but corresponds to the previous time step; it is intended to record the variation", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     living_root_hairs_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Example root segment living root hairs structural mass", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     living_struct_mass: float = declare(default=0., unit="g", unit_comment="", description="Sum of segment and root hair living struct mass", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     root_hair_length: float = declare(default=1.e-3, unit="m", unit_comment="", description="Example root hair length", 
                                                     min_value="", max_value="", value_comment="", references="According to the work of Gahoonia et al. (1997), the root hair maximal length for wheat and barley evolves between 0.5 and 1.3 mm.", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     total_root_hairs_number: float = declare(default=30 * (1.6e-4 / 3.5e-4) * 3.e-3 * 1e3, unit="adim", unit_comment="", description="Example root hairs number on segment external surface", 
                                                     min_value="", max_value="", value_comment="30 * (1.6e-4 / radius) * length * 1e3", references=" According to the work of Gahoonia et al. (1997), the root hair density is about 30 hairs per mm for winter wheat, for a root radius of about 0.16 mm.", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth is coupled to a root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     hexose_consumption_by_fungus: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by fungus", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user") 
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user") 
     distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     volume: float = declare(default=1e-9, unit="m3", unit_comment="", description="Initial volume of the collar element", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     root_hairs_struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     thermal_time_since_emergence: float = declare(default=0, unit="°C", unit_comment="", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="self_rate_state", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     
     # Total state variable
     total_living_struct_mass: float =          declare(default=0, unit="g", unit_comment="of dry weight", description="", 
@@ -353,27 +353,10 @@ class RootGrowthModel(Model):
         self.time_step_in_seconds = time_step_in_seconds
         self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.props)
         self.vertices = self.g.vertices(scale=self.g.max_scale())
-
-        for name in self.state_variables:
-            # We do this to avoid having the initiate_mtg rewritten each time a new state variable is defined.
-            if name not in self.props.keys():
-                self.props.setdefault(name, {})
-                self.props[name].update({key: getattr(self, name) for key in self.vertices})
-            setattr(self, name, self.props[name])
+        self.link_self_to_mtg()
 
         if g is None:
             self.initiate_heterogeneous_variables()
-
-        # for input variables, initialize homogeneous values on each vertices. 
-        # This behavior will be overwritten in case of module providing the input variable
-        for name in self.inputs:
-            if name in self.props.keys() and len(self.props[name]) == len(self.vertices):
-                setattr(self, name, self.props[name])
-            # if it is not provided by mtg file, Use by default value everywhere
-            else:
-                self.props.setdefault(name, {})
-                self.props[name].update({key: getattr(self, name) for key in self.vertices})
-                setattr(self, name, self.props[name])
 
     def initiate_mtg(self):
         """
@@ -1644,7 +1627,13 @@ class RootGrowthModel(Model):
             n = self.g.node(vid)
             # For each apex in the list of apices that have emerged with a positive length:
             if n.label == 'Apex' and n.type == "Normal_root_after_emergence" and n.length > 0.:
-                self.step_new_apices.append(self.segmentation_and_primordium_formation(apex=n))
+                new_apex =  self.segmentation_and_primordium_formation(apex=n)
+                if new_apex != []:
+                    if isinstance(new_apex[0], mtg._ProxyNode):
+                        self.step_new_apices += [apex.index() for apex in new_apex]
+                    else:
+                        for sub_list in new_apex:
+                            self.step_new_apices += [apex.index() for apex in sub_list]
 
         # We make sure that stored vertices are well updated with the new ones
         self.vertices = self.g.vertices(scale=self.g.max_scale())
@@ -1732,7 +1721,9 @@ class RootGrowthModel(Model):
             # We simply call the function primordium_formation to check whether a primordium should have been formed
             # (Note: we assume that the segment length is always smaller than the inter-branching distance IBD,
             # so that in this case, only 0 or 1 primordium may have been formed - the function is called only once):
-            new_apex.append(self.primordium_formation(apex, elongation_rate=initial_elongation_rate))
+            new = self.primordium_formation(apex, elongation_rate=initial_elongation_rate)
+            if new != []:
+                new_apex.append(new)
 
             # If there has been an actual elongation of the root apex:
             if apex.actual_elongation_rate > 0.:
@@ -1770,7 +1761,7 @@ class RootGrowthModel(Model):
                                                         + (apex.length - apex.initial_length) * Thermal_age_of_elongated_part) / apex.length
 
                 # Finally we store this elongation information to expose it to other modules
-                self.step_elongating_elements.append(apex.index)
+                self.step_elongating_elements.append(apex.index())
 
         # CASE 2: THE APEX HAS TO BE SEGMENTED
         # -------------------------------------
@@ -1865,7 +1856,9 @@ class RootGrowthModel(Model):
 
                 # CONSIDERING POSSIBLE PRIMORDIUM FORMATION:
                 # We call the function that can add a primordium on the current apex depending on the new dist_to_ramif:
-                new_apex.append(self.primordium_formation(apex, elongation_rate=initial_elongation_rate))
+                new = self.primordium_formation(apex, elongation_rate=initial_elongation_rate)
+                if new != []:
+                    new_apex.append(new)
 
                 # The current element that has been elongated up to segment_length is now considered as a segment:
                 apex.label = 'Segment'
@@ -1942,7 +1935,9 @@ class RootGrowthModel(Model):
             apex.thermal_time_since_cells_formation = apex.actual_time_since_cells_formation * temperature_time_adjustment
 
             # And we call the function primordium_formation to check whether a primordium should have been formed:
-            new_apex.append(self.primordium_formation(apex, elongation_rate=initial_elongation_rate))
+            new = self.primordium_formation(apex, elongation_rate=initial_elongation_rate)
+            if new != []:
+                new_apex.append(new)
 
             # Finally, we add the last apex present at the end of the elongated axis:
             new_apex.append(apex)
@@ -2438,10 +2433,6 @@ class RootGrowthModel(Model):
                 # Then we simply define the distance to the tip as the length of the element:
                 n.distance_from_tip = n.length
 
-    @totalstate
-    def _total_living_struct_mass(self, living_struct_mass, type):
-        # WARNING, do not parallelize otherwise other pool updates will be based on previous time-step
-        return sum([m for m, t in zip(living_struct_mass.values(), type.values()) if (m > 0) and (t not in ("Dead", "Just_dead"))])
 
     # Adding a new root element with pre-defined properties:
     def ADDING_A_CHILD(self, mother_element, edge_type='+', label='Apex', type='Normal_root_before_emergence',
@@ -2738,12 +2729,12 @@ class RootGrowthModel(Model):
                 processed_root_hair_length = 0.
                 # ... Compute the elongation zone length and the supposed uniform struct mass production along it
                 elongation_zone_length = n.radius * self.growing_zone_factor                
-                uniform_struct_mass_production = (np.pi * n.radius ** 2) * (self.EL * n.radius * self.root_tissue_density) / elongation_zone_length
+                uniform_struct_mass_production = (np.pi * n.radius ** 2) * (self.EL * n.radius * n.root_tissue_density) / elongation_zone_length
 
                 # .. Then handle the consumption by elongating laterals branched on this axis 
                 emergence_period = n.radius * self.EL * self.emergence_delay
                 lateral_sustaining_root_length = n.radius * self.growing_zone_factor # NOTE : it is the same length as the main root elongation zone, which is normal, as the relative rate of elongation is the same between the main root and the lateral root
-                max_lateral_root_struct_mass_production = np.pi * (n.radius * self.RMD) ** 2 * (self.EL * n.radius * self.RMD) * self.root_tissue_density / lateral_sustaining_root_length
+                max_lateral_root_struct_mass_production = np.pi * (n.radius * self.RMD) ** 2 * (self.EL * n.radius * self.RMD) * n.root_tissue_density / lateral_sustaining_root_length
                 k_sustaining_laterals = max_lateral_root_struct_mass_production / lateral_sustaining_root_length
 
             # IF WE ARE IN THE ELONGATION ZONE
@@ -2754,7 +2745,7 @@ class RootGrowthModel(Model):
                     
                     # Here we begin recording for root hair zone length and uniform struct mass production along as it relies on the local radius
                     root_hair_elongation_zone_length = (n.radius * self.EL) * (self.root_hair_max_length / (self.root_hairs_elongation_rate * self.root_hair_radius))
-                    uniform_root_hair_stuct_mass_production = self.root_tissue_density * (
+                    uniform_root_hair_stuct_mass_production = n.root_tissue_density * (
                         self.root_hair_radius ** 2 * np.pi * (self.root_hairs_elongation_rate * self.root_hair_radius)) * (
                             self.root_hairs_density * n.radius * root_hair_elongation_zone_length) / root_hair_elongation_zone_length
                     # Additionnaly we record the struct mass produced for root hair along with core segment structural mass
@@ -2817,21 +2808,25 @@ class RootGrowthModel(Model):
             setattr(module, "vertices", self.vertices)
 
         processed_vid = []
-        print(self.step_new_apices)
-        print(self.step_elongating_elements)
+
+        self.total_living_struct_mass[1] = 0
 
         for vid in self.vertices:
             if vid not in processed_vid:
                 # For every vertex we update the considered living struct_mass for other modules.
-                self.living_struct_mass[vid] = self.struct_mass[vid] + self.living_root_hairs_struct_mass[vid]
+                living_struct_mass = self.struct_mass[vid] + self.living_root_hairs_struct_mass[vid] # local to avoid multiple access
+                self.living_struct_mass[vid] = living_struct_mass
+                self.total_living_struct_mass[1] += living_struct_mass
                 processed_vid.append(vid)
-                if vid in self.step_new_apices:
+                if vid in self.step_new_apices and vid not in self.vertex_index:
 
                     # We increment the vertex identifiers to be accesses in deficits
                     self.vertex_index[vid] = vid
                     # We need to get the parent to compute mass partitionning.
                     parent = self.g.parent(vid)
-                    self.living_struct_mass[parent] = self.struct_mass[parent] + self.living_root_hairs_struct_mass[parent]
+                    living_struct_mass = self.struct_mass[parent] + self.living_root_hairs_struct_mass[parent] # local to avoid multiple access
+                    self.living_struct_mass[parent] = living_struct_mass
+                    self.total_living_struct_mass[1] += living_struct_mass
                     processed_vid.append(parent)
 
                     mass_fraction = self.struct_mass[vid] / (self.struct_mass[vid] + self.struct_mass[parent])

@@ -287,18 +287,18 @@ class RhizoInputsSoilModel(Model):
         :return:
         """
         for vid in self.vertices:
-            for name in self.state_variables:
-                if self.voxel_neighbor[vid] != None:
+            if self.voxel_neighbor[vid] != None:
+                for name in self.state_variables:
                     vy, vz, vx = self.voxel_neighbor[vid]
                     getattr(self, name)[vid] = self.voxels[name][vy][vz][vx]
 
 
     def __call__(self, *args):
         self.pull_available_inputs()
-        self.compute_mtg_voxel_neighbors()
+        # self.compute_mtg_voxel_neighbors()
         self.apply_to_voxel()
         self.choregrapher(module_family=self.family, *args)
-        self.get_from_voxel()
+        # self.get_from_voxel()
     
     # MODEL EAQUATIONS
 
