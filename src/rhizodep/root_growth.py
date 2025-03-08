@@ -17,7 +17,7 @@ from math import sqrt, pi, floor
 from dataclasses import dataclass
 
 from openalea.mtg import *
-from openalea.mtg.traversal import post_order
+from openalea.mtg.traversal import post_order, pre_order2
 from openalea.mtg import turtle as turt
 
 from metafspm.component import Model, declare
@@ -73,6 +73,9 @@ class RootGrowthModel(Model):
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     length: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example root segment length", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
+    initial_length: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example root segment length", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Example root segment structural mass", 
@@ -354,6 +357,15 @@ class RootGrowthModel(Model):
         self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.props)
         self.vertices = self.g.vertices(scale=self.g.max_scale())
         self.link_self_to_mtg()
+
+        # SPECIFIC HERE, Select real children for collar element (vid == 1).
+        # This is mandatory for correct collar-to-tip Hagen-Poiseuille flow partitioning.
+        self.collar_children, self.collar_skip = [], []
+        for vid in self.vertices:
+            children = self.g.children(vid)
+            if self.type[vid] in ('Support_for_seminal_root', 'Support_for_adventitious_root') and children:
+                self.collar_skip += [vid]
+                self.collar_children += [k for k in children if self.type[k] not in ('Support_for_seminal_root', 'Support_for_adventitious_root')]
 
         if g is None:
             self.initiate_heterogeneous_variables()
@@ -1628,12 +1640,18 @@ class RootGrowthModel(Model):
             # For each apex in the list of apices that have emerged with a positive length:
             if n.label == 'Apex' and n.type == "Normal_root_after_emergence" and n.length > 0.:
                 new_apex =  self.segmentation_and_primordium_formation(apex=n)
-                if new_apex != []:
-                    if isinstance(new_apex[0], mtg._ProxyNode):
-                        self.step_new_apices += [apex.index() for apex in new_apex]
+                for sub_list in new_apex:
+                    if isinstance(sub_list, mtg._ProxyNode):
+                        if sub_list.index() not in self.step_new_apices:
+                            self.step_new_apices.append(sub_list.index())
                     else:
-                        for sub_list in new_apex:
-                            self.step_new_apices += [apex.index() for apex in sub_list]
+                        for apex in sub_list:
+                            if isinstance(apex, mtg._ProxyNode):
+                                if apex.index() not in self.step_new_apices:
+                                    self.step_new_apices.append(apex.index())
+                            else:
+                                print(type(apex))
+                                print("Error list dimensions deeper than 2")
 
         # We make sure that stored vertices are well updated with the new ones
         self.vertices = self.g.vertices(scale=self.g.max_scale())
@@ -2807,43 +2825,79 @@ class RootGrowthModel(Model):
         for module in modules_to_update:
             setattr(module, "vertices", self.vertices)
 
-        processed_vid = []
+        # Select the base of the root
+        root = next(self.g.component_roots_at_scale_iter(self.g.root, scale=1))
 
         self.total_living_struct_mass[1] = 0
 
-        for vid in self.vertices:
-            if vid not in processed_vid:
+        # from root base to tips
+        for vid in pre_order2(self.g, root):
+            if vid not in self.collar_skip:
                 # For every vertex we update the considered living struct_mass for other modules.
                 living_struct_mass = self.struct_mass[vid] + self.living_root_hairs_struct_mass[vid] # local to avoid multiple access
                 self.living_struct_mass[vid] = living_struct_mass
                 self.total_living_struct_mass[1] += living_struct_mass
-                processed_vid.append(vid)
+
                 if vid in self.step_new_apices and vid not in self.vertex_index:
 
                     # We increment the vertex identifiers to be accesses in deficits
                     self.vertex_index[vid] = vid
-                    # We need to get the parent to compute mass partitionning.
-                    parent = self.g.parent(vid)
-                    living_struct_mass = self.struct_mass[parent] + self.living_root_hairs_struct_mass[parent] # local to avoid multiple access
-                    self.living_struct_mass[parent] = living_struct_mass
-                    self.total_living_struct_mass[1] += living_struct_mass
-                    processed_vid.append(parent)
 
-                    mass_fraction = self.struct_mass[vid] / (self.struct_mass[vid] + self.struct_mass[parent])
+                    # We need to get the parent to compute mass partitionning.
+                    if vid in self.collar_children:
+                        parent = 1
+                    else:
+                        parent = self.g.parent(vid)
+                    
+                    mass_fraction = self.living_struct_mass[vid] / (self.living_struct_mass[vid] + self.living_struct_mass[parent])
+
                     for module in modules_to_update:
                         for prop in module.massic_concentration:
-                            initial_metabolite_amount = getattr(module, prop)[parent] * (self.initial_struct_mass[parent] + self.initial_living_root_hairs_struct_mass[parent])
-                            getattr(module, prop).update({vid: initial_metabolite_amount * mass_fraction / self.living_struct_mass[vid],
-                                                        parent: initial_metabolite_amount * (1-mass_fraction) / self.living_struct_mass[parent]})
+                            if mass_fraction > 0:
+                                initial_metabolite_amount = getattr(module, prop)[parent] * (self.initial_struct_mass[parent] + self.initial_living_root_hairs_struct_mass[parent])
+                                getattr(module, prop).update({vid: initial_metabolite_amount * mass_fraction / self.living_struct_mass[vid],
+                                                            parent: initial_metabolite_amount * (1-mass_fraction) / self.living_struct_mass[parent]})
+                            else:
+                                getattr(module, prop).update({vid: getattr(module, prop)[parent]})
+                                
                         for prop in module.extensive_variables:
                             initial_amount = getattr(module, prop)[parent]
                             getattr(module, prop).update({vid: initial_amount * mass_fraction,
                                                         parent: initial_amount * (1-mass_fraction)})
+                            
+                        for prop in module.descriptor:
+                            getattr(module, prop).update({vid: None})
+
 
                 elif vid in self.step_elongating_elements:
-                    for module in modules_to_update:
-                        for prop in module.massic_concentration:
-                            getattr(module, prop)[vid] = getattr(module, prop)[vid] * (self.initial_struct_mass[vid] + self.initial_living_root_hairs_struct_mass[vid]) / self.living_struct_mass[vid]
+                    # If this is an already emerged segment, it has its own dynamic regarless of parents
+                    if self.initial_struct_mass[vid] > 0:
+                        for module in modules_to_update:
+                            for prop in module.massic_concentration:
+                                getattr(module, prop)[vid] = getattr(module, prop)[vid] * (self.initial_struct_mass[vid] + self.initial_living_root_hairs_struct_mass[vid]) / self.living_struct_mass[vid]
+
+                    # Else if it elongated from a null structural mass, it shared ressources with its parent and we deal with it as for new apex creation
+                    else:
+                        # We need to get the parent to compute mass partitionning.
+                        if vid in self.collar_children:
+                            parent = 1
+                        else:
+                            parent = self.g.parent(vid)
+                        
+                        mass_fraction = self.living_struct_mass[vid] / (self.living_struct_mass[vid] + self.living_struct_mass[parent])
+
+                        for module in modules_to_update:
+                            for prop in module.massic_concentration:
+                                initial_metabolite_amount = getattr(module, prop)[parent] * (self.initial_struct_mass[parent] + self.initial_living_root_hairs_struct_mass[parent])
+                                getattr(module, prop).update({vid: initial_metabolite_amount * mass_fraction / self.living_struct_mass[vid],
+                                                            parent: initial_metabolite_amount * (1-mass_fraction) / self.living_struct_mass[parent]})
+                                    
+                            for prop in module.extensive_variables:
+                                initial_amount = getattr(module, prop)[parent]
+                                getattr(module, prop).update({vid: initial_amount * mass_fraction,
+                                                            parent: initial_amount * (1-mass_fraction)})
+
+
 
 
     def __call__(self, *args, modules_to_update=[]):

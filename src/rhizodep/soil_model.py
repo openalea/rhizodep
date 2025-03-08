@@ -44,12 +44,19 @@ class RhizoInputsSoilModel(Model):
                                        min_value="", max_value="", variable_type="input", by="model_anatomy", state_variable_type="", edit_by="user")
 
     # FROM GROWTH MODEL
-    struct_mass: float = declare(default=1.35e-4, unit="g", unit_comment="", description="Example root segment structural mass", 
-                                        value_comment="", references="", DOI="",
-                                       min_value="", max_value="", variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
+    length: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example root segment length", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="input", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
+    initial_length: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example root segment length", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="input", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
 
 
     # --- STATE VARIABLES ---
+    voxel_neighbor: int = declare(default=None, unit="adim", unit_comment="", description="",
+                                                 value_comment="", references="", DOI="",
+                                                 min_value="", max_value="", variable_type="state_variable", by="model_soil", state_variable_type="descriptor", edit_by="user")
+
     # Temperature
     soil_temperature: float = declare(default=7.8, unit="°C", unit_comment="", description="soil temperature in contact with roots",
                                                  value_comment="Derived from Swinnen et al. 1994 C inputs, estimated from a labelling experiment starting 3rd of March, with average temperature at 7.8 °C", references="Swinnen et al. 1994", DOI="",
@@ -157,7 +164,6 @@ class RhizoInputsSoilModel(Model):
         :param scenario: mapping of existing variable initialization and parameters to superimpose.
         :return:
         """
-        self.initialization_finished = False
         self.g = g
         self.props = self.g.properties()
         self.vertices = self.g.vertices(scale=self.g.max_scale())
@@ -178,9 +184,9 @@ class RhizoInputsSoilModel(Model):
         Note : not tested for now, just computed to support discussions.
         """
         self.voxels = {}
-        self.props.setdefault("voxel_neighbor", {})
-        self.props["voxel_neighbor"].update({key: None for key in self.vertices})
-        setattr(self, "voxel_neighbor", self.props["voxel_neighbor"])
+        # self.props.setdefault("voxel_neighbor", {})
+        # self.props["voxel_neighbor"].update({key: None for key in self.vertices})
+        # setattr(self, "voxel_neighbor", self.props["voxel_neighbor"])
         
         self.planting_depth = 5e-2
 
@@ -225,7 +231,9 @@ class RhizoInputsSoilModel(Model):
         if "angle_down" in self.g.properties().keys():
             plot_mtg(self.g)
         for vid in self.vertices:
-            if self.struct_mass[vid] > 0. and (self.props["hexose_consumption_by_growth"][vid] > 0. or not self.initialization_finished):
+            if (not self.voxel_neighbor[vid]) or (self.length[vid] > self.initial_length[vid]):
+                if self.length[vid] > 0:
+                    print("debug")
                 baricenter = (np.mean((self.props["x1"][vid], self.props["x2"][vid])), 
                             np.mean((self.props["y1"][vid], self.props["y2"][vid])),
                             -np.mean((self.props["z1"][vid], self.props["z2"][vid])))
@@ -241,8 +249,8 @@ class RhizoInputsSoilModel(Model):
                 except:
                     print(" WARNING, issue in computing the voxel neighbor for vid ", vid)
                     self.voxel_neighbor[vid] = None
-        if not self.initialization_finished:
-            self.initialization_finished = True
+
+
 
     def post_growth_updating(self):
         """
@@ -272,7 +280,7 @@ class RhizoInputsSoilModel(Model):
             self.voxels[name].fill(0)
         
         for vid in self.vertices:
-            if self.voxel_neighbor[vid] != None:
+            if self.length[vid] > 0:
                 vy, vz, vx = self.voxel_neighbor[vid]
                 for name in self.inputs:
                     self.voxels[name][vy][vz][vx] += getattr(self, name)[vid]
@@ -287,10 +295,11 @@ class RhizoInputsSoilModel(Model):
         :return:
         """
         for vid in self.vertices:
-            if self.voxel_neighbor[vid] != None:
+            if self.length[vid] > 0: # Equivalent to : if self.voxel_neighbor[vid] != None:
+                vy, vz, vx = self.voxel_neighbor[vid]
                 for name in self.state_variables:
-                    vy, vz, vx = self.voxel_neighbor[vid]
-                    getattr(self, name)[vid] = self.voxels[name][vy][vz][vx]
+                    if name != "voxel_neighbor":
+                        getattr(self, name)[vid] = self.voxels[name][vy][vz][vx]
 
 
     def __call__(self, *args):

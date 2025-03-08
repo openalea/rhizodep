@@ -219,7 +219,7 @@ class RootAnatomy(Model):
     wall_connectivity_with_inner_neighbor: tuple = declare(default= ((0.334,), 
                                                         (0.203, 0.228, 0.176, 0.214, 0.261), 
                                                         (0.238, 0.124, 0.211, 0.315, 0.), 
-                                                        (0.5)), # Not used so arbitrary
+                                                        (0.5,)), # Not used so arbitrary
                                                 unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
 
