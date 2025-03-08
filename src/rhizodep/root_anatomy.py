@@ -188,10 +188,10 @@ class RootAnatomy(Model):
                                                 unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
     
-    layer_cross_sectional_surface_toRR: tuple = declare(default= ((7.80e-5,), 
-                                                                (1.33e-4, 1.14e-4, 1.68e-4, 9.15e-5, 3.88e-5), 
-                                                                (2.16e-5, 2.09e-15, 5.64e-6, 6.18e-6, 6.31e-6), 
-                                                                (8.20e-6,)), 
+    layer_cross_sectional_surface_toRR: tuple = declare(default= ((2.47e-1,), 
+                                                                (4.22e-1, 4.49e-1, 5.34e-1, 2.90e-1, 1.23e-1), 
+                                                                (6.86e-2, 6.63e-2, 1.79e-2, 1.96e-2, 2.0e-2), 
+                                                                (2.6e-2,)), 
                                                 unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
     

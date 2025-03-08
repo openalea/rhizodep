@@ -232,8 +232,6 @@ class RhizoInputsSoilModel(Model):
             plot_mtg(self.g)
         for vid in self.vertices:
             if (not self.voxel_neighbor[vid]) or (self.length[vid] > self.initial_length[vid]):
-                if self.length[vid] > 0:
-                    print("debug")
                 baricenter = (np.mean((self.props["x1"][vid], self.props["x2"][vid])), 
                             np.mean((self.props["y1"][vid], self.props["y2"][vid])),
                             -np.mean((self.props["z1"][vid], self.props["z2"][vid])))
