@@ -306,7 +306,7 @@ class RootGrowthModel(Model):
     initial_C_hexose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="", description="Initial hexose concentration of root segments", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
-    input_file_path: str = declare(default="C:/Users/frees/rhizodep/src/rhizodep/", unit="m", unit_comment="", description="Filepath for input files", 
+    input_file_path: str = declare(default="inputs", unit="m", unit_comment="", description="Filepath for input files", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     forcing_seminal_roots_events: bool = declare(default=False, unit="m", unit_comment="", description="a Boolean expliciting if seminal root events should be forced", 
@@ -392,6 +392,7 @@ class RootGrowthModel(Model):
         base_segment.type = "Base_of_the_root_system"
         # By definition, we set the order of the primary root to 1:
         base_segment.root_order = 1
+        base_segment.vertex_index = 1
 
         # Authorizations and C requirements:
         # -----------------------------------
@@ -525,6 +526,7 @@ class RootGrowthModel(Model):
                                                                radius=base_radius,
                                                                identical_properties=False,
                                                                nil_properties=True)
+                    segment.vertex_index = segment.index()
 
                     # We define the radius of a seminal root according to the parameter Di:
                     if self.random:
@@ -543,6 +545,7 @@ class RootGrowthModel(Model):
                                                                     radius=radius_seminal,
                                                                     identical_properties=False,
                                                                     nil_properties=True)
+                    apex_seminal.vertex_index = apex_seminal.index()
                     apex_seminal.original_radius = radius_seminal
                     apex_seminal.initial_radius = radius_seminal
                     apex_seminal.growth_duration = self.GDs * (2. * radius_seminal) ** 2 * self.main_roots_growth_extender
@@ -567,7 +570,8 @@ class RootGrowthModel(Model):
             if not os.path.exists(adventitious_inputs_path) or self.forcing_adventitious_roots_events:
                 print("NOTE: no CSV file describing the apparitions of adventitious roots can be used!")
                 print("=> We therefore built a table according to the parameters 'n_adventitious_roots' and 'ER'.")
-                print("")
+                print("")   
+
                 # We initialize an empty data frame:
                 adventitious_inputs_file = pd.DataFrame()
                 # We define a list that will contain the successive thermal times corresponding to root emergence:
@@ -602,6 +606,7 @@ class RootGrowthModel(Model):
                                                                radius=base_radius,
                                                                identical_properties=False,
                                                                nil_properties=True)
+                    segment.vertex_index = segment.index()
 
                     # We define the radius of a adventitious root according to the parameter Di:
                     if self.random:
@@ -622,6 +627,7 @@ class RootGrowthModel(Model):
                                                                          radius=radius_adventitious,
                                                                          identical_properties=False,
                                                                          nil_properties=True)
+                    apex_adventitious.vertex_index = apex_adventitious.index()
                     apex_adventitious.original_radius = radius_adventitious
                     apex_adventitious.initial_radius = radius_adventitious
                     apex_adventitious.growth_duration = self.GDs * (2. * radius_adventitious) ** 2 * self.main_roots_growth_extender
@@ -646,6 +652,7 @@ class RootGrowthModel(Model):
                                                 radius=base_radius,
                                                 identical_properties=False,
                                                 nil_properties=True)
+        apex.vertex_index = apex.index()
         apex.original_radius = apex.radius
         apex.initial_radius = apex.radius
         apex.growth_duration = self.GDs * (2. * base_radius) ** 2 * self.main_roots_growth_extender

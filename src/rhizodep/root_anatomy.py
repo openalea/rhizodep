@@ -534,7 +534,7 @@ class RootAnatomy(Model):
         stele_radius = radius - sum([layer.mean_cell_width_toR * radius + layer.cell_wall_thickness for layer in self.cell_layers 
                                      if layer.tissue_name in ("epidermis", "cortex")])
 
-        return 2 * pi * stele_radius - stele_symplasm_volume
+        return 2 * pi * (stele_radius ** 2) * length - stele_symplasm_volume
     
 
     @actual
@@ -542,17 +542,17 @@ class RootAnatomy(Model):
     def _xylem_vessel_radii(self, radius):
         vessels_radii = []
         num_central_metaxylem = 1
-        num_peripheric_metaxylem = 6
+        num_peripheric_metaxylem = 5
         num_protoxylem_per_metaxylem = 3
 
         for k in range(num_central_metaxylem):
-            vessels_radii.append(0.1*radius)
+            vessels_radii.append(0.092*radius)
 
         for k in range(num_peripheric_metaxylem):
-            vessels_radii.append(0.1*0.25*radius)
+            vessels_radii.append(0.035*radius)
 
             for i in range(num_protoxylem_per_metaxylem):
-                vessels_radii.append(0.1*0.25*0.25*radius)
+                vessels_radii.append(0.012*radius)
 
         return vessels_radii
     

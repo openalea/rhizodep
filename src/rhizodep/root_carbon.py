@@ -168,7 +168,7 @@ class RootCarbonModel(Model):
                                                           variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
     sucrose_loading_in_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                               min_value="", max_value="", value_comment="", references="", DOI="",
-                                               variable_type="state_variable", by="model_carbon", state_variable_type="extensNonInertialExtensiveive", edit_by="user")
+                                               variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
     hexose_exudation: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                      min_value="", max_value="", value_comment="", references="", DOI="",
                                       variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
@@ -578,7 +578,7 @@ class RootCarbonModel(Model):
                                                                      B=self.phloem_unloading_B,
                                                                      C=self.phloem_unloading_C)
 
-                return max(2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) * phloem_exchange_surface, 0)
+                return 2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) * phloem_exchange_surface
 
     @rate
     def _hexose_active_production_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
@@ -603,9 +603,6 @@ class RootCarbonModel(Model):
 
     @rate
     def _sucrose_loading_in_phloem(self, phloem_exchange_surface, C_hexose_root, soil_temperature):
-        # # We correct the max loading rate according to the distance from the tip in the middle of the segment.
-        # max_loading_rate = param.surfacic_loading_rate_reference \
-        #     * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
         # TODO: Reconsider the way the variation of the max loading rate along the root axis has been described!
 
         # We correct loading according to soil temperature:
