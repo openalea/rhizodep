@@ -138,9 +138,6 @@ class RootCarbonModel(Model):
     phloem_exchange_surface: float = declare(default=0., unit="m2", unit_comment="", description="Exchange surface between root parenchyma and apoplasmic xylem vessels.", 
                                             min_value="", max_value="", value_comment="", references="", DOI="",
                                              variable_type="state_variable", by="model_anatomy", state_variable_type="input", edit_by="user")
-    apoplasmic_exchange_surface: float = declare(default=0., unit="m2", unit_comment="", description="Exchange surface to account for exchanges between xylem + stele apoplasm and soil. We account for it through cylindrical surface, a pathway closing as soon as endodermis differentiates", 
-                                                min_value="", max_value="", value_comment="", references="", DOI="",
-                                                 variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user")
     symplasmic_volume: float = declare(default=1e-9, unit="m3", unit_comment="", description="symplasmic volume for water content of root elements", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user")
@@ -726,7 +723,7 @@ class RootCarbonModel(Model):
         
     @rate
     def _phloem_hexose_exudation(self, living_struct_mass, length, symplasmic_volume, root_exchange_surface, C_hexose_root, C_sucrose_root,
-                                        C_hexose_soil, apoplasmic_exchange_surface, soil_temperature):
+                                        C_hexose_soil, phloem_exchange_surface, soil_temperature):
         if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
             return 0.
         else:
@@ -742,7 +739,7 @@ class RootCarbonModel(Model):
             #     corrected_permeability_coeff = corrected_P_max_apex \
             #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
             corrected_permeability_coeff = corrected_P_max_apex
-            return corrected_permeability_coeff * ((2 * C_sucrose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil) * apoplasmic_exchange_surface
+            return corrected_permeability_coeff * ((2 * C_sucrose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil) * phloem_exchange_surface
     
     # Uptake of hexose from the soil by the root:
     # -------------------------------------------
@@ -765,8 +762,8 @@ class RootCarbonModel(Model):
                 * C_hexose_soil / (self.Km_uptake + C_hexose_soil)
 
     @rate
-    def _phloem_hexose_uptake_from_soil(self, length, apoplasmic_exchange_surface, C_hexose_soil, type, soil_temperature):
-        if length <= 0 or apoplasmic_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
+    def _phloem_hexose_uptake_from_soil(self, length, phloem_exchange_surface, C_hexose_soil, type, soil_temperature):
+        if length <= 0 or phloem_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
             return 0.
         else:
             corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
@@ -776,7 +773,7 @@ class RootCarbonModel(Model):
                                                                                     B=self.uptake_rate_max_B,
                                                                                     C=self.uptake_rate_max_C)
 
-            return corrected_uptake_rate_max * apoplasmic_exchange_surface * C_hexose_soil / (
+            return corrected_uptake_rate_max * phloem_exchange_surface * C_hexose_soil / (
                     self.Km_uptake + C_hexose_soil)
 
     # Mucilage secretion:
