@@ -2071,9 +2071,12 @@ class RootGrowthModel(Model):
                                         identical_properties=False,
                                         nil_properties=True)
             # We specifically recomputes the growth duration:
-            ramif.growth_duration = self.GDs * (2. * ramif.radius) ** 2 * self.main_roots_growth_extender
-            # ramif.growth_duration = self.calculate_growth_duration(radius=ramif.radius, index=ramif.index(),
-            #                                                        root_order=ramif.root_order)
+            if self.simple_growth_duration:
+                ramif.growth_duration = self.GDs * (2. * ramif.radius) ** 2 * self.main_roots_growth_extender
+            else:
+                ramif.growth_duration = self.calculate_growth_duration(radius=ramif.radius, index=ramif.index(),
+                                                                       root_order=ramif.root_order)
+                
             # We specify the exact time since formation:
             ramif.actual_time_since_primordium_formation = actual_time_since_formation
             ramif.thermal_time_since_primordium_formation = actual_time_since_formation * temperature_time_adjustment
