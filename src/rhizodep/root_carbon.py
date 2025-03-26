@@ -66,8 +66,6 @@ from metafspm.component import Model, declare
 from metafspm.component_factory import *
 
 
-family = "C_metabolic"
-
 
 @dataclass
 class RootCarbonModel(Model):
@@ -79,8 +77,6 @@ class RootCarbonModel(Model):
     base_commit :
         92a6f7ad927ffa0acf01aef645f9297a4531878c
     """
-
-    family = family
 
     # --- INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
     # FROM SOIL MODEL

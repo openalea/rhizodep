@@ -6,9 +6,6 @@ from metafspm.component import Model, declare
 from metafspm.component_factory import *
 
 
-family = "anatomical"
-
-
 @dataclass
 class RootAnatomy(Model):
     """
@@ -19,8 +16,6 @@ class RootAnatomy(Model):
     base_commit :
         92a6f7ad927ffa0acf01aef645f9297a4531878c
     """
-
-    family = "anatomical"
 
     # --- INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
 

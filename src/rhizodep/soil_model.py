@@ -304,7 +304,7 @@ class RhizoInputsSoilModel(Model):
         self.pull_available_inputs()
         # self.compute_mtg_voxel_neighbors()
         self.apply_to_voxel()
-        self.choregrapher(module_family=self.family, *args)
+        self.choregrapher(module_family=self.__class__.__name__, *args)
         # self.get_from_voxel()
     
     # MODEL EAQUATIONS
