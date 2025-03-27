@@ -17,7 +17,7 @@ from math import sqrt, pi, floor
 from dataclasses import dataclass
 
 from openalea.mtg import *
-from openalea.mtg.traversal import post_order, pre_order2
+from openalea.mtg.traversal import post_order, pre_order2, post_order2
 from openalea.mtg import turtle as turt
 
 from metafspm.component import Model, declare
@@ -52,10 +52,16 @@ class RootGrowthModel(Model):
     type: str = declare(default="Normal_root_after_emergence", unit="", unit_comment="", description="Example segment type provided by root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
+    label: str = declare(default="Apex", unit="", unit_comment="", description="Example segment label provided by root growth model", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
     root_order: int = declare(default=1, unit="", unit_comment="", description="Example root segment's axis order computed by the initiate_mtg method or provided as input", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
     vertex_index: int = declare(default=1, unit="mol.s-1", unit_comment="", description="Unique vertex identifier stored for ease of value access", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
+    axis_index: str = declare(default="seminal_1", unit="dimensionless", unit_comment="", description="Unique axis identifier stored for ease of value access", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
     radius: float = declare(default=3.5e-4, unit="m", unit_comment="", description="Example root segment radius", 
@@ -2259,6 +2265,43 @@ class RootGrowthModel(Model):
             n.hexose_consumption_by_growth += hexose_consumption / self.time_step_in_seconds
             n.resp_growth += hexose_consumption * 6. * (1 - self.yield_growth)
 
+
+    def comute_mtg_axes_id(self):
+        g = self.g
+        root = next(g.component_roots_at_scale_iter(g.root, scale=1))
+        seminal_id = 1
+        adventitious_id = 1
+        lateral_id = 1
+        
+        processed_vids = []
+        
+        for v in post_order2(g, root):
+            if v not in processed_vids:
+                axis = g.Axis(v)
+                insertion_id = g.parent(min(axis))
+
+                if insertion_id:
+                    parent = g.node(insertion_id)
+                    if parent.type == "Support_for_seminal_root":
+                        self.axis_index.update({v: f"seminal_{seminal_id}" for v in axis})
+                        seminal_id += 1
+                    elif parent.type == "Support_for_adventitious_root":
+                        self.axis_index.update({v: f"adventitious_{adventitious_id}" for v in axis})
+                        adventitious_id += 1
+                    else:
+                        if self.root_order[min(axis)] > 1:
+                            self.axis_index.update({v: f"lateral_{lateral_id}" for v in axis})
+                            lateral_id += 1
+                        else:
+                            print("Uncaptured exception on ", v)
+                else:
+                    # If parent is None we now this is the main seminal axis
+                    self.axis_index.update({v: f"seminal_{seminal_id}" for v in axis})
+                    seminal_id += 1
+                
+                processed_vids += axis
+
+
     # TODO UNUSED
     # Function calculating a satisfaction coefficient for the growth of the whole root system:
     # -----------------------------------------------------------------------------------------
@@ -2902,7 +2945,9 @@ class RootGrowthModel(Model):
                                 getattr(module, prop).update({vid: initial_amount * mass_fraction,
                                                             parent: initial_amount * (1-mass_fraction)})
 
-
+        compute_axess_id = True
+        if compute_axess_id:
+            self.comute_mtg_axes_id()
 
 
     def __call__(self, *args, modules_to_update=[]):
