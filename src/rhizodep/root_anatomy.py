@@ -450,8 +450,9 @@ class RootAnatomy(Model):
         :return: the surface (m2)
         """
 
-        return (exodermis_conductance_factor * sum([layer.cell_surface(radius, length) for layer in self.cell_layers if layer.tissue_name in ("epidermis", "cortex")])
+        return (exodermis_conductance_factor * sum([layer.cell_surface(radius, length) for layer in self.cell_layers if layer.tissue_name == "cortex"])
                 + endodermis_conductance_factor * sum([layer.cell_surface(radius, length) for layer in self.cell_layers if layer.tissue_name == "stele"])
+                + sum([layer.cell_surface(radius, length) for layer in self.cell_layers if layer.tissue_name == "epidermis"])
                 + self.root_hairs_external_surface(root_hair_length, total_root_hairs_number))
 
     @actual

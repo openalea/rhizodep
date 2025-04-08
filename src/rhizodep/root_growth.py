@@ -103,6 +103,9 @@ class RootGrowthModel(Model):
     hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth is coupled to a root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
+    resp_growth: float = declare(default=0., unit="mol.s-1", unit_comment="of C", description="respiration rate during growth", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     hexose_consumption_by_fungus: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by fungus", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user") 
@@ -119,6 +122,9 @@ class RootGrowthModel(Model):
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     thermal_time_since_emergence: float = declare(default=0, unit="°C", unit_comment="", description="", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
+    actual_time_since_formation: float = declare(default=0, unit="s", unit_comment="", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     
@@ -2944,7 +2950,21 @@ class RootGrowthModel(Model):
                                 initial_amount = getattr(module, prop)[parent]
                                 getattr(module, prop).update({vid: initial_amount * mass_fraction,
                                                             parent: initial_amount * (1-mass_fraction)})
-
+                
+                #TODO remove, just for a figure
+                if self.label[vid] != "Apex":
+                    if vid not in self.actual_time_since_formation:
+                        self.actual_time_since_formation[vid] = 0
+                    else:
+                        self.actual_time_since_formation[vid] += self.time_step_in_seconds / 3600 / 24
+                else:
+                    if vid not in self.actual_time_since_formation:
+                        self.actual_time_since_formation[vid] = 0
+                    non_meristem_length = self.radius[vid] * 2 * 1.3 #Kozlova et al. (2020), the length of the meristematic region 1.3 times the diameter of the tip
+                    if non_meristem_length < self.length[vid]:
+                        aging_length = self.length[vid] - non_meristem_length
+                        self.actual_time_since_formation[vid] += (self.time_step_in_seconds / 3600 / 24) * aging_length / self.length[vid]
+                
         compute_axess_id = True
         if compute_axess_id:
             self.comute_mtg_axes_id()
