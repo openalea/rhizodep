@@ -229,7 +229,7 @@ class RootAnatomy(Model):
                                                     (4010, 2590, 3200, 4350, 4910), 
                                                     (4940, 4370, 4490, 4840, 4840), 
                                                     (1370,)), # Not seen on the images, so set to equal frequency of metaxylem as it is also a vessel of similar radius 
-                                                unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
+                                                unit=".m-1", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
 
 
@@ -561,7 +561,7 @@ class RootAnatomy(Model):
         for layer in self.cell_layers:
             kr_eq = layer.kr_symplasmic_water(kr_eq, radius, length)
 
-        return kr_eq
+        return kr_eq # not in mol!!!
     
 
     @actual
@@ -578,9 +578,9 @@ class RootAnatomy(Model):
 class RootCellLayer:
     
     # Water related parameters
-    transmembrane_conductance: float = 5.3e-7 # See estimation from Couvreur et al. 2018 , p. 11, from Ehlert et al. 2009 after removal of the bellow plasmodesmata conductance
-    plasmodesmata_conductance: float = 2.4e-7 # See estimation from Couvreur et al. 2018 , p. 11
-    cell_wall_conductivity: float = 2.5e-10 # See estimation from Couvreur et al. 2018 , p. 11, in the case of Maize
+    transmembrane_conductance: float = 5.3e-7 * 1e-6 # m.s-1.Pa-1 (m3.s-1.Pa-1.m-2) See estimation from Couvreur et al. 2018 , p. 11, from Ehlert et al. 2009 after removal of the bellow plasmodesmata conductance
+    plasmodesmata_conductance: float = 2.4e-7 * 1e-6 # m.s-1.Pa-1 (effective with an estimation of 0.4 plasmodesmate /µm2) See estimation from Couvreur et al. 2018 , p. 11
+    cell_wall_conductivity: float = 2.5e-10 * 1e-6 # See estimation from Couvreur et al. 2018 , p. 11, in the case of Maize
 
     def __init__(self, tissue_name, layer_cell_perimeter_toR, layer_cross_sectional_surface_toRR, layer_numbering, 
                  mean_cell_length_toR, mean_cell_width_toR, cell_wall_thickness, wall_connectivity_in_layer, wall_connectivity_with_inner_neighbor,
@@ -613,16 +613,24 @@ class RootCellLayer:
     
 
     def R_apoplasmic_water(self, radius, length):
-        
-        crossed_wall_length_between_cell_lines = (1 - self.wall_connectivity_in_layer) * (1 - self.wall_connectivity_with_inner_neighbor) * self.layer_cell_perimeter_toR * radius
+        number_of_cell_lines_in_layer = 2 * np.pi * self.layer_max_radius_toR * radius / (self.mean_cell_length_toR + self.cell_wall_thickness)
+        # First term removes the common walls between cells and between layers that should be accounted for twice
+        # Times a second term accounting for cell perimeter length that will be crossed
+        crossed_wall_length_between_cell_lines = (1 - self.wall_connectivity_in_layer - self.wall_connectivity_with_inner_neighbor) * self.layer_cell_perimeter_toR * radius
+
         crossed_wall_area_between_cell_lines = self.cell_wall_thickness * length
+        
+        # Here we multiply instead of summing per cell wall conductance because every term is average for all cells therefore constant
+        # The denominator is the average length to cross per cell, not simplified to number_of_cell_lines_in_layer**2 for readability
+        kr_between_cell_lines = number_of_cell_lines_in_layer * (self.cell_wall_conductivity * crossed_wall_area_between_cell_lines / (crossed_wall_length_between_cell_lines / number_of_cell_lines_in_layer)) 
 
-        kr_between_cell_lines = self.cell_wall_conductivity * crossed_wall_area_between_cell_lines / crossed_wall_length_between_cell_lines
-        # Note that we substract shared walls only once because they still contribute once to the flux
-        # the whole perimeter is also retreive to account for the pathway on the 2 edges of the cylinder
-
+        # Area to cross between cells of each cell line
         crossed_wall_area_within_cell_line = 2 * np.pi * self.layer_max_radius_toR * radius * self.cell_wall_thickness
+        # Then length to be crossed for this pathway
+        crossed_wall_length_within_cell_line = self.mean_cell_width_toR * radius
+        #  Then number of times we replicate this pathway in the considered segment
+        number_of_parallel_pathways_within_cell_line = self.cell_line_frequency * length
 
-        kr_walls_within_cell_line = self.cell_wall_conductivity * crossed_wall_area_within_cell_line / (self.mean_cell_width_toR * radius)
+        kr_walls_within_cell_line = self.cell_wall_conductivity * number_of_parallel_pathways_within_cell_line * crossed_wall_area_within_cell_line / crossed_wall_length_within_cell_line
 
         return 1 / (kr_between_cell_lines + kr_walls_within_cell_line)
