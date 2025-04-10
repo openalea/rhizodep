@@ -127,6 +127,9 @@ class RootGrowthModel(Model):
     actual_time_since_formation: float = declare(default=0, unit="s", unit_comment="", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
+    tissue_formation_time: float = declare(default=0, unit="day", unit_comment="", description="", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     
     # Total state variable
     total_living_struct_mass: float =          declare(default=0, unit="g", unit_comment="of dry weight", description="", 
@@ -2964,6 +2967,8 @@ class RootGrowthModel(Model):
                     if non_meristem_length < self.length[vid]:
                         aging_length = self.length[vid] - non_meristem_length
                         self.actual_time_since_formation[vid] += (self.time_step_in_seconds / 3600 / 24) * aging_length / self.length[vid]
+
+                self.tissue_formation_time[vid] = 60 - self.actual_time_since_formation[vid]
                 
         compute_axess_id = True
         if compute_axess_id:
