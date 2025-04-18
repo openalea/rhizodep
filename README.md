@@ -10,6 +10,7 @@
 # OpenAlea.RhizoDep : a Functional-Structural Root Model to simulate rhizodeposition
 
 **Authors:** Frederic Rees, Tristan Gerault, Marion Gauthier, Christophe Pradal3
+
 **Licence:** [CeCILL-C](http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html)  
 
 **Status:** An OpenAlea Python package
