@@ -159,6 +159,9 @@ class RootCarbonModel(Model):
     hexose_active_production_from_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                                          min_value="", max_value="", value_comment="", references="", DOI="",
                                                           variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
+    net_hexose_production_from_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
+                                                         min_value="", max_value="", value_comment="", references="", DOI="",
+                                                          variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
     sucrose_loading_in_phloem: float = declare(default=0., unit="mol.s-1", unit_comment="of hexose", description="", 
                                               min_value="", max_value="", value_comment="", references="", DOI="",
                                                variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
@@ -593,6 +596,11 @@ class RootCarbonModel(Model):
                                                                     C=self.phloem_unloading_C)
                 return max(2. * max_unloading_rate * C_sucrose_root * phloem_exchange_surface / (
                             self.Km_unloading + C_sucrose_root), 0)
+            
+    # TODO : Remove, just for output
+    @rate
+    def _net_hexose_production_from_phloem(self, hexose_diffusion_from_phloem, hexose_active_production_from_phloem):
+        return hexose_diffusion_from_phloem + hexose_active_production_from_phloem
 
     @rate
     def _sucrose_loading_in_phloem(self, phloem_exchange_surface, C_hexose_root, soil_temperature):
@@ -608,6 +616,7 @@ class RootCarbonModel(Model):
             return 0.
         else:
             return max(0.5 * max_loading_rate * phloem_exchange_surface * C_hexose_root / (self.Km_loading + C_hexose_root), 0.)
+        
 
     @rate
     def _hexose_mobilization_from_reserve(self, length, C_hexose_root, C_hexose_reserve, type, living_struct_mass, soil_temperature):

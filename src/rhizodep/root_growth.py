@@ -64,6 +64,9 @@ class RootGrowthModel(Model):
     axis_index: str = declare(default="seminal_1", unit="dimensionless", unit_comment="", description="Unique axis identifier stored for ease of value access", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
+    axis_type: str = declare(default="seminal", unit="", unit_comment="", description="Example axis type provided by root growth model", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
     radius: float = declare(default=3.5e-4, unit="m", unit_comment="", description="Example root segment radius", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
@@ -121,7 +124,10 @@ class RootGrowthModel(Model):
     root_hairs_struct_mass_produced: float = declare(default=0, unit="g", unit_comment="of dry weight", description="", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
-    thermal_time_since_emergence: float = declare(default=0, unit="°C", unit_comment="", description="", 
+    thermal_time_since_emergence: float = declare(default=0, unit="s", unit_comment="", description="", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
+    thermal_time_since_cells_formation: float = declare(default=0, unit="s", unit_comment="", description="Thermal time since tissue formation", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     actual_time_since_formation: float = declare(default=0, unit="s", unit_comment="", description="", 
@@ -2889,6 +2895,33 @@ class RootGrowthModel(Model):
 
         # from root base to tips
         for vid in pre_order2(self.g, root):
+            
+            if self.type[vid] == 'Base_of_the_root_system':
+                self.axis_type[vid] = 'seminal'
+            else:
+                parent = self.g.parent(vid)
+
+                if self.root_order[vid] == 1:
+                    # First exception for pivot root that could be taken for a nodal otherwise
+                    # (Given the structure of the first fake supporting elements)
+                    if vid == max(self.collar_children):
+                        self.axis_type[vid] = 'seminal'
+                    elif self.type[vid] == 'Support_for_seminal_root' or self.type[vid] == 'Support_for_adventitious_root':
+                        self.axis_type[vid] = 'seminal'
+                    elif self.type[parent] == 'Support_for_seminal_root':
+                        self.axis_type[vid] = 'seminal'
+                    elif self.type[parent] == 'Support_for_adventitious_root':
+                        self.axis_type[vid] = 'nodal'
+                    elif self.axis_type[parent] == 'seminal':
+                        self.axis_type[vid] = 'seminal'
+                    elif self.axis_type[parent] == 'nodal':
+                        self.axis_type[vid] = 'nodal'
+                    else:
+                        print('Uncaught exception')
+                else:
+                    self.axis_type[vid] = 'lateral'
+                
+
             if vid not in self.collar_skip:
                 # For every vertex we update the considered living struct_mass for other modules.
                 living_struct_mass = self.struct_mass[vid] + self.living_root_hairs_struct_mass[vid] # local to avoid multiple access
