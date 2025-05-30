@@ -153,7 +153,7 @@ class RhizoInputsSoilModel(Model):
                                         value_comment="", references="We assume that Km for cells degradation is identical to the one for hexose degradation.", DOI="",
                                        min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
 
-    def __init__(self, g, time_step_in_seconds, **scenario: dict):
+    def __init__(self, time_step_in_seconds, soil_grid=None, **scenario: dict):
         """
         DESCRIPTION
         -----------
@@ -164,25 +164,23 @@ class RhizoInputsSoilModel(Model):
         :param scenario: mapping of existing variable initialization and parameters to superimpose.
         :return:
         """
-        self.g = g
-        self.props = self.g.properties()
-        self.vertices = self.g.vertices(scale=self.g.max_scale())
-        # Before any other operation, we apply the provided scenario by changing default parameters and initialization
-        self.apply_scenario(**scenario)
-        self.initiate_voxel_soil()
-        self.time_step_in_seconds = time_step_in_seconds
-        self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.voxels, compartment="soil")
 
-        self.link_self_to_mtg()    
+        self.apply_scenario(**scenario)
+        self.initiate_voxel_soil(soil_grid=soil_grid)
+        self.time_step_in_seconds = time_step_in_seconds
+        self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.voxels, compartment="soil")   
 
     # SERVICE FUNCTIONS
 
     # Just ressource for now
-    def initiate_voxel_soil(self):
+    def initiate_voxel_soil(self, soil_grid=None):
         """
         Note : not tested for now, just computed to support discussions.
         """
-        self.voxels = {}
+        if soil_grid is None:
+            self.voxels = {}
+        else:
+            self.voxels = soil_grid
         
         self.planting_depth = 5e-2
 
@@ -217,39 +215,38 @@ class RhizoInputsSoilModel(Model):
             if name != "voxel_volume":
                 self.voxel_grid_to_self(name, init_value=getattr(self, name))
 
-        self.props["voxel_neighbor"].update({key: None for key in self.vertices})
-        setattr(self, "voxel_neighbor", self.props["voxel_neighbor"])
-
 
     def voxel_grid_to_self(self, name, init_value):
         self.voxels[name] = np.zeros((self.voxel_number_xy, self.voxel_number_z, self.voxel_number_xy))
         self.voxels[name].fill(init_value)
         #setattr(self, name, self.voxels[name])
 
-    def compute_mtg_voxel_neighbors(self):
+    def compute_mtg_voxel_neighbors(self, g):
+        props = g.properties()
+
         # necessary to get updated coordinates.
-        if "angle_down" in self.g.properties().keys():
-            plot_mtg(self.g)
-        for vid in self.vertices:
-            if (not self.voxel_neighbor[vid]) or (self.length[vid] > self.initial_length[vid]):
-                baricenter = (np.mean((self.props["x1"][vid], self.props["x2"][vid])), 
-                            np.mean((self.props["y1"][vid], self.props["y2"][vid])),
-                            -np.mean((self.props["z1"][vid], self.props["z2"][vid])))
+        if "angle_down" in g.properties().keys():
+            plot_mtg(g)
+        for vid in g.vertices(scale=self.g.max_scale()):
+            if (not props["voxel_neighbor"][vid]) or (props["length"][vid] > props["initial_length"][vid]):
+                baricenter = (np.mean((props["x1"][vid], props["x2"][vid])), 
+                            np.mean((props["y1"][vid], props["y2"][vid])),
+                            -np.mean((props["z1"][vid], props["z2"][vid])))
                 testx1 = self.voxels["x1"] <= baricenter[0]
                 testx2 = baricenter[0] <= self.voxels["x2"]
                 testy1 = self.voxels["y1"] <= baricenter[1]
                 testy2 = baricenter[1] <= self.voxels["y2"]
-                testz1 = self.voxels["z1"] <= baricenter[2] + self.planting_depth
-                testz2 = baricenter[2] + self.planting_depth <= self.voxels["z2"]
+                testz1 = self.voxels["z1"] <= baricenter[2]
+                testz2 = baricenter[2] <= self.voxels["z2"]
                 test = testx1 * testx2 * testy1 * testy2 * testz1 * testz2
                 try:
-                    self.voxel_neighbor[vid] = [int(v) for v in np.where(test)]
+                    props["voxel_neighbor"][vid] = [int(v) for v in np.where(test)]
                 except:
                     print(" WARNING, issue in computing the voxel neighbor for vid ", vid)
-                    self.voxel_neighbor[vid] = None
+                    props["voxel_neighbor"][vid] = None
 
 
-    def apply_to_voxel(self):
+    def apply_to_voxel(self, g):
         """
         This function computes the flow perceived by voxels surrounding the considered root segment.
         Note : not tested for now, just computed to support discussions.
@@ -258,16 +255,18 @@ class RhizoInputsSoilModel(Model):
         :param root_flows: The root flows to be perceived by soil voxels. The underlying assumptions are that only flows, i.e. extensive variables are passed as arguments.
         :return:
         """
+        props = g.properties()
+
         for name in self.inputs:
             self.voxels[name].fill(0)
         
-        for vid in self.vertices:
+        for vid in g.vertices(scale=self.g.max_scale()):
             if self.length[vid] > 0:
-                vy, vz, vx = self.voxel_neighbor[vid]
+                vy, vz, vx = props["voxel_neighbor"][vid]
                 for name in self.inputs:
-                    self.voxels[name][vy][vz][vx] += getattr(self, name)[vid]
+                    self.voxels[name][vy][vz][vx] += props[name][vid]
 
-    def get_from_voxel(self):
+    def get_from_voxel(self, g):
         """
         This function computes the soil states from voxels perceived by the considered root segment.
         Note : not tested for now, just computed to support discussions.
@@ -276,22 +275,41 @@ class RhizoInputsSoilModel(Model):
         :param soil_states: The soil states to be perceived by soil voxels. The underlying assumptions are that only intensive extensive variables are passed as arguments.
         :return:
         """
-        for vid in self.vertices:
-            if self.length[vid] > 0: # Equivalent to : if self.voxel_neighbor[vid] != None:
-                vy, vz, vx = self.voxel_neighbor[vid]
+        props = g.properties()
+        for vid in g.vertices(scale=self.g.max_scale()):
+            if props["length"][vid] > 0:
+                vy, vz, vx = props["voxel_neighbor"][vid]
                 for name in self.state_variables:
                     if name != "voxel_neighbor":
-                        getattr(self, name)[vid] = self.voxels[name][vy][vz][vx]
+                        props[name][vid] = self.voxels[name][vy][vz][vx]
+
+    def pull_available_inputs(self, g):
+        # Pointer to avoid repeated lookups in self (Usefull?)
+        props = g.properties()
+        for input, source_variables in self.pullable_inputs[props["model_name"]].items():
+            vertices = props[list(source_variables.keys())[0]].keys()
+            props[input].update({vid: sum([props[variable][vid]*unit_conversion 
+                                           for variable, unit_conversion in source_variables.items()]) 
+                                 for vid in vertices})
 
 
-    def __call__(self, *args):
-        self.pull_available_inputs()
-        # self.compute_mtg_voxel_neighbors()
-        self.apply_to_voxel()
+    def __call__(self, input_mtgs: list=[], *args):
+
+        # We get fluxes and voxel interception from the plant mtgs (If none passed, soil model can be autonomous)
+        for g in input_mtgs:
+            self.pull_available_inputs(g)
+            self.compute_mtg_voxel_neighbors(g)
+            self.apply_to_voxel(g)
+
+        # Run the soil model
         self.choregrapher(module_family=self.__class__.__name__, *args)
-        # self.get_from_voxel()
+
+        # Then apply the states to the plants
+        for g in input_mtgs:
+            self.get_from_voxel(g)
     
-    # MODEL EAQUATIONS
+
+    # MODEL EQUATIONS
 
     #TP@rate
     def _hexose_degradation(self, C_hexose_soil, root_exchange_surface, soil_temperature):
