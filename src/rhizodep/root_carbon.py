@@ -207,7 +207,7 @@ class RootCarbonModel(Model):
                                          variable_type="state_variable", by="model_carbon", state_variable_type="extensive", edit_by="user")
 
     # SUMMED STATE VARIABLES
-    total_sucrose_root: float = declare(default=0., unit="mol", unit_comment="of sucrose", description="Summed sucrose root at root system level", 
+    total_sucrose_phloem: float = declare(default=0., unit="mol", unit_comment="of sucrose", description="Summed sucrose root at root system level", 
                                        min_value="", max_value="", value_comment="", references="", DOI="",
                                         variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user")
     global_sucrose_deficit: float = declare(default=0., unit="mol.s-1", unit_comment="of sucrose", description="Summed sucrose deficit at root system level", 
@@ -454,6 +454,7 @@ class RootCarbonModel(Model):
         self.initiate_heterogeneous_variables() # TODO Transfer to root growth or condition by only if root system is created
 
         self.previous_C_amount_in_the_root_system = self.compute_root_system_C_content()
+        self.total_root_sucrose_and_living_struct_mass() # Needed otherwise first shoot unloading will be unrealistic
 
     def initiate_heterogeneous_variables(self):
         # We cover all the vertices in the MTG:
@@ -474,19 +475,20 @@ class RootCarbonModel(Model):
         This function computes the total amount of sucrose of the root system (in mol of sucrose),
         and the total dry structural mass of the root system (in g of dry structural mass).
         :param g: the investigated MTG
-        :return: total_sucrose_root (mol of sucrose), total_struct_mass (g of dry structural mass)
+        :return: total_sucrose_phloem (mol of sucrose), total_struct_mass (g of dry structural mass)
         (untouched)
         """
         # We initialize the values to 0:
-        self.total_sucrose_root[1] = 0.
+        self.total_sucrose_phloem[1] = 0.
 
         # We cover all the vertices in the MTG, whether they are dead or not:
-        for vid in self.g.vertices_iter(scale=1):
+        for vid in self.vertices:
             if self.length[vid] <= 0.:
                 continue
             else:
                 # We increment the total amount of sucrose in the root system, including dead root elements (if any):
-                self.total_sucrose_root[1] += self.C_sucrose_root[vid] * self.living_struct_mass[vid] - self.deficit_sucrose_root[vid]
+                self.total_sucrose_phloem[1] += self.C_sucrose_root[vid] * self.living_struct_mass[vid] - self.deficit_sucrose_root[vid]
+                
 
     # Calculating the net input of sucrose by the aerial parts into the root system:
     # ------------------------------------------------------------------------------
@@ -514,7 +516,7 @@ class RootCarbonModel(Model):
             print("!!! Before homogenizing sucrose concentration, the global deficit in sucrose was",
                   self.global_sucrose_deficit[1])
         # The new average sucrose concentration in the root system is calculated as:
-        C_sucrose_root_after_supply = (self.total_sucrose_root[1] + (
+        C_sucrose_root_after_supply = (self.total_sucrose_phloem[1] + (
                     self.sucrose_input_rate[1] * self.time_step) - self.global_sucrose_deficit[1]) \
                                       / self.total_living_struct_mass[1]
         

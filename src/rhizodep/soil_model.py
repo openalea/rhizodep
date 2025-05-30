@@ -172,7 +172,6 @@ class RhizoInputsSoilModel(Model):
         self.initiate_voxel_soil()
         self.time_step_in_seconds = time_step_in_seconds
         self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.voxels, compartment="soil")
-        self.vertices = self.g.vertices(scale=self.g.max_scale())
 
         self.link_self_to_mtg()    
 
@@ -184,9 +183,6 @@ class RhizoInputsSoilModel(Model):
         Note : not tested for now, just computed to support discussions.
         """
         self.voxels = {}
-        # self.props.setdefault("voxel_neighbor", {})
-        # self.props["voxel_neighbor"].update({key: None for key in self.vertices})
-        # setattr(self, "voxel_neighbor", self.props["voxel_neighbor"])
         
         self.planting_depth = 5e-2
 
@@ -203,6 +199,7 @@ class RhizoInputsSoilModel(Model):
         # We want the plant to be centered
         if self.voxel_number_xy%2 == 0:
             self.voxel_number_xy += 1
+
         scene_z_range = 1.
         self.voxel_number_z = int(scene_z_range / voxel_height)
 
@@ -219,6 +216,9 @@ class RhizoInputsSoilModel(Model):
         for name in self.state_variables + self.inputs:
             if name != "voxel_volume":
                 self.voxel_grid_to_self(name, init_value=getattr(self, name))
+
+        self.props["voxel_neighbor"].update({key: None for key in self.vertices})
+        setattr(self, "voxel_neighbor", self.props["voxel_neighbor"])
 
 
     def voxel_grid_to_self(self, name, init_value):
@@ -248,22 +248,6 @@ class RhizoInputsSoilModel(Model):
                     print(" WARNING, issue in computing the voxel neighbor for vid ", vid)
                     self.voxel_neighbor[vid] = None
 
-
-
-    def post_growth_updating(self):
-        """
-        Description :
-            Extend property dictionary upon new element partitioning.
-        """
-        self.vertices = self.g.vertices(scale=self.g.max_scale())
-        for vid in self.vertices:
-            if vid not in list(self.C_hexose_soil.keys()):
-                parent = self.g.parent(vid)
-                for prop in self.state_variables:
-                    # All concentrations, temperature and pressure are intensive, so we need structural mass wise partitioning to initialize
-                    getattr(self, prop).update({vid: getattr(self, prop)[parent]})
-                # Specific as it can be a mix of None and lists
-                getattr(self, "voxel_neighbor").update({vid: None})
 
     def apply_to_voxel(self):
         """
