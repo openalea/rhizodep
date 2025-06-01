@@ -479,15 +479,16 @@ class RootCarbonModel(Model):
         (untouched)
         """
         # We initialize the values to 0:
-        self.total_sucrose_phloem[1] = 0.
+        self.props["total_sucrose_phloem"][1] = 0.
 
         # We cover all the vertices in the MTG, whether they are dead or not:
         for vid in self.vertices:
-            if self.length[vid] <= 0.:
+            n = self.g.node(vid)
+            if n.length <= 0.:
                 continue
             else:
                 # We increment the total amount of sucrose in the root system, including dead root elements (if any):
-                self.total_sucrose_phloem[1] += self.C_sucrose_root[vid] * self.living_struct_mass[vid] - self.deficit_sucrose_root[vid]
+                self.props["total_sucrose_phloem"][1] += n.C_sucrose_root * n.living_struct_mass - n.deficit_sucrose_root
                 
 
     # Calculating the net input of sucrose by the aerial parts into the root system:
@@ -512,13 +513,13 @@ class RootCarbonModel(Model):
         # (in moles of sucrose) of the whole root system calculated at the previous time_step:
         # Note that this value is stored in the base node of the root system.
 
-        if self.global_sucrose_deficit[1] > 0.:
+        if self.props["global_sucrose_deficit"][1] > 0.:
             print("!!! Before homogenizing sucrose concentration, the global deficit in sucrose was",
-                  self.global_sucrose_deficit[1])
+                  self.props["global_sucrose_deficit"][1])
         # The new average sucrose concentration in the root system is calculated as:
-        C_sucrose_root_after_supply = (self.total_sucrose_phloem[1] + (
-                    self.sucrose_input_rate[1] * self.time_step) - self.global_sucrose_deficit[1]) \
-                                      / self.total_living_struct_mass[1]
+        C_sucrose_root_after_supply = (self.props["total_sucrose_phloem"][1] + (
+                    self.props["sucrose_input_rate"][1] * self.time_step) - self.props["global_sucrose_deficit"][1]) \
+                                      / self.props["total_living_struct_mass"][1]
         
         # This new concentration includes the amount of sucrose from element that have just died,
         # but excludes the mass of these dead elements!
@@ -526,29 +527,30 @@ class RootCarbonModel(Model):
         if C_sucrose_root_after_supply >= 0.:
             new_C_sucrose_root = C_sucrose_root_after_supply
             # We reset the global variable global_sucrose_deficit:
-            self.global_sucrose_deficit[1] = 0.
+            self.props["global_sucrose_deficit"][1] = 0.
         else:
             # We record the general deficit in sucrose:
-            self.global_sucrose_deficit[1] = - C_sucrose_root_after_supply * self.total_living_struct_mass[1]
+            self.props["global_sucrose_deficit"][1] = - C_sucrose_root_after_supply * self.props["total_living_struct_mass"][1]
 
             print("!!! After homogenizing sucrose concentration, the deficit in sucrose is",
-                  self.global_sucrose_deficit[1])
+                  self.props["global_sucrose_deficit"][1])
             # We defined the new concentration of sucrose as 0:
             new_C_sucrose_root = 0.
         
         # We go through the MTG to modify the sugars concentrations:
         for vid in self.g.vertices_iter(scale=1):
+            n = self.g.node(vid)
             # If the element has not emerged yet, it doesn't contain any sucrose yet;
             # if has died, it should not contain any sucrose anymore:
-            if self.length[vid] <= 0. or self.type[vid] == "Dead" or self.type[vid] == "Just_dead":
-                self.C_sucrose_root[vid] = 0.
+            if n.length <= 0. or n.type == "Dead" or n.type == "Just_dead":
+                n.C_sucrose_root = 0.
             else:
                 # The local sucrose concentration in the root is calculated from the new sucrose concentration calculated above:
-                self.C_sucrose_root[vid] = new_C_sucrose_root
+                n.C_sucrose_root = new_C_sucrose_root
                 
             # AND BECAUSE THE LOCAL DEFICITS OF SUCROSE HAVE BEEN ALREADY INCLUDED IN THE TOTAL SUCROSE CALCULATION,
             # WE RESET ALL LOCAL DEFICITS TO 0:
-            self.deficit_sucrose_root[vid] = 0.
+            n.deficit_sucrose_root = 0.
 
     # Unloading of sucrose from the phloem and conversion of sucrose into hexose:
 
@@ -565,7 +567,7 @@ class RootCarbonModel(Model):
             return 0
 
         else:
-            if (self.global_sucrose_deficit[1] > 0.) or (C_sucrose_root <= C_hexose_root / 2.):
+            if (self.props["global_sucrose_deficit"][1] > 0.) or (C_sucrose_root <= C_hexose_root / 2.):
                 return 0
             else:
                 phloem_permeability = self.phloem_permeability * (1 + hexose_consumption_by_growth /
@@ -586,7 +588,7 @@ class RootCarbonModel(Model):
             return 0
 
         else:
-            if (self.global_sucrose_deficit[1] > 0.) or (C_sucrose_root <= C_hexose_root / 2.):
+            if (self.props["global_sucrose_deficit"][1] > 0.) or (C_sucrose_root <= C_hexose_root / 2.):
                 return 0
             else:
                 max_unloading_rate = self.max_unloading_rate * (1 + hexose_consumption_by_growth /
@@ -873,6 +875,7 @@ class RootCarbonModel(Model):
     def _C_sucrose_root(self, vertex_index, C_sucrose_root, living_struct_mass, hexose_diffusion_from_phloem,
                             hexose_active_production_from_phloem, phloem_hexose_exudation, sucrose_loading_in_phloem,
                             phloem_hexose_uptake_from_soil, deficit_sucrose_root):
+        
         balance = C_sucrose_root + (self.time_step / living_struct_mass) * (
                 - hexose_diffusion_from_phloem / 2.
                 - hexose_active_production_from_phloem / 2.
@@ -883,10 +886,10 @@ class RootCarbonModel(Model):
         
         if balance < 0:
             deficit = - balance * living_struct_mass / self.time_step
-            self.deficit_sucrose_root[vertex_index] = deficit if deficit > 1e-20 else 0.
+            self.props["deficit_sucrose_root"][vertex_index] = deficit if deficit > 1e-20 else 0.
             return 0.
         else:
-            self.deficit_sucrose_root[vertex_index] = 0. 
+            self.props["deficit_sucrose_root"][vertex_index] = 0. 
             return balance
     
     @state
@@ -899,10 +902,10 @@ class RootCarbonModel(Model):
         
         if balance < 0:
             deficit = - balance * living_struct_mass / self.time_step
-            self.deficit_hexose_reserve[vertex_index] = deficit if deficit > 1e-20 else 0.
+            self.props["deficit_hexose_reserve"][vertex_index] = deficit if deficit > 1e-20 else 0.
             return 0.
         else:
-            self.deficit_hexose_reserve[vertex_index] = 0. 
+            self.props["deficit_hexose_reserve"][vertex_index] = 0. 
             return balance
 
     @state
@@ -928,10 +931,10 @@ class RootCarbonModel(Model):
         
         if balance < 0:
             deficit = - balance * living_struct_mass / self.time_step
-            self.deficit_hexose_root[vertex_index] = deficit if deficit > 1e-20 else 0.
+            self.props["deficit_hexose_root"][vertex_index] = deficit if deficit > 1e-20 else 0.
             return 0.
         else:
-            self.deficit_hexose_root[vertex_index] = 0. 
+            self.props["deficit_hexose_root"][vertex_index] = 0. 
             return balance
     
 
@@ -966,10 +969,10 @@ class RootCarbonModel(Model):
 
     def compute_root_system_C_content(self):
         return sum([(6*labile + 12*phloem + 6*reserve)*m for labile, phloem, reserve, m in zip(
-            self.C_hexose_root.values(), 
-            self.C_sucrose_root.values(),
-            self.C_hexose_reserve.values(),
-            self.living_struct_mass.values())])
+            self.props["C_hexose_root"].values(), 
+            self.props["C_sucrose_root"].values(),
+            self.props["C_hexose_reserve"].values(),
+            self.props["living_struct_mass"].values())])
 
     # TODO adapt to class structure
     class Differential_Equation_System(object):

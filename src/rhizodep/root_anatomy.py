@@ -332,10 +332,10 @@ class RootAnatomy(Model):
                 fraction_of_meristem_zone = 1 - (distance_from_tip - length) / meristem_zone_length
                 # And the relative conductance of the cell walls in the whole element is a linear combination of the meristem
                 # zone and the non-meristem zone:
-                self.relative_conductance_walls[vid] = 1 + (self.relative_conductance_at_meristem - 1) * fraction_of_meristem_zone
+                n.relative_conductance_walls = 1 + (self.relative_conductance_at_meristem - 1) * fraction_of_meristem_zone
             else:
                 # Otherwise, the relative conductance of the cell walls is considered to be 1 by definition.
-                self.relative_conductance_walls[vid] = 1.
+                n.relative_conductance_walls = 1.
             
 
             # TIME WISE BARRIERS OF ENDODERMIS & exodermis:
@@ -369,7 +369,7 @@ class RootAnatomy(Model):
                 # exodermis_conductance_factor = (100 - self.exodermis_max * np.exp(-np.exp(self.exodermis_delay / (60. * 60. * 24.) - self.exodermis_rate * age))) / 100.
 
                 gompertz_start_xylem = - np.log(p) * np.exp(self.xylem_rate * self.xylem_delay)
-                self.xylem_differentiation_factor[vid] = self.xylem_max * np.exp(- gompertz_start_xylem * np.exp( - self.xylem_rate * age)) / 100
+                n.xylem_differentiation_factor = self.xylem_max * np.exp(- gompertz_start_xylem * np.exp( - self.xylem_rate * age)) / 100
                 # self.xylem_differentiation_factor[vid] = self.xylem_max * np.exp(-np.exp(self.xylem_delay / (60. * 60. * 24.) - self.xylem_rate * age)) / 100
 
             # Distance Wise barriers
@@ -413,7 +413,7 @@ class RootAnatomy(Model):
 
                 # Logistic xylem differentiation
                 logistic_precision = 0.99
-                self.xylem_differentiation_factor[vid] = 1 / (1 + (logistic_precision / ((1 - logistic_precision) * np.exp(
+                n.xylem_differentiation_factor = 1 / (1 + (logistic_precision / ((1 - logistic_precision) * np.exp(
                                                                 -self.begin_xylem_differentiation)) * np.exp(-barycenter_distance / self.span_xylem_differentiation)))
 
 
@@ -478,8 +478,8 @@ class RootAnatomy(Model):
 
             # We record the new conductances of cell walls, endodermis and exodermis:
 
-            self.endodermis_conductance_factor[vid] = endodermis_conductance_factor
-            self.exodermis_conductance_factor[vid] = exodermis_conductance_factor
+            n.endodermis_conductance_factor = endodermis_conductance_factor
+            n.exodermis_conductance_factor = exodermis_conductance_factor
         
             
 

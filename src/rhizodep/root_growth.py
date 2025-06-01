@@ -22,6 +22,7 @@ from openalea.mtg import turtle as turt
 
 from metafspm.component import Model, declare
 from metafspm.component_factory import *
+from log.visualize import plot_mtg
 
 
 @dataclass
@@ -379,12 +380,12 @@ class RootGrowthModel(Model):
         self.collar_children, self.collar_skip = [], []
         for vid in self.vertices:
             children = self.g.children(vid)
-            if self.type[vid] in ('Support_for_seminal_root', 'Support_for_adventitious_root') and children:
+            if self.props["type"][vid] in ('Support_for_seminal_root', 'Support_for_adventitious_root') and children:
                 self.collar_skip += [vid]
-                self.collar_children += [k for k in children if self.type[k] not in ('Support_for_seminal_root', 'Support_for_adventitious_root')]
+                self.collar_children += [k for k in children if self.props["type"][k] not in ('Support_for_seminal_root', 'Support_for_adventitious_root')]
 
-        if g is None:
-            self.initiate_heterogeneous_variables()
+        self.initiate_heterogeneous_variables()
+
 
     def initiate_mtg(self):
         """
@@ -454,6 +455,7 @@ class RootGrowthModel(Model):
         base_segment.volume = self.volume
 
         base_segment.struct_mass = base_segment.volume * self.new_root_tissue_density
+        base_segment.living_struct_mass = base_segment.struct_mass + base_segment.living_root_hairs_struct_mass
         base_segment.initial_struct_mass = base_segment.struct_mass
         base_segment.initial_living_root_hairs_struct_mass = base_segment.living_root_hairs_struct_mass
 
@@ -684,6 +686,7 @@ class RootGrowthModel(Model):
 
         apex.volume = self.volume
         apex.struct_mass = apex.volume * apex.root_tissue_density
+        apex.living_struct_mass = apex.struct_mass + apex.living_root_hairs_struct_mass
         apex.initial_struct_mass = apex.struct_mass
         apex.initial_living_root_hairs_struct_mass = apex.living_root_hairs_struct_mass
 
@@ -696,6 +699,7 @@ class RootGrowthModel(Model):
             n = self.g.node(vid)
             n.volume = self.volume_from_radius_and_length(n, n.radius, n.length)
             n.struct_mass = n.volume * self.new_root_tissue_density
+            n.living_struct_mass = n.struct_mass + n.living_root_hairs_struct_mass
 
         algo.orders(self.g)
         self.update_distance_from_tip()
@@ -2283,6 +2287,7 @@ class RootGrowthModel(Model):
 
     def comute_mtg_axes_id(self):
         g = self.g
+        props = self.props
         root = next(g.component_roots_at_scale_iter(g.root, scale=1))
         seminal_id = 1
         adventitious_id = 1
@@ -2298,20 +2303,20 @@ class RootGrowthModel(Model):
                 if insertion_id:
                     parent = g.node(insertion_id)
                     if parent.type == "Support_for_seminal_root":
-                        self.axis_index.update({v: f"seminal_{seminal_id}" for v in axis})
+                        props["axis_index"].update({v: f"seminal_{seminal_id}" for v in axis})
                         seminal_id += 1
                     elif parent.type == "Support_for_adventitious_root":
-                        self.axis_index.update({v: f"adventitious_{adventitious_id}" for v in axis})
+                        props["axis_index"].update({v: f"adventitious_{adventitious_id}" for v in axis})
                         adventitious_id += 1
                     else:
-                        if self.root_order[min(axis)] > 1:
-                            self.axis_index.update({v: f"lateral_{lateral_id}" for v in axis})
+                        if props["root_order"][min(axis)] > 1:
+                            props["axis_index"].update({v: f"lateral_{lateral_id}" for v in axis})
                             lateral_id += 1
                         else:
                             print("Uncaptured exception on ", v)
                 else:
                     # If parent is None we now this is the main seminal axis
-                    self.axis_index.update({v: f"seminal_{seminal_id}" for v in axis})
+                    props["axis_index"].update({v: f"seminal_{seminal_id}" for v in axis})
                     seminal_id += 1
                 
                 processed_vids += axis
@@ -2884,6 +2889,8 @@ class RootGrowthModel(Model):
             processed_length += n.length
 
     def post_growth_updating(self, modules_to_update):
+        g = self.g
+        props = self.props
 
         for module in modules_to_update:
             setattr(module, "vertices", self.vertices)
@@ -2891,118 +2898,117 @@ class RootGrowthModel(Model):
         # Select the base of the root
         root = next(self.g.component_roots_at_scale_iter(self.g.root, scale=1))
 
-        self.total_living_struct_mass[1] = 0
+        props["total_living_struct_mass"][1] = 0
 
         # from root base to tips
-        for vid in pre_order2(self.g, root):
+        for vid in pre_order2(g, root):
+            n = g.node(vid)
+            n.living_struct_mass = n.struct_mass + n.living_root_hairs_struct_mass
             
-            if self.type[vid] == 'Base_of_the_root_system':
-                self.axis_type[vid] = 'seminal'
-            else:
-                parent = self.g.parent(vid)
+            if n.struct_mass > 0:
 
-                if self.root_order[vid] == 1:
-                    # First exception for pivot root that could be taken for a nodal otherwise
-                    # (Given the structure of the first fake supporting elements)
-                    if vid == max(self.collar_children):
-                        self.axis_type[vid] = 'seminal'
-                    elif self.type[vid] == 'Support_for_seminal_root' or self.type[vid] == 'Support_for_adventitious_root':
-                        self.axis_type[vid] = 'seminal'
-                    elif self.type[parent] == 'Support_for_seminal_root':
-                        self.axis_type[vid] = 'seminal'
-                    elif self.type[parent] == 'Support_for_adventitious_root':
-                        self.axis_type[vid] = 'nodal'
-                    elif self.axis_type[parent] == 'seminal':
-                        self.axis_type[vid] = 'seminal'
-                    elif self.axis_type[parent] == 'nodal':
-                        self.axis_type[vid] = 'nodal'
-                    else:
-                        print('Uncaught exception')
+                # We need to get the parent to compute mass partitionning.
+                if vid in self.collar_children:
+                    parent = 1
                 else:
-                    self.axis_type[vid] = 'lateral'
+                    parent = self.g.parent(vid)
+                p = g.node(parent)
                 
-
-            if vid not in self.collar_skip:
-                # For every vertex we update the considered living struct_mass for other modules.
-                living_struct_mass = self.struct_mass[vid] + self.living_root_hairs_struct_mass[vid] # local to avoid multiple access
-                self.living_struct_mass[vid] = living_struct_mass
-                self.total_living_struct_mass[1] += living_struct_mass
-
-                if vid in self.step_new_apices and vid not in self.vertex_index:
-
-                    # We increment the vertex identifiers to be accesses in deficits
-                    self.vertex_index[vid] = vid
-
-                    # We need to get the parent to compute mass partitionning.
-                    if vid in self.collar_children:
-                        parent = 1
-                    else:
-                        parent = self.g.parent(vid)
-                    
-                    mass_fraction = self.living_struct_mass[vid] / (self.living_struct_mass[vid] + self.living_struct_mass[parent])
-
-                    for module in modules_to_update:
-                        for prop in module.massic_concentration:
-                            if mass_fraction > 0:
-                                initial_metabolite_amount = getattr(module, prop)[parent] * (self.initial_struct_mass[parent] + self.initial_living_root_hairs_struct_mass[parent])
-                                getattr(module, prop).update({vid: initial_metabolite_amount * mass_fraction / self.living_struct_mass[vid],
-                                                            parent: initial_metabolite_amount * (1-mass_fraction) / self.living_struct_mass[parent]})
-                            else:
-                                getattr(module, prop).update({vid: getattr(module, prop)[parent]})
-                                
-                        for prop in module.extensive_variables:
-                            initial_amount = getattr(module, prop)[parent]
-                            getattr(module, prop).update({vid: initial_amount * mass_fraction,
-                                                        parent: initial_amount * (1-mass_fraction)})
-                            
-                        for prop in module.descriptor:
-                            getattr(module, prop).update({vid: None})
-
-
-                elif vid in self.step_elongating_elements:
-                    # If this is an already emerged segment, it has its own dynamic regarless of parents
-                    if self.initial_struct_mass[vid] > 0:
-                        for module in modules_to_update:
-                            for prop in module.massic_concentration:
-                                getattr(module, prop)[vid] = getattr(module, prop)[vid] * (self.initial_struct_mass[vid] + self.initial_living_root_hairs_struct_mass[vid]) / self.living_struct_mass[vid]
-
-                    # Else if it elongated from a null structural mass, it shared ressources with its parent and we deal with it as for new apex creation
-                    else:
-                        # We need to get the parent to compute mass partitionning.
-                        if vid in self.collar_children:
-                            parent = 1
+                if n.type == 'Base_of_the_root_system':
+                    n.axis_type = 'seminal'
+                else:
+                    if n.root_order == 1:
+                        # First exception for pivot root that could be taken for a nodal otherwise
+                        # (Given the structure of the first fake supporting elements)
+                        if vid == max(self.collar_children):
+                            n.axis_type = 'seminal'
+                        elif n.type == 'Support_for_seminal_root' or n.type == 'Support_for_adventitious_root':
+                            n.axis_type = 'seminal'
+                        elif p.type == 'Support_for_seminal_root':
+                            n.axis_type = 'seminal'
+                        elif p.type == 'Support_for_adventitious_root':
+                            n.axis_type = 'nodal'
+                        elif p.axis_type == 'seminal':
+                            n.axis_type = 'seminal'
+                        elif p.axis_type == 'nodal':
+                            n.axis_type = 'nodal'
                         else:
-                            parent = self.g.parent(vid)
+                            print('Uncaught exception')
+                    else:
+                        n.axis_type = 'lateral'
+                    
+
+                if vid not in self.collar_skip:
+                    # For every vertex we update the considered living struct_mass for other modules.
+                    props["total_living_struct_mass"][1] += n.living_struct_mass
+
+                    if vid in self.step_new_apices and vid not in props["vertex_index"]:
+
+                        # We increment the vertex identifiers to be accesses in deficits
+                        n.vertex_index = vid
                         
-                        mass_fraction = self.living_struct_mass[vid] / (self.living_struct_mass[vid] + self.living_struct_mass[parent])
+                        mass_fraction = n.living_struct_mass / (n.living_struct_mass + p.living_struct_mass)
 
                         for module in modules_to_update:
                             for prop in module.massic_concentration:
-                                initial_metabolite_amount = getattr(module, prop)[parent] * (self.initial_struct_mass[parent] + self.initial_living_root_hairs_struct_mass[parent])
-                                getattr(module, prop).update({vid: initial_metabolite_amount * mass_fraction / self.living_struct_mass[vid],
-                                                            parent: initial_metabolite_amount * (1-mass_fraction) / self.living_struct_mass[parent]})
+                                if mass_fraction > 0:
+                                    initial_metabolite_amount = getattr(p, prop) * (p.initial_struct_mass + p.initial_living_root_hairs_struct_mass)
+                                    props[prop].update({vid: initial_metabolite_amount * mass_fraction / n.living_struct_mass,
+                                                                parent: initial_metabolite_amount * (1-mass_fraction) / p.living_struct_mass})
+                                else:
+                                    props[prop].update({vid: getattr(p, prop)})
                                     
                             for prop in module.extensive_variables:
-                                initial_amount = getattr(module, prop)[parent]
-                                getattr(module, prop).update({vid: initial_amount * mass_fraction,
+                                initial_amount = getattr(p, prop)
+                                props[prop].update({vid: initial_amount * mass_fraction,
                                                             parent: initial_amount * (1-mass_fraction)})
-                
-                #TODO remove, just for a figure
-                if self.label[vid] != "Apex":
-                    if vid not in self.actual_time_since_formation:
-                        self.actual_time_since_formation[vid] = 0
-                    else:
-                        self.actual_time_since_formation[vid] += self.time_step_in_seconds / 3600 / 24
-                else:
-                    if vid not in self.actual_time_since_formation:
-                        self.actual_time_since_formation[vid] = 0
-                    non_meristem_length = self.radius[vid] * 2 * 1.3 #Kozlova et al. (2020), the length of the meristematic region 1.3 times the diameter of the tip
-                    if non_meristem_length < self.length[vid]:
-                        aging_length = self.length[vid] - non_meristem_length
-                        self.actual_time_since_formation[vid] += (self.time_step_in_seconds / 3600 / 24) * aging_length / self.length[vid]
+                                
+                            for prop in module.descriptor:
+                                props[prop].update({vid: None})
 
-                self.tissue_formation_time[vid] = 60 - self.actual_time_since_formation[vid]
+
+                    elif vid in self.step_elongating_elements:
+                        # If this is an already emerged segment, it has its own dynamic regarless of parents
+                        if n.initial_struct_mass > 0:
+                            for module in modules_to_update:
+                                for prop in module.massic_concentration:
+                                    setattr(n, prop, getattr(n, prop)* (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass) / n.living_struct_mass)
+
+                        # Else if it elongated from a null structural mass, it shared ressources with its parent and we deal with it as for new apex creation
+                        else:
+                            
+                            mass_fraction = n.living_struct_mass / (n.living_struct_mass + p.living_struct_mass)
+
+                            for module in modules_to_update:
+                                for prop in module.massic_concentration:
+                                    initial_metabolite_amount = getattr(p, prop) * (p.initial_struct_mass + p.initial_living_root_hairs_struct_mass)
+                                    props[prop].update({vid: initial_metabolite_amount * mass_fraction / n.living_struct_mass,
+                                                                parent: initial_metabolite_amount * (1-mass_fraction) / p.living_struct_mass})
+                                        
+                                for prop in module.extensive_variables:
+                                    initial_amount = getattr(p, prop)
+                                    props[prop].update({vid: initial_amount * mass_fraction,
+                                                                parent: initial_amount * (1-mass_fraction)})
+                    
+                    #TODO remove, just for a figure
+                    if n.label != "Apex":
+                        if vid not in props["actual_time_since_formation"]:
+                            n.actual_time_since_formation = 0
+                        else:
+                            n.actual_time_since_formation += self.time_step_in_seconds / 3600 / 24
+                    else:
+                        if vid not in props["actual_time_since_formation"]:
+                            n.actual_time_since_formation = 0
+                        non_meristem_length = n.radius * 2 * 1.3 #Kozlova et al. (2020), the length of the meristematic region 1.3 times the diameter of the tip
+                        if non_meristem_length < n.length:
+                            aging_length = n.length - non_meristem_length
+                            n.actual_time_since_formation += (self.time_step_in_seconds / 3600 / 24) * aging_length / n.length
+
+                    n.tissue_formation_time = 60 - n.actual_time_since_formation
                 
+        # UPDATE MTG COORDINATES IN CASE OF GROWTH
+        plot_mtg(self.g)
+
         compute_axess_id = True
         if compute_axess_id:
             self.comute_mtg_axes_id()

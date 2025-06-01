@@ -221,14 +221,14 @@ class RhizoInputsSoilModel(Model):
         self.voxels[name].fill(init_value)
         #setattr(self, name, self.voxels[name])
 
-    def compute_mtg_voxel_neighbors(self, g):
-        props = g.properties()
+    def compute_mtg_voxel_neighbors(self, props):
 
         # necessary to get updated coordinates.
-        if "angle_down" in g.properties().keys():
-            plot_mtg(g)
-        for vid in g.vertices(scale=self.g.max_scale()):
-            if (not props["voxel_neighbor"][vid]) or (props["length"][vid] > props["initial_length"][vid]):
+        # if "angle_down" in g.properties().keys():
+        #     plot_mtg(g)
+
+        for vid in props["vertex_index"].keys():
+            if (props["voxel_neighbor"][vid] is None) or (props["length"][vid] > props["initial_length"][vid]):
                 baricenter = (np.mean((props["x1"][vid], props["x2"][vid])), 
                             np.mean((props["y1"][vid], props["y2"][vid])),
                             -np.mean((props["z1"][vid], props["z2"][vid])))
@@ -244,9 +244,11 @@ class RhizoInputsSoilModel(Model):
                 except:
                     print(" WARNING, issue in computing the voxel neighbor for vid ", vid)
                     props["voxel_neighbor"][vid] = None
+        
+        return props
 
 
-    def apply_to_voxel(self, g):
+    def apply_to_voxel(self, props):
         """
         This function computes the flow perceived by voxels surrounding the considered root segment.
         Note : not tested for now, just computed to support discussions.
@@ -255,18 +257,18 @@ class RhizoInputsSoilModel(Model):
         :param root_flows: The root flows to be perceived by soil voxels. The underlying assumptions are that only flows, i.e. extensive variables are passed as arguments.
         :return:
         """
-        props = g.properties()
 
         for name in self.inputs:
             self.voxels[name].fill(0)
         
-        for vid in g.vertices(scale=self.g.max_scale()):
-            if self.length[vid] > 0:
+        for vid in props["vertex_index"].keys():
+            if props["length"][vid] > 0:
                 vy, vz, vx = props["voxel_neighbor"][vid]
                 for name in self.inputs:
                     self.voxels[name][vy][vz][vx] += props[name][vid]
 
-    def get_from_voxel(self, g):
+
+    def get_from_voxel(self, props):
         """
         This function computes the soil states from voxels perceived by the considered root segment.
         Note : not tested for now, just computed to support discussions.
@@ -275,38 +277,48 @@ class RhizoInputsSoilModel(Model):
         :param soil_states: The soil states to be perceived by soil voxels. The underlying assumptions are that only intensive extensive variables are passed as arguments.
         :return:
         """
-        props = g.properties()
-        for vid in g.vertices(scale=self.g.max_scale()):
+        for vid in props["vertex_index"].keys():
             if props["length"][vid] > 0:
                 vy, vz, vx = props["voxel_neighbor"][vid]
                 for name in self.state_variables:
                     if name != "voxel_neighbor":
                         props[name][vid] = self.voxels[name][vy][vz][vx]
+        
+        return props
 
-    def pull_available_inputs(self, g):
-        # Pointer to avoid repeated lookups in self (Usefull?)
-        props = g.properties()
+
+    def pull_available_inputs(self, props):
+        # vertices = props["vertex_index"].keys()
+        vertices = [vid for vid in props["vertex_index"].keys() if props["living_struct_mass"][vid] > 0]
+        print(props["living_struct_mass"])
+        
         for input, source_variables in self.pullable_inputs[props["model_name"]].items():
-            vertices = props[list(source_variables.keys())[0]].keys()
+            if input not in props:
+                props[input] = {}
+            # print(input, source_variables)
             props[input].update({vid: sum([props[variable][vid]*unit_conversion 
                                            for variable, unit_conversion in source_variables.items()]) 
                                  for vid in vertices})
+        return props
 
 
-    def __call__(self, input_mtgs: list=[], *args):
+    def __call__(self, shared_root_mtgs: dict={}, *args):
 
         # We get fluxes and voxel interception from the plant mtgs (If none passed, soil model can be autonomous)
-        for g in input_mtgs:
-            self.pull_available_inputs(g)
-            self.compute_mtg_voxel_neighbors(g)
-            self.apply_to_voxel(g)
+        for id, props in shared_root_mtgs.items():
+            props = self.pull_available_inputs(props)
+            props = self.compute_mtg_voxel_neighbors(props)
+            self.apply_to_voxel(props)
+            shared_root_mtgs[id] = props
 
         # Run the soil model
         self.choregrapher(module_family=self.__class__.__name__, *args)
 
         # Then apply the states to the plants
-        for g in input_mtgs:
-            self.get_from_voxel(g)
+        for id, props in shared_root_mtgs.items():
+            props = self.get_from_voxel(props)
+            # Update soil properties so that plants can retreive
+            shared_root_mtgs[id] = props
     
 
     # MODEL EQUATIONS
