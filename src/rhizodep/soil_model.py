@@ -228,7 +228,7 @@ class RhizoInputsSoilModel(Model):
         #     plot_mtg(g)
 
         for vid in props["vertex_index"].keys():
-            if (props["voxel_neighbor"][vid] is None) or (props["length"][vid] > props["initial_length"][vid]):
+            if (vid not in props["voxel_neighbor"].keys()) or (props["voxel_neighbor"][vid] is None) or (props["length"][vid] > props["initial_length"][vid]):
                 baricenter = (np.mean((props["x1"][vid], props["x2"][vid])), 
                             np.mean((props["y1"][vid], props["y2"][vid])),
                             -np.mean((props["z1"][vid], props["z2"][vid])))
@@ -268,7 +268,7 @@ class RhizoInputsSoilModel(Model):
                     self.voxels[name][vy][vz][vx] += props[name][vid]
 
 
-    def get_from_voxel(self, props):
+    def get_from_voxel(self, props, soil_outputs):
         """
         This function computes the soil states from voxels perceived by the considered root segment.
         Note : not tested for now, just computed to support discussions.
@@ -278,11 +278,10 @@ class RhizoInputsSoilModel(Model):
         :return:
         """
         for vid in props["vertex_index"].keys():
-            if props["length"][vid] > 0:
-                vy, vz, vx = props["voxel_neighbor"][vid]
-                for name in self.state_variables:
-                    if name != "voxel_neighbor":
-                        props[name][vid] = self.voxels[name][vy][vz][vx]
+            vy, vz, vx = props["voxel_neighbor"][vid]
+            for name in soil_outputs:
+                if name != "voxel_neighbor":
+                    props[name][vid] = self.voxels[name][vy][vz][vx]
         
         return props
 
@@ -290,7 +289,6 @@ class RhizoInputsSoilModel(Model):
     def pull_available_inputs(self, props):
         # vertices = props["vertex_index"].keys()
         vertices = [vid for vid in props["vertex_index"].keys() if props["living_struct_mass"][vid] > 0]
-        print(props["living_struct_mass"])
         
         for input, source_variables in self.pullable_inputs[props["model_name"]].items():
             if input not in props:
@@ -302,7 +300,7 @@ class RhizoInputsSoilModel(Model):
         return props
 
 
-    def __call__(self, shared_root_mtgs: dict={}, *args):
+    def __call__(self, shared_root_mtgs: dict={}, soil_outputs: list=[], *args):
 
         # We get fluxes and voxel interception from the plant mtgs (If none passed, soil model can be autonomous)
         for id, props in shared_root_mtgs.items():
@@ -316,7 +314,7 @@ class RhizoInputsSoilModel(Model):
 
         # Then apply the states to the plants
         for id, props in shared_root_mtgs.items():
-            props = self.get_from_voxel(props)
+            props = self.get_from_voxel(props, soil_outputs=soil_outputs)
             # Update soil properties so that plants can retreive
             shared_root_mtgs[id] = props
     

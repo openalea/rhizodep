@@ -697,6 +697,7 @@ class RootGrowthModel(Model):
         for vid in self.g.vertices_iter(scale=1):
             # n represents the vertex:
             n = self.g.node(vid)
+            n.vertex_index = vid
             n.volume = self.volume_from_radius_and_length(n, n.radius, n.length)
             n.struct_mass = n.volume * self.new_root_tissue_density
             n.living_struct_mass = n.struct_mass + n.living_root_hairs_struct_mass
@@ -2888,7 +2889,7 @@ class RootGrowthModel(Model):
 
             processed_length += n.length
 
-    def post_growth_updating(self, modules_to_update):
+    def post_growth_updating(self, modules_to_update, soil_boundaries_to_infer=[]):
         g = self.g
         props = self.props
 
@@ -2966,6 +2967,10 @@ class RootGrowthModel(Model):
                             for prop in module.descriptor:
                                 props[prop].update({vid: None})
 
+                        # For soil related inputs, given new elements have been formed and we will not compute soil interception now, we infer the values from those of the parent
+                        for prop in soil_boundaries_to_infer:
+                            setattr(n, prop, getattr(p, prop))
+
 
                     elif vid in self.step_elongating_elements:
                         # If this is an already emerged segment, it has its own dynamic regarless of parents
@@ -3014,7 +3019,7 @@ class RootGrowthModel(Model):
             self.comute_mtg_axes_id()
 
 
-    def __call__(self, *args, modules_to_update=[]):
+    def __call__(self, *args, modules_to_update=[], soil_boundaries_to_infer=[]):
         super().__call__(*args)
-        self.post_growth_updating(modules_to_update=modules_to_update)
+        self.post_growth_updating(modules_to_update=modules_to_update, soil_boundaries_to_infer=soil_boundaries_to_infer)
     
