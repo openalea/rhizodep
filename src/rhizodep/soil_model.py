@@ -153,7 +153,7 @@ class RhizoInputsSoilModel(Model):
                                         value_comment="", references="We assume that Km for cells degradation is identical to the one for hexose degradation.", DOI="",
                                        min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
 
-    def __init__(self, time_step_in_seconds, soil_grid=None, **scenario: dict):
+    def __init__(self, time_step_in_seconds, soil_grid=None, scene_xrange=1., scene_yrange=1., **scenario: dict):
         """
         DESCRIPTION
         -----------
@@ -173,7 +173,7 @@ class RhizoInputsSoilModel(Model):
     # SERVICE FUNCTIONS
 
     # Just ressource for now
-    def initiate_voxel_soil(self, soil_grid=None):
+    def initiate_voxel_soil(self, soil_grid=None, scene_xrange=1., scene_yrange=1.):
         """
         Note : not tested for now, just computed to support discussions.
         """
@@ -188,24 +188,29 @@ class RhizoInputsSoilModel(Model):
         voxel_width = cubic_length
         voxel_height = cubic_length
         voxel_volume = voxel_height * voxel_width * voxel_width
-        scene_xy_range = 5e-1
 
         self.delta_z = voxel_height
         self.voxels_Z_section_area = voxel_width * voxel_width
+        
+        self.voxel_number_x = int(scene_xrange / voxel_width) + 1
+        actual_voxel_width = scene_xrange / self.voxel_number_x
+        self.scene_xrange = scene_xrange
 
-        self.voxel_number_xy = int(scene_xy_range / voxel_width)
-        # We want the plant to be centered
-        if self.voxel_number_xy%2 == 0:
-            self.voxel_number_xy += 1
+        self.voxel_number_y = int(scene_yrange / voxel_width) + 1
+        actual_voxel_length = scene_yrange / self.voxel_number_y
+        self.scene_yrange = scene_yrange
 
-        scene_z_range = 1.
-        self.voxel_number_z = int(scene_z_range / voxel_height)
+        voxel_volume = voxel_height * actual_voxel_width * actual_voxel_length
 
-        y, z, x = np.indices((self.voxel_number_xy, self.voxel_number_z, self.voxel_number_xy))
-        self.voxels["x1"] = x * voxel_width - ((self.voxel_number_xy*voxel_width)/2)
-        self.voxels["x2"] = self.voxels["x1"] + voxel_width
-        self.voxels["y1"] = y * voxel_width - ((self.voxel_number_xy*voxel_width)/2)
-        self.voxels["y2"] = self.voxels["y1"] + voxel_width
+        scene_zrange = 1.
+        self.voxel_number_z = int(scene_zrange / voxel_height) + 1
+
+        # Uncentered, positive grid
+        y, z, x = np.indices((self.voxel_number_y, self.voxel_number_z, self.voxel_number_x))
+        self.voxels["x1"] = x * actual_voxel_width
+        self.voxels["x2"] = self.voxels["x1"] + actual_voxel_width
+        self.voxels["y1"] = y * actual_voxel_length
+        self.voxels["y2"] = self.voxels["y1"] + actual_voxel_length
         self.voxels["z1"] = z * voxel_height
         self.voxels["z2"] = self.voxels["z1"] + voxel_height
 
@@ -217,7 +222,7 @@ class RhizoInputsSoilModel(Model):
 
 
     def voxel_grid_to_self(self, name, init_value):
-        self.voxels[name] = np.zeros((self.voxel_number_xy, self.voxel_number_z, self.voxel_number_xy))
+        self.voxels[name] = np.zeros((self.voxel_number_y, self.voxel_number_z, self.voxel_number_x))
         self.voxels[name].fill(init_value)
         #setattr(self, name, self.voxels[name])
 
@@ -229,8 +234,8 @@ class RhizoInputsSoilModel(Model):
 
         for vid in props["vertex_index"].keys():
             if (vid not in props["voxel_neighbor"].keys()) or (props["voxel_neighbor"][vid] is None) or (props["length"][vid] > props["initial_length"][vid]):
-                baricenter = (np.mean((props["x1"][vid], props["x2"][vid])), 
-                            np.mean((props["y1"][vid], props["y2"][vid])),
+                baricenter = (np.mean((props["x1"][vid], props["x2"][vid])) % self.scene_xrange, # min value is 0
+                            np.mean((props["y1"][vid], props["y2"][vid])) % self.scene_yrange, # min value is 0
                             -np.mean((props["z1"][vid], props["z2"][vid])))
                 testx1 = self.voxels["x1"] <= baricenter[0]
                 testx2 = baricenter[0] <= self.voxels["x2"]
@@ -241,6 +246,7 @@ class RhizoInputsSoilModel(Model):
                 test = testx1 * testx2 * testy1 * testy2 * testz1 * testz2
                 try:
                     props["voxel_neighbor"][vid] = [int(v) for v in np.where(test)]
+                    print(vid, props["voxel_neighbor"][vid])
                 except:
                     print(" WARNING, issue in computing the voxel neighbor for vid ", vid)
                     props["voxel_neighbor"][vid] = None

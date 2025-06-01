@@ -22,7 +22,6 @@ from openalea.mtg import turtle as turt
 
 from metafspm.component import Model, declare
 from metafspm.component_factory import *
-from log.visualize import plot_mtg
 
 
 @dataclass
@@ -3010,9 +3009,6 @@ class RootGrowthModel(Model):
                             n.actual_time_since_formation += (self.time_step_in_seconds / 3600 / 24) * aging_length / n.length
 
                     n.tissue_formation_time = 60 - n.actual_time_since_formation
-                
-        # UPDATE MTG COORDINATES IN CASE OF GROWTH
-        plot_mtg(self.g)
 
         compute_axess_id = True
         if compute_axess_id:
