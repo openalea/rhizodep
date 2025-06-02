@@ -153,7 +153,7 @@ class RhizoInputsSoilModel(Model):
                                         value_comment="", references="We assume that Km for cells degradation is identical to the one for hexose degradation.", DOI="",
                                        min_value="", max_value="", variable_type="parameter", by="model_soil", state_variable_type="", edit_by="user")
 
-    def __init__(self, time_step_in_seconds, soil_grid=None, scene_xrange=1., scene_yrange=1., **scenario: dict):
+    def __init__(self, time_step_in_seconds, scene_xrange=1., scene_yrange=1., **scenario: dict):
         """
         DESCRIPTION
         -----------
@@ -166,21 +166,20 @@ class RhizoInputsSoilModel(Model):
         """
 
         self.apply_scenario(**scenario)
-        self.initiate_voxel_soil(soil_grid=soil_grid)
+        self.initiate_voxel_soil(scene_xrange, scene_yrange)
         self.time_step_in_seconds = time_step_in_seconds
         self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.voxels, compartment="soil")   
 
     # SERVICE FUNCTIONS
 
     # Just ressource for now
-    def initiate_voxel_soil(self, soil_grid=None, scene_xrange=1., scene_yrange=1.):
+    def initiate_voxel_soil(self, scene_xrange=1., scene_yrange=1.):
         """
         Note : not tested for now, just computed to support discussions.
         """
-        if soil_grid is None:
-            self.voxels = {}
-        else:
-            self.voxels = soil_grid
+
+        self.voxels = {}
+
         
         self.planting_depth = 5e-2
 
@@ -246,7 +245,6 @@ class RhizoInputsSoilModel(Model):
                 test = testx1 * testx2 * testy1 * testy2 * testz1 * testz2
                 try:
                     props["voxel_neighbor"][vid] = [int(v) for v in np.where(test)]
-                    print(vid, props["voxel_neighbor"][vid])
                 except:
                     print(" WARNING, issue in computing the voxel neighbor for vid ", vid)
                     props["voxel_neighbor"][vid] = None
