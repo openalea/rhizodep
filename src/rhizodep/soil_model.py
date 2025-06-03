@@ -304,23 +304,35 @@ class RhizoInputsSoilModel(Model):
         return props
 
 
-    def __call__(self, shared_root_mtgs: dict={}, soil_outputs: list=[], *args):
+    def __call__(self, queue_plants_to_soil, queues_soil_to_plants, soil_outputs: list=[], *args):
 
         # We get fluxes and voxel interception from the plant mtgs (If none passed, soil model can be autonomous)
-        for id, props in shared_root_mtgs.items():
+        # Waiting for all plants to put their outputs
+
+        batch = []
+        for _ in range(len(queues_soil_to_plants)):
+            batch.append(queue_plants_to_soil.get())
+
+        # LINKING MODULES after plant initialization
+        keep_props_locally = {}
+        for plant_data in batch:
+            # Unpacking message
+            id = plant_data["plant_id"]
+            props = plant_data["data"]
+            
             props = self.pull_available_inputs(props)
             props = self.compute_mtg_voxel_neighbors(props)
             self.apply_to_voxel(props)
-            shared_root_mtgs[id] = props
+            keep_props_locally[id] = props
 
         # Run the soil model
         self.choregrapher(module_family=self.__class__.__name__, *args)
 
         # Then apply the states to the plants
-        for id, props in shared_root_mtgs.items():
+        for id, props in keep_props_locally.items(): # Not reteived from batch once more since props may be a copy when pulled out of a mp.Queue.get()
             props = self.get_from_voxel(props, soil_outputs=soil_outputs)
             # Update soil properties so that plants can retreive
-            shared_root_mtgs[id] = props
+            queues_soil_to_plants[id].put(props)
     
 
     # MODEL EQUATIONS
