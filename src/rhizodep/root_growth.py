@@ -1216,9 +1216,6 @@ class RootGrowthModel(Model):
         index_apex = self.g.Axis(segment.index())[-1]
         apex = self.g.node(index_apex)
         # print("For segment", segment.index(), "the terminal index is", index_apex, "and has the type", apex.type)
-        if apex.label != "Apex":
-            print("ERROR: when trying to access the terminal apex of the axis of the segment", segment.index(),
-                "we obtained the element", index_apex," that is a", apex.label, "!!!")
 
         # Depending on the type of the apex, we adjust the type of the segment on the same axis:
         if apex.type == "Just_stopped":
