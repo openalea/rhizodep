@@ -562,6 +562,7 @@ class RootCarbonModel(Model):
     @rate
     def _hexose_diffusion_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
                                              hexose_consumption_by_growth, soil_temperature):
+        
         # We consider all the cases where no net exchange should be allowed:
         if length <= 0. or phloem_exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
             return 0
@@ -875,6 +876,8 @@ class RootCarbonModel(Model):
     def _C_sucrose_root(self, vertex_index, C_sucrose_root, living_struct_mass, hexose_diffusion_from_phloem,
                             hexose_active_production_from_phloem, phloem_hexose_exudation, sucrose_loading_in_phloem,
                             phloem_hexose_uptake_from_soil, deficit_sucrose_root):
+        
+        # print({k: v for k, v in locals().items() if k != 'self'})
         
         balance = C_sucrose_root + (self.time_step / living_struct_mass) * (
                 - hexose_diffusion_from_phloem / 2.

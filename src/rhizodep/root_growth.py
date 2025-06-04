@@ -372,7 +372,7 @@ class RootGrowthModel(Model):
         self.time_step_in_seconds = time_step_in_seconds
         self.choregrapher.add_time_and_data(instance=self, sub_time_step=self.time_step_in_seconds, data=self.props)
         self.vertices = self.g.vertices(scale=self.g.max_scale())
-        self.link_self_to_mtg()
+        self.link_self_to_mtg(ignore=list(self.props.keys())) # Here we need to ignore properties already created by self in initiate mtg, because the general rule is to superimpose for state variables
 
         # SPECIFIC HERE, Select real children for collar element (vid == 1).
         # This is mandatory for correct collar-to-tip Hagen-Poiseuille flow partitioning.

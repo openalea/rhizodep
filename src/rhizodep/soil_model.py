@@ -269,6 +269,7 @@ class RhizoInputsSoilModel(Model):
             if props["length"][vid] > 0:
                 vy, vz, vx = props["voxel_neighbor"][vid]
                 for name in self.inputs:
+                    # print(name,  props[name])
                     self.voxels[name][vy][vz][vx] += props[name][vid]
 
 
