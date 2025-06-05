@@ -803,6 +803,7 @@ class RootGrowthModel(Model):
                 # We record the different elements that can contribute to the C supply necessary for growth,
                 # and we calculate a mean concentration of hexose in this supplying zone:
                 self.calculating_supply_for_elongation(element=apex)
+                
                 # The corresponding potential elongation of the apex is calculated:
                 apex.potential_length = self.elongated_length(element=apex, initial_length=apex.initial_length,
                                                               radius=apex.initial_radius,
@@ -1017,6 +1018,7 @@ class RootGrowthModel(Model):
                 elongation = self.EL * 2. * radius * C_hexose_root / (
                         self.Km_elongation + C_hexose_root) * elongation_time_in_seconds
             else:
+                print(f"For element {element.index()}, no elongation, negative concentrations!! ", C_hexose_root)
                 elongation = 0.
 
         # We calculate the new potential length corresponding to this elongation:
@@ -1216,6 +1218,9 @@ class RootGrowthModel(Model):
         index_apex = self.g.Axis(segment.index())[-1]
         apex = self.g.node(index_apex)
         # print("For segment", segment.index(), "the terminal index is", index_apex, "and has the type", apex.type)
+        if apex.label != "Apex":
+            print("ERROR: when trying to access the terminal apex of the axis of the segment", segment.index(),
+                "we obtained the element", index_apex," that is a", apex.label, "!!!")
 
         # Depending on the type of the apex, we adjust the type of the segment on the same axis:
         if apex.type == "Just_stopped":
@@ -1367,6 +1372,8 @@ class RootGrowthModel(Model):
         # PROCEEDING TO ACTUAL GROWTH:
         # -----------------------------
 
+        self.step_elongating_elements = []
+
         # We have to cover each vertex from the apices up to the base one time:
         root_gen = self.g.component_roots_at_scale_iter(self.g.root, scale=1)
         root = next(root_gen)
@@ -1475,7 +1482,7 @@ class RootGrowthModel(Model):
 
             # If the element can elongate:
             if n.potential_length > n.initial_length:
-
+                
                 # CALCULATING ACTUAL ELONGATION:
                 # If elongation is possible but is limited by the amount of hexose available:
                 if n.potential_length >= length_max:
@@ -1492,6 +1499,9 @@ class RootGrowthModel(Model):
                     1. / 6. * (volume_after_elongation - initial_volume) \
                     * n.root_tissue_density * self.struct_mass_C_content / self.yield_growth
 
+                # Finally we store this elongation information to expose it to other modules
+                self.step_elongating_elements.append(n.index())
+                
                 # If there has been an actual elongation:
                 if n.length > n.initial_length:
 
@@ -1657,7 +1667,6 @@ class RootGrowthModel(Model):
         # We simulate the segmentation of all apices:
 
         self.step_new_apices = []
-        self.step_elongating_elements = []
 
         for vid in self.vertices:
             n = self.g.node(vid)
@@ -1802,8 +1811,6 @@ class RootGrowthModel(Model):
                 apex.thermal_time_since_cells_formation = (apex.initial_length * Thermal_age_of_non_elongated_part
                                                         + (apex.length - apex.initial_length) * Thermal_age_of_elongated_part) / apex.length
 
-                # Finally we store this elongation information to expose it to other modules
-                self.step_elongating_elements.append(apex.index())
 
         # CASE 2: THE APEX HAS TO BE SEGMENTED
         # -------------------------------------
@@ -2893,15 +2900,18 @@ class RootGrowthModel(Model):
             setattr(module, "vertices", self.vertices)
 
         # Select the base of the root
-        root = next(self.g.component_roots_at_scale_iter(self.g.root, scale=1))
+        root = next(g.component_roots_at_scale_iter(g.root, scale=1))
 
         props["total_living_struct_mass"][1] = 0
+
+        debug = False
+        if debug: print(self.step_elongating_elements, self.step_new_apices)
 
         # from root base to tips
         for vid in pre_order2(g, root):
             n = g.node(vid)
             n.living_struct_mass = n.struct_mass + n.living_root_hairs_struct_mass
-            
+
             if n.struct_mass > 0:
 
                 # We need to get the parent to compute mass partitionning.
@@ -2940,7 +2950,7 @@ class RootGrowthModel(Model):
                     props["total_living_struct_mass"][1] += n.living_struct_mass
 
                     if vid in self.step_new_apices and vid not in props["vertex_index"]:
-
+                        
                         # We increment the vertex identifiers to be accesses in deficits
                         n.vertex_index = vid
                         
@@ -2990,7 +3000,15 @@ class RootGrowthModel(Model):
                                     initial_amount = getattr(p, prop)
                                     props[prop].update({vid: initial_amount * mass_fraction,
                                                                 parent: initial_amount * (1-mass_fraction)})
+                            
+                            if n.vertex_index is None:
+                                n.vertex_index = vid
+                            
+                            # If first elongation but primordia was formed earlier, needs access to soil states
+                            for prop in soil_boundaries_to_infer:
+                                setattr(n, prop, getattr(p, prop))
                     
+
                     #TODO remove, just for a figure
                     if n.label != "Apex":
                         if vid not in props["actual_time_since_formation"]:
