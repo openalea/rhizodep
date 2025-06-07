@@ -4,7 +4,7 @@ from rhizodep.root_carbon import RootCarbonModel
 from rhizodep.root_anatomy import RootAnatomy
 from rhizodep.soil_model import SoilModel
 
-from metafspm.composite_wrapper import CompositeModel
+from openalea.metafspm.composite_wrapper import CompositeModel
 
 
 class Model(CompositeModel):

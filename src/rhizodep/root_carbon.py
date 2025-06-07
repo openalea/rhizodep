@@ -62,8 +62,8 @@ import inspect as ins
 from functools import partial
 from math import pi
 
-from metafspm.component import Model, declare
-from metafspm.component_factory import *
+from openalea.metafspm.component import Model, declare
+from openalea.metafspm.component_factory import *
 
 
 

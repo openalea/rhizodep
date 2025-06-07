@@ -20,8 +20,8 @@ from openalea.mtg import *
 from openalea.mtg.traversal import post_order, pre_order2, post_order2
 from openalea.mtg import turtle as turt
 
-from metafspm.component import Model, declare
-from metafspm.component_factory import *
+from openalea.metafspm.component import Model, declare
+from openalea.metafspm.component_factory import *
 
 
 @dataclass

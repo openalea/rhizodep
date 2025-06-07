@@ -2,8 +2,8 @@
 import numpy as np
 from dataclasses import dataclass
 
-from metafspm.component import Model, declare
-from metafspm.component_factory import *
+from openalea.metafspm.component import Model, declare
+from openalea.metafspm.component_factory import *
 from log.visualize import plot_mtg
 
 
