@@ -66,10 +66,16 @@ class RootAnatomy(Model):
     xylem_volume: float = declare(default=0, unit="m3", unit_comment="", description="xylem volume for water transport between elements", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="state_variable", by="model_anatomy", state_variable_type="NonInertialExtensive", edit_by="user")
+    phloem_volume: float = declare(default=0, unit="m3", unit_comment="", description="xylem volume for water transport between elements", 
+                            min_value="", max_value="", value_comment="", references="", DOI="",
+                            variable_type="state_variable", by="model_anatomy", state_variable_type="NonInertialExtensive", edit_by="user")
     total_phloem_volume: float = declare(default=0, unit="m3", unit_comment="", description="total phloem volume throughout the root system", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="plant_scale_state", by="model_anatomy", state_variable_type="NonInertialExtensive", edit_by="user")
     xylem_vessel_radii: float = declare(default=0., unit="m", unit_comment="", description="list of individual xylem radius, also providing their numbering", 
+                                             min_value="", max_value="", value_comment="", references="", DOI="",
+                                             variable_type="state_variables", by="model_anatomy", state_variable_type="descriptor", edit_by="user")
+    phloem_vessel_radii: float = declare(default=0., unit="m", unit_comment="", description="list of individual xylem radius, also providing their numbering", 
                                              min_value="", max_value="", value_comment="", references="", DOI="",
                                              variable_type="state_variables", by="model_anatomy", state_variable_type="descriptor", edit_by="user")
 
@@ -88,10 +94,13 @@ class RootAnatomy(Model):
                             variable_type="state_variable", by="model_anatomy", state_variable_type="NonInertialIntensive", edit_by="user")
     
     # Whole segment conductance
-    kr_symplasmic_water: float = declare(default=1., unit="m3.s-1.Pa-1", unit_comment="", description="Symplasmic water conductance of all cell layer contribution, including transmembrane and plasmodesmata resistance", 
+    kr_symplasmic_water_xylem: float = declare(default=1., unit="m3.s-1.Pa-1", unit_comment="", description="Symplasmic water conductance of all cell layer contribution, including transmembrane and plasmodesmata resistance", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="state_variable", by="model_anatomy", state_variable_type="NonInertialExtensive", edit_by="user")
-    kr_apoplastic_water: float = declare(default=1., unit="m3.s-1.Pa-1", unit_comment="", description="Apolastic water conductance including the endoderm differentiation blocking this pathway. Considering xylem volume to be equivalent to whole stele apoplasm, we only account for the cumulated resistance of cortex and epidermis cell wals.", 
+    kr_apoplastic_water_xylem: float = declare(default=1., unit="m3.s-1.Pa-1", unit_comment="", description="Apolastic water conductance including the endoderm differentiation blocking this pathway. Considering xylem volume to be equivalent to whole stele apoplasm, we only account for the cumulated resistance of cortex and epidermis cell wals.", 
+                            min_value="", max_value="", value_comment="", references="", DOI="",
+                            variable_type="state_variable", by="model_anatomy", state_variable_type="NonInertialExtensive", edit_by="user")
+    kr_symplasmic_water_phloem: float = declare(default=1., unit="m3.s-1.Pa-1", unit_comment="", description="Symplasmic water conductance of all cell layer contribution, including transmembrane and plasmodesmata resistance", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="state_variable", by="model_anatomy", state_variable_type="NonInertialExtensive", edit_by="user")
     
@@ -543,7 +552,7 @@ class RootAnatomy(Model):
         :param length: the root segment length (m)
         :return: the surface (m2)
         """
-        return self.cell_layers[-1].cell_surface(radius, length)
+        return sum([layer.cell_surface(radius, length) for layer in self.cell_layers if layer.tissue_name == "phloem"])
 
 
     @actual
@@ -575,6 +584,19 @@ class RootAnatomy(Model):
 
         return 2 * pi * (stele_radius ** 2) * length - stele_symplasm_volume
     
+    @actual
+    @state
+    def _phloem_volume(self, radius, length):
+        """
+        Computes phloem volume for water transport between elements
+
+        :param radius: the root segment radius (m)
+        :param length: the root segment length (m)
+        :return: the volume (m3)
+        """
+
+        return sum([layer.cell_volume(radius, length) for layer in self.cell_layers if layer.tissue_name == "phloem"])
+    
 
     @actual
     @state
@@ -594,6 +616,17 @@ class RootAnatomy(Model):
                 vessels_radii.append(0.012*radius)
 
         return vessels_radii
+    
+    @actual
+    @state
+    def _phloem_vessel_radii(self, radius):
+        vessels_radii = []
+        num_protophloem = 1
+
+        for k in range(num_protophloem):
+            vessels_radii.append(0.092*radius)
+
+        return vessels_radii
 
     @actual
     @state
@@ -608,7 +641,7 @@ class RootAnatomy(Model):
 
     @actual
     @state
-    def _kr_symplasmic_water(self, radius, length):
+    def _kr_symplasmic_water_xylem(self, radius, length):
         kr_eq = 0
 
         for layer in self.cell_layers:
@@ -619,11 +652,21 @@ class RootAnatomy(Model):
 
     @actual
     @state
-    def _kr_apoplastic_water(self, radius, length, endodermis_conductance_factor, relative_conductance_walls):
+    def _kr_apoplastic_water_xylem(self, radius, length, endodermis_conductance_factor, relative_conductance_walls):
         return endodermis_conductance_factor * 1 / sum([layer.R_apoplasmic_water(radius, length, self.cell_wall_conductivity * relative_conductance_walls) 
                                                         for layer in self.cell_layers if layer.tissue_name != "phloem"])
 
+    @actual
+    @state
+    def _kr_symplasmic_water_phloem(self, radius, length):
+        kr_eq = 0
 
+        for layer in self.cell_layers:
+            if layer.tissue_name == "phloem":
+                kr_eq = layer.kr_symplasmic_water(kr_eq, radius, length)
+
+        return kr_eq
+    
     @totalstate
     def _total_phloem_volume(self, radius, length):
         return sum([self.cell_layers[-1].cell_volume(r, l) for r, l in zip(radius.values(), length.values())])
