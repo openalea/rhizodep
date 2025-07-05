@@ -7,48 +7,6 @@
     :license: see LICENSE for details.
 """
 
-# TODO: Update ArchiSimple option (e.g. with the new way to represent Seminal/Adventitious roots?)
-# TODO: Add a general upper scale for the whole root system, in which the properties about phloem sucrose could be stored?
-# TODO: Introduce explicit threshold concentration for limiting processes, rather than "0"
-# TODO: Consider giving priority to root maintenance, and trigger senescence when root maintenance is not ensured
-# TODO: Watch the calculation of surface and volume for the apices - if they correspond to cones, the mass balance for
-#  segmentation may not be correct! A "reverse" function for calculating length/radius from the volume should be used.
-
-# TODO: POSSIBLE FUTURE DEVELOPMENT - Modify the way the apex and elongation zone are discretized:
-#  instead of using a tip that is elongated and segmented over time, define a meristem object and an elongation zone
-#  object of fixed length, followed by a segmentation zone of variable length that is actually elongating. This would
-#  help to get a better spatial description of fluxes and concentration at the root tip, without the influence of the
-#  length of the tip (the larger the tip, the lower the internal and external concentrations....).
-
-# TODO: POSSIBLE FUTURE DEVELOPMENT - Use two distinct structures for computing fluxes and geometry:
-#  instead of using a unique structure of the root system for growth, C exchange and topology/geometry, we would define
-#  a first "metabolic" structure with elements of variable length (smaller at the apex, larger at the base of each root
-#  axis), which would be used to calculate growth, topology and fluxes, without consideration of the spatial position of
-#  each root element. A converter would then be used to translate this structure into another "geometric" structure with
-#  elements of fixed (?) length and specified orientation in space. The concentrations and fluxes in an element of the 
-#  new structure would be calculated as a linear combination of the concentrations and fluxes in the corresponding 
-#  elements of the first structure. This second structure would be used to display a plausible geometry and to project 
-#  the root system into a soil grid. New concentrations at the interface of the roots would then be calculated, and the 
-#  converter would be used in a reverse way to switch back to the first, metabolic structure at the next time step. This 
-#  new development would be useful only if the metabolic structure has less elements in total than the geometric one.
-
-# TODO: POSSIBLE FUTURE DEVELOPMENT - Create a new ID of each root element, so that the ID does not change over time
-#  (unlike the index of elements in the MTG, which cannot be easily predicted or interpreted):
-#  We could label the elongating apex as a special case (A) for a given axis, while segments' numerotation
-#  would start close to the mother root and increase towards the apex. In this way the apex keeps the same ID regardless
-#  of the elongation of the axis and the segmentation, while a given segment also keeps its own ID regardless of
-#  segmentation. Each lateral axis would be identified based on the supporting element (if two laterals emerge from the
-#  same segment, they are numbered successively depending on their orientation in space ?).
-#  Example:
-#  - R(0)-A always designates the apex of the primary root.
-#  - R(0-S3-1)-S2 represents the second segment of the axis R(0-S3-1), which corresponds to the first lateral emerging
-#  from the third segment of axis R0.
-#  - R((0-S3-1)-S2-1)-A represents the apex of the first lateral root emerging from the segment described above.
-#  Check what is used in L-system and whether we are not reinventing the wheel!
-
-# TODO: POSSIBLE FUTURE DEVELOPMENT - Create a way to detect oscillatory events (e.g. when a concentration is either nil
-#  or very high from one step to another) and to avoid them (by blocking the consumption of the particular pool for example).
-
 import os
 import numpy as np
 import pandas as pd
@@ -100,7 +58,6 @@ def volume_and_external_surface_from_radius_and_length(g, element, radius, lengt
         for child_vid in g.Sons(vid, EdgeType='+'):
             son = g.node(child_vid)
             # We avoid to remove the section of the sphere of a nodule:
-            # TODO: Should the section of a son nodule also be removed from the section of the mother element?
             if son.type != "Root_nodule":
                 sum_ramif_sections += pi * son.radius ** 2
         # And we subtract this sum of sections from the external area of the main cylinder:
@@ -139,9 +96,6 @@ def specific_surfaces(element):
     # --------------------
     n = element
     external_surface = n.external_surface
-
-    # TODO: Improve the calculation of phloem surface and stellar/cortical/epidermal surfaces, e.g. taking into 
-    #  account an age factor?
 
     # PHLOEM VESSELS:
     # We assume that the total surface of the phloem vessels is proportional to the external surface:
@@ -295,7 +249,6 @@ def transport_barriers(g, n, computation_with_age=True, computation_with_distanc
     relative_conductance_at_meristem = param.relative_conductance_at_meristem
     # We assume that the relative conductance of cell walls is either homogeneously reduced over the length of the
     # meristem zone, or is maximal elsewhere, i.e. equal to 1.
-    # TODO: Consider a progressive reduction of the conductance of cell walls with high root cells age?
     # If the current element encompasses a part of the meristem zone:
     if (distance_from_tip - length) < meristem_zone_length:
         # Then we calculate the fraction of the length of the current element where the meristem is present:
@@ -883,10 +836,6 @@ def ADDING_A_CHILD(mother_element, edge_type='+', label='Apex', type='Normal_roo
     :return: the new child element
     """
 
-    # TODO FOR TRISTAN: When working with a dynamic root structure, you will need to specify in this function
-    #  "ADDING_A_CHILD" your new variables that will either be set to 0 (nil properties) or be equal to that of the mother
-    #  element.
-
     # If nil_properties = True, then we set most of the properties of the new element to 0:
     if nil_properties:
 
@@ -1267,7 +1216,6 @@ def primordium_formation(g, apex, elongation_rate=0., time_step_in_seconds=1. * 
     if apex.dist_to_ramif > param.IPD and potential_radius >= param.Dmin and potential_radius <= apex.radius:
         # The distance that the tip of the apex has covered since the actual primordium formation is calculated:
         elongation_since_last_ramif = apex.dist_to_ramif - param.IPD
-        # TODO: Is the third condition really relevant?
 
         # A specific rolling angle is attributed to the parent apex:
         apex.angle_roll = apex_angle_roll
@@ -1319,7 +1267,7 @@ def calculating_C_supply_for_elongation(g, element):
     :param element: the element for which we calculate the possible supply of C for its elongation
     :return: three lists containing the indices of elements, their hexose amount (mol of hexose) and their structural mass (g).
     """
-    # TODO FOR TRISTAN: Consider using a similar approach for sustaining the need for N when a root apex should elongate.
+
     n = element
 
     # We initialize each amount of hexose available for growth:
@@ -1353,7 +1301,6 @@ def calculating_C_supply_for_elongation(g, element):
             if current_element.length > 0.:
                 # We add to the amount of hexose available all the hexose in the current element
                 # (EXCLUDING sugars in the living root hairs):
-                # TODO: Should the C from root hairs be used for helping roots to grow?
                 hexose_contribution = current_element.C_hexose_root * current_element.struct_mass
                 n.hexose_possibly_required_for_elongation += hexose_contribution
                 n.struct_mass_contributing_to_elongation += current_element.struct_mass
@@ -1699,8 +1646,6 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
     :return: the updated segment
     """
 
-    # TODO FOR TRISTAN: Consider adding a regulation of root thickening with the availability of N in the root segment (only the limitation by hexose has been considered so far).
-
     # We initialize an empty list that will contain the new segment to be returned:
     new_segment = []
     # We record the current radius and length prior to growth as the initial radius and length:
@@ -1719,7 +1664,6 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
     if segment.type == "Root_nodule":
         # We consider the amount of hexose available in the nodule AND in the parent segment
         # (EXCLUDING the amount of hexose in living rot hairs):
-        # TODO: Should the C from root hairs be used for helping nodules to grow?
         index_parent = g.Father(segment.index(), EdgeType='+')
         parent = g.node(index_parent)
         segment.hexose_available_for_thickening = parent.C_hexose_root * parent.struct_mass \
@@ -1760,7 +1704,6 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
 
     # We define the amount of hexose available for thickening
     # (EXCLUDING the amount of hexose in living root hairs):
-    # TODO: Should the C from root hairs be used for helping nodules to grow?
     segment.hexose_available_for_thickening = segment.C_hexose_root * segment.struct_mass
 
     # CALCULATING AN EQUIVALENT OF THERMAL TIME:
@@ -2002,13 +1945,6 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
     :return:
     """
 
-    # TODO: Simplify the readability of this function by looping on two sets of variables, the ones that remain identical
-    #  within the segments, and those that are divided.
-
-    # TODO FOR TRISTAN: When working with a dynamic root structure, you will need to specify in this function "segmentation"
-    #  the new quantitative variables that would need to be recalculated when segmenting a long root apex
-    #  (ex: N amount will need to be divided, while N concentration will remain identical among the segments)
-
     # CALCULATING AN EQUIVALENT OF THERMAL TIME:
     # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
     # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
@@ -2058,7 +1994,6 @@ def segmentation_and_primordium_formation(g, apex, time_step_in_seconds=1. * 60.
     initial_dead_root_hairs_number = apex.dead_root_hairs_number
     initial_total_root_hairs_number = apex.total_root_hairs_number
     initial_living_root_hairs_external_surface = apex.living_root_hairs_external_surface
-    # TODO: the time-related variables associated to root hairs will not be changed here, but rather in the function 'root_hairs_dynamics' - check whether this is OK!
 
     # NOTE: The following is not an error, we also need to record the "initial" structural mass and surfaces before growth!
     initial_initial_struct_mass = apex.initial_struct_mass
@@ -2490,10 +2425,6 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
     :return: g, the updated MTG
     """
 
-    # TODO FOR TRISTAN: Here you would need to explicit at least a cost of N associated to the actual growth,
-    #  and consider how to limit the actual growth when not enough N is available.
-    #  In a second step, you may consider how the emergence of primordia may depend on N availability in the root or in the soil.
-
     # CALCULATING AN EQUIVALENT OF THERMAL TIME:
     # -------------------------------------------
 
@@ -2566,7 +2497,6 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
 
         # If elongation is possible:
         if n.potential_length > n.length:
-            # TODO: Check how useful it is to limit the growth so that the concentration does not go below a treshold.
             # NEW - We calculate the actual amount of hexose that can be used for growth according to the treshold
             # concentration below which no growth process is authorized:
             hexose_available_for_elongation \
@@ -2581,7 +2511,6 @@ def actual_growth_and_corresponding_respiration(g, time_step_in_seconds, soil_te
         # If radial growth is possible:
         if n.potential_radius > n.radius:
             # We only consider the amount of hexose immediately available in the element that can increase in radius.
-            # TODO: Check how useful it is to limit the growth so that the concentration does not go below a treshold.
             # NEW - We calculate the actual amount of hexose that can be used for thickening according to the treshold
             # concentration below which no thickening is authorized:
             hexose_available_for_thickening = n.hexose_available_for_thickening \
@@ -2843,8 +2772,6 @@ def ArchiSimple_growth(g, SC, time_step_in_seconds, soil_temperature_in_Celsius=
     :return: g, the updated root MTG
     """
 
-    # TODO FOR TRISTAN: If one day you have time to lose, you may see whether you want to add an equivalent limitation of the elongation of all apices with the amount of N available in the root - knowing that this does not exist in ArchiSimple anyway.
-
     # We have to cover each vertex from the apices up to the base one time:
     root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
     root = next(root_gen)
@@ -2932,8 +2859,6 @@ def reinitializing_growth_variables(g):
     :return: [the MTG has been updated with new values for the growth-related variables]
     """
 
-    # TODO FOR TRISTAN: Consider reinitializing the demand/cost for N in each element here, at the begining of a new time step
-
     # We cover all the vertices in the MTG:
     for vid in g.vertices_iter(scale=1):
         # n represents the vertex:
@@ -2979,9 +2904,6 @@ def root_hairs_dynamics(g, time_step_in_seconds=1. * (60. * 60. * 24.),
     :return:
     """
 
-    # TODO FOR TRISTAN: Consider adding a limitation of growth for root hairs associated to the availability of N in the root.
-    #  In a second step, consider playing on the density / max. length of root hairs depending on the availability of N in the soil (if relevant)?
-
     # We cover all the vertices in the MTG:
     for vid in g.vertices_iter(scale=1):
         # n represents the vertex:
@@ -2995,7 +2917,6 @@ def root_hairs_dynamics(g, time_step_in_seconds=1. * (60. * 60. * 24.),
         if n.type == "Just_dead" or n.type == "Dead" or n.type == "Nodule":
             continue
 
-        # # TODO: Check the consequences of avoiding apex in root hairs dynamics!
         # # WE ALSO AVOID ROOT APICES - EVEN IF IN THEORY ROOT HAIRS MAY ALSO APPEAR ON THEM:
         # if n.label == "Apex":
         #     continue
@@ -3442,7 +3363,6 @@ def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_war
         # # We correct the max loading rate according to the distance from the tip in the middle of the segment.
         # max_loading_rate = param.surfacic_loading_rate_reference \
         #     * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
-        # TODO: Reconsider the way the variation of the max loading rate along the root axis has been described!
         max_loading_rate = param.max_loading_rate
 
         # We correct loading according to soil temperature:
@@ -3463,7 +3383,6 @@ def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_war
             max_loading_rate = 0.
 
         # If there is a demand for growth, we set the loading rate to 0:
-        # TODO: Here we forbid the loading into the phloem if there is a growth consumption in the current element - should it be so? or should we also include the demand for growth?
         if hexose_consumption_by_growth_rate > 0.:
             max_loading_rate  = 0.
 
@@ -3505,8 +3424,6 @@ def exchange_with_reserve_rate(n, soil_temperature_in_Celsius=20, printing_warni
     :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
     :return: the updated root element n
     """
-
-    # TODO FOR TRISTAN: Consider doing a similar function for N reserve pool (?)
 
     # READING THE VALUES:
     # --------------------
@@ -3624,8 +3541,6 @@ def maintenance_respiration_rate(n, soil_temperature_in_Celsius=20, printing_war
     :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
     :return: the updated root element n
     """
-
-    # TODO FOR TRISTAN: Consider expliciting a respiration cost associated to the exchange of N in the root (e.g. cost for uptake, xylem loading)?
 
     # READING THE VALUES:
     # --------------------
@@ -3863,7 +3778,6 @@ def root_sugars_uptake_from_soil_rate(n, soil_temperature_in_Celsius=20, printin
                   "because soil hexose concentration was", C_hexose_soil, "mol/g.")
     # We consider that dead elements cannot take up any hexose from the soil:
     if n.type == "Just_dead" or n.type == "Dead":
-        # TODO: Is it really correct to consider that Just_dead elements did not take up hexose over a given time step?
         possible_uptake = False
 
     if possible_uptake:
@@ -3948,8 +3862,6 @@ def mucilage_secretion_rate(n, soil_temperature_in_Celsius=20, printing_warnings
     if n.type == "Stopped":
         possible_secretion = False
 
-    # TODO: Shouldn't we also introduce a limit with dist-to_tip, so that elements too far away from the tip are not even considered?
-
     if possible_secretion:
 
         # CALCULATION OF THE MAXIMAL RATE OF SECRETION:
@@ -3971,7 +3883,6 @@ def mucilage_secretion_rate(n, soil_temperature_in_Celsius=20, printing_warnings
             print("!!!ERROR!!! The distance to tip is lower than the length of the root element", vid)
             corrected_secretion_rate_max = 0.
         else:
-            # TODO: Re-visit this formalism of mucilage secretion along roots (e.g. should it include root hairs)?
             corrected_secretion_rate_max = corrected_secretion_rate_max \
                                            / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_secretion
 
@@ -3982,7 +3893,6 @@ def mucilage_secretion_rate(n, soil_temperature_in_Celsius=20, printing_warnings
         # external surface):
         corrected_secretion_rate_max = corrected_secretion_rate_max \
                                            * (param.Cs_mucilage_soil_max - Cs_mucilage_soil) / param.Cs_mucilage_soil_max
-        # TODO: Validate this linear decrease until reaching the max surfacic density.
 
         # We verify that the rate is not negative:
         if corrected_secretion_rate_max < 0.:
@@ -3993,7 +3903,6 @@ def mucilage_secretion_rate(n, soil_temperature_in_Celsius=20, printing_warnings
         # We calculate the rate of secretion according to a Michaelis-Menten formalis:
         mucilage_secretion_rate = corrected_secretion_rate_max * exchange_surface \
                                   * C_hexose_root / (param.Km_secretion + C_hexose_root)
-        # TODO: Should the mucilage secretion really be limited by hexose availability, or should it rather depend on the growth rate?
 
     # RECORDING THE RESULTS:
     # ----------------------
@@ -4095,7 +4004,6 @@ def cells_release_rate(n, soil_temperature_in_Celsius=20, printing_warnings=Fals
         # soil (NOTE: Cs_cells_soil is expressed in mol of equivalent hexose per m2 of external surface):
         corrected_cells_surfacic_release = corrected_cells_surfacic_release \
                                            * (param.Cs_cells_soil_max - Cs_cells_soil) / param.Cs_cells_soil_max
-        # TODO: Validate this linear decrease until reaching the max surfacic density.
 
         # We verify that cells release is not negative:
         if corrected_cells_surfacic_release < 0.:
@@ -4106,7 +4014,6 @@ def cells_release_rate(n, soil_temperature_in_Celsius=20, printing_warnings=Fals
 
         # The release of cells by the root is then calculated according to this surface:
         cells_release_rate = exchange_surface * corrected_cells_surfacic_release
-        # TODO: Are we sure that cells release is not dependent on C availability?
 
     # RECORDING THE RESULTS:
     # ----------------------
@@ -4335,8 +4242,6 @@ def cells_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=
 
     return n
 
-# TODO FOR TRISTAN: Consider adding similar functions for describing N mineralization/organization in the soil?
-
 ########################################################################################################################
 
 ########################################################################################################################
@@ -4359,8 +4264,6 @@ def calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius,
                                         (i.e. within the meristem and root elongation zone) or not
     :return: the updated root element n
     """
-
-    # TODO FOR TRISTAN: Consider adding here N-related rates (or building a similar function to be possibly used in a solver).
 
     # Unloading of sucrose from phloem and conversion of sucrose into hexose, or reloading of sucrose:
     exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius, printing_warnings)
@@ -4393,8 +4296,6 @@ def calculating_amounts_from_rates(n, time_step_in_seconds):
     :param time_step_in_seconds: the time step over which the amounts will be calculated
     :return: the updated root element n
     """
-
-    # TODO FOR TRISTAN: Consider adding N-related amounts here (or building a similar function to be possibly used in a solver).
 
     n.hexose_production_from_phloem = n.hexose_production_from_phloem_rate * time_step_in_seconds
     n.sucrose_loading_in_phloem = n.sucrose_loading_in_phloem_rate * time_step_in_seconds
@@ -4462,8 +4363,6 @@ def calculating_time_derivatives_of_the_amount_in_each_pool(n):
     :return: a dictionary "y_derivatives" containing the values of net evolution rates for each pool.
     """
 
-    # TODO FOR TRISTAN: Consider adding N balance here (to be possibly used in the solver).
-
     # We initialize an empty dictionary which will contain the different fluxes:
     y_derivatives = {}
 
@@ -4530,8 +4429,6 @@ def adjusting_pools_and_deficits(n, time_step_in_seconds, printing_warnings=Fals
     :param printing_warnings: if True, warning messages will be printed
     :return: the updated element n
     """
-
-    # TODO FOR TRISTAN: Consider doing similar balance with recorded deficits for N compounds?
 
     # We calculate possible deficits to be included in the next time step:
     # ---------------------------------------------------------------------
@@ -4638,8 +4535,6 @@ def adjusting_pools_and_deficits(n, time_step_in_seconds, printing_warnings=Fals
 # We create a class containing the system of differential equations to be solved with a solver:
 #----------------------------------------------------------------------------------------------
 class Differential_Equation_System(object):
-
-    # TODO FOR TRISTAN: Consider adding N-related variables here to be computed together with C fluxes...
 
     def __init__(self, g, n, time_step_in_seconds=1. * (60. * 60. * 24.), soil_temperature_in_Celsius=20,
                  printing_warnings=False, printing_solver_outputs=False):
@@ -4967,8 +4862,6 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
     :return: the function updates the properties of the MTG g and returns the concentration of hexose in the apex of the primary root
     """
 
-    # TODO FOR TRISTAN: Consider updating this function with N fluxes, or doing a similar function separated from here.
-
     # We initialize a tip concentration:
     tip_C_hexose_root = -1
 
@@ -5137,8 +5030,6 @@ def summing_and_possibly_homogenizing(g,
                                      allows the root-soil interface to be artificially "cleaned"
     :return: a dictionary containing the numerical value of each property integrated over the whole MTG
     """
-
-    # TODO FOR TRISTAN: If no similar function is present in CyNAPS, consider adding N balance here to compute variables on the whole root system.
 
     # We initialize the values to 0:
     total_length = 0.
@@ -5660,8 +5551,6 @@ def initiate_mtg(random=True,
                                            between each adventitious root is detailed (if not forcing a regular interval of seminal root emergence)
     :return:
     """
-
-    # TODO FOR TRISTAN: Add all initial N-related variables that need to be explicited before N fluxes computation.
 
     # We create a new MTG called g:
     g = MTG()

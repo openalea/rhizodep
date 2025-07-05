@@ -1570,32 +1570,32 @@ if __name__ == "__main__":
     #                                    recording_averaged_MTG=True,
     #                                    recording_directory='D:/Documents/MES ARTICLES/Article 2025 Rees et al PLSO/SIMULATIONS RHIZODEP/Scenario_0185/MTG_files_for_Tristan_averaged')
 
-    # PLOTTING THE NEW AVERAGED MTG FILES:
-    loading_MTG_files(my_path='D:/Documents/MES ARTICLES/Article 2025 Rees et al PLSO/SIMULATIONS RHIZODEP/Scenario_0185/',
-                      opening_list=True,
-                      MTG_directory="MTG_files_for_Tristan_averaged",
-                      plotting_with_PlantGL=False,
-                      normal_plotting_with_pyvista=True,
-                      factor_of_higher_resolution=2,
-                      closing_window=True,
-                      background_color=[94, 76, 64],
-                      # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
-                      # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
-                      # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
-                      # property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True, cmap='jet',
-                      # property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
-                      property="hexose_consumption_by_growth_rate", vmin=1e-14, vmax=1e-10, log_scale=True, cmap='jet',
-                      width=1200, height=1200,
-                      x_center=0, y_center=0, z_center=-0.2,
-                      x_cam=0.4, y_cam=0, z_cam=-0.15,
-                      recording_images=True,
-                      images_directory="averaged_root_images_for_Tristan",
-                      printing_sum=False,
-                      recording_sum=False,
-                      recording_g_properties=False,
-                      MTG_properties_folder='averaged_MTG_properties_for_Tristan',
-                      z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
-    print("Done!")
+    # # PLOTTING THE NEW AVERAGED MTG FILES:
+    # loading_MTG_files(my_path='D:/Documents/MES ARTICLES/Article 2025 Rees et al PLSO/SIMULATIONS RHIZODEP/Scenario_0185/',
+    #                   opening_list=True,
+    #                   MTG_directory="MTG_files_for_Tristan_averaged",
+    #                   plotting_with_PlantGL=False,
+    #                   normal_plotting_with_pyvista=True,
+    #                   factor_of_higher_resolution=2,
+    #                   closing_window=True,
+    #                   background_color=[94, 76, 64],
+    #                   # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
+    #                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
+    #                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
+    #                   # property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True, cmap='jet',
+    #                   # property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
+    #                   property="hexose_consumption_by_growth_rate", vmin=1e-14, vmax=1e-10, log_scale=True, cmap='jet',
+    #                   width=1200, height=1200,
+    #                   x_center=0, y_center=0, z_center=-0.2,
+    #                   x_cam=0.4, y_cam=0, z_cam=-0.15,
+    #                   recording_images=True,
+    #                   images_directory="averaged_root_images_for_Tristan",
+    #                   printing_sum=False,
+    #                   recording_sum=False,
+    #                   recording_g_properties=False,
+    #                   MTG_properties_folder='averaged_MTG_properties_for_Tristan',
+    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
+    # print("Done!")
 
     # PLOTTING AND COMPUTING ON ONE ROOT AXIS ONLY:
     ###############################################
