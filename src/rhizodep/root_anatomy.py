@@ -248,14 +248,14 @@ class RootAnatomy(Model):
     wall_connectivity_with_inner_neighbor: tuple = declare(default= ((0.334,), 
                                                         (0.203, 0.228, 0.176, 0.214, 0.261), 
                                                         (0.238, 0.124, 0.211, 0.315, 0.), 
-                                                        (0.5,)), # Not used so arbitrary
+                                                        (0.,)), # Not relevant since only used for transmembrane flux between xylem and phloem
                                                 unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
 
     wall_connectivity_in_layer: tuple = declare(default= ((0.222,), 
                                                         (0.201, 0.141, 0.156, 0.102, 0.176), 
                                                         (0.235, 0.331, 0.206, 0.190, 0.284), 
-                                                        (0.5,)), # Not used so arbitrary
+                                                        (0.,)), # Not used so arbitrary
                                                 unit="adim", unit_comment="", description="", min_value="", max_value="", value_comment="", references="", DOI="",
                                                 variable_type="parameter", by="model_anatomy", state_variable_type="", edit_by="user")
     
@@ -621,10 +621,10 @@ class RootAnatomy(Model):
     @state
     def _phloem_vessel_radii(self, radius):
         vessels_radii = []
-        num_protophloem = 1
+        num_protophloem = 25
 
         for k in range(num_protophloem):
-            vessels_radii.append(0.092*radius)
+            vessels_radii.append(0.0171*radius)
 
         return vessels_radii
 
