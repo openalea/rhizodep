@@ -23,6 +23,7 @@ from openalea.mtg import turtle as turt
 from openalea.metafspm.component import Model, declare
 from openalea.metafspm.component_factory import *
 
+debug = False
 
 @dataclass
 class RootGrowthModel(Model):
@@ -1018,7 +1019,7 @@ class RootGrowthModel(Model):
                 elongation = self.EL * 2. * radius * C_hexose_root / (
                         self.Km_elongation + C_hexose_root) * elongation_time_in_seconds
             else:
-                print(f"For element {element.index()}, no elongation, negative concentrations!! ", C_hexose_root)
+                if debug: print(f"For element {element.index()}, no elongation, negative concentrations!! ", C_hexose_root)
                 elongation = 0.
 
         # We calculate the new potential length corresponding to this elongation:
