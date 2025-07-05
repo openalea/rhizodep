@@ -380,10 +380,13 @@ class RootGrowthModel(Model):
         self.collar_children, self.collar_skip = [], []
         for vid in self.vertices:
             children = self.g.children(vid)
-            if self.props["type"][vid] in ('Support_for_seminal_root', 'Support_for_adventitious_root') and children:
+            # if self.props["type"][vid] in ('Support_for_seminal_root', 'Support_for_adventitious_root') and children: # Alternative as these properties can be overridden during the simulation
+            if self.props["label"][vid] == "Segment" and self.props["length"][vid] == 0 and children:
                 self.collar_skip += [vid]
-                self.collar_children += [k for k in children if self.props["type"][k] not in ('Support_for_seminal_root', 'Support_for_adventitious_root')]
+                # self.collar_children += [k for k in children if self.props["type"][k] not in ('Support_for_seminal_root', 'Support_for_adventitious_root')]
+                self.collar_children += [k for k in children if not (self.props["label"][k] == "Segment" and self.props["length"][k] == 0)] # Alternative as these properties can be overridden during the simulation
 
+        # TODO introduce an option instead of commenting!
         self.initiate_heterogeneous_variables()
 
 
@@ -704,7 +707,8 @@ class RootGrowthModel(Model):
 
         algo.orders(self.g)
         self.update_distance_from_tip()
-        self.initiate_heterogeneous_struct_mass_production()
+        # self.initiate_heterogeneous_struct_mass_production()
+        self.post_growth_updating()
     
     # SUBDIVISIONS OF THE SCHEDULING LOOP
     # -----------------------------------
@@ -2893,7 +2897,7 @@ class RootGrowthModel(Model):
 
             processed_length += n.length
 
-    def post_growth_updating(self, modules_to_update, soil_boundaries_to_infer=[]):
+    def post_growth_updating(self, modules_to_update=[], soil_boundaries_to_infer=[]):
         g = self.g
         props = self.props
 
@@ -2913,118 +2917,119 @@ class RootGrowthModel(Model):
             n = g.node(vid)
             n.living_struct_mass = n.struct_mass + n.living_root_hairs_struct_mass
 
-            if n.struct_mass > 0:
+            # We need to get the parent to compute mass partitionning.
+            if vid in self.collar_children:
+                parent = 1
+            else:
+                parent = g.parent(vid)
+            p = g.node(parent)
+            # We have to introduce this to get proper axis type
+            graph_parent = g.node(g.parent(vid))
 
-                # We need to get the parent to compute mass partitionning.
-                if vid in self.collar_children:
-                    parent = 1
-                else:
-                    parent = self.g.parent(vid)
-                p = g.node(parent)
-                
-                if n.type == 'Base_of_the_root_system':
-                    n.axis_type = 'seminal'
-                else:
-                    if n.root_order == 1:
-                        # First exception for pivot root that could be taken for a nodal otherwise
-                        # (Given the structure of the first fake supporting elements)
-                        if vid == max(self.collar_children):
-                            n.axis_type = 'seminal'
-                        elif n.type == 'Support_for_seminal_root' or n.type == 'Support_for_adventitious_root':
-                            n.axis_type = 'seminal'
-                        elif p.type == 'Support_for_seminal_root':
-                            n.axis_type = 'seminal'
-                        elif p.type == 'Support_for_adventitious_root':
-                            n.axis_type = 'nodal'
-                        elif p.axis_type == 'seminal':
-                            n.axis_type = 'seminal'
-                        elif p.axis_type == 'nodal':
-                            n.axis_type = 'nodal'
-                        else:
-                            print('Uncaught exception')
+            if n.type == 'Base_of_the_root_system' or p is None:
+                n.axis_type = 'seminal'
+            else:
+                if n.root_order == 1:
+                    # First exception for pivot root that could be taken for a nodal otherwise
+                    # (Given the structure of the first fake supporting elements)
+                    if vid == max(self.collar_children):
+                        n.axis_type = 'seminal'
+                    elif n.type == 'Support_for_seminal_root' or n.type == 'Support_for_adventitious_root':
+                        n.axis_type = 'seminal'
+                    elif graph_parent.type == 'Support_for_seminal_root':
+                        n.axis_type = 'seminal'
+                    elif graph_parent.type == 'Support_for_adventitious_root':
+                        n.axis_type = 'nodal'
+                    elif graph_parent.axis_type == 'seminal':
+                        n.axis_type = 'seminal'
+                    elif graph_parent.axis_type == 'nodal':
+                        n.axis_type = 'nodal'
                     else:
-                        n.axis_type = 'lateral'
+                        print('Uncaught exception')
+                else:
+                    n.axis_type = 'lateral'
                     
+                if n.struct_mass > 0:
+                    if vid not in self.collar_skip:
+                        # For every vertex we update the considered living struct_mass for other modules.
+                        props["total_living_struct_mass"][1] += n.living_struct_mass
 
-                if vid not in self.collar_skip:
-                    # For every vertex we update the considered living struct_mass for other modules.
-                    props["total_living_struct_mass"][1] += n.living_struct_mass
-
-                    if vid in self.step_new_apices and vid not in props["vertex_index"]:
-                        
-                        # We increment the vertex identifiers to be accesses in deficits
-                        n.vertex_index = vid
-                        
-                        mass_fraction = n.living_struct_mass / (n.living_struct_mass + p.living_struct_mass)
-
-                        for module in modules_to_update:
-                            for prop in module.massic_concentration:
-                                if mass_fraction > 0:
-                                    initial_metabolite_amount = getattr(p, prop) * (p.initial_struct_mass + p.initial_living_root_hairs_struct_mass)
-                                    props[prop].update({vid: initial_metabolite_amount * mass_fraction / n.living_struct_mass,
-                                                                parent: initial_metabolite_amount * (1-mass_fraction) / p.living_struct_mass})
-                                else:
-                                    props[prop].update({vid: getattr(p, prop)})
-                                    
-                            for prop in module.extensive_variables:
-                                initial_amount = getattr(p, prop)
-                                props[prop].update({vid: initial_amount * mass_fraction,
-                                                            parent: initial_amount * (1-mass_fraction)})
+                        if len(modules_to_update) > 0: # Only relevant if the growth model has been coupled, otherwise all properties have already been updated
+                            if vid in self.step_new_apices and vid not in props["vertex_index"]:
                                 
-                            for prop in module.descriptor:
-                                props[prop].update({vid: None})
-
-                        # For soil related inputs, given new elements have been formed and we will not compute soil interception now, we infer the values from those of the parent
-                        for prop in soil_boundaries_to_infer:
-                            setattr(n, prop, getattr(p, prop))
-
-
-                    elif vid in self.step_elongating_elements:
-                        # If this is an already emerged segment, it has its own dynamic regarless of parents
-                        if n.initial_struct_mass > 0:
-                            for module in modules_to_update:
-                                for prop in module.massic_concentration:
-                                    setattr(n, prop, getattr(n, prop)* (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass) / n.living_struct_mass)
-
-                        # Else if it elongated from a null structural mass, it shared ressources with its parent and we deal with it as for new apex creation
-                        else:
-                            
-                            mass_fraction = n.living_struct_mass / (n.living_struct_mass + p.living_struct_mass)
-
-                            for module in modules_to_update:
-                                for prop in module.massic_concentration:
-                                    initial_metabolite_amount = getattr(p, prop) * (p.initial_struct_mass + p.initial_living_root_hairs_struct_mass)
-                                    props[prop].update({vid: initial_metabolite_amount * mass_fraction / n.living_struct_mass,
-                                                                parent: initial_metabolite_amount * (1-mass_fraction) / p.living_struct_mass})
-                                        
-                                for prop in module.extensive_variables:
-                                    initial_amount = getattr(p, prop)
-                                    props[prop].update({vid: initial_amount * mass_fraction,
-                                                                parent: initial_amount * (1-mass_fraction)})
-                            
-                            if n.vertex_index is None:
+                                # We increment the vertex identifiers to be accesses in deficits
                                 n.vertex_index = vid
+                                
+                                mass_fraction = n.living_struct_mass / (n.living_struct_mass + p.living_struct_mass)
+
+                                for module in modules_to_update:
+                                    for prop in module.massic_concentration:
+                                        if mass_fraction > 0:
+                                            initial_metabolite_amount = getattr(p, prop) * (p.initial_struct_mass + p.initial_living_root_hairs_struct_mass)
+                                            props[prop].update({vid: initial_metabolite_amount * mass_fraction / n.living_struct_mass,
+                                                                        parent: initial_metabolite_amount * (1-mass_fraction) / p.living_struct_mass})
+                                        else:
+                                            props[prop].update({vid: getattr(p, prop)})
+                                            
+                                    for prop in module.extensive_variables:
+                                        initial_amount = getattr(p, prop)
+                                        props[prop].update({vid: initial_amount * mass_fraction,
+                                                                    parent: initial_amount * (1-mass_fraction)})
+                                        
+                                    for prop in module.descriptor:
+                                        props[prop].update({vid: None})
+
+                                # For soil related inputs, given new elements have been formed and we will not compute soil interception now, we infer the values from those of the parent
+                                for prop in soil_boundaries_to_infer:
+                                    setattr(n, prop, getattr(p, prop))
+
+
+                            elif vid in self.step_elongating_elements:
+                                # If this is an already emerged segment, it has its own dynamic regarless of parents
+                                if n.initial_struct_mass > 0:
+                                    for module in modules_to_update:
+                                        for prop in module.massic_concentration:
+                                            setattr(n, prop, getattr(n, prop)* (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass) / n.living_struct_mass)
+
+                                # Else if it elongated from a null structural mass, it shared ressources with its parent and we deal with it as for new apex creation
+                                else:
+                                    
+                                    mass_fraction = n.living_struct_mass / (n.living_struct_mass + p.living_struct_mass)
+
+                                    for module in modules_to_update:
+                                        for prop in module.massic_concentration:
+                                            initial_metabolite_amount = getattr(p, prop) * (p.initial_struct_mass + p.initial_living_root_hairs_struct_mass)
+                                            props[prop].update({vid: initial_metabolite_amount * mass_fraction / n.living_struct_mass,
+                                                                        parent: initial_metabolite_amount * (1-mass_fraction) / p.living_struct_mass})
+                                                
+                                        for prop in module.extensive_variables:
+                                            initial_amount = getattr(p, prop)
+                                            props[prop].update({vid: initial_amount * mass_fraction,
+                                                                        parent: initial_amount * (1-mass_fraction)})
+                                    
+                                    if n.vertex_index is None:
+                                        n.vertex_index = vid
+                                    
+                                    # If first elongation but primordia was formed earlier, needs access to soil states
+                                    for prop in soil_boundaries_to_infer:
+                                        setattr(n, prop, getattr(p, prop))
                             
-                            # If first elongation but primordia was formed earlier, needs access to soil states
-                            for prop in soil_boundaries_to_infer:
-                                setattr(n, prop, getattr(p, prop))
-                    
 
-                    #TODO remove, just for a figure
-                    if n.label != "Apex":
-                        if vid not in props["actual_time_since_formation"]:
-                            n.actual_time_since_formation = 0
+                        #TODO remove, just for a figure
+                        if n.label != "Apex":
+                            if vid not in props["actual_time_since_formation"]:
+                                n.actual_time_since_formation = 0
+                            else:
+                                n.actual_time_since_formation += self.time_step_in_seconds / 3600 / 24
                         else:
-                            n.actual_time_since_formation += self.time_step_in_seconds / 3600 / 24
-                    else:
-                        if vid not in props["actual_time_since_formation"]:
-                            n.actual_time_since_formation = 0
-                        non_meristem_length = n.radius * 2 * 1.3 #Kozlova et al. (2020), the length of the meristematic region 1.3 times the diameter of the tip
-                        if non_meristem_length < n.length:
-                            aging_length = n.length - non_meristem_length
-                            n.actual_time_since_formation += (self.time_step_in_seconds / 3600 / 24) * aging_length / n.length
+                            if vid not in props["actual_time_since_formation"]:
+                                n.actual_time_since_formation = 0
+                            non_meristem_length = n.radius * 2 * 1.3 #Kozlova et al. (2020), the length of the meristematic region 1.3 times the diameter of the tip
+                            if non_meristem_length < n.length:
+                                aging_length = n.length - non_meristem_length
+                                n.actual_time_since_formation += (self.time_step_in_seconds / 3600 / 24) * aging_length / n.length
 
-                    n.tissue_formation_time = 60 - n.actual_time_since_formation
+                        n.tissue_formation_time = 50 - n.thermal_time_since_cells_formation / 3600 / 24
 
         compute_axess_id = True
         if compute_axess_id:
