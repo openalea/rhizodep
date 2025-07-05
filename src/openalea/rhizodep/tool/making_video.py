@@ -135,6 +135,7 @@ def resizing_and_film_making(outputs_path='outputs',
         for filename in filenames:
 
             # We get the ID of the image in order to calculate the proper time step to be displayed:
+            filename=str(filename)
             MTG_ID = int(filename[-9:-4])
 
             # The time is calculated:
@@ -366,53 +367,53 @@ if __name__ == "__main__":
     # # Creating a new movie from root systems for one given scenario:
     # ################################################################
 
-    # # FROM ORIGINAL GRAPHS - classic:
-    # resizing_and_film_making(outputs_path='C:/Users/frees/SIMBAL/simulation/outputs',
-    #                          # outputs_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185',
-    #                          # outputs_path='C:/Users/frees/SIMBAL/simulation/outputs',
-    #                          # images_folder='root_images_net_rhizodeposition',
-    #                          # images_folder='root_images',
-    #                          images_folder='plots',
-    #                          # images_folder='new_axis_images',
-    #                          # resized_images_folder='root_images_resized',
-    #                          resized_images_folder='plots_resized',
-    #                          # resized_images_folder='new_root_images_resized',
-    #                          film_making=True,
-    #                          film_name="root_movie.gif",
-    #                          image_transforming=True,
-    #                          resizing=False, dividing_size_by=1.,
-    #                          colorbar_option=False, colorbar_position=1,
-    #                          colorbar_title="Net rhizodeposition rate (gC per day per cm)",
-    #                          # colorbar_title=bar_title,
-    #                          # colorbar_cmap='jet', colorbar_lognorm=lognorm,
-    #                          # ticks=[],
-    #                          # vmin=vmin, vmax=vmax,
-    #                          # time_printing=True, time_position=1,
-    #                          time_printing=True,
-    #                          # time_step_in_days=6/24., sampling_frequency=1, fps=24,
-    #                          time_step_in_days=1 / 24., sampling_frequency=1, fps=24,
-    #                          title="")
-
-    # FROM AXIS GRAPHS:
-    resizing_and_film_making(outputs_path='outputs/Scenario_0001',
+    # FROM ORIGINAL GRAPHS - classic:
+    resizing_and_film_making(outputs_path='C:/Users/frees/SIMBAL/simulation/outputs',
+                             # outputs_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185',
+                             # outputs_path='C:/Users/frees/SIMBAL/simulation/outputs',
                              # images_folder='root_images_net_rhizodeposition',
-                             images_folder='axis_55-65_days_images',
+                             # images_folder='root_images',
+                             images_folder='plots',
                              # images_folder='new_axis_images',
-                             resized_images_folder='axis_55-65_days_images_resized',
+                             # resized_images_folder='root_images_resized',
+                             resized_images_folder='plots_resized',
                              # resized_images_folder='new_root_images_resized',
                              film_making=True,
-                             film_name="axis_55-65_days_movie.gif",
+                             # film_name="root_movie.gif",
+                             film_name="plant_movie.gif",
                              image_transforming=True,
                              resizing=False, dividing_size_by=1.,
-                             colorbar_option=True, colorbar_position=3,
-                             colorbar_title=bar_title,
-                             colorbar_cmap='jet', colorbar_lognorm=lognorm,
+                             colorbar_option=False, colorbar_position=1,
+                             colorbar_title="Net rhizodeposition rate (gC per day per cm)",
+                             # colorbar_title=bar_title,
+                             # colorbar_cmap='jet', colorbar_lognorm=lognorm,
                              # ticks=[],
-                             vmin=vmin, vmax=vmax,
+                             # vmin=vmin, vmax=vmax,
                              # time_printing=True, time_position=1,
                              time_printing=True,
                              # time_step_in_days=6/24., sampling_frequency=1, fps=24,
-                             time_step_in_days=1 / 24., sampling_frequency=1, fps=12)
+                             time_step_in_days=1./24., sampling_frequency=1, fps=24)
+
+    # # FROM AXIS GRAPHS:
+    # resizing_and_film_making(outputs_path='outputs/Scenario_0001',
+    #                          # images_folder='root_images_net_rhizodeposition',
+    #                          images_folder='axis_55-65_days_images',
+    #                          # images_folder='new_axis_images',
+    #                          resized_images_folder='axis_55-65_days_images_resized',
+    #                          # resized_images_folder='new_root_images_resized',
+    #                          film_making=True,
+    #                          film_name="axis_55-65_days_movie.gif",
+    #                          image_transforming=True,
+    #                          resizing=False, dividing_size_by=1.,
+    #                          colorbar_option=True, colorbar_position=3,
+    #                          colorbar_title=bar_title,
+    #                          colorbar_cmap='jet', colorbar_lognorm=lognorm,
+    #                          # ticks=[],
+    #                          vmin=vmin, vmax=vmax,
+    #                          # time_printing=True, time_position=1,
+    #                          time_printing=True,
+    #                          # time_step_in_days=6/24., sampling_frequency=1, fps=24,
+    #                          time_step_in_days=1 / 24., sampling_frequency=1, fps=12)
 
     # # FROM REDRAWN GRAPHS:
     # resizing_and_film_making(outputs_path=os.path.join('outputs', 'Scenario_0088'),

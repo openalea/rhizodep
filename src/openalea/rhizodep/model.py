@@ -768,6 +768,8 @@ def recording_MTG_properties(g, file_name='g_properties.csv', list_of_properties
     This function records the properties of each node of the MTG "g" inside a csv file.
     :param g: the MTG where properties are recorded
     :param file_name: the name of the csv file where properties of each node will be recorded
+    :param list_of_properties: a list containing the names of the specific properties to be recorded
+                              (if the list is empty, all the properties of the MTG will be recorded)
     :return: [no return]
     """
 
@@ -1139,7 +1141,9 @@ def ADDING_A_CHILD(mother_element, edge_type='+', label='Apex', type='Normal_roo
 
 def elongated_length(initial_length=0., radius=0., C_hexose_root=1,
                      elongation_time_in_seconds=0.,
-                     ArchiSimple=True, printing_warnings=False, soil_temperature_in_Celsius=20):
+                     ArchiSimple=True, printing_warnings=False,
+                     growth_reduction = 1.,
+                     soil_temperature_in_Celsius=20):
     """
     This function computes a new length (m) based on the elongation process described by ArchiSimple and regulated by
     the available concentration of hexose.
@@ -1149,21 +1153,21 @@ def elongated_length(initial_length=0., radius=0., C_hexose_root=1,
     :param elongation_time_in_seconds: the period of elongation (s)
     :param ArchiSimple: if True, a classical ArchiSimple elongation without hexose regulation will be computed
     :param printing_warnings: if True, all warning messages will be displayed in the console
+    :param growth_reduction: a factor reducing the rate of elongation (dimensionless, between 0 and 1)
+    :param soil_temperature_in_Celsius: the soil temperature perceived by the root (in degrees Celsius)
     :return: the new elongated length
     """
-
-    # TODO FOR TRISTAN: Consider including a control of potential elongation by N availability (only the regulation by hexose concentration has been considered so far).
 
     # If we keep the classical ArchiSimple rule:
     if ArchiSimple:
         # Then the elongation is calculated following the rules of Pages et al. (2014):
-        elongation = param.EL * 2. * radius * elongation_time_in_seconds
+        elongation = param.EL * growth_reduction * 2. * radius * elongation_time_in_seconds
     else:
         # Otherwise, we additionally consider a limitation of the elongation according to the local concentration of hexose,
         # based on a Michaelis-Menten formalism:
         if C_hexose_root > param.C_hexose_min_for_elongation:
-            elongation = param.EL * 2. * radius * C_hexose_root / (
-                    param.Km_elongation + C_hexose_root) * elongation_time_in_seconds
+            elongation = (param.EL * growth_reduction * 2. * radius
+                          * C_hexose_root / (param.Km_elongation + C_hexose_root) * elongation_time_in_seconds)
         else:
             elongation = 0.
 
@@ -1476,6 +1480,7 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
                                                      C_hexose_root=apex.growing_zone_C_hexose_root,
                                                      elongation_time_in_seconds=apex.thermal_potential_time_since_emergence,
                                                      ArchiSimple=ArchiSimple,
+                                                     growth_reduction=1-param.friction_coefficient,
                                                      soil_temperature_in_Celsius=soil_temperature_in_Celsius)
             # Last, if ArchiSimple has been chosen as the growth model:
             if ArchiSimple:
@@ -1511,6 +1516,7 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
                                                      C_hexose_root=apex.growing_zone_C_hexose_root,
                                                      elongation_time_in_seconds=apex.thermal_potential_time_since_emergence,
                                                      ArchiSimple=ArchiSimple,
+                                                     growth_reduction=1-param.friction_coefficient,
                                                      soil_temperature_in_Celsius=soil_temperature_in_Celsius)
 
             # If ArchiSimple has been chosen as the growth model:
@@ -1558,6 +1564,7 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
                                                  C_hexose_root=apex.growing_zone_C_hexose_root,
                                                  elongation_time_in_seconds=time_step_in_seconds * temperature_time_adjustment,
                                                  ArchiSimple=ArchiSimple,
+                                                 growth_reduction=1-param.friction_coefficient,
                                                  soil_temperature_in_Celsius=soil_temperature_in_Celsius)
         # And the new element returned by the function corresponds to the modified apex:
         new_apex.append(apex)
@@ -1605,6 +1612,7 @@ def potential_apex_development(g, apex, time_step_in_seconds=1. * 60. * 60. * 24
                                                          C_hexose_root=apex.growing_zone_C_hexose_root,
                                                          elongation_time_in_seconds=time_step_in_seconds * temperature_time_adjustment - apex.thermal_time_since_growth_stopped,
                                                          ArchiSimple=ArchiSimple,
+                                                         growth_reduction=1-param.friction_coefficient,
                                                          soil_temperature_in_Celsius=soil_temperature_in_Celsius)
                 # VERIFICATION:
                 if time_step_in_seconds * temperature_time_adjustment - apex.thermal_time_since_growth_stopped < 0.:
@@ -1778,16 +1786,16 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
     if apex.label != "Apex":
         print("ERROR: when trying to access the terminal apex of the axis of the segment", segment.index(),
               "we obtained the element", index_apex," that is a", apex.label, "!!!")
-    # Depending on the type of the apex, we adjust the type of the segment on the same axis:
-    if apex.type == "Just_stopped":
-        segment.type = "Just_stopped"
-        # print("The segment", segment.index(), "has been considered as just stopped as the apex", index_apex, "has just stopped.")
-    elif apex.type == "Stopped":
-        segment.type = "Stopped"
-        # print("The segment", segment.index(), "has been considered as stopped as the apex", index_apex, "has stopped.")
+    # If the apex of the root axis has stopped growing, we propagrate this information to the segment,
+    # unless the segment is just a supporting element of a lateral seminal or adventitious axis:
+    if segment.type != "Support_for_seminal_root" and segment.type != "Support_for_adventitious_root":
+        if apex.type == "Just_stopped":
+            segment.type = "Just_stopped"
+        elif apex.type == "Stopped":
+            segment.type = "Stopped"
 
-    # CHECKING POSSIBLE ROOT SEGMENT DEATH:
-    # -------------------------------------
+    # CHECKING POSSIBLE ROOT SEGMENT DEATH (and computing intermediate variable for radial growth):
+    # ---------------------------------------------------------------------------------------------
 
     # For each child of the segment:
     for child in segment.children():
@@ -1824,7 +1832,8 @@ def potential_segment_development(g, segment, time_step_in_seconds=60. * 60. * 2
         if segment.type == "Just_dead" or segment.type == "Dead":
             # Then we transform its status into "Dead"
             segment.type = "Dead"
-        else:
+        # Otherwise, if the segment does not correspond to a supporting element without length:
+        elif segment.type != "Support_for_seminal_root" and segment.type != "Support_for_adventitious_root":
             # Then the segment has to die:
             segment.type = "Just_dead"
     # Otherwise, at least one of the children axis is not dead, so the father segment should not be dead
@@ -2920,7 +2929,7 @@ def reinitializing_growth_variables(g):
     """
     This function re-initializes different growth-related variables (e.g. potential growth variables).
     :param g: the root MTG to be considered
-    :return:
+    :return: [the MTG has been updated with new values for the growth-related variables]
     """
 
     # TODO FOR TRISTAN: Consider reinitializing the demand/cost for N in each element here, at the begining of a new time step
@@ -3189,9 +3198,9 @@ def nodule_formation(g, mother_element):
 def total_root_sucrose_and_living_struct_mass(g):
     """
     This function computes the total amount of sucrose of the root system (in mol of sucrose),
-    and the total dry structural mass of the root system (in g of dry structural mass).
+    and the total dry structural mass of the root system (in gram of dry structural mass).
     :param g: the investigated MTG
-    :return: total_sucrose_root (mol of sucrose), total_struct_mass (g of dry structural mass)
+    :return: total_sucrose_root (mol of sucrose), total_struct_mass (gram of dry structural mass)
     """
 
     # We initialize the values to 0:
@@ -3485,7 +3494,7 @@ def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_war
 ########################################################################################################################
 ########################################################################################################################
 
-# Unloading of sucrose from the phloem and conversion of sucrose into hexose:
+# Net exchange between labile hexose and reserve pool:
 # --------------------------------------------------------------------------
 def exchange_with_reserve_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
     """
@@ -3680,7 +3689,8 @@ def maintenance_respiration_rate(n, soil_temperature_in_Celsius=20, printing_war
 
 # Exudation of hexose from the root into the soil:
 # ------------------------------------------------
-def root_sugars_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False):
+def root_sugars_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=False,
+                               exudation_at_root_tips_only=False):
     """
     This function computes the rate of hexose exudation (mol of hexose per seconds) for a given root element.
     Exudation corresponds to an efflux of hexose from the root to the soil by a passive diffusion. This efflux
@@ -3689,6 +3699,8 @@ def root_sugars_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warni
     :param n: the root element to be considered
     :param soil_temperature_in_Celsius: the temperature experience by the root element n
     :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
+    :param exudation_at_root_tips_only: a Boolean (True/False) determining whether exudation is only allowed at root tips
+                                        (i.e. within the meristem and root elongation zone) or not
     :return: the updated root element n
     """
 
@@ -3732,13 +3744,20 @@ def root_sugars_exudation_rate(n, soil_temperature_in_Celsius=20, printing_warni
     possible_exudation = True
     # First, we ensure that the element has a positive length and surface of exchange:
     if length <= 0 or non_vascular_exchange_surface <=0.:
+        # If not, we forbid exudation:
         possible_exudation = False
     # We check whether the concentration of hexose in root is positive or not:
     if C_hexose_root <= 0.:
+        # If not, we forbid exudation:
         possible_exudation = False
         if printing_warnings:
             print("WARNING: No hexose exudation occurred for node", n.index(),
                   "because root hexose concentration was", C_hexose_root, "mol/g.")
+    # We also check the possibility that exudation is only allowed at root tips.
+    # If the distance from root tip is higher than the prescribed root elongation zone:
+    if exudation_at_root_tips_only and n.distance_from_tip > n.radius * param.growing_zone_factor :
+        # Then we forbid exudation:
+        possible_exudation = False
 
     if possible_exudation:
 
@@ -4327,14 +4346,17 @@ def cells_degradation_rate(n, soil_temperature_in_Celsius=20, printing_warnings=
 ########################################################################################################################
 
 
-def calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius, printing_warnings):
+def calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius, printing_warnings,
+                                              exudation_at_root_tips_only=False):
     """
     This function simply calls all the fluxes-related (not growth-dependent) functions of the model and runs them on a 
     given element n.
+    :param g: the root MTG to be considered
     :param n: the root element to be considered
     :param soil_temperature_in_Celsius: the temperature experience by the root element n
-    :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the 
-    console
+    :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
+    :param exudation_at_root_tips_only: a Boolean (True/False) determining whether exudation is only allowed at root tips
+                                        (i.e. within the meristem and root elongation zone) or not
     :return: the updated root element n
     """
 
@@ -4347,7 +4369,8 @@ def calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius,
     # Maintenance respiration:
     maintenance_respiration_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Transfer of hexose from the root to the soil:
-    root_sugars_exudation_rate(n, soil_temperature_in_Celsius, printing_warnings)
+    root_sugars_exudation_rate(n, soil_temperature_in_Celsius, printing_warnings,
+                               exudation_at_root_tips_only=exudation_at_root_tips_only)
     # Transfer of hexose from the soil to the root:
     root_sugars_uptake_from_soil_rate(n, soil_temperature_in_Celsius, printing_warnings)
     # Consumption of hexose in the soil:
@@ -4363,7 +4386,7 @@ def calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius,
 
     return n
 
-def calculating_amounts_from_fluxes(n, time_step_in_seconds):
+def calculating_amounts_from_rates(n, time_step_in_seconds):
     """
     This function simply integrates the values of several fluxes over a given time step for a given root element n.
     :param n: the root element to be considered
@@ -4434,7 +4457,7 @@ def calculating_extra_variables(n, time_step_in_seconds):
 def calculating_time_derivatives_of_the_amount_in_each_pool(n):
     """
     This function calculates the time derivative (dQ/dt) of the amount in each pool, for a given root element, based on 
-    a C balance.
+    a carbon balance.
     :param n: the root element to be considered
     :return: a dictionary "y_derivatives" containing the values of net evolution rates for each pool.
     """
@@ -4768,7 +4791,8 @@ class Differential_Equation_System(object):
         #  Calculation of all C-related fluxes:
         # -------------------------------------
         # We call an external function that computes all the fluxes for given element n, based on the new concentrations:
-        calculating_all_growth_independent_fluxes(self.g, self.n, self.soil_temperature_in_Celsius, self.printing_warnings)
+        calculating_all_growth_independent_fluxes(self.g, self.n, self.soil_temperature_in_Celsius, self.printing_warnings,
+                                                  self.exudation_at_root_tips_only)
 
         # Calculation of time derivatives:
         # ---------------------------------
@@ -4929,16 +4953,18 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
                                                                    soil_temperature_in_Celsius=20,
                                                                    using_solver=False,
                                                                    printing_solver_outputs=False,
-                                                                   printing_warnings=False):
+                                                                   printing_warnings=False,
+                                                                   exudation_at_root_tips_only=False):
     """
-
-    :param g:
+    :param g: the root MTG to be considered
     :param time_step_in_seconds: the time step over which the balance is done
-    :param soil_temperature_in_Celsius:
-    :param using_solver:
-    :param printing_solver_outputs:
-    :param printing_warnings:
-    :return:
+    :param soil_temperature_in_Celsius: the temperature experience by the root element n
+    :param using_solver: a Boolean (True/False) expliciting whether the system should be solved by a solver or using finite differences
+    :param printing_solver_outputs: a Boolean (True/False) expliciting whether the outputs of the solver should be displayed or not
+    :param printing_warnings: a Boolean (True/False) expliciting whether warning messages should be printed in the console
+    :param exudation_at_root_tips_only: a Boolean (True/False) determining whether exudation is only allowed at root tips
+                                        (i.e. within the meristem and root elongation zone) or not
+    :return: the function updates the properties of the MTG g and returns the concentration of hexose in the apex of the primary root
     """
 
     # TODO FOR TRISTAN: Consider updating this function with N fluxes, or doing a similar function separated from here.
@@ -4971,10 +4997,11 @@ def C_exchange_and_balance_in_roots_and_at_the_root_soil_interface(g,
             #---------------------------------------------------
 
             # We calculate all C-related fluxes (independent of the time step):
-            calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius, printing_warnings)
+            calculating_all_growth_independent_fluxes(g, n, soil_temperature_in_Celsius, printing_warnings,
+                                                      exudation_at_root_tips_only)
 
             # We then calculate the quantities that correspond to these fluxes (dependent of the time step):
-            calculating_amounts_from_fluxes(n, time_step_in_seconds)
+            calculating_amounts_from_rates(n, time_step_in_seconds)
 
             # Calculating the new variations of the quantities in each pool over time:
             #-------------------------------------------------------------------------
@@ -5094,15 +5121,24 @@ def summing_and_possibly_homogenizing(g,
                                       renewal_of_soil_solution=False,
                                       time_step_in_seconds=60.*60.):
     """
-    This function computes a number of general properties summed over the whole MTG.
+    This function computes a number of general properties summed over the whole MTG, and possibly modifies
+    concentrations inside or outside the roots to account for artificial rehomogenization.
     :param g: the investigated MTG
-    :param printing_total_length: a Boolean defining whether total_length should be printed on the screen or not
-    :param printing_total_struct_mass: a Boolean defining whether total_struct_mass should be printed on the screen or not
-    :param printing_all: a Boolean defining whether all properties should be printed on the screen or not
+    :param printing_total_length: a Boolean (True/False) defining whether total_length should be printed on the screen or not
+    :param printing_total_struct_mass: a Boolean (True/False) defining whether total_struct_mass should be printed on the screen or not
+    :param printing_all: a Boolean (True/False) defining whether all properties should be printed on the screen or not
+    :param homogenizing_root_sugar_concentrations: a Boolean (True/False) allowing the concentration of root mobile hexose
+                                                   and root reserve hexose to be rehomogenized, so that the concentrations
+                                                   are uniform within the whole root system
+    :param homogenizing_soil_concentrations: a Boolean (True/False) allowing the concentration of rhizodeposits
+                                             to be rehomogenized, so that the concentrations at the soil-root
+                                             interface are uniform within the whole root system
+    :param renewal_of_soil_solution: a Boolean (True/False), which, together with homogenizing_soil_concentrations,
+                                     allows the root-soil interface to be artificially "cleaned"
     :return: a dictionary containing the numerical value of each property integrated over the whole MTG
     """
 
-    # TODO FOR TRISTAN: If no similar function is present in CINAPS, consider adding N balance here to compute variables on the whole root system.
+    # TODO FOR TRISTAN: If no similar function is present in CyNAPS, consider adding N balance here to compute variables on the whole root system.
 
     # We initialize the values to 0:
     total_length = 0.
@@ -5563,7 +5599,10 @@ def summing_and_possibly_homogenizing(g,
 # --------------------------------
 def control_of_anomalies(g):
     """
-    The function contol_of_anomalies checks for the presence of elements with negative measurable properties (e.g. length, concentrations).
+    The function contol_of_anomalies checks for the presence of elements with negative measurable properties
+    (e.g. length, concentrations).
+    :param g: the root MTG to be considered
+    :return: [nothing, only warnings are displayed]
     """
 
     # CHECKING THAT UNEMERGED ROOT ELEMENTS DO NOT CONTAIN CARBON:
@@ -5603,12 +5642,22 @@ def initiate_mtg(random=True,
                  adventitious_roots_events_file="adventitious_roots_inputs.csv"):
 
     """
-    This functions generates a root MTG from nothing, containing only one segment of a specific length,
+    This functions generates a root MTG from scratch, containing only one segment of a specific length,
     terminated by an apex (preferably of length 0).
-    :param random:
-    :param initial_segment_length:
-    :param initial_C_sucrose_root:
-    :param initial_C_hexose_root:
+    :param random: if True, random angles and radii will be used
+    :param simple_growth_duration: if True, the classical rule of ArchiSimple will be used to determine the growth
+                                   duration of roots (otherwise, a probabilistic rule will be used)
+    :param initial_segment_length: the length of the initial segment to create
+    :param initial_apex_length: the length of the initial apex to create
+    :param initial_C_sucrose_root: the initial sucrose concentration in the root axis to create
+    :param initial_C_hexose_root: the initial mobile hexose concentration in the root axis to create
+    :param input_file_path: the path of the folder containing the files setting the emergence of seminal roots and adventitious roots
+    :param forcing_seminal_roots_events: if True, the emergence of future seminal roots will be set according to a regular time interval
+    :param seminal_roots_events_file: the name of the file where information of the delay of emergence
+                                      between each seminal root is detailed (if not forcing a regular interval of seminal root emergence)
+    :param forcing_adventitious_roots_events: if True, the emergence of future adventitious roots will be set according to a regular time interval
+    :param adventitious_roots_events_file: the name of the file where information of the delay of emergence
+                                           between each adventitious root is detailed (if not forcing a regular interval of seminal root emergence)
     :return:
     """
 
@@ -5712,8 +5761,8 @@ def initiate_mtg(random=True,
     base_segment.Deficit_mucilage_soil_rate = 0.
     base_segment.Deficit_cells_soil_rate = 0.
 
-    # Fluxes:
-    # --------
+    # Amounts related to the processes:
+    # ---------------------------------
     base_segment.struct_mass_produced = 0.
     base_segment.resp_maintenance = 0.
     base_segment.resp_growth = 0.
@@ -5758,7 +5807,6 @@ def initiate_mtg(random=True,
 
     # Time indications:
     # ------------------
-    # base_segment.growth_duration = param.GDs * (2. * base_radius) ** 2 * param.main_roots_growth_extender #WATCH OUT!!! we artificially multiply growth duration for seminal and adventious roots!!!!!!!!!!!!!!!!!!!!!!
     base_segment.growth_duration = calculate_growth_duration(radius=base_radius, index=id_segment, root_order=1,
                                                              ArchiSimple=simple_growth_duration)
     base_segment.life_duration = param.LDs * (2. * base_radius) * param.root_tissue_density

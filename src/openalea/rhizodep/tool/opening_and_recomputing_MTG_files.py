@@ -201,6 +201,7 @@ def classifying_on_z(g, z_min=0, z_max=1, z_interval=0.1):
         name_surface_z = "surface_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
         name_net_hexose_exudation_z = "net_hexose_exudation_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
         name_hexose_degradation_z = "hexose_degradation_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
+        name_net_rhizodeposition_z = "net_rhizodeposition_" + str(z_start) + "-" + str(z_start + z_interval) + "_m"
 
         # We (re)initialize total values:
         total_included_length = 0
@@ -233,7 +234,7 @@ def classifying_on_z(g, z_min=0, z_max=1, z_interval=0.1):
             if n.type == "Dead" or n.type == "Just_dead":
                 total_included_root_necromass += n.struct_mass * fraction_length
             total_included_surface += n.external_surface * fraction_length
-            total_included_net_hexose_exudation += (n.hexose_exudation - n.hexose_uptake) * fraction_length
+            total_included_net_hexose_exudation += (n.hexose_exudation - n.hexose_uptake_from_soil) * fraction_length
             total_included_hexose_degradation += n.hexose_degradation * fraction_length
 
         # We record the summed values for this interval of z in several dictionnaries:
@@ -581,7 +582,7 @@ def loading_MTG_files(my_path='',
     :param list_of_MTG_ID: a list containing the ID number of each MTG to be opened (each MTG name is assumed to be in the format 'rootXXXXX.pckl')
     :param property: the property of the MTG to be displayed
     :param vmin, vmax, log_scale, cmap, width, height, x_center, y_center, z_center, z_cam, camera_distance,
-    step_back_coefficient, camera_rotation, n_rotation_points: [cf parameters of the function plot_MTG]
+           step_back_coefficient, camera_rotation, n_rotation_points: [cf parameters of the function plot_MTG]
     :param adding_images_on_plot: for adding some additional features on the plots' images
     :param recording_images: if True, images opened in PlantGL will be recorded
     :param images_directory: the name of the directory where images will be recorded
@@ -628,6 +629,19 @@ def loading_MTG_files(my_path='',
                 for file in files:
                     os.remove(os.path.join(root, file))
 
+    if recording_g_properties:
+        # We define the directory "MTG_properties_dir"
+        properties_dir = os.path.join(my_path,MTG_properties_folder)
+        # If this directory doesn't exist:
+        if not os.path.exists(properties_dir):
+            # Then we create it:
+            os.mkdir(properties_dir)
+        else:
+            # Otherwise, we delete all the files that are already present inside:
+            for root, dirs, files in os.walk(properties_dir):
+                for file in files:
+                    os.remove(os.path.join(root, file))
+
     # Depending on the extension of the file, we may either consider pickle files or csv files containing
     # all the properties of the MTG:
     if file_extension == 'pckl':
@@ -661,37 +675,23 @@ def loading_MTG_files(my_path='',
     else:
         list_of_MTG_numbers = [int(str(single_MTG_filename)[-10:-5])]
 
-    if recording_g_properties:
-        # We define the directory "MTG_properties"
-        prop_dir = os.path.join(MTG_properties_folder)
-        # If this directory doesn't exist:
-        if not os.path.exists(prop_dir):
-            # Then we create it:
-            os.mkdir(prop_dir)
-        else:
-            # Otherwise, we delete all the files that are already present inside:
-            for root, dirs, files in os.walk(prop_dir):
-                for file in files:
-                    os.remove(os.path.join(root, file))
-
-        # In addition, we get the final list of properties corresponding to the last MTG of the list.
-        # We first load the last MTG of the list:
-        ID = list_of_MTG_numbers[-1]
-        if file_extension == 'pckl':
-            filename = 'root%.5d.pckl' % ID
-            MTG_path = os.path.join(g_dir, filename)
-            f = open(MTG_path, 'rb')
-            g = pickle.load(f)
-            f.close()
-        else:
-            filename = 'root%.5d.csv' % ID
-            MTG_path = os.path.join(g_dir, filename)
-            g = create_MTG_from_csv_file(csv_filename=MTG_path)
-
-        # And we define the final list of properties to record according to all the properties of this MTG:
-        list_of_properties = list(g.properties().keys())
-        # We sort it alphabetically:
-        list_of_properties.sort(key=str.lower)
+    # In addition, we get the final list of properties corresponding to the last MTG of the list.
+    # We first load the last MTG of the list:
+    ID = list_of_MTG_numbers[-1]
+    if file_extension == 'pckl':
+        filename = 'root%.5d.pckl' % ID
+        MTG_path = os.path.join(g_dir, filename)
+        f = open(MTG_path, 'rb')
+        g = pickle.load(f)
+        f.close()
+    else:
+        filename = 'root%.5d.csv' % ID
+        MTG_path = os.path.join(g_dir, filename)
+        g = create_MTG_from_csv_file(csv_filename=MTG_path)
+    # And we define the final list of properties to record according to all the properties of this MTG:
+    list_of_properties = list(g.properties().keys())
+    # We sort it alphabetically:
+    list_of_properties.sort(key=str.lower)
 
     if z_classification:
         # We create an empty dataframe that will contain the results of z classification:
@@ -873,7 +873,11 @@ def loading_MTG_files(my_path='',
         # For recording the properties of g in a csv file:
         # ------------------------------------------------
         if recording_g_properties:
-            prop_file_name = os.path.join(MTG_properties_folder, 'root%.5d.csv')
+            # We define the final list of properties to record according to all the properties of this MTG:
+            list_of_properties = list(g.properties().keys())
+            # We sort it alphabetically:
+            list_of_properties.sort(key=str.lower)
+            prop_file_name = os.path.join(properties_dir, 'root%.5d.csv')
             recording_MTG_properties(g, file_name=prop_file_name % ID, list_of_properties=list_of_properties)
 
         # For integrating root variables on the z axis:
@@ -1003,7 +1007,7 @@ def averaging_a_list_of_MTGs(list_of_MTG_numbers=[143, 167, 191], list_of_proper
             testing_if_numeric = any(isinstance(item, (int, float, complex)) for item in temporary_list)
             # If the list contains numerical values:
             if testing_if_numeric is True:
-                # Then we calculate the mean value from the list:
+                # Then we calculate the mean value from the list (or add NA if it cannot be calculated):
                 try:
                     mean_value = np.nanmean(temporary_list)
                 except:
@@ -1013,9 +1017,6 @@ def averaging_a_list_of_MTGs(list_of_MTG_numbers=[143, 167, 191], list_of_proper
             else:
                 # Otherwise we assign the original value of the last MTG to the vertex in the averaged MTG:
                 averaged_MTG.property(property)[vid] = g.property(property)[vid]
-
-            if property=="hexose_consumption_by_growth" and vid==363:
-                print("The mean value of hexose_consumption_by_growth for vid", vid, "was", averaged_MTG.property(property)[vid])
 
     if recording_averaged_MTG:
         # If no specific name for the averaged MTG has been specified:
@@ -1041,8 +1042,11 @@ def averaging_a_list_of_MTGs(list_of_MTG_numbers=[143, 167, 191], list_of_proper
 
 # Function for creating many averaged MTG when covering a large list of MTG files:
 #---------------------------------------------------------------------------------
-def averaging_through_a_series_of_MTGs(MTG_directory='MTG_files', list_of_properties=[],
-                                       odd_number_of_MTGs_for_averaging = 3, recording_averaged_MTG=True,
+def averaging_through_a_series_of_MTGs(MTG_directory='MTG_files',
+                                       list_of_MTG_numbers_to_average=[],
+                                       list_of_properties=[],
+                                       odd_number_of_MTGs_for_averaging = 3,
+                                       recording_averaged_MTG=True,
                                        recording_directory='averaged_MTG_files'):
     """
     This function covers each MTG in a directory, and for each one calculates an averaged MTG based on a specific number
@@ -1062,6 +1066,7 @@ def averaging_through_a_series_of_MTGs(MTG_directory='MTG_files', list_of_proper
     print("We now calculate a mean MTG averaged over", odd_number_of_MTGs_for_averaging,
           "successive MTGs, for each MTG present in the directory", MTG_directory, "...")
 
+    # We organize the output folder:
     if recording_averaged_MTG:
         # If the directory where the average MTG will be recorded does not exist:
         if not os.path.exists(recording_directory):
@@ -1073,49 +1078,55 @@ def averaging_through_a_series_of_MTGs(MTG_directory='MTG_files', list_of_proper
                 for file in files:
                     os.remove(os.path.join(root, file))
 
-    # Defining the list of MTG files:
-    # -------------------------------
-    filenames = Path(MTG_directory).glob('*pckl')
-    # We reorder the files if needed, from the lowest to the highest number:
-    filenames = sorted(filenames)
-
-    # Calculating the number of MTG at a higher or lower position compared to the targeted MTG to include when averaging:
+    # We calculate the number of MTG at a higher or lower position compared to the targeted MTG to include when averaging:
     half_number = floor(odd_number_of_MTGs_for_averaging/2.)
-    # For example, if the odd number is 7, then we will average the MTG together with 3 MTG located before it and 3 MTG located after it.
+    # For example, if the odd number is 7, then we will average the MTG together with 3 MTG located before it and 3 MTG
+    # located after it.
 
-    # We cover each MTG in the directory:
-    for target_MTG_position in range(0,len(filenames)):
-        # If the current position of the MTG in the list is stricly lower than half of the prescribed number of MTGs used
-        # for averaging (X):
-        if target_MTG_position < half_number:
-            # Then the averaged MTG will be calculated starting at the first MTG of the list and ending X MTG afer the current position:
-            MTG_positions_to_cover = range(0,
-                                           target_MTG_position + half_number + 1)
-        # If the current position of the MTG in the list is in an intermediate, "normal" position:
-        elif target_MTG_position >= half_number and target_MTG_position < len(filenames) - half_number:
-            # Then the averaged MTG will be calculated starting X MTG before and ending X MTG afer the current position:
-            MTG_positions_to_cover =range(target_MTG_position - half_number,
-                                          target_MTG_position + half_number + 1)
-        # If the current position of the MTG in the list is close to the last MTG of the list:
-        elif target_MTG_position >= len(filenames) - half_number:
-            # Then the averaged MTG will be calculated starting X MTG before and ending at the last MTG of the list:
-            MTG_positions_to_cover = range(target_MTG_position - half_number,
-                                           len(filenames))
+    # DEFINING A LIST CONTAINING THE ID NUMBER OF ALL MTG FILES IN THE DIRECTORY:
+    # We create a list containing the path of each MTG files in the directory:
+    filenames = Path(MTG_directory).glob('*pckl')
+    # We convert the path of each MTG to a string:
+    filenames = [str(path) for path in filenames]
+    # We reorder the MTG files if needed, from the lowest to the highest number:
+    filenames = sorted(filenames)
+    # We create a second list containing only the ID numbers of these MTG files:
+    complete_list_of_MTG_ID=[]
+    # For each MTG path in the list 'filenames':
+    for position in range(0, len(filenames)):
+        # We get the full name of the MTG file, ending by 'rootXXXXX.pckl', where X is a digit:
+        MTG_path = filenames[position]
+        # We extract the characters corresponding to the ID number of the MTG, and convert it to an integer:
+        MTG_ID = int(str(MTG_path)[-10:-5])
+        # We add the number to the complete list of MTG numbers in the directory:
+        complete_list_of_MTG_ID.append(MTG_ID)
 
-        # We initialize an empty list of MTG ID number:
-        list_of_MTG_ID = []
-        # And we fill this list with all the MTG numbers to average:
-        for position in MTG_positions_to_cover:
-            # We get the full name of the MTG file, ending by 'rootXXXXX.pckl', where X is a digit:
-            MTG_path=filenames[position]
-            # We extract the characters corresponding to the ID number of the MTG, and convert it to an integer:
-            MTG_ID = int(MTG_path[-10:-5])
-            # We add the number to the list:
-            list_of_MTG_ID.append(MTG_ID)
-        # Eventually, we proceed to the averaging using the function 'averaging_a_list_of_MTGs':
-        target_MTG_ID = int(filenames[target_MTG_position][-10:-5])
-        print("For the MTG", str(target_MTG_ID), "we average over the MTGs' list", list_of_MTG_ID, "...")
-        averaged_MTG = averaging_a_list_of_MTGs(list_of_MTG_numbers=list_of_MTG_ID,
+    # DEFINING THE LIST OF TARGETED MTG NUMBERS:
+    # If the user has not specified a dedicated list of specific MTG to average within the directory of MTG files,
+    # we assume that all MTG files in the directory have to be averaged:
+    if list_of_MTG_numbers_to_average == [] or list_of_MTG_numbers_to_average == None:
+        list_of_MTG_numbers_to_average = complete_list_of_MTG_ID
+    # Otherwise, this list has already been defined.
+
+    # COVERING EACH MTG TO BE AVERAGED:
+    # We cover each desired MTG file in the directory:
+    for target_MTG_ID in list_of_MTG_numbers_to_average:
+
+        # 1) We define the list that will contain the final ID numbers of the MTG files to average for the targeted MTG.
+        # We first initialize it.
+        MTG_list_to_average=[]
+        # We cover each potential MTG number to be averaged for the targeted MTG:
+        for ID in range(target_MTG_ID - half_number, target_MTG_ID + half_number):
+            # We check that this theoretical ID number actually exists in the MTG number lists:
+            if ID in complete_list_of_MTG_ID:
+                # If so, we add its ID to the final list of MTG numbers to be averaged for the specific targeted MTG file:
+                MTG_list_to_average.append(ID)
+            # If not, maybe the targeted position is at the beginning or end of the complete list of MTG in the directory.
+            # In such case, we just move to the next possible ID number.
+
+        # 2) Eventually, we proceed to the averaging using the function 'averaging_a_list_of_MTGs':
+        print("For the MTG", str(target_MTG_ID), "we average over the MTGs' list", MTG_list_to_average, "...")
+        averaged_MTG = averaging_a_list_of_MTGs(list_of_MTG_numbers=MTG_list_to_average,
                                                 list_of_properties=list_of_properties,
                                                 directory_path=MTG_directory,
                                                 recording_averaged_MTG=recording_averaged_MTG,
@@ -1464,16 +1475,18 @@ if __name__ == "__main__":
     #                   opening_list=True,
     #                   # single_MTG_filename="root00599.pckl",
     #                   # list_of_MTG_ID=range(2,4318,6),
-    #                   list_of_MTG_ID=[720],
+    #                   list_of_MTG_ID=[2494],
     #                   recording_images=True,
     #                   normal_plotting_with_pyvista=True, show_Pyvista_axes=False,
     #                   fast_plotting_with_pyvista=False,
-    #                   closing_window=True,
+    #                   closing_window=False,
     #                   factor_of_higher_resolution=2,
     #                   # property="C_hexose_root",
-    #                   # vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
-    #                   property="net_rhizodeposition_rate_per_day_per_cm",
-    #                   vmin=1e-7, vmax=1e-4, log_scale=True, cmap='jet',
+    #                   # vmin=1e-4, vmax=1e-3, log_scale=True, cmap='jet',
+    #                   property="resp_maintenance_rate",
+    #                   vmin=1e-13, vmax=1e-11, log_scale=True, cmap='jet',
+    #                   # property="net_rhizodeposition_rate_per_day_per_cm",
+    #                   # vmin=1e-7, vmax=1e-4, log_scale=True, cmap='jet',
     #                   # property="root_order",
     #                   # vmin=1, vmax=5, log_scale=False, cmap='jet',
     #                   # property=None,
@@ -1485,9 +1498,10 @@ if __name__ == "__main__":
     #                   # x_cam=1.2, y_cam=0, z_cam=-0.2,
     #                   step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
     #                   background_color=[94, 76, 64],
+    #                   # background_color=[255, 255, 255],
     #                   root_hairs_display=True,
     #                   mycorrhizal_fungus_display=False,
-    #                   images_directory="new_images_with_axes",
+    #                   images_directory="C_hexose_image",
     #                   printing_sum=False,
     #                   recording_sum=False,
     #                   recording_g_properties=False,
@@ -1495,33 +1509,33 @@ if __name__ == "__main__":
     #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1 / 24.)
     # print("Done!")
 
-    # PLOTTING A SPATIAL SCALE TO PUT ON A GRAPH:
-    # We create a MTG file corresponding to the spatial scale we want to plot:
-    g = creating_a_spatial_scale_MTG(total_length=0.50, length_increment=0.1, line_thickness=0.002, starting_z=-0.1)
-    # We record the MTG:
-    g_file_name = 'C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/spatial_scale/root00000.pckl'
-    with open(g_file_name, 'wb') as output:
-        pickle.dump(g, output, protocol=2)
-    # We plot it:
-    loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
-                      MTG_directory="spatial_scale",
-                      opening_list=True,
-                      recording_images=True,
-                      normal_plotting_with_pyvista=True, show_Pyvista_axes=False,
-                      closing_window=False,
-                      factor_of_higher_resolution=2,
-                      width=800, height=800,
-                      property="length", vmin=0, vmax=0.1, log_scale=False,
-                      x_center=0, y_center=0, z_center=-0.20,
-                      x_cam=0.4, y_cam=0, z_cam=-0.15,
-                      background_color=[94, 76, 64],
-                      root_hairs_display=False,
-                      images_directory="new_images_with_axes",
-                      printing_sum=False,
-                      recording_sum=False,
-                      recording_g_properties=False,
-                      z_classification=False)
-    print("Done!")
+    # # PLOTTING A SPATIAL SCALE TO PUT ON A GRAPH:
+    # # We create a MTG file corresponding to the spatial scale we want to plot:
+    # g = creating_a_spatial_scale_MTG(total_length=0.50, length_increment=0.1, line_thickness=0.002, starting_z=-0.1)
+    # # We record the MTG:
+    # g_file_name = 'C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/spatial_scale/root00000.pckl'
+    # with open(g_file_name, 'wb') as output:
+    #     pickle.dump(g, output, protocol=2)
+    # # We plot it:
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
+    #                   MTG_directory="spatial_scale",
+    #                   opening_list=True,
+    #                   recording_images=True,
+    #                   normal_plotting_with_pyvista=True, show_Pyvista_axes=False,
+    #                   closing_window=False,
+    #                   factor_of_higher_resolution=2,
+    #                   width=800, height=800,
+    #                   property="length", vmin=0, vmax=0.1, log_scale=False,
+    #                   x_center=0, y_center=0, z_center=-0.20,
+    #                   x_cam=0.4, y_cam=0, z_cam=-0.15,
+    #                   background_color=[94, 76, 64],
+    #                   root_hairs_display=False,
+    #                   images_directory="new_images_with_axes",
+    #                   printing_sum=False,
+    #                   recording_sum=False,
+    #                   recording_g_properties=False,
+    #                   z_classification=False)
+    # print("Done!")
 
 
     # # (RE-)PLOTTING A SERIES OF ORIGINAL MTG FILES FROM ONE SCENARIO:
@@ -1549,34 +1563,39 @@ if __name__ == "__main__":
     ######################
 
     # # CREATING NEW MTG FILES WITH AVERAGE PROPERTIES FROM DIFFERENT MTG FILES:
-    # averaging_through_a_series_of_MTGs(MTG_directory='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0100/MTG_files',
-    #                                    list_of_properties=['length', 'C_hexose_root', 'net_rhizodeposition_rate_per_day_per_cm'],
+    # averaging_through_a_series_of_MTGs(MTG_directory='D:/Documents/MES ARTICLES/Article 2025 Rees et al PLSO/SIMULATIONS RHIZODEP/Scenario_0185/MTG_files',
+    #                                    list_of_MTG_numbers_to_average=[322, 604, 897, 1178, 1394, 1550, 1707, 1875, 2037, 2188, 2340, 2494],
     #                                    odd_number_of_MTGs_for_averaging=7,
+    #                                    list_of_properties=[], # We average all the properties
     #                                    recording_averaged_MTG=True,
-    #                                    recording_directory='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0100/averaged_MTG_files')
-    #
-    # # PLOTTING THE NEW AVERAGED MTG FILES:
-    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/simulations/running_scenarios/outputs/Scenario_0100/',
-    #                   opening_list=True,
-    #                   MTG_directory="averaged_MTG_files",
-    #                   # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
-    #                   # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
-    #                   # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
-    #                   # property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True, cmap='jet',
-    #                   property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
-    #                   width=1200, height=1200,
-    #                   x_center=0, y_center=0, z_center=-0.1, z_cam=-0.2,
-    #                   camera_distance=0.4, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-    #                   # x_center=0, y_center=0, z_center=-0, z_cam=-0,
-    #                   # camera_distance=1, step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
-    #                   adding_images_on_plot=False,
-    #                   recording_images=True,
-    #                   images_directory="averaged_root_images",
-    #                   printing_sum=False,
-    #                   recording_sum=False,
-    #                   recording_g_properties=False,
-    #                   z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
-    # print("Done!")
+    #                                    recording_directory='D:/Documents/MES ARTICLES/Article 2025 Rees et al PLSO/SIMULATIONS RHIZODEP/Scenario_0185/MTG_files_for_Tristan_averaged')
+
+    # PLOTTING THE NEW AVERAGED MTG FILES:
+    loading_MTG_files(my_path='D:/Documents/MES ARTICLES/Article 2025 Rees et al PLSO/SIMULATIONS RHIZODEP/Scenario_0185/',
+                      opening_list=True,
+                      MTG_directory="MTG_files_for_Tristan_averaged",
+                      plotting_with_PlantGL=False,
+                      normal_plotting_with_pyvista=True,
+                      factor_of_higher_resolution=2,
+                      closing_window=True,
+                      background_color=[94, 76, 64],
+                      # property="C_hexose_reserve", vmin=1e-8, vmax=1e-5, log_scale=True,
+                      # property="net_sucrose_unloading", vmin=1e-12, vmax=1e-8, log_scale=True,
+                      # property="net_hexose_exudation_rate_per_day_per_gram", vmin=1e-5, vmax=1e-2, log_scale=True,
+                      # property="net_rhizodeposition_rate_per_day_per_cm", vmin=1e-8, vmax=1e-5, log_scale=True, cmap='jet',
+                      # property="C_hexose_root", vmin=1e-6, vmax=1e-3, log_scale=True, cmap='jet',
+                      property="hexose_consumption_by_growth_rate", vmin=1e-14, vmax=1e-10, log_scale=True, cmap='jet',
+                      width=1200, height=1200,
+                      x_center=0, y_center=0, z_center=-0.2,
+                      x_cam=0.4, y_cam=0, z_cam=-0.15,
+                      recording_images=True,
+                      images_directory="averaged_root_images_for_Tristan",
+                      printing_sum=False,
+                      recording_sum=False,
+                      recording_g_properties=False,
+                      MTG_properties_folder='averaged_MTG_properties_for_Tristan',
+                      z_classification=False, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1)
+    print("Done!")
 
     # PLOTTING AND COMPUTING ON ONE ROOT AXIS ONLY:
     ###############################################
@@ -1725,3 +1744,43 @@ if __name__ == "__main__":
     #                   recording_sum=False,
     #                   printing_warnings=True,
     #                   recording_g_properties=False)
+
+    # # RECALCULATING THE Z CLASSIFICATION ON THE LAST MTG FILE:
+    # loading_MTG_files(my_path='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/',
+    #                   MTG_directory="MTG_files",
+    #                   opening_list=False,
+    #                   single_MTG_filename="root04318.pckl",
+    #                   # list_of_MTG_ID=range(2,4318,6),
+    #                   list_of_MTG_ID=[1920],
+    #                   recording_images=False,
+    #                   # normal_plotting_with_pyvista=True, show_Pyvista_axes=False,
+    #                   # fast_plotting_with_pyvista=False,
+    #                   # closing_window=False,
+    #                   # factor_of_higher_resolution=2,
+    #                   # property="C_hexose_root",
+    #                   # vmin=1e-4, vmax=1e-3, log_scale=True, cmap='jet',
+    #                   # property="resp_maintenance_rate",
+    #                   # vmin=1e-13, vmax=1e-11, log_scale=True, cmap='jet',
+    #                   # property="net_rhizodeposition_rate_per_day_per_cm",
+    #                   # vmin=1e-7, vmax=1e-4, log_scale=True, cmap='jet',
+    #                   # property="root_order",
+    #                   # vmin=1, vmax=5, log_scale=False, cmap='jet',
+    #                   # property=None,
+    #                   # width=800, height=800,
+    #                   # width=400, height=800,
+    #                   # x_center=0, y_center=0, z_center=-0.20,
+    #                   # x_cam=0.4, y_cam=0, z_cam=-0.15,
+    #                   # x_center=0, y_center=0, z_center=-0.2,
+    #                   # x_cam=1.2, y_cam=0, z_cam=-0.2,
+    #                   # step_back_coefficient=0., camera_rotation=False, n_rotation_points=12 * 10,
+    #                   # background_color=[94, 76, 64],
+    #                   # background_color=[255, 255, 255],
+    #                   # root_hairs_display=True,
+    #                   # mycorrhizal_fungus_display=False,
+    #                   # images_directory="C_hexose_image",
+    #                   printing_sum=True,
+    #                   recording_sum=False,
+    #                   recording_g_properties=False,
+    #                   # MTG_properties_folder='C:/Users/frees/rhizodep/saved_outputs/outputs_2024-11/Scenario_0185/MTG_properties/',
+    #                   z_classification=True, z_min=0.00, z_max=1., z_interval=0.05, time_step_in_days=1 / 24.)
+    # print("Done!")

@@ -22,7 +22,7 @@ RhizoDep is a functional-structural root model aiming to simulate root growth, r
 
 ### Package description
 
-The folder ‘src/openalea/rhizodep’ contains the main files for running RhizoDep, including ‘model.py’ that contains the main code of the model, ‘parameters.py’ that contains default values of parameters, and ‘running_simulation.py’ that allows to run a complete simulation. Additional scripts in the subfolder ‘tool’ allow plotting the root system computing different variables within the root system. The file ‘running_scenarios.py’ allows in particular to run different scenarios, on the basis of the input file ‘scenarios.list’ that is located in tutorial/inputs. A rapid test of the model can be launched with the file ‘test_rhizodep.py’ in the folder ‘test’.
+The folder ‘src/openalea/rhizodep’ contains the main files for running RhizoDep, including ‘model.py’ that contains the main code of the model, ‘parameters.py’ that contains default values of parameters, and ‘running_simulation.py’ that allows to run a complete simulation. Additional scripts in the subfolder ‘tool’ allow plotting the root system computing different variables within the root system. The file ‘running_scenarios.py’ allows in particular to run different scenarios, on the basis of the input file ‘scenarios_list’ that is located in tutorial/inputs. A rapid test of the model can be launched with the file ‘test_rhizodep.py’ in the folder ‘test’.
 
 ### Installation
 

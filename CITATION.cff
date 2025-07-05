@@ -5,7 +5,7 @@ cff-version: 1.2.0
 title: RhizoDep
 message: >-
   RhizoDep is a model designed to simulate root architecture
-  and rhizodeposition processes according to root carbone balance
+  and rhizodeposition processes according to root carbon balance.
 type: software
 authors:
   - given-names: Frédéric
@@ -27,7 +27,7 @@ repository-code: 'https://github.com/openalea/rhizodep'
 abstract: >-
   RhizoDep is a functional-structural root model that
   simulates 3D root growth, respiration, and rhizodeposition
-  based on C balance and root morphology at the individual
+  based on carbon balance and root morphology at the individual
   root segment level.
 keywords:
   - openalea

@@ -1,7 +1,7 @@
 # -*- coding: latin-1 -*-
 
 """
-    This script allows to run RhizoDep over one scenario or a list of tutorial, using a specific set of parameters and
+    This script allows to run RhizoDep over one scenario or a list of scenarios using a specific set of parameters and
     options, which are specified in an input file.
 
     :copyright: see AUTHORS.

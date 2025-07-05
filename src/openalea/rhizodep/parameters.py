@@ -130,6 +130,10 @@ struct_mass_N_content = 0.05 / 14.
 #------------------------------
 gravitropism_coefficient = 0.06
 
+# Friction coefficient (dimensionless, between 0 and 1):
+#-------------------------------------------------------
+friction_coefficient = 0. # We assume that there is no limitation of root growth with the friction in the soil
+
 # Length of a segment (in meters of root):
 #-----------------------------------------
 segment_length = 3. / 1000.

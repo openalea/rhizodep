@@ -1,7 +1,7 @@
 #  -*- coding: utf-8 -*-
 
 """
-    This script 'run_simulation' enables to run a complete simulation with the model RhizoDep.
+    This script enables to run a complete simulation with the model RhizoDep.
 
     :copyright: see AUTHORS.
     :license: see LICENSE for details.
@@ -21,9 +21,6 @@ from .tool import alternative_plotting, tools
 from . import parameters as param
 from . import mycorrhizae
 
-
-# TODO: explicitly add 'surfaces_and_volumes()' in the sequence of modelling!
-
 # We define the main tutorial program:
 def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     radial_growth=False, ArchiSimple=False, ArchiSimple_C_fraction=0.10,
@@ -32,9 +29,10 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     input_file_time_step_in_days=1/24.,
                     outputs_directory='outputs',
                     forcing_constant_inputs=False, constant_sucrose_input_rate=1.e-6,
+                    constant_soil_temperature_in_Celsius=20,
+                    exudation_at_root_tips_only=False,
                     homogenizing_root_sugar_concentrations=False, homogenizing_soil_concentrations=False,
                     renewal_of_soil_solution=False, interval_between_renewal_events=1.*60.*60.*24.,
-                    constant_soil_temperature_in_Celsius=20,
                     nodules=False,
                     mycorrhizal_fungus=False,
                     fungus_MTG=None,
@@ -69,7 +67,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     background_color = [0,0,0]):
 
     """
-    This general function controls the actual tutorial of root growth and C fluxes over the whole tutorial period.
+    This general function controls the actual simulation of root growth and C fluxes over the whole simulation period.
     :param g: the root MTG to consider
     :param simulation_period_in_days: the length of the tutorial period (days)
     :param time_step_in_days: the regular time step over the tutorial (days)
@@ -82,7 +80,20 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     :param forcing_constant_inputs: if True, input file will be ignored and a constant sucrose input rate and a constant soil temperature will be applied as inputs
     :param constant_sucrose_input_rate: input of sucrose applied at every time step (mol of sucrose per second per plant)
     :param constant_soil_temperature_in_Celsius: soil temperature applied to every root at every time step (degree Celsius)
+    :param exudation_at_root_tips_only: a Boolean (True/False) determining whether exudation is only allowed at root tips
+                                        (i.e. within the meristem and root elongation zone) or not
+    :param homogenizing_root_sugar_concentrations: a Boolean (True/False) allowing the concentration of root mobile hexose
+                                                   and root reserve hexose to be rehomogenized, so that the concentrations
+                                                   are uniform within the whole root system
+    :param homogenizing_soil_concentrations: a Boolean (True/False) allowing the concentration of rhizodeposits
+                                             to be rehomogenized, so that the concentrations at the soil-root
+                                             interface are uniform within the whole root system
+    :param renewal_of_soil_solution: a Boolean (True/False), which, together with homogenizing_soil_concentrations,
+                                     allows the root-soil interface to be artificially "cleaned"
+    :param interval_between_renewal_events: the time interval between two soil solution renewal events (in seconds)
     :param nodules: if True, a new type of element - “nodule” - that feeds from the mobile hexose of a mother root will be simulated
+    :param mycorrhizal_fungus: if True, interactions with simulated mycorrhizal fungus will be added to the simulation
+    :param fungus_MTG: the fungus MTG containing the properties of the fungus to be considered
     :param root_order_limitation: if True, lateral roots of higher orders will not be formed
     :param root_order_treshold: root order above which no lateral roots can be formed
     :param using_solver: if True, a solver will be used to compute C fluxes and concentrations
@@ -599,7 +610,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             else:
                 sucrose_input_rate = input_frame.loc[step - initial_step_number, 'sucrose_input_rate']
 
-            # TODO: WATHC OUT - her we artificially increase the supply of C depending on the mass of the fungus!
+            # TODO: WATCH OUT - her we artificially increase the supply of C depending on the mass of the fungus!
             if mycorrhizal_fungus:
                 if fungus_MTG.overall_infection_severity > 0.:
                     sucrose_input_rate =sucrose_input_rate * (1 + fungus_MTG.overall_infection_severity \
@@ -742,7 +753,8 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                         soil_temperature_in_Celsius=soil_temperature,
                         using_solver=using_solver,
                         printing_solver_outputs=printing_solver_outputs,
-                        printing_warnings=printing_warnings)
+                        printing_warnings=printing_warnings,
+                        exudation_at_root_tips_only=exudation_at_root_tips_only)
                 # NOTE: we also use this function to record specifically the concentration of hexose in the root apex
                 # of the primary root!
 
