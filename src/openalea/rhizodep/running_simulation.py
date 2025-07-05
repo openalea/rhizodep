@@ -19,8 +19,11 @@ import openalea.plantgl.all as pgl
 from . import model
 from .tool import alternative_plotting, tools
 from . import parameters as param
-from . import mycorrhizae
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 1bf87af11d8a55bd3ec614e424a06656216f58ba
 # We define the main tutorial program:
 def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     radial_growth=False, ArchiSimple=False, ArchiSimple_C_fraction=0.10,
@@ -610,7 +613,10 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
             else:
                 sucrose_input_rate = input_frame.loc[step - initial_step_number, 'sucrose_input_rate']
 
+<<<<<<< HEAD
             # TODO: WATCH OUT - her we artificially increase the supply of C depending on the mass of the fungus!
+=======
+>>>>>>> 1bf87af11d8a55bd3ec614e424a06656216f58ba
             if mycorrhizal_fungus:
                 if fungus_MTG.overall_infection_severity > 0.:
                     sucrose_input_rate =sucrose_input_rate * (1 + fungus_MTG.overall_infection_severity \
@@ -764,7 +770,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                                                          printing_warnings=printing_warnings)
                 # WARNING: The function "shoot_sucrose_supply_and_spreading" must be called AFTER the function "balance",
                 # otherwise the deficit in sucrose may be counted twice!!!
-                # TODO: check this affirmation about the position of shoot_sucrose_supply_and_spreading
 
                 # # OPTIONAL: checking of possible anomalies in the root system:
                 # model.control_of_anomalies(g)
