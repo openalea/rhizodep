@@ -3360,14 +3360,9 @@ def exchange_with_phloem_rate(g, n, soil_temperature_in_Celsius=20, printing_war
 
         # SUCROSE LOADING:
         # ----------------
-<<<<<<< HEAD
         # # We correct the max loading rate according to the distance from the tip in the middle of the segment.
         # max_loading_rate = param.surfacic_loading_rate_reference \
         #     * (1. - 1. / (1. + ((distance_from_tip-length/2.) / original_radius) ** param.gamma_loading))
-        max_loading_rate = param.max_loading_rate
-=======
->>>>>>> 1bf87af11d8a55bd3ec614e424a06656216f58ba
-
         max_loading_rate = param.max_loading_rate
         # We correct loading according to soil temperature:
         max_loading_rate = max_loading_rate \

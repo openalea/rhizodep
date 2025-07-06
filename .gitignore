@@ -77,7 +77,6 @@ nosetests.xml
 # Mac dirs
 .DS_Store
 saving_outputs
-<<<<<<< HEAD
 /src/rhizodep/model_old.py
 /src/rhizodep/simulation_old.py
 /simulations/running_scenarios/outputs
@@ -101,8 +100,6 @@ saving_outputs
 /tutorial/inputs/sucrose_input_Swinnen_et_al_1994_starting_at_120_days.csv
 /tutorial/inputs/sucrose_input_Swinnen_et_al_1994_starting_at_150_days.csv
 /src/openalea/rhizodep/mycorrhizae.py
-/src/openalea/rhizodep/mycorrhizae.py
-=======
 
 # VS Code project
 *.code-workspace
@@ -131,4 +128,3 @@ tutorial/inputs/sucrose_input_Swinnen_et_al_1994_starting_at_90_days.csv
 tutorial/inputs/sucrose_input_Swinnen_et_al_1994_starting_at_120_days.csv
 tutorial/inputs/sucrose_input_Swinnen_et_al_1994_starting_at_150_days.csv
 src/openalea/rhizodep/mycorrhizae.py
->>>>>>> 1bf87af11d8a55bd3ec614e424a06656216f58ba

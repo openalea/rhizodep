@@ -20,10 +20,6 @@ from . import model
 from .tool import alternative_plotting, tools
 from . import parameters as param
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 1bf87af11d8a55bd3ec614e424a06656216f58ba
 # We define the main tutorial program:
 def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                     radial_growth=False, ArchiSimple=False, ArchiSimple_C_fraction=0.10,
@@ -612,11 +608,6 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
                 sucrose_input_rate = constant_sucrose_input_rate
             else:
                 sucrose_input_rate = input_frame.loc[step - initial_step_number, 'sucrose_input_rate']
-
-<<<<<<< HEAD
-            # TODO: WATCH OUT - her we artificially increase the supply of C depending on the mass of the fungus!
-=======
->>>>>>> 1bf87af11d8a55bd3ec614e424a06656216f58ba
             if mycorrhizal_fungus:
                 if fungus_MTG.overall_infection_severity > 0.:
                     sucrose_input_rate =sucrose_input_rate * (1 + fungus_MTG.overall_infection_severity \
