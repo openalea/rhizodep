@@ -67,7 +67,7 @@ def formatted_inputs(original_input_file="None", final_input_file='updated_input
         input_frame = pd.DataFrame(
             columns=["step_number", "initial_time_in_days", "final_time_in_days", "soil_temperature_in_degree_Celsius",
                      "sucrose_input_rate"])
-        initial_step_number = df["step_number"].iloc[0]
+        initial_step_number = int(df["step_number"].iloc[0])
         input_frame["step_number"] = range(initial_step_number * round(original_time_step_in_days/final_time_step_in_days),
                                            initial_step_number * round(original_time_step_in_days/final_time_step_in_days) + n_steps)
         input_frame["initial_time_in_days"] = input_frame["step_number"] * final_time_step_in_days
