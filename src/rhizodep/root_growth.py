@@ -3029,7 +3029,7 @@ class RootGrowthModel(Model):
                                 aging_length = n.length - non_meristem_length
                                 n.actual_time_since_formation += (self.time_step_in_seconds / 3600 / 24) * aging_length / n.length
 
-                        n.tissue_formation_time = 50 - n.thermal_time_since_cells_formation / 3600 / 24
+                        n.tissue_formation_time = n.thermal_time_since_cells_formation / 3600 / 24
 
         compute_axess_id = True
         if compute_axess_id:

@@ -560,7 +560,7 @@ class RootCarbonModel(Model):
     # parenchyma and from the epidermis. The function also simulates the opposite process of sucrose loading,
     # considering that 2 mol of hexose are produced for 1 mol of sucrose.
     @rate
-    def _hexose_diffusion_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
+    def _hexose_diffusion_from_phloem(self, type, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
                                              hexose_consumption_by_growth, soil_temperature):
         
         # We consider all the cases where no net exchange should be allowed:
@@ -940,6 +940,11 @@ class RootCarbonModel(Model):
             self.props["deficit_hexose_root"][vertex_index] = 0. 
             return balance
     
+    
+    @totalstate
+    def _total_sucrose_phloem(self, C_sucrose_root, living_struct_mass):
+        return sum([x * y for x, y in zip(C_sucrose_root.values(), living_struct_mass.values())])
+
 
     def check_balance(self):
         """
