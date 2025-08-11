@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 from math import sqrt, pi, floor
 from dataclasses import dataclass
+from functools import partial
 
 from openalea.mtg import *
 from openalea.mtg.traversal import post_order, pre_order2, post_order2
@@ -389,6 +390,10 @@ class RootGrowthModel(Model):
         # TODO introduce an option instead of commenting!
         self.initiate_heterogeneous_variables()
 
+        # Partial to avoid call overhead
+        self.growth_temperature_modification = partial(self.temperature_modification, process_at_T_ref=self.process_at_T_ref,
+                                            T_ref=self.T_ref, A=self.A, B=self.B, C=self.C)
+
 
     def initiate_mtg(self):
         """
@@ -704,25 +709,36 @@ class RootGrowthModel(Model):
             n.volume = self.volume_from_radius_and_length(n, n.radius, n.length)
             n.struct_mass = n.volume * self.new_root_tissue_density
             n.living_struct_mass = n.struct_mass + n.living_root_hairs_struct_mass
+            n.temperature_modification = self.temperature_modification(n.soil_temperature)
 
         algo.orders(self.g)
         self.update_distance_from_tip()
         # self.initiate_heterogeneous_struct_mass_production()
         self.post_growth_updating()
     
+
     # SUBDIVISIONS OF THE SCHEDULING LOOP
     # -----------------------------------
-    @stepinit
-    def reinitializing_growth_variables(self):
-        """
-        This function re-initializes different growth-related variables (e.g. potential growth variables).
 
+    # Function that calculates the potential growth of the whole MTG at a given time step:
+    @potential
+    @state
+    def potential_growth(self):
+        """
+        This function covers the whole root MTG and computes the potential growth of segments and apices.
         :return:
         """
-        # We cover all the vertices in the MTG:
-        for vid in self.g.vertices_iter(scale=1):
-            # n represents the vertex:
-            n = self.g.node(vid)
+        # Repeated calls
+        g = self.g
+        potential_apex_development = self.potential_apex_development
+        potential_segment_development = self.potential_segment_development
+        temperature_modification = self.growth_temperature_modification
+
+        # We simulate the development of all apices and segments in the MTG:
+        for vid in g.vertices_iter(scale=1):
+            n = g.node(vid)
+
+            # Re-initializes different growth-related variables (e.g. potential growth variables).
 
             # We set to 0 the growth-related variables:
             n.hexose_consumption_by_growth_amount = 0.
@@ -744,23 +760,16 @@ class RootGrowthModel(Model):
             n.theoretical_radius = n.radius
             n.initial_struct_mass = n.struct_mass
             n.initial_living_root_hairs_struct_mass = n.living_root_hairs_struct_mass
-        return
 
-    # Function that calculates the potential growth of the whole MTG at a given time step:
-    @potential
-    @state
-    def potential_growth(self):
-        """
-        This function covers the whole root MTG and computes the potential growth of segments and apices.
-        :return:
-        """
-        # We simulate the development of all apices and segments in the MTG:
-        for vid in self.g.vertices_iter(scale=1):
-            n = self.g.node(vid)
+            # Store temperature modifications for further calls
+            n.temperature_modification = temperature_modification(n.soil_temperature)
+
             if n.label == "Apex":
-                self.potential_apex_development(apex=n)
+                potential_apex_development(apex=n)
             elif n.label == "Segment":
-                self.potential_segment_development(segment=n)
+                potential_segment_development(segment=n)
+
+
 
     # Function calculating the potential development of an apex:
     def potential_apex_development(self, apex):
@@ -772,6 +781,8 @@ class RootGrowthModel(Model):
         :param apex: the apex to be considered
         :return: the updated apex
         """
+        # Repeated calls
+        time_step_in_seconds = self.time_step_in_seconds
 
         # We initialize an empty list in which the modified apex will be added:
         new_apex = []
@@ -787,23 +798,21 @@ class RootGrowthModel(Model):
 
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = self.temperature_modification(process_at_T_ref=self.process_at_T_ref,
-                                                                    soil_temperature=apex.soil_temperature,
-                                                                    T_ref=self.T_ref, A=self.A, B=self.B, C=self.C)
+        temperature_time_adjustment = apex.temperature_modification
 
         # CASE 1: THE APEX CORRESPONDS TO THE PRIMORDIUM OF A POTENTIALLY EMERGING SEMINAL OR ADVENTITIOUS ROOT
         # -----------------------------------------------------------------------------------------------------
         # If the seminal root has not emerged yet:
         if apex.type == "Seminal_root_before_emergence" or apex.type == "Adventitious_root_before_emergence":
             # If the time elapsed since the last emergence of seminal root is higher than the prescribed interval time:
-            if ( apex.thermal_time_since_primordium_formation + self.time_step_in_seconds * temperature_time_adjustment) >= apex.emergence_delay_in_thermal_time:
+            if ( apex.thermal_time_since_primordium_formation + time_step_in_seconds * temperature_time_adjustment) >= apex.emergence_delay_in_thermal_time:
                 # The potential time elapsed since seminal root's possible emergence is calculated:
-                apex.thermal_potential_time_since_emergence = apex.thermal_time_since_primordium_formation + self.time_step_in_seconds * temperature_time_adjustment \
+                apex.thermal_potential_time_since_emergence = apex.thermal_time_since_primordium_formation + time_step_in_seconds * temperature_time_adjustment \
                                                               - apex.emergence_delay_in_thermal_time
                 # If the apex could have emerged sooner:
-                if apex.thermal_potential_time_since_emergence > self.time_step_in_seconds * temperature_time_adjustment:
+                if apex.thermal_potential_time_since_emergence > time_step_in_seconds * temperature_time_adjustment:
                     # The time since emergence is reduced to the time elapsed during this time step:
-                    apex.thermal_potential_time_since_emergence = self.time_step_in_seconds * temperature_time_adjustment
+                    apex.thermal_potential_time_since_emergence = time_step_in_seconds * temperature_time_adjustment
 
                 # We record the different elements that can contribute to the C supply necessary for growth,
                 # and we calculate a mean concentration of hexose in this supplying zone:
@@ -819,8 +828,8 @@ class RootGrowthModel(Model):
                     # Then we automatically allow the root to emerge, without consideration of C limitation:
                     apex.type = "Normal_root_after_emergence"
             # In any case, the time since primordium formation is incremented, as usual:
-            apex.actual_time_since_primordium_formation += self.time_step_in_seconds
-            apex.thermal_time_since_primordium_formation += self.time_step_in_seconds * temperature_time_adjustment
+            apex.actual_time_since_primordium_formation += time_step_in_seconds
+            apex.thermal_time_since_primordium_formation += time_step_in_seconds * temperature_time_adjustment
             # And the new element returned by the function corresponds to the potentially emerging apex:
             new_apex.append(apex)
             # And the function returns this new apex and stops here:
@@ -830,16 +839,16 @@ class RootGrowthModel(Model):
         # ---------------------------------------------------------------------------------------------
         if apex.type == "Normal_root_before_emergence":
             # If the time since primordium formation is higher than the delay of emergence:
-            if apex.thermal_time_since_primordium_formation + self.time_step_in_seconds * temperature_time_adjustment > self.emergence_delay:
+            if apex.thermal_time_since_primordium_formation + time_step_in_seconds * temperature_time_adjustment > self.emergence_delay:
                 # The time since primordium formation is incremented:
-                apex.actual_time_since_primordium_formation += self.time_step_in_seconds
-                apex.thermal_time_since_primordium_formation += self.time_step_in_seconds * temperature_time_adjustment
+                apex.actual_time_since_primordium_formation += time_step_in_seconds
+                apex.thermal_time_since_primordium_formation += time_step_in_seconds * temperature_time_adjustment
                 # The potential time elapsed at the end of this time step since the emergence is calculated:
                 apex.thermal_potential_time_since_emergence = apex.thermal_time_since_primordium_formation - self.emergence_delay
                 # If the apex could have emerged sooner:
-                if apex.thermal_potential_time_since_emergence > self.time_step_in_seconds * temperature_time_adjustment:
+                if apex.thermal_potential_time_since_emergence > time_step_in_seconds * temperature_time_adjustment:
                     # The time since emergence is equal to the time elapsed during this time step (since it must have emerged at this time step):
-                    apex.thermal_potential_time_since_emergence = self.time_step_in_seconds * temperature_time_adjustment
+                    apex.thermal_potential_time_since_emergence = time_step_in_seconds * temperature_time_adjustment
                 # We record the different element that can contribute to the C supply necessary for growth,
                 # and we calculate a mean concentration of hexose in this supplying zone:
                 self.calculating_supply_for_elongation(element=apex)
@@ -870,8 +879,8 @@ class RootGrowthModel(Model):
                     return new_apex
             # Otherwise, the time since primordium formation is simply incremented:
             else:
-                apex.actual_time_since_primordium_formation += self.time_step_in_seconds
-                apex.thermal_time_since_primordium_formation += self.time_step_in_seconds * temperature_time_adjustment
+                apex.actual_time_since_primordium_formation += time_step_in_seconds
+                apex.thermal_time_since_primordium_formation += time_step_in_seconds * temperature_time_adjustment
                 # And the new element returned by the function corresponds to the modified apex:
                 new_apex.append(apex)
                 # And the function returns this new apex and stops here:
@@ -880,19 +889,19 @@ class RootGrowthModel(Model):
         # CASE 3: THE APEX BELONGS TO AN AXIS THAT HAS ALREADY EMERGED:
         # --------------------------------------------------------------
         # IF THE APEX CAN CONTINUE GROWING:
-        if apex.thermal_time_since_emergence + self.time_step_in_seconds * temperature_time_adjustment < apex.growth_duration:
+        if apex.thermal_time_since_emergence + time_step_in_seconds * temperature_time_adjustment < apex.growth_duration:
             # The times are incremented:
-            apex.actual_time_since_primordium_formation += self.time_step_in_seconds
-            apex.thermal_time_since_primordium_formation += self.time_step_in_seconds * temperature_time_adjustment
-            apex.actual_time_since_emergence += self.time_step_in_seconds
-            apex.thermal_time_since_emergence += self.time_step_in_seconds * temperature_time_adjustment
+            apex.actual_time_since_primordium_formation += time_step_in_seconds
+            apex.thermal_time_since_primordium_formation += time_step_in_seconds * temperature_time_adjustment
+            apex.actual_time_since_emergence += time_step_in_seconds
+            apex.thermal_time_since_emergence += time_step_in_seconds * temperature_time_adjustment
             # We record the different element that can contribute to the C supply necessary for growth,
             # and we calculate a mean concentration of hexose in this supplying zone:
             self.calculating_supply_for_elongation(element=apex)
             # The corresponding potential elongation of the apex is calculated:
             apex.potential_length = self.elongated_length(element=apex, initial_length=apex.length, radius=apex.radius,
                                                           C_hexose_root=apex.growing_zone_C_hexose_root,
-                                                          elongation_time_in_seconds=self.time_step_in_seconds * temperature_time_adjustment)
+                                                          elongation_time_in_seconds=time_step_in_seconds * temperature_time_adjustment)
             # And the new element returned by the function corresponds to the modified apex:
             new_apex.append(apex)
             # And the function returns this new apex and stops here:
@@ -901,21 +910,21 @@ class RootGrowthModel(Model):
         # OTHERWISE, THE APEX HAD TO STOP:
         else:
             # IF THE APEX HAS NOT REACHED ITS LIFE DURATION:
-            if apex.thermal_time_since_growth_stopped + self.time_step_in_seconds * temperature_time_adjustment < apex.life_duration:
+            if apex.thermal_time_since_growth_stopped + time_step_in_seconds * temperature_time_adjustment < apex.life_duration:
                 # IF THE APEX HAS ALREADY BEEN STOPPED AT A PREVIOUS TIME STEP:
                 if apex.type == "Stopped" or apex.type == "Just_stopped":
                     # The time since growth stopped is simply increased by one time step:
-                    apex.actual_time_since_growth_stopped += self.time_step_in_seconds
-                    apex.thermal_time_since_growth_stopped += self.time_step_in_seconds * temperature_time_adjustment
+                    apex.actual_time_since_growth_stopped += time_step_in_seconds
+                    apex.thermal_time_since_growth_stopped += time_step_in_seconds * temperature_time_adjustment
                     # The type is (re)declared "Stopped":
                     apex.type = "Stopped"
                     # The times are incremented:
-                    apex.actual_time_since_primordium_formation += self.time_step_in_seconds
-                    apex.thermal_time_since_primordium_formation += self.time_step_in_seconds * temperature_time_adjustment
-                    apex.actual_time_since_emergence += self.time_step_in_seconds
-                    apex.thermal_time_since_emergence += self.time_step_in_seconds * temperature_time_adjustment
-                    apex.actual_time_since_cells_formation += self.time_step_in_seconds
-                    apex.thermal_time_since_cells_formation += self.time_step_in_seconds * temperature_time_adjustment
+                    apex.actual_time_since_primordium_formation += time_step_in_seconds
+                    apex.thermal_time_since_primordium_formation += time_step_in_seconds * temperature_time_adjustment
+                    apex.actual_time_since_emergence += time_step_in_seconds
+                    apex.thermal_time_since_emergence += time_step_in_seconds * temperature_time_adjustment
+                    apex.actual_time_since_cells_formation += time_step_in_seconds
+                    apex.thermal_time_since_cells_formation += time_step_in_seconds * temperature_time_adjustment
                     # The new element returned by the function corresponds to this apex:
                     new_apex.append(apex)
                     # And the function returns this new apex and stops here:
@@ -927,7 +936,7 @@ class RootGrowthModel(Model):
                     apex.type = "Just_stopped"
                     # Then the exact time since growth stopped is calculated:
                     apex.thermal_time_since_growth_stopped = apex.thermal_time_since_emergence \
-                                                             + self.time_step_in_seconds * temperature_time_adjustment \
+                                                             + time_step_in_seconds * temperature_time_adjustment \
                                                              - apex.growth_duration
                     apex.actual_time_since_growth_stopped = apex.thermal_time_since_growth_stopped / temperature_time_adjustment
 
@@ -937,7 +946,7 @@ class RootGrowthModel(Model):
                     # And the potential elongation of the apex before growth stopped is calculated:
                     apex.potential_length = self.elongated_length(element=apex, initial_length=apex.length, radius=apex.radius,
                                                                   C_hexose_root=apex.growing_zone_C_hexose_root,
-                                                                  elongation_time_in_seconds=self.time_step_in_seconds * temperature_time_adjustment - apex.thermal_time_since_growth_stopped)
+                                                                  elongation_time_in_seconds=time_step_in_seconds * temperature_time_adjustment - apex.thermal_time_since_growth_stopped)
                     # VERIFICATION:
                     if self.time_step_in_seconds * temperature_time_adjustment - apex.thermal_time_since_growth_stopped < 0.:
                         print("!!! ERROR: The apex", apex.index(), "has stopped since",
@@ -947,12 +956,12 @@ class RootGrowthModel(Model):
                         apex.potential_length = apex.initial_length
 
                     # The times are incremented:
-                    apex.actual_time_since_primordium_formation += self.time_step_in_seconds
-                    apex.actual_time_since_emergence += self.time_step_in_seconds
-                    apex.thermal_time_since_primordium_formation += self.time_step_in_seconds * temperature_time_adjustment
-                    apex.thermal_time_since_emergence += self.time_step_in_seconds * temperature_time_adjustment
-                    apex.actual_time_since_cells_formation += self.time_step_in_seconds
-                    apex.thermal_time_since_cells_formation += self.time_step_in_seconds * temperature_time_adjustment
+                    apex.actual_time_since_primordium_formation += time_step_in_seconds
+                    apex.actual_time_since_emergence += time_step_in_seconds
+                    apex.thermal_time_since_primordium_formation += time_step_in_seconds * temperature_time_adjustment
+                    apex.thermal_time_since_emergence += time_step_in_seconds * temperature_time_adjustment
+                    apex.actual_time_since_cells_formation += time_step_in_seconds
+                    apex.thermal_time_since_cells_formation += time_step_in_seconds * temperature_time_adjustment
                     # The new element returned by the function corresponds to this apex:
                     new_apex.append(apex)
                     # And the function returns this new apex and stops here:
@@ -965,16 +974,16 @@ class RootGrowthModel(Model):
                     # The type is (re)declared "Dead":
                     apex.type = "Dead"
                     # And the times are simply incremented:
-                    apex.actual_time_since_primordium_formation += self.time_step_in_seconds
-                    apex.actual_time_since_emergence += self.time_step_in_seconds
-                    apex.actual_time_since_cells_formation += self.time_step_in_seconds
-                    apex.actual_time_since_growth_stopped += self.time_step_in_seconds
-                    apex.actual_time_since_death += self.time_step_in_seconds
-                    apex.thermal_time_since_primordium_formation += self.time_step_in_seconds * temperature_time_adjustment
-                    apex.thermal_time_since_emergence += self.time_step_in_seconds * temperature_time_adjustment
-                    apex.thermal_time_since_cells_formation += self.time_step_in_seconds * temperature_time_adjustment
-                    apex.thermal_time_since_growth_stopped += self.time_step_in_seconds * temperature_time_adjustment
-                    apex.thermal_time_since_death += self.time_step_in_seconds * temperature_time_adjustment
+                    apex.actual_time_since_primordium_formation += time_step_in_seconds
+                    apex.actual_time_since_emergence += time_step_in_seconds
+                    apex.actual_time_since_cells_formation += time_step_in_seconds
+                    apex.actual_time_since_growth_stopped += time_step_in_seconds
+                    apex.actual_time_since_death += time_step_in_seconds
+                    apex.thermal_time_since_primordium_formation += time_step_in_seconds * temperature_time_adjustment
+                    apex.thermal_time_since_emergence += time_step_in_seconds * temperature_time_adjustment
+                    apex.thermal_time_since_cells_formation += time_step_in_seconds * temperature_time_adjustment
+                    apex.thermal_time_since_growth_stopped += time_step_in_seconds * temperature_time_adjustment
+                    apex.thermal_time_since_death += time_step_in_seconds * temperature_time_adjustment
                     # The new element returned by the function corresponds to this apex:
                     new_apex.append(apex)
                     # And the function returns this new apex and stops here:
@@ -984,21 +993,22 @@ class RootGrowthModel(Model):
                     # Then the apex is declared "Just dead":
                     apex.type = "Just_dead"
                     # The exact time since the apex died is calculated:
-                    apex.thermal_time_since_death = apex.thermal_time_since_growth_stopped + self.time_step_in_seconds * temperature_time_adjustment - apex.life_duration
+                    apex.thermal_time_since_death = apex.thermal_time_since_growth_stopped + time_step_in_seconds * temperature_time_adjustment - apex.life_duration
                     apex.actual_time_since_death = apex.thermal_time_since_death / temperature_time_adjustment
                     # And the other times are incremented:
-                    apex.actual_time_since_primordium_formation += self.time_step_in_seconds
-                    apex.actual_time_since_emergence += self.time_step_in_seconds
-                    apex.actual_time_since_cells_formation += self.time_step_in_seconds
-                    apex.actual_time_since_growth_stopped += self.time_step_in_seconds
-                    apex.thermal_time_since_primordium_formation += self.time_step_in_seconds * temperature_time_adjustment
-                    apex.thermal_time_since_emergence += self.time_step_in_seconds * temperature_time_adjustment
-                    apex.thermal_time_since_cells_formation += self.time_step_in_seconds * temperature_time_adjustment
-                    apex.thermal_time_since_growth_stopped += self.time_step_in_seconds * temperature_time_adjustment
+                    apex.actual_time_since_primordium_formation += time_step_in_seconds
+                    apex.actual_time_since_emergence += time_step_in_seconds
+                    apex.actual_time_since_cells_formation += time_step_in_seconds
+                    apex.actual_time_since_growth_stopped += time_step_in_seconds
+                    apex.thermal_time_since_primordium_formation += time_step_in_seconds * temperature_time_adjustment
+                    apex.thermal_time_since_emergence += time_step_in_seconds * temperature_time_adjustment
+                    apex.thermal_time_since_cells_formation += time_step_in_seconds * temperature_time_adjustment
+                    apex.thermal_time_since_growth_stopped += time_step_in_seconds * temperature_time_adjustment
                     # The new element returned by the function corresponds to this apex:
                     new_apex.append(apex)
                     # And the function returns this new apex and stops here:
                     return new_apex
+
 
     # Function for calculating root elongation:
     def elongated_length(self, element, initial_length: float, radius: float, C_hexose_root: float, elongation_time_in_seconds: float):
@@ -1180,9 +1190,8 @@ class RootGrowthModel(Model):
                               / (self.Km_nodule_thickening + C_hexose_regulating_nodule_growth)
             # We calculate a coefficient that will modify the rate of thickening according to soil temperature
             # assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-            thickening_rate = thickening_rate * self.temperature_modification(process_at_T_ref=self.process_at_T_ref,
-                                                                    soil_temperature=segment.soil_temperature,
-                                                                    T_ref=self.T_ref, A=self.A, B=self.B, C=self.C)
+            thickening_rate = thickening_rate * segment.temperature_modification
+
             segment.theoretical_radius = segment.radius * (1 + thickening_rate * self.time_step_in_seconds)
             if segment.theoretical_radius > self.nodule_max_radius:
                 segment.potential_radius = self.nodule_max_radius
@@ -1212,9 +1221,7 @@ class RootGrowthModel(Model):
 
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = self.temperature_modification(process_at_T_ref=self.process_at_T_ref,
-                                                                    soil_temperature=segment.soil_temperature,
-                                                                    T_ref=self.T_ref, A=self.A, B=self.B, C=self.C)
+        temperature_time_adjustment = segment.temperature_modification
 
         # CHECKING WHETHER THE APEX OF THE ROOT AXIS HAS STOPPED GROWING:
         # ---------------------------------------------------------------
@@ -1305,9 +1312,8 @@ class RootGrowthModel(Model):
                                   * segment.C_hexose_root / (self.Km_thickening + segment.C_hexose_root)
                 # We calculate a coefficient that will modify the rate of thickening according to soil temperature
                 # assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-                thickening_rate = thickening_rate * self.temperature_modification(process_at_T_ref=self.process_at_T_ref,
-                                                                    soil_temperature=segment.soil_temperature,
-                                                                    T_ref=self.T_ref, A=self.A, B=self.B, C=self.C)
+                thickening_rate = thickening_rate * segment.temperature_modification
+
                 # The maximal possible new radius according to this regulation is therefore:
                 new_radius_max = (1 + thickening_rate * self.time_step_in_seconds) * segment.initial_radius
                 # If the potential new radius is higher than the maximal new radius:
@@ -1377,27 +1383,30 @@ class RootGrowthModel(Model):
         # PROCEEDING TO ACTUAL GROWTH:
         # -----------------------------
 
+        # Repeated calls
+        g = self.g
+        volume_from_radius_and_length = self.volume_from_radius_and_length
+
         self.step_elongating_elements = []
 
         # We have to cover each vertex from the apices up to the base one time:
-        root_gen = self.g.component_roots_at_scale_iter(self.g.root, scale=1)
+        root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
         root = next(root_gen)
         # We cover all the vertices in the MTG, from the tips to the base:
-        for vid in post_order(self.g, root):
+        for vid in post_order(g, root):
 
             # n represents the current root element:
-            n = self.g.node(vid)
+            n = g.node(vid)
 
             # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
             # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-            temperature_time_adjustment = self.temperature_modification(process_at_T_ref=self.process_at_T_ref,
-                                                                    soil_temperature=n.soil_temperature,
-                                                                    T_ref=self.T_ref, A=self.A, B=self.B, C=self.C)
+            temperature_time_adjustment = n.temperature_modification
 
             # AVOIDANCE OF UNWANTED CASES:
             # -----------------------------
             # We make sure that the element is not dead:
-            if n.type == "Dead" or n.type == "Just_dead" or n.type == "Support_for_seminal_root" or n.type == "Support_for_adventitious_root":
+            n_type = n.type
+            if n_type in ("Dead", "Just_dead", "Support_for_seminal_root", "Support_for_adventitious_root"):
                 # In such case, we just pass to the next element in the iteration:
                 continue
 
@@ -1412,9 +1421,9 @@ class RootGrowthModel(Model):
             # WARNING: All growth related variables should have been initialized by another module at the beginning of the time step!!!
 
             # We calculate the initial volume of the element:
-            initial_volume = self.volume_from_radius_and_length(n, n.initial_radius, n.initial_length)
+            initial_volume = volume_from_radius_and_length(n, n.initial_radius, n.initial_length)
             # We calculate the potential volume of the element based on the potential radius and potential length:
-            potential_volume = self.volume_from_radius_and_length(n, n.potential_radius, n.potential_length)
+            potential_volume = volume_from_radius_and_length(n, n.potential_radius, n.potential_length)
             # We calculate the number of moles of hexose required for growth, including the respiration cost according to
             # the yield growth included in the model of Thornley and Cannell (2000), where root_tissue_density is the dry structural
             # weight per volume (g m-3) and struct_mass_C_content is the amount of C per gram of dry structural mass (mol_C g-1):
@@ -1498,7 +1507,7 @@ class RootGrowthModel(Model):
                     # Elongation is done up to the full potential:
                     n.length = n.potential_length
                 # The corresponding new volume is calculated:
-                volume_after_elongation = self.volume_from_radius_and_length(n, n.initial_radius, n.length)
+                volume_after_elongation = volume_from_radius_and_length(n, n.initial_radius, n.length)
                 # The overall cost of elongation is calculated as:
                 hexose_consumption_by_elongation = \
                     1. / 6. * (volume_after_elongation - initial_volume) \
@@ -1514,7 +1523,7 @@ class RootGrowthModel(Model):
                     # We cover each of the elements that have provided hexose for sustaining the elongation of element n:
                     for i in range(0, len(list_of_elongation_supporting_elements)):
                         index = list_of_elongation_supporting_elements[i]
-                        supplying_element = self.g.node(index)
+                        supplying_element = g.node(index)
                         # We define the actual contribution of the current element based on total hexose consumption by growth
                         # of element n and the relative contribution of the current element to the pool of the potentially available hexose:
                         hexose_actual_contribution_to_elongation = hexose_consumption_by_elongation \
@@ -1539,7 +1548,7 @@ class RootGrowthModel(Model):
                     / (n.root_tissue_density * self.struct_mass_C_content)
                 # We calculate the maximal possible volume based on the volume of the new cylinder after elongation
                 # and the increase in volume that could be achieved by consuming all the remaining hexose:
-                volume_max = self.volume_from_radius_and_length(n, n.initial_radius, n.length) + possible_radial_increase_in_volume
+                volume_max = volume_from_radius_and_length(n, n.initial_radius, n.length) + possible_radial_increase_in_volume
                 # We then calculate the corresponding new possible radius corresponding to this maximum volume:
                 if n.type == "Root_nodule":
                     # If the element corresponds to a nodule, then it we calculate the radius of a theoretical sphere:
@@ -1562,8 +1571,8 @@ class RootGrowthModel(Model):
                 else:
                     # Otherwise, radial growth is done up to the full potential and the remaining hexose is calculated:
                     n.radius = n.potential_radius
-                    net_increase_in_volume = self.volume_from_radius_and_length(n, n.radius, n.length) \
-                        - self.volume_from_radius_and_length(n, n.initial_radius, n.length)
+                    net_increase_in_volume = volume_from_radius_and_length(n, n.radius, n.length) \
+                        - volume_from_radius_and_length(n, n.initial_radius, n.length)
                     # net_increase_in_volume = pi * (n.radius ** 2 - n.initial_radius ** 2) * n.length
                     # We then calculate the remaining amount of hexose after thickening:
                     hexose_actual_contribution_to_thickening = \
@@ -1584,8 +1593,8 @@ class RootGrowthModel(Model):
                     (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) \
                     * (1 - self.yield_growth) * 6.
                 if n.type == "Root_nodule":
-                    index_parent = self.g.Father(n.index(), EdgeType='+')
-                    parent = self.g.node(index_parent)
+                    index_parent = g.Father(n.index(), EdgeType='+')
+                    parent = g.node(index_parent)
                     fraction_of_available_hexose_in_the_element = \
                         (parent.C_hexose_root * parent.initial_struct_mass) / hexose_available_for_thickening
                     # The amount of hexose used for growth in this element is increased:
@@ -1602,7 +1611,7 @@ class RootGrowthModel(Model):
             # RECORDING THE ACTUAL STRUCTURAL MODIFICATIONS:
             # -----------------------------------------------
             # The new volume of the element is automatically calculated
-            n.volume = self.volume_from_radius_and_length(n, n.radius, n.length)
+            n.volume = volume_from_radius_and_length(n, n.radius, n.length)
             # The new dry structural struct_mass of the element is calculated from its new volume:
             n.struct_mass = n.volume * n.root_tissue_density
             n.struct_mass_produced = (n.volume - initial_volume) * n.root_tissue_density
@@ -1670,29 +1679,29 @@ class RootGrowthModel(Model):
         :return:
         """
         # We simulate the segmentation of all apices:
+        g = self.g
+        apex_ids = [vid for vid in self.step_elongating_elements if g.node(vid).label == 'Apex' and g.node(vid).type == 'Normal_root_after_emergence']
 
         self.step_new_apices = []
 
-        for vid in self.vertices:
-            n = self.g.node(vid)
-            # For each apex in the list of apices that have emerged with a positive length:
-            if n.label == 'Apex' and n.type == "Normal_root_after_emergence" and n.length > 0.:
-                new_apex =  self.segmentation_and_primordium_formation(apex=n)
-                for sub_list in new_apex:
-                    if isinstance(sub_list, mtg._ProxyNode):
-                        if sub_list.index() not in self.step_new_apices:
-                            self.step_new_apices.append(sub_list.index())
-                    else:
-                        for apex in sub_list:
-                            if isinstance(apex, mtg._ProxyNode):
-                                if apex.index() not in self.step_new_apices:
-                                    self.step_new_apices.append(apex.index())
-                            else:
-                                print(type(apex))
-                                print("Error list dimensions deeper than 2")
+        # For each apex in the list of apices that have emerged with a positive length:
+        for vid in apex_ids:
+            new_apex =  self.segmentation_and_primordium_formation(apex=g.node(vid))
+            for sub_list in new_apex:
+                if isinstance(sub_list, mtg._ProxyNode):
+                    if sub_list.index() not in self.step_new_apices:
+                        self.step_new_apices.append(sub_list.index())
+                else:
+                    for apex in sub_list:
+                        if isinstance(apex, mtg._ProxyNode):
+                            if apex.index() not in self.step_new_apices:
+                                self.step_new_apices.append(apex.index())
+                        else:
+                            print(type(apex))
+                            print("Error list dimensions deeper than 2")
 
         # We make sure that stored vertices are well updated with the new ones
-        self.vertices = self.g.vertices(scale=self.g.max_scale())
+        self.vertices = g.vertices(scale=g.max_scale())
         
 
     def segmentation_and_primordium_formation(self, apex):
@@ -1713,9 +1722,7 @@ class RootGrowthModel(Model):
         # CALCULATING AN EQUIVALENT OF THERMAL TIME:
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = self.temperature_modification(process_at_T_ref=self.process_at_T_ref,
-                                                                    soil_temperature=apex.soil_temperature,
-                                                                    T_ref=self.T_ref, A=self.A, B=self.B, C=self.C)
+        temperature_time_adjustment = apex.temperature_modification
 
         # ADJUSTING ROOT ANGLES FOR THE FUTURE NEW SEGMENTS:
         # Optional - We can add random geometry, or not:
@@ -2017,9 +2024,7 @@ class RootGrowthModel(Model):
 
         # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
         # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-        temperature_time_adjustment = self.temperature_modification(process_at_T_ref=self.process_at_T_ref,
-                                                                    soil_temperature=apex.soil_temperature,
-                                                                    T_ref=self.T_ref, A=self.A, B=self.B, C=self.C)
+        temperature_time_adjustment = apex.temperature_modification
 
         # OPERATING PRIMORDIUM FORMATION:
         # --------------------------------
@@ -2120,28 +2125,25 @@ class RootGrowthModel(Model):
 
         return new_apex
 
-    @postsegmentation
-    @state
-    def root_hairs_dynamics(self):
+
+    def root_hairs_dynamics(self, segment):
         """
         This function computes the evolution of the density and average length of root hairs along each root,
         and specifies which hairs are alive or dead.
+
+        EDIT : After growth function to should is called in post_growth updating loop
+
         :return:
         """
         # TODO FOR TRISTAN In a second step, consider playing on the density / max. length of root hairs depending on the availability of N in the soil (if relevant)?
 
-        # We cover all the vertices in the MTG:
-        for vid in self.g.vertices_iter(scale=1):
-            # n represents the vertex:
-            n = self.g.node(vid)
+        # Repeated calls
+        n = segment
 
-            # First, we ensure that the element has a positive length:
-            if n.length <= 0:
-                continue
-
-            # We also exclude nodules and dead elements from this computation:
-            if n.type == "Just_dead" or n.type == "Dead" or n.type == "Nodule":
-                continue
+        # We also exclude nodules and dead elements from this computation:
+        n_type = n.type
+        if n_type not in ("Just_dead", "Dead", "Nodule") and n.distance_from_tip > self.growing_zone_factor * n.radius:
+            
 
             # # TODO: Check the consequences of avoiding apex in root hairs dynamics!
             # # WE ALSO AVOID ROOT APICES - EVEN IF IN THEORY ROOT HAIRS MAY ALSO APPEAR ON THEM:
@@ -2151,9 +2153,8 @@ class RootGrowthModel(Model):
             # # when the element becomes a segment.
 
             # We calculate the equivalent of a thermal time for the current time step:
-            temperature_time_adjustment = self.temperature_modification(process_at_T_ref=self.process_at_T_ref,
-                                                                    soil_temperature=n.soil_temperature,
-                                                                    T_ref=self.T_ref, A=self.A, B=self.B, C=self.C)
+            temperature_time_adjustment = n.temperature_modification
+
             elapsed_thermal_time = self.time_step_in_seconds * temperature_time_adjustment
 
             # We keep in memory the initial total mass of root hairs (possibly including dead hairs):
@@ -2161,11 +2162,7 @@ class RootGrowthModel(Model):
 
             # We calculate the total number of (newly formed) root hairs (if any) and update their age:
             # ------------------------------------------------------------------------------------------
-            # CASE 1 - If the current element is completely included within the actual growing zone of the root at the root
-            # tip, the root hairs cannot have formed yet:
-            if n.distance_from_tip <= self.growing_zone_factor * n.radius:
-                # We stop here with the calculations and move to the next element:
-                continue
+            
             # CASE 2 - If all root hairs have already been formed:
             if n.all_root_hairs_formed:
                 # Then we simply increase the time since root hairs emergence started:
@@ -2214,9 +2211,9 @@ class RootGrowthModel(Model):
                 # The elongation of the corresponding root tip is calculated as the difference between the new
                 # distance_from_tip of the element and the previous one:
                 elongation_rate_in_actual_time = (
-                                                         n.distance_from_tip - n.former_distance_from_tip) / self.time_step_in_seconds
+                                                            n.distance_from_tip - n.former_distance_from_tip) / self.time_step_in_seconds
                 elongation_rate_in_thermal_time = (
-                                                          n.distance_from_tip - n.former_distance_from_tip) / elapsed_thermal_time
+                                                            n.distance_from_tip - n.former_distance_from_tip) / elapsed_thermal_time
                 # The actual time since root hairs emergence has stopped is then calculated:
                 if elongation_rate_in_actual_time > 0.:
                     n.actual_time_since_root_hairs_emergence_stopped += \
@@ -2246,7 +2243,7 @@ class RootGrowthModel(Model):
                 # and the last one that has emerged:
                 time_since_first_death = n.thermal_time_since_root_hairs_emergence_started - n.root_hairs_lifespan
                 dead_fraction = time_since_first_death / (n.thermal_time_since_root_hairs_emergence_started
-                                                          - n.thermal_time_since_root_hairs_emergence_stopped)
+                                                            - n.thermal_time_since_root_hairs_emergence_stopped)
                 n.dead_root_hairs_number = n.total_root_hairs_number * dead_fraction
 
             # In all cases, the number of the living root hairs is then calculated by difference with the total hair number:
@@ -2260,8 +2257,8 @@ class RootGrowthModel(Model):
                 # corrected by temperature and modulated by the concentration of hexose (in the same way as for root
                 # elongation) available in the root hair zone on the root element:
                 new_length = n.root_hair_length + self.root_hairs_elongation_rate * self.root_hair_radius \
-                             * n.C_hexose_root * (n.actual_length_with_hairs / n.length) \
-                             / (self.Km_elongation + n.C_hexose_root) * elapsed_thermal_time
+                                * n.C_hexose_root * (n.actual_length_with_hairs / n.length) \
+                                / (self.Km_elongation + n.C_hexose_root) * elapsed_thermal_time
                 # If the new calculated length is higher than the maximal length:
                 if new_length > self.root_hair_max_length:
                     # We set the root hairs length to the maximal length:
@@ -2278,7 +2275,7 @@ class RootGrowthModel(Model):
             n.root_hairs_struct_mass = n.root_hairs_volume * n.root_tissue_density
             if n.total_root_hairs_number > 0.:
                 n.living_root_hairs_struct_mass = n.root_hairs_struct_mass * n.living_root_hairs_number \
-                                                  / n.total_root_hairs_number
+                                                    / n.total_root_hairs_number
             else:
                 n.living_root_hairs_struct_mass = 0.
 
@@ -2294,7 +2291,7 @@ class RootGrowthModel(Model):
             n.resp_growth += hexose_consumption * 6. * (1 - self.yield_growth)
 
 
-    def comute_mtg_axes_id(self):
+    def compute_mtg_axes_id(self):
         g = self.g
         props = self.props
         root = next(g.component_roots_at_scale_iter(g.root, scale=1))
@@ -2410,9 +2407,7 @@ class RootGrowthModel(Model):
 
             # We calculate a coefficient that will modify the different "ages" experienced by roots according to soil
             # temperature assuming a linear relationship (this is equivalent as the calculation of "growth degree-days):
-            temperature_time_adjustment = self.temperature_modification(process_at_T_ref=self.process_at_T_ref,
-                                                                    soil_temperature=n.soil_temperature,
-                                                                    T_ref=self.T_ref, A=self.A, B=self.B, C=self.C)
+            temperature_time_adjustment = n.temperature_modification
 
             # We make sure that the element is not dead and has not already been stopped at the previous time step:
             if n.type == "Dead" or n.type == "Just_dead" or n.type == "Stopped":
@@ -2634,7 +2629,8 @@ class RootGrowthModel(Model):
                                                  thermal_time_since_cells_formation=0.,
                                                  thermal_potential_time_since_emergence=0.,
                                                  thermal_time_since_growth_stopped=0.,
-                                                 thermal_time_since_death=0.
+                                                 thermal_time_since_death=0.,
+                                                 temperature_modification=0.
                                                  )
             
             return new_child
@@ -2719,7 +2715,8 @@ class RootGrowthModel(Model):
                                                  thermal_time_since_cells_formation=mother_element.thermal_time_since_cells_formation,
                                                  thermal_potential_time_since_emergence=mother_element.thermal_potential_time_since_emergence,
                                                  thermal_time_since_growth_stopped=mother_element.thermal_time_since_growth_stopped,
-                                                 thermal_time_since_death=mother_element.thermal_time_since_death
+                                                 thermal_time_since_death=mother_element.thermal_time_since_death,
+                                                 temperature_modification=mother_element.temperature_modification
                                                  )
             
             return new_child
@@ -2897,9 +2894,12 @@ class RootGrowthModel(Model):
 
             processed_length += n.length
 
-    def post_growth_updating(self, modules_to_update=[], soil_boundaries_to_infer=[]):
+    def post_growth_updating(self, modules_to_update=[], soil_boundaries_to_infer=[], optional_for_plot=False):
+        
+        # Repeated calls
         g = self.g
         props = self.props
+        root_hairs_dynamics = self.root_hairs_dynamics
 
         for module in modules_to_update:
             setattr(module, "vertices", self.vertices)
@@ -2909,13 +2909,22 @@ class RootGrowthModel(Model):
 
         props["total_living_struct_mass"][1] = 0
 
-        debug = False
         if debug: print(self.step_elongating_elements, self.step_new_apices)
 
+        if optional_for_plot:
+            iterator = pre_order2(g, root)
+        else:
+            iterator = props["focus_elements"] # It has just been computed by the Choregrapher so stick to it
+
         # from root base to tips
-        for vid in pre_order2(g, root):
+        for vid in iterator:
             n = g.node(vid)
+
+            # Update the living struct mass
             n.living_struct_mass = n.struct_mass + n.living_root_hairs_struct_mass
+
+            # Update root hairs
+            root_hairs_dynamics(segment=n)
 
             # We need to get the parent to compute mass partitionning.
             if vid in self.collar_children:
@@ -2923,31 +2932,34 @@ class RootGrowthModel(Model):
             else:
                 parent = g.parent(vid)
             p = g.node(parent)
-            # We have to introduce this to get proper axis type
-            graph_parent = g.node(g.parent(vid))
-
+            
             if n.type == 'Base_of_the_root_system' or p is None:
                 n.axis_type = 'seminal'
             else:
-                if n.root_order == 1:
-                    # First exception for pivot root that could be taken for a nodal otherwise
-                    # (Given the structure of the first fake supporting elements)
-                    if vid == max(self.collar_children):
-                        n.axis_type = 'seminal'
-                    elif n.type == 'Support_for_seminal_root' or n.type == 'Support_for_adventitious_root':
-                        n.axis_type = 'seminal'
-                    elif graph_parent.type == 'Support_for_seminal_root':
-                        n.axis_type = 'seminal'
-                    elif graph_parent.type == 'Support_for_adventitious_root':
-                        n.axis_type = 'nodal'
-                    elif graph_parent.axis_type == 'seminal':
-                        n.axis_type = 'seminal'
-                    elif graph_parent.axis_type == 'nodal':
-                        n.axis_type = 'nodal'
+                if optional_for_plot:
+                    
+                    if n.root_order == 1:
+                        # We have to introduce this to get proper axis type
+                        graph_parent = g.node(g.parent(vid))
+
+                        # First exception for pivot root that could be taken for a nodal otherwise
+                        # (Given the structure of the first fake supporting elements)
+                        if vid == max(self.collar_children):
+                            n.axis_type = 'seminal'
+                        elif n.type == 'Support_for_seminal_root' or n.type == 'Support_for_adventitious_root':
+                            n.axis_type = 'seminal'
+                        elif graph_parent.type == 'Support_for_seminal_root':
+                            n.axis_type = 'seminal'
+                        elif graph_parent.type == 'Support_for_adventitious_root':
+                            n.axis_type = 'nodal'
+                        elif graph_parent.axis_type == 'seminal':
+                            n.axis_type = 'seminal'
+                        elif graph_parent.axis_type == 'nodal':
+                            n.axis_type = 'nodal'
+                        else:
+                            print('Uncaught exception')
                     else:
-                        print('Uncaught exception')
-                else:
-                    n.axis_type = 'lateral'
+                        n.axis_type = 'lateral'
                     
                 if n.struct_mass > 0:
                     if vid not in self.collar_skip:
@@ -3014,26 +3026,27 @@ class RootGrowthModel(Model):
                                     for prop in soil_boundaries_to_infer:
                                         setattr(n, prop, getattr(p, prop))
                             
-
-                        #TODO remove, just for a figure
-                        if n.label != "Apex":
-                            if vid not in props["actual_time_since_formation"]:
-                                n.actual_time_since_formation = 0
+                        if optional_for_plot:
+                            #TODO remove, just for a figure
+                            if n.label != "Apex":
+                                if vid not in props["actual_time_since_formation"]:
+                                    n.actual_time_since_formation = 0
+                                else:
+                                    n.actual_time_since_formation += self.time_step_in_seconds / 3600 / 24
                             else:
-                                n.actual_time_since_formation += self.time_step_in_seconds / 3600 / 24
-                        else:
-                            if vid not in props["actual_time_since_formation"]:
-                                n.actual_time_since_formation = 0
-                            non_meristem_length = n.radius * 2 * 1.3 #Kozlova et al. (2020), the length of the meristematic region 1.3 times the diameter of the tip
-                            if non_meristem_length < n.length:
-                                aging_length = n.length - non_meristem_length
-                                n.actual_time_since_formation += (self.time_step_in_seconds / 3600 / 24) * aging_length / n.length
+                                if vid not in props["actual_time_since_formation"]:
+                                    n.actual_time_since_formation = 0
+                                non_meristem_length = n.radius * 2 * 1.3 #Kozlova et al. (2020), the length of the meristematic region 1.3 times the diameter of the tip
+                                if non_meristem_length < n.length:
+                                    aging_length = n.length - non_meristem_length
+                                    n.actual_time_since_formation += (self.time_step_in_seconds / 3600 / 24) * aging_length / n.length
 
-                        n.tissue_formation_time = n.thermal_time_since_cells_formation / 3600 / 24
+                            n.tissue_formation_time = n.thermal_time_since_cells_formation / 3600 / 24
 
-        compute_axess_id = True
-        if compute_axess_id:
-            self.comute_mtg_axes_id()
+        if optional_for_plot:
+            self.compute_mtg_axes_id()
+
+    
 
 
     def __call__(self, *args, modules_to_update=[], soil_boundaries_to_infer=[]):
