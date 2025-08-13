@@ -17,13 +17,14 @@ from math import sqrt, pi, floor
 from dataclasses import dataclass
 from functools import partial
 
+from openalea.metafspm.utils import mtg_to_arraydict
+
 from openalea.mtg import *
 from openalea.mtg.traversal import post_order, pre_order2, post_order2
 from openalea.mtg import turtle as turt
 
 from openalea.metafspm.component import Model, declare
 from openalea.metafspm.component_factory import *
-from openalea.metafspm.utils import mtg_to_arraydict
 
 debug = False
 
@@ -353,7 +354,7 @@ class RootGrowthModel(Model):
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
-    def __init__(self, g=None, time_step_in_seconds: int=3600, numba_option: bool = True, **scenario: dict):
+    def __init__(self, g=None, time_step_in_seconds: int=3600, **scenario: dict):
         """
         DESCRIPTION
         -----------
@@ -369,10 +370,7 @@ class RootGrowthModel(Model):
         if g is None:
             self.g = self.initiate_mtg()
         else:
-            self.g = g
-
-        if numba_option:
-            mtg_to_arraydict(self.g)
+            self.g = g  
 
         self.props = self.g.properties()
         self.time_step_in_seconds = time_step_in_seconds

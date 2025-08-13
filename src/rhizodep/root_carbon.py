@@ -467,7 +467,7 @@ class RootCarbonModel(Model):
                 n.C_hexose_root = 0.0071 * n.distance_from_tip + 0.0002
             # After this first cm, a decrease towards a plateau has been described by several authors 
             else:
-                n.C_hexose_root = max(0.0002 * np.exp(-7.857 * n.distance_from_tip), 2e-5)
+                n.C_hexose_root = np.maximum(0.0002 * np.exp(-7.857 * n.distance_from_tip), 2e-5)
 
 
     def total_root_sucrose_and_living_struct_mass(self):
@@ -599,7 +599,7 @@ class RootCarbonModel(Model):
                                                                     A=self.phloem_unloading_A,
                                                                     B=self.phloem_unloading_B,
                                                                     C=self.phloem_unloading_C)
-                return max(2. * max_unloading_rate * C_sucrose_root * phloem_exchange_surface / (
+                return np.maximum(2. * max_unloading_rate * C_sucrose_root * phloem_exchange_surface / (
                             self.Km_unloading + C_sucrose_root), 0)
             
     # TODO : Remove, just for output
@@ -620,7 +620,7 @@ class RootCarbonModel(Model):
         if C_hexose_root <= 0.:
             return 0.
         else:
-            return max(0.5 * max_loading_rate * phloem_exchange_surface * C_hexose_root / (self.Km_loading + C_hexose_root), 0.)
+            return np.maximum(0.5 * max_loading_rate * phloem_exchange_surface * C_hexose_root / (self.Km_loading + C_hexose_root), 0.)
         
 
     @rate
@@ -728,7 +728,7 @@ class RootCarbonModel(Model):
             
             corrected_permeability_coeff = corrected_P_max_apex
             # print("Concentration : ", C_hexose_root * living_struct_mass / symplasmic_volume, "gradient :", (C_hexose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil)
-            return max(corrected_permeability_coeff * ((C_hexose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil) * root_exchange_surface,
+            return np.maximum(corrected_permeability_coeff * ((C_hexose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil) * root_exchange_surface,
                        0)
         
     @rate
@@ -815,7 +815,7 @@ class RootCarbonModel(Model):
                                                    self.Cs_mucilage_soil_max - Cs_mucilage_soil) / self.Cs_mucilage_soil_max
             # TODO: Validate this linear decrease until reaching the max surfacic density.
 
-            return max(corrected_secretion_rate_max * root_exchange_surface * C_hexose_root / (
+            return np.maximum(corrected_secretion_rate_max * root_exchange_surface * C_hexose_root / (
                     self.Km_secretion + C_hexose_root), 0.)
 
     # Release of root cells:
@@ -867,7 +867,7 @@ class RootCarbonModel(Model):
 
             # The release of cells by the root is then calculated according to this surface:
             # TODO: Are we sure that cells release is not dependent on C availability?
-            return max(root_exchange_surface * corrected_cells_surfacic_release, 0.)
+            return np.maximum(root_exchange_surface * corrected_cells_surfacic_release, 0.)
 
     # These methods calculate the time derivative (dQ/dt) of the amount in each pool, for a given root element, based on
     # a C balance.
