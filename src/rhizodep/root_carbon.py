@@ -94,7 +94,7 @@ class RootCarbonModel(Model):
                                    variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
 
     # FROM GROWTH MODEL
-    type: str = declare(default="Normal_root_after_emergence", unit="", unit_comment="", description="Example segment type provided by root growth model", 
+    type: int = declare(default=1, unit="", unit_comment="", description="Example segment type provided by root growth model", 
                        min_value="", max_value="", value_comment="", references="", DOI="",
                         variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     radius: float = declare(default=3.5e-4, unit="m", unit_comment="", description="Example root segment radius", 
@@ -431,6 +431,54 @@ class RootCarbonModel(Model):
                                                 min_value="", max_value="", value_comment="DO A REAL ESTIMATION!", references="", DOI="",
                                                 variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
 
+    # Helpers to keep labels intergers
+    label_Segment: int = declare(default=1, unit="adim", unit_comment="", description="label utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    label_Apex: int = declare(default=2, unit="adim", unit_comment="", description="label utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    
+    
+    # Helpers to keep types intergers
+    type_Base_of_the_root_system: int = declare(default=1, unit="adim", unit_comment="", description="type utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    type_Support_for_seminal_root: int = declare(default=2, unit="adim", unit_comment="", description="type utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    type_Seminal_root_before_emergence: int = declare(default=3, unit="adim", unit_comment="", description="type utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    type_Support_for_adventitious_root: int = declare(default=4, unit="adim", unit_comment="", description="type utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    type_Adventitious_root_before_emergence: int = declare(default=5, unit="adim", unit_comment="", description="type utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    type_Normal_root_before_emergence: int = declare(default=6, unit="adim", unit_comment="", description="type utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    type_Normal_root_after_emergence: int = declare(default=7, unit="adim", unit_comment="", description="type utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    type_Stopped: int = declare(default=8, unit="adim", unit_comment="", description="type utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    type_Just_stopped: int = declare(default=9, unit="adim", unit_comment="", description="type utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    type_Dead: int = declare(default=10, unit="adim", unit_comment="", description="type utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    type_Just_dead: int = declare(default=11, unit="adim", unit_comment="", description="type utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+    type_Root_nodule: int = declare(default=12, unit="adim", unit_comment="", description="type utility", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="parameter", by="model_carbon", state_variable_type="", edit_by="user")
+
+
     def __init__(self, g, time_step: int,  **scenario: dict):
         """
         DESCRIPTION
@@ -542,7 +590,7 @@ class RootCarbonModel(Model):
             n = self.g.node(vid)
             # If the element has not emerged yet, it doesn't contain any sucrose yet;
             # if has died, it should not contain any sucrose anymore:
-            if n.length <= 0. or n.type == "Dead" or n.type == "Just_dead":
+            if n.length <= 0. or n.type == self.type_Dead or n.type == self.type_Just_dead:
                 n.C_sucrose_root = 0.
             else:
                 # The local sucrose concentration in the root is calculated from the new sucrose concentration calculated above:
@@ -564,7 +612,7 @@ class RootCarbonModel(Model):
                                              hexose_consumption_by_growth, soil_temperature):
         
         # We consider all the cases where no net exchange should be allowed:
-        if length <= 0. or phloem_exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
+        if length <= 0. or phloem_exchange_surface <= 0. or type == self.type_Just_Dead or type == self.type_Dead:
             return 0
 
         else:
@@ -585,7 +633,7 @@ class RootCarbonModel(Model):
     def _hexose_active_production_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
                                                      hexose_consumption_by_growth, soil_temperature):
         # We consider all the cases where no net exchange should be allowed:
-        if length <= 0. or phloem_exchange_surface <= 0. or type == "Just_dead" or type == "Dead":
+        if length <= 0. or phloem_exchange_surface <= 0. or type == self.type_Just_dead or type == self.type_Dead:
             return 0
 
         else:
@@ -630,7 +678,7 @@ class RootCarbonModel(Model):
         CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE
         We verify that the element does not correspond to a primordium that has not emerged:
         """
-        if length <= 0. or C_hexose_root < 0. or C_hexose_reserve < 0. or type == "Root_nodule":
+        if length <= 0. or C_hexose_root < 0. or C_hexose_reserve < 0. or type == self.type_Root_nodule:
             return 0.
         else:
             # We correct maximum rates according to soil temperature:
@@ -651,7 +699,7 @@ class RootCarbonModel(Model):
                                           living_struct_mass, soil_temperature):
         # CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE:
         if C_hexose_root <= self.C_hexose_root_min_for_reserve or C_hexose_reserve >= self.C_hexose_reserve_max \
-                or type == "Just_dead" or type == "Dead":
+                or type == self.type_Just_dead or type == self.type_Dead:
             return 0.
         else:
             corrected_max_immobilization_rate = self.max_immobilization_rate \
@@ -681,7 +729,7 @@ class RootCarbonModel(Model):
         # CONSIDERING CASES THAT SHOULD BE AVOIDED:
         # We consider that dead elements cannot respire (unless over the first time step following death,
         # i.e. when the type is "Just_dead"):
-        if type == "Dead" or C_hexose_root <= 0.:
+        if type == self.type_Dead or C_hexose_root <= 0.:
             return 0.
         else:
             # We correct the maximal respiration rate according to soil temperature:
@@ -759,7 +807,7 @@ class RootCarbonModel(Model):
 
     @rate
     def _hexose_uptake_from_soil(self, length, root_exchange_surface, C_hexose_soil, type, soil_temperature):
-        if length <= 0 or root_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
+        if length <= 0 or root_exchange_surface <= 0. or C_hexose_soil <= 0. or type == self.type_Just_dead or type == self.type_Dead:
             return 0.
         else:
             corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
@@ -773,7 +821,7 @@ class RootCarbonModel(Model):
 
     @rate
     def _phloem_hexose_uptake_from_soil(self, length, phloem_exchange_surface, C_hexose_soil, type, soil_temperature):
-        if length <= 0 or phloem_exchange_surface <= 0. or C_hexose_soil <= 0. or type == "Just_dead" or type == "Dead":
+        if length <= 0 or phloem_exchange_surface <= 0. or C_hexose_soil <= 0. or type == self.type_Just_dead or type == self.type_Dead:
             return 0.
         else:
             corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
@@ -792,7 +840,7 @@ class RootCarbonModel(Model):
     @rate
     def _mucilage_secretion(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_mucilage_soil, soil_temperature):
         # First, we ensure that the element has a positive length and surface of exchange:
-        if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0. or type == "Dead" or type == "Stopped" or distance_from_tip < length:
+        if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0. or type == self.type_Dead or type == self.type_Stopped or distance_from_tip < length:
             return 0.
         else:
             # We correct the maximal secretion rate according to soil temperature
@@ -827,7 +875,7 @@ class RootCarbonModel(Model):
     @rate
     def _cells_release(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_cells_soil, soil_temperature):
         # First, we ensure that the element has a positive length and surface of exchange:
-        if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0. or type == "Just_dead" or type == "Dead" or type == "Stopped":
+        if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0. or type == self.type_Just_dead or type == self.type_Dead or type == self.type_Stopped:
             return 0.
         else:
             # We modify the maximal surfacic release rate according to the mean distance to the tip (in the middle of the
