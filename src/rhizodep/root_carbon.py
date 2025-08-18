@@ -490,6 +490,9 @@ class RootCarbonModel(Model):
         :param scenario: mapping of existing variable initialization and parameters to superimpose.
         :return:
         """
+        # Before any other operation, we apply the provided scenario by changing default parameters and initialization
+        self.apply_scenario(**scenario)
+
         self.g = g
         self.props = self.g.properties()
         self.time_step = time_step
@@ -497,7 +500,6 @@ class RootCarbonModel(Model):
         self.vertices = self.g.vertices(scale=self.g.max_scale())
 
         # Before any other operation, we apply the provided scenario by changing default parameters and initialization
-        self.apply_scenario(**scenario)
         self.link_self_to_mtg()
         self.initiate_heterogeneous_variables() # TODO Transfer to root growth or condition by only if root system is created
 
@@ -665,10 +667,11 @@ class RootCarbonModel(Model):
                                                                                  A=self.max_loading_rate_A,
                                                                                  B=self.max_loading_rate_B,
                                                                                  C=self.max_loading_rate_C)
-        if C_hexose_root <= 0.:
-            return 0.
-        else:
-            return np.maximum(0.5 * max_loading_rate * phloem_exchange_surface * C_hexose_root / (self.Km_loading + C_hexose_root), 0.)
+        # if C_hexose_root <= 0.:
+        #     return 0.
+        # else:
+        #     return np.maximum(0.5 * max_loading_rate * phloem_exchange_surface * C_hexose_root / (self.Km_loading + C_hexose_root), 0.)
+        return np.where(C_hexose_root > 0., np.maximum(0.5 * max_loading_rate * phloem_exchange_surface * C_hexose_root / (self.Km_loading + C_hexose_root), 0.), 0.)
         
 
     @rate
@@ -1152,7 +1155,7 @@ class RootCarbonModel(Model):
                 # In the case the element did not emerge (i.e. its age is higher that the normal simulation time step),
                 # there must have been a problem:
                 if self.n.actual_time_since_emergence > self.time_step_in_days * (24. * 60. * 60.):
-                    print("!!! For element", self.n.index(),
+                    print("!!! For element", self.n._vid,
                           "the initial mass before updating concentrations in the solver was 0 or NA!")
             else:
                 # Otherwise, new concentrations are calculated considering the new amounts in each pool and the initial mass of the element:
@@ -1174,7 +1177,7 @@ class RootCarbonModel(Model):
                 # In the case the element did not emerge (i.e. its age is higher that the normal simulation time step),
                 # there must have been a problem:
                 if self.n.actual_time_since_emergence > self.time_step_in_days * (24. * 60. * 60.):
-                    print("!!! For element", self.n.index(),
+                    print("!!! For element", self.n._vid,
                           "the initial surface before updating concentrations in the solver was 0 or NA!")
             else:
                 self.n.Cs_mucilage_soil = (self.n.mucilage_soil) / surface
@@ -1217,13 +1220,13 @@ class RootCarbonModel(Model):
             # We calculate the structural mass to which concentrations are related:
             mass = (self.n.initial_struct_mass + self.n.initial_living_root_hairs_struct_mass)
             if isnan(mass):
-                print("!!! For element", self.n.index(),
+                print("!!! For element", self.n._vid,
                       "the initial mass before updating the initial conditions in the solver was NA!")
                 mass = 0.
             # We calculate the external surface to which some concentrations are related:
             surface = (self.n.initial_external_surface + self.n.initial_living_root_hairs_external_surface)
             if isnan(surface):
-                print("!!! For element", self.n.index(),
+                print("!!! For element", self.n._vid,
                       "the initial external surface before updating the initial conditions in the solver was NA!")
                 surface = 0.
 
@@ -1316,7 +1319,7 @@ class RootCarbonModel(Model):
             # OPTIONAL: We can print the results of the different iterations at some of the micro time steps!
             if self.printing_solver_outputs:
                 try:
-                    # print(self.n.type, "-", self.n.label, "-", self.n.index())
+                    # print(self.n.type, "-", self.n.label, "-", self.n._vid)
                     solver_times = pd.DataFrame(sol.t)
                     solver_times.columns = ['Time']
                     solver_y = pd.DataFrame(sol.y)
@@ -1456,7 +1459,7 @@ class RootCarbonModel(Model):
     #         if using_solver:
     #
     #             if printing_solver_outputs:
-    #                 print("Considering for the solver the element", n.index(), "of length", n.length, "...")
+    #                 print("Considering for the solver the element", n._vid, "of length", n.length, "...")
     #
     #             # We use the class corresponding to the system of differential equations and its resolution:
     #             System = self.Differential_Equation_System(self.g, n,

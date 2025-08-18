@@ -602,7 +602,8 @@ class RootGrowthModel(Model):
                                                                radius=base_radius,
                                                                identical_properties=False,
                                                                nil_properties=True)
-                    segment.vertex_index = segment.index()
+
+                    segment.vertex_index = segment._vid
 
                     # We define the radius of a seminal root according to the parameter Di:
                     if self.random:
@@ -621,12 +622,12 @@ class RootGrowthModel(Model):
                                                                     radius=radius_seminal,
                                                                     identical_properties=False,
                                                                     nil_properties=True)
-                    apex_seminal.vertex_index = apex_seminal.index()
+                    apex_seminal.vertex_index = apex_seminal._vid
                     apex_seminal.original_radius = radius_seminal
                     apex_seminal.initial_radius = radius_seminal
                     apex_seminal.growth_duration = self.GDs * (2. * radius_seminal) ** 2 * self.main_roots_growth_extender
                     # apex_seminal.growth_duration = self.calculate_growth_duration(radius=radius_seminal,
-                    #                                                                            index=apex_seminal.index(),
+                    #                                                                            index=apex_seminal._vid,
                     #                                                                            root_order=1)
                     apex_seminal.life_duration = self.LDs * (2. * radius_seminal) * apex_seminal.root_tissue_density
 
@@ -682,7 +683,8 @@ class RootGrowthModel(Model):
                                                                radius=base_radius,
                                                                identical_properties=False,
                                                                nil_properties=True)
-                    segment.vertex_index = segment.index()
+                    
+                    segment.vertex_index = segment._vid
 
                     # We define the radius of a adventitious root according to the parameter Di:
                     if self.random:
@@ -703,13 +705,13 @@ class RootGrowthModel(Model):
                                                                          radius=radius_adventitious,
                                                                          identical_properties=False,
                                                                          nil_properties=True)
-                    apex_adventitious.vertex_index = apex_adventitious.index()
+                    apex_adventitious.vertex_index = apex_adventitious._vid
                     apex_adventitious.original_radius = radius_adventitious
                     apex_adventitious.initial_radius = radius_adventitious
                     apex_adventitious.growth_duration = self.GDs * (2. * radius_adventitious) ** 2 * self.main_roots_growth_extender
                     # apex_adventitious.growth_duration = self.calculate_growth_duration(
                     #     radius=radius_adventitious,
-                    #     index=apex_adventitious.index(),
+                    #     index=apex_adventitious._vid,
                     #     root_order=1)
                     apex_adventitious.life_duration = self.LDs * (2. * radius_adventitious) * apex_adventitious.root_tissue_density
 
@@ -728,12 +730,12 @@ class RootGrowthModel(Model):
                                                 radius=base_radius,
                                                 identical_properties=False,
                                                 nil_properties=True)
-        apex.vertex_index = apex.index()
+        apex.vertex_index = apex._vid
         apex.original_radius = apex.radius
         apex.initial_radius = apex.radius
         apex.growth_duration = self.GDs * (2. * base_radius) ** 2 * self.main_roots_growth_extender
         # apex.growth_duration = self.calculate_growth_duration(radius=base_radius,
-        #                                                                    index=apex.index(),
+        #                                                                    index=apex._vid,
         #                                                                    root_order=1)
         apex.life_duration = self.LDs * (2. * base_radius) * apex.root_tissue_density
 
@@ -917,12 +919,12 @@ class RootGrowthModel(Model):
                 # Otherwise, we control the actual emergence of this primordium through the management of the parent:
                 else:
                     # We select the parent on which the primordium has been formed:
-                    vid = apex.index()
+                    vid = apex._vid
                     index_parent = self.g.Father(vid, EdgeType='+')
                     parent = self.g.node(index_parent)
                     # The possibility of emergence of a lateral root from the parent is recorded inside the parent:
                     parent.lateral_root_emergence_possibility = "Possible"
-                    parent.lateral_primordium_index = apex.index()
+                    parent.lateral_primordium_index = apex._vid
                     # And the new element returned by the function corresponds to the potentially emerging apex:
                     new_apex.append(apex)
                     # And the function returns this new apex and stops here:
@@ -999,7 +1001,7 @@ class RootGrowthModel(Model):
                                                                   elongation_time_in_seconds=time_step_in_seconds * temperature_time_adjustment - apex.thermal_time_since_growth_stopped)
                     # VERIFICATION:
                     if self.time_step_in_seconds * temperature_time_adjustment - apex.thermal_time_since_growth_stopped < 0.:
-                        print("!!! ERROR: The apex", apex.index(), "has stopped since",
+                        print("!!! ERROR: The apex", apex._vid, "has stopped since",
                               apex.actual_time_since_growth_stopped,
                               "seconds; the time step is", self.time_step_in_seconds)
                         print("We set the potential length of this apex equal to its initial length.")
@@ -1083,7 +1085,7 @@ class RootGrowthModel(Model):
                 elongation = self.EL * 2. * radius * C_hexose_root / (
                         self.Km_elongation + C_hexose_root) * elongation_time_in_seconds
             else:
-                if debug: print(f"For element {element.index()}, no elongation, negative concentrations!! ", C_hexose_root)
+                if debug: print(f"For element {element._vid}, no elongation, negative concentrations!! ", C_hexose_root)
                 elongation = 0.
 
         # We calculate the new potential length corresponding to this elongation:
@@ -1118,7 +1120,7 @@ class RootGrowthModel(Model):
         supplying_volume = growing_zone_length * n.radius ** 2 * pi
 
         # We start counting the hexose at the apex:
-        index = n.index()
+        index = n._vid
         current_element = n
 
         # We initialize a temporary variable that will be used as a counter:
@@ -1185,7 +1187,7 @@ class RootGrowthModel(Model):
         if n.struct_mass_contributing_to_elongation > 0.:
             n.growing_zone_C_hexose_root = n.hexose_possibly_required_for_elongation / n.struct_mass_contributing_to_elongation
         else:
-            print("!!! ERROR: the mass contributing to elongation in element", n.index(), "of type", n.type, "is",
+            print("!!! ERROR: the mass contributing to elongation in element", n._vid, "of type", n.type, "is",
                   n.struct_mass_contributing_to_elongation,
                   "g, and its structural mass is", n.struct_mass, "g!")
             n.growing_zone_C_hexose_root = 0.
@@ -1227,7 +1229,7 @@ class RootGrowthModel(Model):
             # We consider the amount of hexose available in the nodule AND in the parent segment
             # (EXCLUDING the amount of hexose in living rot hairs):
             # TODO: Should the C from root hairs be used for helping nodules to grow?
-            index_parent = self.g.Father(segment.index(), EdgeType='+')
+            index_parent = self.g.Father(segment._vid, EdgeType='+')
             parent = self.g.node(index_parent)
             segment.hexose_available_for_thickening = parent.C_hexose_root * parent.struct_mass \
                                                       + segment.C_hexose_root * segment.struct_mass
@@ -1277,20 +1279,20 @@ class RootGrowthModel(Model):
         # ---------------------------------------------------------------
 
         # We look at the apex of the axis to which the segment belongs (i.e. we get the last element of the axis):
-        index_apex = self.g.Axis(segment.index())[-1]
+        index_apex = self.g.Axis(segment._vid)[-1]
         apex = self.g.node(index_apex)
-        # print("For segment", segment.index(), "the terminal index is", index_apex, "and has the type", apex.type)
+        # print("For segment", segment._vid, "the terminal index is", index_apex, "and has the type", apex.type)
         if apex.label != self.label_Apex:
-            print("ERROR: when trying to access the terminal apex of the axis of the segment", segment.index(),
+            print("ERROR: when trying to access the terminal apex of the axis of the segment", segment._vid,
                 "we obtained the element", index_apex," that is a", apex.label, "!!!")
 
         # Depending on the type of the apex, we adjust the type of the segment on the same axis:
         if apex.type == self.type_Just_stopped:
             segment.type = self.type_Just_stopped
-            # print("The segment", segment.index(), "has been considered as just stopped as the apex", index_apex, "has just stopped.")
+            # print("The segment", segment._vid, "has been considered as just stopped as the apex", index_apex, "has just stopped.")
         elif apex.type == self.type_Stopped:
             segment.type = self.type_Stopped
-            # print("The segment", segment.index(), "has been considered as stopped as the apex", index_apex, "has stopped.")
+            # print("The segment", segment._vid, "has been considered as stopped as the apex", index_apex, "has stopped.")
 
         # CHECKING POSSIBLE ROOT SEGMENT DEATH:
         # -------------------------------------
@@ -1302,7 +1304,7 @@ class RootGrowthModel(Model):
             number_of_actual_children += 1
 
             if child.radius < 0. or child.potential_radius < 0.:
-                print("!!! ERROR: the radius of the element", child.index(), "is negative!")
+                print("!!! ERROR: the radius of the element", child._vid, "is negative!")
             # If the child belongs to the same axis:
             if child.edge_type == '<':
                 # Then we record the THEORETICAL section of this child:
@@ -1482,7 +1484,7 @@ class RootGrowthModel(Model):
             # We verify that this potential growth demand is positive:
             if n.hexose_growth_demand < 0.:
                 print("!!! ERROR: a negative growth demand of", n.hexose_growth_demand,
-                      "was calculated for the element", n.index(), "of class", n.label)
+                      "was calculated for the element", n._vid, "of class", n.label)
                 print("The initial volume is", initial_volume, "the potential volume is", potential_volume)
                 print("The initial length was", n.initial_length, "and the potential length was",
                       n.potential_length)
@@ -1564,7 +1566,7 @@ class RootGrowthModel(Model):
                     * n.root_tissue_density * self.struct_mass_C_content / self.yield_growth
 
                 # Finally we store this elongation information to expose it to other modules
-                self.step_elongating_elements.append(n.index())
+                self.step_elongating_elements.append(n._vid)
                 
                 # If there has been an actual elongation:
                 if n.length > n.initial_length:
@@ -1607,7 +1609,7 @@ class RootGrowthModel(Model):
                     # Otherwise, we calculate the radius of a cylinder:
                     possible_radius = sqrt(volume_max / (n.length * pi))
                 if possible_radius < 0.9999 * n.initial_radius:  # We authorize a difference of 0.01% due to calculation errors!
-                    print("!!! ERROR: the calculated new radius of element", n.index(),
+                    print("!!! ERROR: the calculated new radius of element", n._vid,
                           "is lower than the initial one!")
                     print("The possible radius was", possible_radius, "and the initial radius was",
                           n.initial_radius)
@@ -1643,7 +1645,7 @@ class RootGrowthModel(Model):
                     (hexose_actual_contribution_to_thickening * fraction_of_available_hexose_in_the_element) \
                     * (1 - self.yield_growth) * 6.
                 if n.type == self.type_Root_nodule:
-                    index_parent = g.Father(n.index(), EdgeType='+')
+                    index_parent = g.Father(n._vid, EdgeType='+')
                     parent = g.node(index_parent)
                     fraction_of_available_hexose_in_the_element = \
                         (parent.C_hexose_root * parent.initial_struct_mass) / hexose_available_for_thickening
@@ -1667,12 +1669,12 @@ class RootGrowthModel(Model):
             n.struct_mass_produced = (n.volume - initial_volume) * n.root_tissue_density
 
             if n.struct_mass < n.initial_struct_mass and n.struct_mass_produced > 0.:
-                print(f"!!! ERROR during initialisation for initial struct mass, no concentrations will be updated on {n.index()}")
+                print(f"!!! ERROR during initialisation for initial struct mass, no concentrations will be updated on {n._vid}")
                 n.initial_struct_mass = n.struct_mass
 
             # Verification: we check that no negative length or struct_mass have been generated!
             if n.volume < 0:
-                print("!!! ERROR: the element", n.index(), "of class", n.label, "has a length of", n.length,
+                print("!!! ERROR: the element", n._vid, "of class", n.label, "has a length of", n.length,
                       "and a mass of", n.struct_mass)
                 # We then reset all the geometrical values to their initial values:
                 n.length = n.initial_length
@@ -1699,7 +1701,7 @@ class RootGrowthModel(Model):
                     n.actual_elongation_rate = n.actual_elongation / n.actual_time_since_emergence
                     # Note: at this stage, no sugar has been allocated to the emerging primordium itself!
                     # if n.type == "Adventitious_root_before_emergence":
-                    #     print("> A new adventitious root has emerged, starting from element", n.index(), "!")
+                    #     print("> A new adventitious root has emerged, starting from element", n._vid, "!")
                 elif n.type == self.type_Normal_root_after_emergence:
                     # The actual elongation rate is calculated:
                     n.actual_elongation = n.length - n.initial_length
@@ -1739,13 +1741,13 @@ class RootGrowthModel(Model):
             new_apex =  self.segmentation_and_primordium_formation(apex=g.node(vid))
             for sub_list in new_apex:
                 if isinstance(sub_list, mtg._ProxyNode):
-                    if sub_list.index() not in self.step_new_apices:
-                        self.step_new_apices.append(sub_list.index())
+                    if sub_list._vid not in self.step_new_apices:
+                        self.step_new_apices.append(sub_list._vid)
                 else:
                     for apex in sub_list:
                         if isinstance(apex, mtg._ProxyNode):
-                            if apex.index() not in self.step_new_apices:
-                                self.step_new_apices.append(apex.index())
+                            if apex._vid not in self.step_new_apices:
+                                self.step_new_apices.append(apex._vid)
                         else:
                             print(type(apex))
                             print("Error list dimensions deeper than 2")
@@ -1778,7 +1780,7 @@ class RootGrowthModel(Model):
         # Optional - We can add random geometry, or not:
         if self.random:
             # The seed used to generate random values is defined according to a parameter random_choice and the index of the apex:
-            np.random.seed(self.random_choice * apex.index())
+            np.random.seed(self.random_choice * apex._vid)
             angle_mean = 0
             angle_var = 5
             segment_angle_down = np.random.normal(angle_mean, angle_var)
@@ -2102,7 +2104,7 @@ class RootGrowthModel(Model):
         # We also set the root angles depending on random:
         if self.random:
             # The seed used to generate random values is defined according to a parameter random_choice and the index of the apex:
-            np.random.seed(self.random_choice * apex.index())
+            np.random.seed(self.random_choice * apex._vid)
             potential_radius = np.random.normal((apex.radius - self.Dmin / 2.) * self.RMD + self.Dmin / 2.,
                                                 ((apex.radius - self.Dmin / 2.) * self.RMD + self.Dmin / 2.) * self.CVDD)
             apex_angle_roll = abs(np.random.normal(120, 10))
@@ -2158,7 +2160,7 @@ class RootGrowthModel(Model):
             if self.simple_growth_duration:
                 ramif.growth_duration = self.GDs * (2. * ramif.radius) ** 2 * self.main_roots_growth_extender
             else:
-                ramif.growth_duration = self.calculate_growth_duration(radius=ramif.radius, index=ramif.index(),
+                ramif.growth_duration = self.calculate_growth_duration(radius=ramif.radius, index=ramif._vid,
                                                                        root_order=ramif.root_order)
                 
             # We specify the exact time since formation:
@@ -2168,7 +2170,7 @@ class RootGrowthModel(Model):
             # by taking into account the actual elongation of apex since the child formation:
             apex.dist_to_ramif = elongation_since_last_ramif
             # # We also put in memory the index of the child:
-            # apex.lateral_primordium_index = ramif.index()
+            # apex.lateral_primordium_index = ramif._vid
             # We add the apex and its ramif in the list of apices returned by the function:
             new_apex.append(apex)
             new_apex.append(ramif)
@@ -2506,7 +2508,7 @@ class RootGrowthModel(Model):
 
             # VERIFICATION:
             if n.length < 0 or n.struct_mass < 0:
-                print("!!! ERROR: the element", n.index(), "of class", n.label, "has a length of", n.length,
+                print("!!! ERROR: the element", n._vid, "of class", n.label, "has a length of", n.length,
                       "and a mass of", n.struct_mass)
 
     # Formation of root nodules:
@@ -2533,7 +2535,7 @@ class RootGrowthModel(Model):
         nodule.volume = self.volume_from_radius_and_length(nodule, nodule.radius, nodule.length)
         nodule.struct_mass = nodule.volume * nodule.root_tissue_density * self.struct_mass_C_content
 
-        # print("Nodule", nodule.index(), "has been formed!")
+        # print("Nodule", nodule._vid, "has been formed!")
 
         return nodule
 
@@ -2960,6 +2962,13 @@ class RootGrowthModel(Model):
         props["total_living_struct_mass"][1] = 0
 
         if debug: print(self.step_elongating_elements, self.step_new_apices)
+
+        if "focus_elements" not in props.keys():
+            filter =  {"label": [1, 2], "type":[1, 7, 8, 9, 10, 11, 12]} # in line with choregrapger
+            props["focus_elements"] = [vid for vid in props["struct_mass"].keys() if (
+                props["struct_mass"][vid] > 0 # NOTE : Check if robust, don't we need any calculation for non emerged elements?
+                and props["label"][vid] in filter["label"] 
+                and props["type"][vid] in filter["type"])]
 
         if optional_for_plot:
             iterator = pre_order2(g, root)
