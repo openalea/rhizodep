@@ -55,16 +55,16 @@ class RootGrowthModel(Model):
     # --- INITIALIZE MODEL STATE VARIABLES ---
     type: int = declare(default=1, unit="", unit_comment="", description="Example segment type provided by root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     label: int = declare(default=1, unit="", unit_comment="", description="Example segment label provided by root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     root_order: int = declare(default=1, unit="", unit_comment="", description="Example root segment's axis order computed by the initiate_mtg method or provided as input", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
     vertex_index: int = declare(default=1, unit="mol.s-1", unit_comment="", description="Unique vertex identifier stored for ease of value access", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     axis_index: str = declare(default="seminal_1", unit="dimensionless", unit_comment="", description="Unique axis identifier stored for ease of value access", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
@@ -2946,6 +2946,7 @@ class RootGrowthModel(Model):
 
             processed_length += n.length
 
+
     def post_growth_updating(self, modules_to_update=[], soil_boundaries_to_infer=[], optional_for_plot=False):
         
         # Repeated calls
@@ -2966,7 +2967,7 @@ class RootGrowthModel(Model):
         if "focus_elements" not in props.keys():
             filter =  {"label": [1, 2], "type":[1, 7, 8, 9, 10, 11, 12]} # in line with choregrapger
             props["focus_elements"] = [vid for vid in props["struct_mass"].keys() if (
-                props["struct_mass"][vid] > 0 # NOTE : Check if robust, don't we need any calculation for non emerged elements?
+                props["struct_mass"][vid] > 0. # NOTE : Check if robust, don't we need any calculation for non emerged elements?
                 and props["label"][vid] in filter["label"] 
                 and props["type"][vid] in filter["type"])]
 
@@ -3049,6 +3050,10 @@ class RootGrowthModel(Model):
                                         
                                     for prop in module.descriptor:
                                         props[prop].update({vid: None})
+
+                                    # New for ArrayDicts but optional if coming back to dicts
+                                    for prop in module.non_inertial_variables:
+                                        props[prop].update({vid: 0.})
 
                                 # For soil related inputs, given new elements have been formed and we will not compute soil interception now, we infer the values from those of the parent
                                 for prop in soil_boundaries_to_infer:

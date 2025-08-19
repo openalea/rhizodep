@@ -611,46 +611,37 @@ class RootCarbonModel(Model):
     # considering that 2 mol of hexose are produced for 1 mol of sucrose.
     @rate
     def _hexose_diffusion_from_phloem(self, type, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
-                                             hexose_consumption_by_growth, soil_temperature):
+                                             hexose_consumption_by_growth, soil_temperature, global_sucrose_deficit):
         
-        # We consider all the cases where no net exchange should be allowed:
-        if length <= 0. or phloem_exchange_surface <= 0. or type == self.type_Just_Dead or type == self.type_Dead:
-            return 0
 
-        else:
-            if (self.props["global_sucrose_deficit"][1] > 0.) or (C_sucrose_root <= C_hexose_root / 2.):
-                return 0
-            else:
-                phloem_permeability = self.phloem_permeability * (1 + hexose_consumption_by_growth /
-                                                                  self.reference_rate_of_hexose_consumption_by_growth)
-                phloem_permeability *= self.temperature_modification(soil_temperature=soil_temperature,
-                                                                     T_ref=self.phloem_unloading_T_ref,
-                                                                     A=self.phloem_unloading_A,
-                                                                     B=self.phloem_unloading_B,
-                                                                     C=self.phloem_unloading_C)
+        phloem_permeability = self.phloem_permeability * (1 + hexose_consumption_by_growth /
+                                                            self.reference_rate_of_hexose_consumption_by_growth)
+        phloem_permeability *= self.temperature_modification(soil_temperature=soil_temperature,
+                                                                T_ref=self.phloem_unloading_T_ref,
+                                                                A=self.phloem_unloading_A,
+                                                                B=self.phloem_unloading_B,
+                                                                C=self.phloem_unloading_C)
 
-                return 2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) * phloem_exchange_surface
+            
+        return np.where((length <= 0.) | (phloem_exchange_surface <= 0.) | (type == self.type_Just_Dead) | (type == self.type_Dead) | (np.any(global_sucrose_deficit > 0.)) | (C_sucrose_root <= C_hexose_root / 2.), 0.,
+                        2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) * phloem_exchange_surface)
+            
 
     @rate
     def _hexose_active_production_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
-                                                     hexose_consumption_by_growth, soil_temperature):
-        # We consider all the cases where no net exchange should be allowed:
-        if length <= 0. or phloem_exchange_surface <= 0. or type == self.type_Just_dead or type == self.type_Dead:
-            return 0
-
-        else:
-            if (self.props["global_sucrose_deficit"][1] > 0.) or (C_sucrose_root <= C_hexose_root / 2.):
-                return 0
-            else:
-                max_unloading_rate = self.max_unloading_rate * (1 + hexose_consumption_by_growth /
-                                                                self.reference_rate_of_hexose_consumption_by_growth)
-                max_unloading_rate *= self.temperature_modification(soil_temperature=soil_temperature,
-                                                                    T_ref=self.phloem_unloading_T_ref,
-                                                                    A=self.phloem_unloading_A,
-                                                                    B=self.phloem_unloading_B,
-                                                                    C=self.phloem_unloading_C)
-                return np.maximum(2. * max_unloading_rate * C_sucrose_root * phloem_exchange_surface / (
-                            self.Km_unloading + C_sucrose_root), 0)
+                                                     hexose_consumption_by_growth, soil_temperature, global_sucrose_deficit):
+        
+        max_unloading_rate = self.max_unloading_rate * (1 + hexose_consumption_by_growth /
+                                                        self.reference_rate_of_hexose_consumption_by_growth)
+        max_unloading_rate *= self.temperature_modification(soil_temperature=soil_temperature,
+                                                            T_ref=self.phloem_unloading_T_ref,
+                                                            A=self.phloem_unloading_A,
+                                                            B=self.phloem_unloading_B,
+                                                            C=self.phloem_unloading_C)
+        
+        return np.where((length <= 0.) | (phloem_exchange_surface <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead) | (np.any(global_sucrose_deficit > 0.)) | (C_sucrose_root <= C_hexose_root / 2.), 0.,
+                        np.maximum(2. * max_unloading_rate * C_sucrose_root * phloem_exchange_surface / (
+                            self.Km_unloading + C_sucrose_root), 0))
             
     # TODO : Remove, just for output
     @rate
@@ -667,10 +658,6 @@ class RootCarbonModel(Model):
                                                                                  A=self.max_loading_rate_A,
                                                                                  B=self.max_loading_rate_B,
                                                                                  C=self.max_loading_rate_C)
-        # if C_hexose_root <= 0.:
-        #     return 0.
-        # else:
-        #     return np.maximum(0.5 * max_loading_rate * phloem_exchange_surface * C_hexose_root / (self.Km_loading + C_hexose_root), 0.)
         return np.where(C_hexose_root > 0., np.maximum(0.5 * max_loading_rate * phloem_exchange_surface * C_hexose_root / (self.Km_loading + C_hexose_root), 0.), 0.)
         
 
@@ -681,39 +668,36 @@ class RootCarbonModel(Model):
         CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE
         We verify that the element does not correspond to a primordium that has not emerged:
         """
-        if length <= 0. or C_hexose_root < 0. or C_hexose_reserve < 0. or type == self.type_Root_nodule:
-            return 0.
-        else:
-            # We correct maximum rates according to soil temperature:
-            corrected_max_mobilization_rate = self.max_mobilization_rate * self.temperature_modification(
-                                                                        soil_temperature=soil_temperature,
-                                                                        T_ref=self.max_mobilization_rate_T_ref,
-                                                                        A=self.max_mobilization_rate_A,
-                                                                        B=self.max_mobilization_rate_B,
-                                                                        C=self.max_mobilization_rate_C)
-            if C_hexose_reserve <= self.C_hexose_reserve_min:
-                return 0.
-            else:
-                return corrected_max_mobilization_rate * C_hexose_reserve / (
-                        self.Km_mobilization + C_hexose_reserve) * living_struct_mass
+
+        # We correct maximum rates according to soil temperature:
+        corrected_max_mobilization_rate = self.max_mobilization_rate * self.temperature_modification(
+                                                                    soil_temperature=soil_temperature,
+                                                                    T_ref=self.max_mobilization_rate_T_ref,
+                                                                    A=self.max_mobilization_rate_A,
+                                                                    B=self.max_mobilization_rate_B,
+                                                                    C=self.max_mobilization_rate_C)
+            
+        return np.where((length <= 0.) | (C_hexose_root < 0.) | (C_hexose_reserve < 0.) | (type == self.type_Root_nodule) | (C_hexose_reserve <= self.C_hexose_reserve_min), 0.,
+                        corrected_max_mobilization_rate * C_hexose_reserve / (
+                        self.Km_mobilization + C_hexose_reserve) * living_struct_mass)
+    
 
     @rate
     def _hexose_immobilization_as_reserve(self, C_hexose_root, C_hexose_reserve, type,
                                           living_struct_mass, soil_temperature):
         # CALCULATIONS OF THEORETICAL IMMOBILIZATION RATE:
-        if C_hexose_root <= self.C_hexose_root_min_for_reserve or C_hexose_reserve >= self.C_hexose_reserve_max \
-                or type == self.type_Just_dead or type == self.type_Dead:
-            return 0.
-        else:
-            corrected_max_immobilization_rate = self.max_immobilization_rate \
-                                                * self.temperature_modification(
-                                                                        soil_temperature=soil_temperature,
-                                                                        T_ref=self.max_immobilization_rate_T_ref,
-                                                                        A=self.max_immobilization_rate_A,
-                                                                        B=self.max_immobilization_rate_B,
-                                                                        C=self.max_immobilization_rate_C)
+        corrected_max_immobilization_rate = self.max_immobilization_rate \
+                                            * self.temperature_modification(
+                                                                    soil_temperature=soil_temperature,
+                                                                    T_ref=self.max_immobilization_rate_T_ref,
+                                                                    A=self.max_immobilization_rate_A,
+                                                                    B=self.max_immobilization_rate_B,
+                                                                    C=self.max_immobilization_rate_C)
 
-            return corrected_max_immobilization_rate * C_hexose_root / (self.Km_immobilization + C_hexose_root) * living_struct_mass
+        return np.where((C_hexose_root <= self.C_hexose_root_min_for_reserve) | (C_hexose_reserve >= self.C_hexose_reserve_max) \
+                | (type == self.type_Just_dead) | (type == self.type_Dead), 0.,
+                corrected_max_immobilization_rate * C_hexose_root / (self.Km_immobilization + C_hexose_root) * living_struct_mass)
+    
 
     # Function calculating maintenance respiration:
     # ----------------------------------------------
@@ -726,24 +710,25 @@ class RootCarbonModel(Model):
     # to the structural dry mass of the element n and is regulated by a Michaelis-Menten function of the local
     # concentration of hexose.
 
+
     @rate
     def _maintenance_respiration(self, type, C_hexose_root, living_struct_mass, soil_temperature):
 
         # CONSIDERING CASES THAT SHOULD BE AVOIDED:
         # We consider that dead elements cannot respire (unless over the first time step following death,
         # i.e. when the type is "Just_dead"):
-        if type == self.type_Dead or C_hexose_root <= 0.:
-            return 0.
-        else:
-            # We correct the maximal respiration rate according to soil temperature:
-            corrected_resp_maintenance_max = self.resp_maintenance_max * self.temperature_modification(
-                                                                    soil_temperature=soil_temperature,
-                                                                    T_ref=self.resp_maintenance_max_T_ref,
-                                                                    A=self.resp_maintenance_max_A,
-                                                                    B=self.resp_maintenance_max_B,
-                                                                    C=self.resp_maintenance_max_C)
 
-            return corrected_resp_maintenance_max * C_hexose_root / (self.Km_maintenance + C_hexose_root) * living_struct_mass
+        # We correct the maximal respiration rate according to soil temperature:
+        corrected_resp_maintenance_max = self.resp_maintenance_max * self.temperature_modification(
+                                                                soil_temperature=soil_temperature,
+                                                                T_ref=self.resp_maintenance_max_T_ref,
+                                                                A=self.resp_maintenance_max_A,
+                                                                B=self.resp_maintenance_max_B,
+                                                                C=self.resp_maintenance_max_C)
+        
+        return np.where((type == self.type_Dead) | (C_hexose_root <= 0.), 0.,
+                        corrected_resp_maintenance_max * C_hexose_root / (self.Km_maintenance + C_hexose_root) * living_struct_mass)
+
 
     # Exudation of hexose from the root into the soil:
     # ------------------------------------------------
@@ -762,46 +747,46 @@ class RootCarbonModel(Model):
 
     @rate
     def _hexose_exudation(self, living_struct_mass, length, root_exchange_surface, symplasmic_volume, C_hexose_root, C_hexose_soil, soil_temperature):
-        if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
-            return 0.
-        else:
-            corrected_P_max_apex = self.Pmax_apex * self.temperature_modification(
-                                                                   soil_temperature=soil_temperature,
-                                                                   T_ref=self.permeability_coeff_T_ref,
-                                                                   A=self.permeability_coeff_A,
-                                                                   B=self.permeability_coeff_B,
-                                                                   C=self.permeability_coeff_C)
-            # if distance_from_tip < length:
-            #     print("!!!ERROR!!! The distance to tip is lower than the length of the root element", vid)
-            # else:
-            #     corrected_permeability_coeff = corrected_P_max_apex \
-            #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
-            
-            corrected_permeability_coeff = corrected_P_max_apex
-            # print("Concentration : ", C_hexose_root * living_struct_mass / symplasmic_volume, "gradient :", (C_hexose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil)
-            return np.maximum(corrected_permeability_coeff * ((C_hexose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil) * root_exchange_surface,
-                       0)
         
+        corrected_P_max_apex = self.Pmax_apex * self.temperature_modification(soil_temperature=soil_temperature,
+                                                                T_ref=self.permeability_coeff_T_ref,
+                                                                A=self.permeability_coeff_A,
+                                                                B=self.permeability_coeff_B,
+                                                                C=self.permeability_coeff_C)
+        # if distance_from_tip < length:
+        #     print("!!!ERROR!!! The distance to tip is lower than the length of the root element", vid)
+        # else:
+        #     corrected_permeability_coeff = corrected_P_max_apex \
+        #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
+        
+        corrected_permeability_coeff = corrected_P_max_apex
+        # print("Concentration : ", C_hexose_root * living_struct_mass / symplasmic_volume, "gradient :", (C_hexose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil)
+        
+        return np.where((length <= 0) | (root_exchange_surface <= 0.) | (C_hexose_root <= 0.), 0.,
+                        np.maximum(corrected_permeability_coeff * ((C_hexose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil) * root_exchange_surface, 0.))
+        
+
     @rate
     def _phloem_hexose_exudation(self, living_struct_mass, length, symplasmic_volume, root_exchange_surface, C_hexose_root, C_sucrose_root,
                                         C_hexose_soil, phloem_exchange_surface, soil_temperature):
-        if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0.:
-            return 0.
-        else:
-            corrected_P_max_apex = self.Pmax_apex * self.temperature_modification(
-                                                                   soil_temperature=soil_temperature,
-                                                                   T_ref=self.permeability_coeff_T_ref,
-                                                                   A=self.permeability_coeff_A,
-                                                                   B=self.permeability_coeff_B,
-                                                                   C=self.permeability_coeff_C)
-            # if distance_from_tip < length:
-            #     print("!!!ERROR!!! The distance to tip is lower than the length of the root element", vid)
-            # else:
-            #     corrected_permeability_coeff = corrected_P_max_apex \
-            #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
-            corrected_permeability_coeff = corrected_P_max_apex
-            return corrected_permeability_coeff * ((2 * C_sucrose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil) * phloem_exchange_surface
+        
+        corrected_P_max_apex = self.Pmax_apex * self.temperature_modification(
+                                                                soil_temperature=soil_temperature,
+                                                                T_ref=self.permeability_coeff_T_ref,
+                                                                A=self.permeability_coeff_A,
+                                                                B=self.permeability_coeff_B,
+                                                                C=self.permeability_coeff_C)
+        # if distance_from_tip < length:
+        #     print("!!!ERROR!!! The distance to tip is lower than the length of the root element", vid)
+        # else:
+        #     corrected_permeability_coeff = corrected_P_max_apex \
+        #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
+        corrected_permeability_coeff = corrected_P_max_apex
+
+        return np.where((length <= 0) | (root_exchange_surface <= 0.) | (C_hexose_root <= 0.), 0.,
+                        corrected_permeability_coeff * ((2 * C_sucrose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil) * phloem_exchange_surface)
     
+
     # Uptake of hexose from the soil by the root:
     # -------------------------------------------
     # This function computes the rate of hexose uptake by roots from the soil. This influx of hexose is represented
@@ -810,64 +795,59 @@ class RootCarbonModel(Model):
 
     @rate
     def _hexose_uptake_from_soil(self, length, root_exchange_surface, C_hexose_soil, type, soil_temperature):
-        if length <= 0 or root_exchange_surface <= 0. or C_hexose_soil <= 0. or type == self.type_Just_dead or type == self.type_Dead:
-            return 0.
-        else:
-            corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
+        
+        corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
+                                                                            soil_temperature=soil_temperature,
+                                                                            T_ref=self.uptake_rate_max_T_ref,
+                                                                            A=self.uptake_rate_max_A,
+                                                                            B=self.uptake_rate_max_B,
+                                                                            C=self.uptake_rate_max_C)
+        
+        return np.where((length <= 0) | (root_exchange_surface <= 0.) | (C_hexose_soil <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead), 0.,
+                        corrected_uptake_rate_max * root_exchange_surface * C_hexose_soil / (self.Km_uptake + C_hexose_soil))
+
+
+    @rate
+    def _phloem_hexose_uptake_from_soil(self, length, phloem_exchange_surface, C_hexose_soil, type, soil_temperature):
+        
+        corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
                                                                                 soil_temperature=soil_temperature,
                                                                                 T_ref=self.uptake_rate_max_T_ref,
                                                                                 A=self.uptake_rate_max_A,
                                                                                 B=self.uptake_rate_max_B,
                                                                                 C=self.uptake_rate_max_C)
-            return corrected_uptake_rate_max * root_exchange_surface \
-                * C_hexose_soil / (self.Km_uptake + C_hexose_soil)
+        
+        return np.where((length <= 0) | (phloem_exchange_surface <= 0.) | (C_hexose_soil <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead), 0.,
+                        corrected_uptake_rate_max * phloem_exchange_surface * C_hexose_soil / (self.Km_uptake + C_hexose_soil))
 
-    @rate
-    def _phloem_hexose_uptake_from_soil(self, length, phloem_exchange_surface, C_hexose_soil, type, soil_temperature):
-        if length <= 0 or phloem_exchange_surface <= 0. or C_hexose_soil <= 0. or type == self.type_Just_dead or type == self.type_Dead:
-            return 0.
-        else:
-            corrected_uptake_rate_max = self.uptake_rate_max * self.temperature_modification(
-                                                                                    soil_temperature=soil_temperature,
-                                                                                    T_ref=self.uptake_rate_max_T_ref,
-                                                                                    A=self.uptake_rate_max_A,
-                                                                                    B=self.uptake_rate_max_B,
-                                                                                    C=self.uptake_rate_max_C)
-
-            return corrected_uptake_rate_max * phloem_exchange_surface * C_hexose_soil / (
-                    self.Km_uptake + C_hexose_soil)
 
     # Mucilage secretion:
     # ------------------
     # This function computes the rate of mucilage secretion (in mol of equivalent hexose per second) for a given root element n.
     @rate
     def _mucilage_secretion(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_mucilage_soil, soil_temperature):
-        # First, we ensure that the element has a positive length and surface of exchange:
-        if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0. or type == self.type_Dead or type == self.type_Stopped or distance_from_tip < length:
-            return 0.
-        else:
-            # We correct the maximal secretion rate according to soil temperature
-            # (This could to a bell-shape where the maximum is obtained at 27 degree Celsius,
-            # as suggested by Morré et al. (1967) for maize mucilage secretion):
-            corrected_secretion_rate_max = self.secretion_rate_max * self.temperature_modification(
-                                                                                    soil_temperature=soil_temperature,
-                                                                                    T_ref=self.secretion_rate_max_T_ref,
-                                                                                    A=self.secretion_rate_max_A,
-                                                                                    B=self.secretion_rate_max_B,
-                                                                                    C=self.secretion_rate_max_C
-                # We also regulate the rate according to the potential accumulation of mucilage around the root:
-                # the rate is maximal when no mucilage accumulates around, and linearily decreases with the concentration
-                # of mucilage at the soil-root interface, until reaching 0 when the concentration is equal or higher than
-                # the maximal concentration soil (NOTE: Cs_mucilage_soil is expressed in mol of equivalent hexose per m2 of
-                # external surface):
-            ) / (
-                                                   (1 + (distance_from_tip - length / 2.) / radius) ** self.gamma_secretion
-                                           ) * (
-                                                   self.Cs_mucilage_soil_max - Cs_mucilage_soil) / self.Cs_mucilage_soil_max
-            # TODO: Validate this linear decrease until reaching the max surfacic density.
+        
+        # We correct the maximal secretion rate according to soil temperature
+        # (This could to a bell-shape where the maximum is obtained at 27 degree Celsius,
+        # as suggested by Morré et al. (1967) for maize mucilage secretion):
 
-            return np.maximum(corrected_secretion_rate_max * root_exchange_surface * C_hexose_root / (
-                    self.Km_secretion + C_hexose_root), 0.)
+        # We also regulate the rate according to the potential accumulation of mucilage around the root:
+            # the rate is maximal when no mucilage accumulates around, and linearily decreases with the concentration
+            # of mucilage at the soil-root interface, until reaching 0 when the concentration is equal or higher than
+            # the maximal concentration soil (NOTE: Cs_mucilage_soil is expressed in mol of equivalent hexose per m2 of
+            # external surface):
+
+        corrected_secretion_rate_max = self.secretion_rate_max * self.temperature_modification(
+                                                                                soil_temperature=soil_temperature,
+                                                                                T_ref=self.secretion_rate_max_T_ref,
+                                                                                A=self.secretion_rate_max_A,
+                                                                                B=self.secretion_rate_max_B,
+                                                                                C=self.secretion_rate_max_C) / (
+            (1 + (distance_from_tip - length / 2.) / radius) ** self.gamma_secretion) * (self.Cs_mucilage_soil_max - Cs_mucilage_soil) / self.Cs_mucilage_soil_max
+        # TODO: Validate this linear decrease until reaching the max surfacic density.
+
+        return np.where((length <= 0) | (root_exchange_surface <= 0.) | (C_hexose_root <= 0.) | (type == self.type_Dead) | (type == self.type_Stopped) | (distance_from_tip < length), 0.,
+                        np.maximum(corrected_secretion_rate_max * root_exchange_surface * C_hexose_root / (self.Km_secretion + C_hexose_root), 0.))
 
     # Release of root cells:
     # ----------------------
@@ -877,48 +857,41 @@ class RootCarbonModel(Model):
     # hexose per m2) is also linearily decreasing the release of cells at the interface.
     @rate
     def _cells_release(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_cells_soil, soil_temperature):
-        # First, we ensure that the element has a positive length and surface of exchange:
-        if length <= 0 or root_exchange_surface <= 0. or C_hexose_root <= 0. or type == self.type_Just_dead or type == self.type_Dead or type == self.type_Stopped:
-            return 0.
-        else:
+
+        cells_surfacic_release = np.where(
             # We modify the maximal surfacic release rate according to the mean distance to the tip (in the middle of the
             # root element), assuming that the release decreases linearily with the distance to the tip, until reaching 0
             # when the this distance becomes higher than the growing zone length:
-            if distance_from_tip < self.growing_zone_factor * radius:
-                average_distance = distance_from_tip - length / 2.
-                reduction = (self.growing_zone_factor * radius - average_distance) \
-                            / (self.growing_zone_factor * radius)
-                cells_surfacic_release = self.surfacic_cells_release_rate * reduction
+            (distance_from_tip < self.growing_zone_factor * radius), 
+            self.surfacic_cells_release_rate * (self.growing_zone_factor * radius - (distance_from_tip - length / 2.)) / (self.growing_zone_factor * radius), 
             # In the special case where the end of the growing zone is located somewhere on the root element:
-            elif distance_from_tip - length < self.growing_zone_factor * radius:
-                average_distance = (distance_from_tip - length) + (self.growing_zone_factor * radius
-                                                                   - (distance_from_tip - length)) / 2.
-                reduction = (self.growing_zone_factor * radius - average_distance) \
-                            / (self.growing_zone_factor * radius)
-                cells_surfacic_release = self.surfacic_cells_release_rate * reduction
-            # Otherwise, there is no cells release:
-            else:
-                return 0.
+            np.where((distance_from_tip - length < self.growing_zone_factor * radius), 
+                    self.surfacic_cells_release_rate * (self.growing_zone_factor * radius - (
+                        (distance_from_tip - length) + (self.growing_zone_factor * radius - (distance_from_tip - length)) / 2.)) / (self.growing_zone_factor * radius), 
+                        # Otherwise, there is no cells release:
+                        0.)             )
 
-            # We correct the release rate according to soil temperature:
-            corrected_cells_surfacic_release = cells_surfacic_release * self.temperature_modification(
-                                                                    soil_temperature=soil_temperature,
-                                                                    T_ref=self.surfacic_cells_release_rate_T_ref,
-                                                                    A=self.surfacic_cells_release_rate_A,
-                                                                    B=self.surfacic_cells_release_rate_B,
-                                                                    C=self.surfacic_cells_release_rate_C)
+        # We correct the release rate according to soil temperature:
+        corrected_cells_surfacic_release = cells_surfacic_release * self.temperature_modification(
+                                                                soil_temperature=soil_temperature,
+                                                                T_ref=self.surfacic_cells_release_rate_T_ref,
+                                                                A=self.surfacic_cells_release_rate_A,
+                                                                B=self.surfacic_cells_release_rate_B,
+                                                                C=self.surfacic_cells_release_rate_C)
 
-            # We also regulate the surface release rate according to the potential accumulation of cells around the root:
-            # the rate is maximal when no cells are around, and linearily decreases with the concentration of cells
-            # in the soil, until reaching 0 when the concentration is equal or higher than the maximal concentration in the
-            # soil (NOTE: Cs_cells_soil is expressed in mol of equivalent hexose per m2 of external surface):
-            corrected_cells_surfacic_release = corrected_cells_surfacic_release * (
-                    self.Cs_cells_soil_max - Cs_cells_soil) / self.Cs_cells_soil_max
-            # TODO: Validate this linear decrease until reaching the max surfacic density.
+        # We also regulate the surface release rate according to the potential accumulation of cells around the root:
+        # the rate is maximal when no cells are around, and linearily decreases with the concentration of cells
+        # in the soil, until reaching 0 when the concentration is equal or higher than the maximal concentration in the
+        # soil (NOTE: Cs_cells_soil is expressed in mol of equivalent hexose per m2 of external surface):
+        corrected_cells_surfacic_release = corrected_cells_surfacic_release * (
+                self.Cs_cells_soil_max - Cs_cells_soil) / self.Cs_cells_soil_max
+        # TODO: Validate this linear decrease until reaching the max surfacic density.
 
-            # The release of cells by the root is then calculated according to this surface:
-            # TODO: Are we sure that cells release is not dependent on C availability?
-            return np.maximum(root_exchange_surface * corrected_cells_surfacic_release, 0.)
+        # The release of cells by the root is then calculated according to this surface:
+        # TODO: Are we sure that cells release is not dependent on C availability?
+        
+        return np.where((length <= 0) | (root_exchange_surface <= 0.) | (C_hexose_root <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead) | (type == self.type_Stopped), 0.,
+                np.maximum(root_exchange_surface * corrected_cells_surfacic_release, 0.))
 
     # These methods calculate the time derivative (dQ/dt) of the amount in each pool, for a given root element, based on
     # a C balance.
@@ -926,7 +899,7 @@ class RootCarbonModel(Model):
     @state
     def _C_sucrose_root(self, vertex_index, C_sucrose_root, living_struct_mass, hexose_diffusion_from_phloem,
                             hexose_active_production_from_phloem, phloem_hexose_exudation, sucrose_loading_in_phloem,
-                            phloem_hexose_uptake_from_soil, deficit_sucrose_root):
+                            phloem_hexose_uptake_from_soil, deficit_sucrose_root) -> tuple[float, str, float]:
         
         # print({k: v for k, v in locals().items() if k != 'self'})
         
@@ -938,36 +911,35 @@ class RootCarbonModel(Model):
                 + phloem_hexose_uptake_from_soil / 2.
                 - deficit_sucrose_root)
         
-        if balance < 0:
-            deficit = - balance * living_struct_mass / self.time_step
-            self.props["deficit_sucrose_root"][vertex_index] = deficit if deficit > 1e-20 else 0.
-            return 0.
-        else:
-            self.props["deficit_sucrose_root"][vertex_index] = 0. 
-            return balance
+        deficit = - balance * living_struct_mass / self.time_step
+        deficit = np.where(deficit > 1e-20, deficit, 0.)
+        balance = np.maximum(balance, 0.)
+
+        return balance, 'deficit_sucrose_root', deficit
+
     
     @state
     def _C_hexose_reserve(self, vertex_index, C_hexose_reserve, living_struct_mass, hexose_immobilization_as_reserve,
-                              hexose_mobilization_from_reserve, deficit_hexose_reserve):
+                              hexose_mobilization_from_reserve, deficit_hexose_reserve) -> tuple[float, str, float]:
         balance = C_hexose_reserve + (self.time_step / living_struct_mass) * (
                 hexose_immobilization_as_reserve
                 - hexose_mobilization_from_reserve
                 - deficit_hexose_reserve)
         
-        if balance < 0:
-            deficit = - balance * living_struct_mass / self.time_step
-            self.props["deficit_hexose_reserve"][vertex_index] = deficit if deficit > 1e-20 else 0.
-            return 0.
-        else:
-            self.props["deficit_hexose_reserve"][vertex_index] = 0. 
-            return balance
+        
+        deficit = - balance * living_struct_mass / self.time_step
+        deficit = np.where(deficit > 1e-20, deficit, 0.)
+        balance = np.maximum(balance, 0.)
+
+        return balance, 'deficit_hexose_reserve', deficit
+    
 
     @state
     def _C_hexose_root(self, vertex_index, C_hexose_root, living_struct_mass, hexose_exudation, hexose_uptake_from_soil,
                            mucilage_secretion, cells_release, maintenance_respiration,
                            hexose_consumption_by_growth, hexose_consumption_by_fungus, hexose_diffusion_from_phloem,
                            hexose_active_production_from_phloem, sucrose_loading_in_phloem,
-                           hexose_mobilization_from_reserve, hexose_immobilization_as_reserve, deficit_hexose_root):
+                           hexose_mobilization_from_reserve, hexose_immobilization_as_reserve, deficit_hexose_root) -> tuple[float, str, float]:
         balance = C_hexose_root + (self.time_step / living_struct_mass) * (
                 - hexose_exudation
                 + hexose_uptake_from_soil
@@ -983,13 +955,11 @@ class RootCarbonModel(Model):
                 - hexose_immobilization_as_reserve
                 - deficit_hexose_root)
         
-        if balance < 0:
-            deficit = - balance * living_struct_mass / self.time_step
-            self.props["deficit_hexose_root"][vertex_index] = deficit if deficit > 1e-20 else 0.
-            return 0.
-        else:
-            self.props["deficit_hexose_root"][vertex_index] = 0. 
-            return balance
+        deficit = - balance * living_struct_mass / self.time_step
+        deficit = np.where(deficit > 1e-20, deficit, 0.)
+        balance = np.maximum(balance, 0.)
+
+        return balance, 'deficit_hexose_root', deficit
     
     
     @totalstate
