@@ -2964,12 +2964,12 @@ class RootGrowthModel(Model):
 
         if debug: print(self.step_elongating_elements, self.step_new_apices)
 
-        if "focus_elements" not in props.keys():
-            filter =  {"label": [1, 2], "type":[1, 7, 8, 9, 10, 11, 12]} # in line with choregrapger
-            props["focus_elements"] = [vid for vid in props["struct_mass"].keys() if (
-                props["struct_mass"][vid] > 0. # NOTE : Check if robust, don't we need any calculation for non emerged elements?
-                and props["label"][vid] in filter["label"] 
-                and props["type"][vid] in filter["type"])]
+        # if "focus_elements" not in props.keys():
+        filter =  {"label": [1, 2], "type":[1, 7, 8, 9, 10, 11, 12]} # in line with choregrapger
+        props["focus_elements"] = [vid for vid in props["struct_mass"].keys() if (
+            props["struct_mass"][vid] > 0. # NOTE : Check if robust, don't we need any calculation for non emerged elements?
+            and props["label"][vid] in filter["label"] 
+            and props["type"][vid] in filter["type"])]
 
         if optional_for_plot:
             iterator = pre_order2(g, root)
@@ -3027,7 +3027,7 @@ class RootGrowthModel(Model):
                         props["total_living_struct_mass"][1] += n.living_struct_mass
 
                         if len(modules_to_update) > 0: # Only relevant if the growth model has been coupled, otherwise all properties have already been updated
-                            if vid in self.step_new_apices and vid not in props["vertex_index"]:
+                            if vid in self.step_new_apices and vid not in list(props["vertex_index"].values()):
                                 
                                 # We increment the vertex identifiers to be accesses in deficits
                                 n.vertex_index = vid
@@ -3054,6 +3054,7 @@ class RootGrowthModel(Model):
                                     # New for ArrayDicts but optional if coming back to dicts
                                     for prop in module.non_inertial_variables:
                                         props[prop].update({vid: 0.})
+                                    # print("extended ", module.non_inertial_variables, vid)
 
                                 # For soil related inputs, given new elements have been formed and we will not compute soil interception now, we infer the values from those of the parent
                                 for prop in soil_boundaries_to_infer:
@@ -3082,9 +3083,15 @@ class RootGrowthModel(Model):
                                             initial_amount = getattr(p, prop)
                                             props[prop].update({vid: initial_amount * mass_fraction,
                                                                         parent: initial_amount * (1-mass_fraction)})
+
                                     
                                     if n.vertex_index is None:
                                         n.vertex_index = vid
+
+                                        for module in modules_to_update:
+                                            for prop in module.non_inertial_variables:
+                                                props[prop].update({vid: 0.})
+                                        
                                     
                                     # If first elongation but primordia was formed earlier, needs access to soil states
                                     for prop in soil_boundaries_to_infer:

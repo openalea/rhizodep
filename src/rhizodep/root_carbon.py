@@ -117,7 +117,7 @@ class RootCarbonModel(Model):
                                        variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     vertex_index: int = declare(default=1, unit="mol.s-1", unit_comment="", description="Unique vertex identifier stored for ease of value access", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="input", by="model_growth", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     total_living_struct_mass: float = declare(default=0.001, unit="g", unit_comment="", description="Summed structural mass at root system level", 
                                             min_value="", max_value="", value_comment="", references="", DOI="",
                                             variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
@@ -644,9 +644,9 @@ class RootCarbonModel(Model):
                             self.Km_unloading + C_sucrose_root), 0))
             
     # TODO : Remove, just for output
-    @rate
-    def _net_hexose_production_from_phloem(self, hexose_diffusion_from_phloem, hexose_active_production_from_phloem):
-        return hexose_diffusion_from_phloem + hexose_active_production_from_phloem
+    # @rate
+    # def _net_hexose_production_from_phloem(self, hexose_diffusion_from_phloem, hexose_active_production_from_phloem):
+    #     return hexose_diffusion_from_phloem + hexose_active_production_from_phloem
 
     @rate
     def _sucrose_loading_in_phloem(self, phloem_exchange_surface, C_hexose_root, soil_temperature):
@@ -897,7 +897,7 @@ class RootCarbonModel(Model):
     # a C balance.
         
     @state
-    def _C_sucrose_root(self, vertex_index, C_sucrose_root, living_struct_mass, hexose_diffusion_from_phloem,
+    def _C_sucrose_root(self, C_sucrose_root, living_struct_mass, hexose_diffusion_from_phloem,
                             hexose_active_production_from_phloem, phloem_hexose_exudation, sucrose_loading_in_phloem,
                             phloem_hexose_uptake_from_soil, deficit_sucrose_root) -> tuple[float, str, float]:
         
@@ -919,7 +919,7 @@ class RootCarbonModel(Model):
 
     
     @state
-    def _C_hexose_reserve(self, vertex_index, C_hexose_reserve, living_struct_mass, hexose_immobilization_as_reserve,
+    def _C_hexose_reserve(self, C_hexose_reserve, living_struct_mass, hexose_immobilization_as_reserve,
                               hexose_mobilization_from_reserve, deficit_hexose_reserve) -> tuple[float, str, float]:
         balance = C_hexose_reserve + (self.time_step / living_struct_mass) * (
                 hexose_immobilization_as_reserve
@@ -935,7 +935,7 @@ class RootCarbonModel(Model):
     
 
     @state
-    def _C_hexose_root(self, vertex_index, C_hexose_root, living_struct_mass, hexose_exudation, hexose_uptake_from_soil,
+    def _C_hexose_root(self, C_hexose_root, living_struct_mass, hexose_exudation, hexose_uptake_from_soil,
                            mucilage_secretion, cells_release, maintenance_respiration,
                            hexose_consumption_by_growth, hexose_consumption_by_fungus, hexose_diffusion_from_phloem,
                            hexose_active_production_from_phloem, sucrose_loading_in_phloem,
