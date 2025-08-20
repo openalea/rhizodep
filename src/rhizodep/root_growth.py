@@ -3052,9 +3052,12 @@ class RootGrowthModel(Model):
                                         props[prop].update({vid: None})
 
                                     # New for ArrayDicts but optional if coming back to dicts
-                                    for prop in module.non_inertial_variables:
-                                        props[prop].update({vid: 0.})
-                                    # print("extended ", module.non_inertial_variables, vid)
+                                    for prop in module.non_inertial_intensive:
+                                        props[prop].update({vid: getattr(p, prop)})
+                                    
+                                    for prop in module.non_inertial_extensive:
+                                        props[prop].update({vid: mass_fraction * getattr(p, prop)})
+                                    
 
                                 # For soil related inputs, given new elements have been formed and we will not compute soil interception now, we infer the values from those of the parent
                                 for prop in soil_boundaries_to_infer:
@@ -3087,12 +3090,16 @@ class RootGrowthModel(Model):
                                     
                                     if n.vertex_index is None:
                                         n.vertex_index = vid
+                                        
+                                        mass_fraction = n.living_struct_mass / (n.living_struct_mass + p.living_struct_mass)
 
                                         for module in modules_to_update:
-                                            for prop in module.non_inertial_variables:
-                                                props[prop].update({vid: 0.})
-                                        
-                                    
+                                            for prop in module.non_inertial_intensive:
+                                                props[prop].update({vid: getattr(p, prop)})
+
+                                            for prop in module.non_inertial_extensive:
+                                                props[prop].update({vid: mass_fraction * getattr(p, prop)})
+                                            
                                     # If first elongation but primordia was formed earlier, needs access to soil states
                                     for prop in soil_boundaries_to_infer:
                                         setattr(n, prop, getattr(p, prop))
