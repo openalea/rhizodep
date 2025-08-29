@@ -20,7 +20,7 @@ from functools import partial
 from openalea.metafspm.utils import mtg_to_arraydict
 
 from openalea.mtg import *
-from openalea.mtg.traversal import post_order, pre_order2, post_order2
+from openalea.mtg.traversal import pre_order2, post_order2
 from openalea.mtg import turtle as turt
 
 from openalea.metafspm.component import Model, declare
@@ -62,8 +62,14 @@ class RootGrowthModel(Model):
     root_order: int = declare(default=1, unit="", unit_comment="", description="Example root segment's axis order computed by the initiate_mtg method or provided as input", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="descriptor", edit_by="user")
-    vertex_index: int = declare(default=1, unit="mol.s-1", unit_comment="", description="Unique vertex identifier stored for ease of value access", 
+    vertex_index: int = declare(default=1, unit="dimensionless", unit_comment="", description="Unique vertex identifier stored for ease of value access", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
+    parent_id: int = declare(default=-1, unit="dimensionless", unit_comment="", description="Unique vertex identifier of current element's parent stored for ease of value access", 
+                                                    min_value="", max_value="", value_comment="-1 as default when there is no parent assigned", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
+    axis_apex_id: int = declare(default=-1, unit="dimensionless", unit_comment="", description="Vertex identifier of the terminal apex of the root axis bearing the considered segment", 
+                                                    min_value="", max_value="", value_comment="-1 as default when not assigned", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialIntensive", edit_by="user")
     axis_index: str = declare(default="seminal_1", unit="dimensionless", unit_comment="", description="Unique axis identifier stored for ease of value access", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
@@ -437,12 +443,13 @@ class RootGrowthModel(Model):
                 # self.collar_children += [k for k in children if self.props["type"][k] not in ('Support_for_seminal_root', 'Support_for_adventitious_root')]
                 self.collar_children += [k for k in children if not (self.props["label"][k] == self.label_Segment and self.props["length"][k] == 0)] # Alternative as these properties can be overridden during the simulation
 
-        # TODO introduce an option instead of commenting!
-        self.initiate_heterogeneous_variables()
-
         # Partial to avoid call overhead
         self.growth_temperature_modification = partial(self.temperature_modification, process_at_T_ref=self.process_at_T_ref,
                                             T_ref=self.T_ref, A=self.A, B=self.B, C=self.C)
+        
+        # TODO introduce an option instead of commenting!
+        self.initiate_heterogeneous_variables()
+
 
 
     def initiate_mtg(self):
@@ -753,17 +760,26 @@ class RootGrowthModel(Model):
         return g
 
     def initiate_heterogeneous_variables(self):
+        g = self.g
+        self.step_new_apices = []
+        self.step_elongating_elements = []
+
         # We cover all the vertices in the MTG:
-        for vid in self.g.vertices_iter(scale=1):
+        for vid in g.vertices_iter(scale=1):
             # n represents the vertex:
-            n = self.g.node(vid)
+            n = g.node(vid)
             n.vertex_index = vid
+            if vid in self.collar_children:
+                parent = 1
+            else:
+                parent = g.parent(vid)
+            n.parent_id = parent if parent is not None else -1
             n.volume = self.volume_from_radius_and_length(n, n.radius, n.length)
             n.struct_mass = n.volume * self.new_root_tissue_density
             n.living_struct_mass = n.struct_mass + n.living_root_hairs_struct_mass
-            n.temperature_modification = self.temperature_modification(n.soil_temperature)
+            n.temperature_modification = self.growth_temperature_modification(n.soil_temperature)
 
-        algo.orders(self.g)
+        algo.orders(g)
         self.update_distance_from_tip()
         # self.initiate_heterogeneous_struct_mass_production()
         self.post_growth_updating()
@@ -786,8 +802,8 @@ class RootGrowthModel(Model):
         potential_segment_development = self.potential_segment_development
         temperature_modification = self.growth_temperature_modification
 
-        # We simulate the development of all apices and segments in the MTG:
-        for vid in g.vertices_iter(scale=1):
+        # We simulate the development of all apices and segments from tips to the base, so that :
+        for vid in post_order2(g, 1):
             n = g.node(vid)
 
             # Re-initializes different growth-related variables (e.g. potential growth variables).
@@ -817,8 +833,16 @@ class RootGrowthModel(Model):
             n.temperature_modification = temperature_modification(n.soil_temperature)
 
             if n.label == self.label_Apex:
+                # Edge case because we assign soil states only to emerged elements
+                if n.length == 0.:
+                    parent = g.parent(vid) if vid not in self.collar_children else 1
+                    n.soil_temperature = g.node(parent).soil_temperature
+                # Store temperature modifications for further calls
+                n.temperature_modification = temperature_modification(n.soil_temperature)
                 potential_apex_development(apex=n)
             elif n.label == self.label_Segment:
+                # Store temperature modifications for further calls
+                n.temperature_modification = temperature_modification(n.soil_temperature)
                 potential_segment_development(segment=n)
 
 
@@ -1279,12 +1303,14 @@ class RootGrowthModel(Model):
         # ---------------------------------------------------------------
 
         # We look at the apex of the axis to which the segment belongs (i.e. we get the last element of the axis):
-        index_apex = self.g.Axis(segment._vid)[-1]
-        apex = self.g.node(index_apex)
-        # print("For segment", segment._vid, "the terminal index is", index_apex, "and has the type", apex.type)
-        if apex.label != self.label_Apex:
-            print("ERROR: when trying to access the terminal apex of the axis of the segment", segment._vid,
-                "we obtained the element", index_apex," that is a", apex.label, "!!!")
+        apex = self.g.node(segment.axis_apex_id)
+
+        # index_apex = self.g.Axis(segment._vid)[-1]
+        # apex = self.g.node(index_apex)
+        # # print("For segment", segment._vid, "the terminal index is", index_apex, "and has the type", apex.type)
+        # if apex.label != self.label_Apex:
+        #     print("ERROR: when trying to access the terminal apex of the axis of the segment", segment._vid,
+        #         "we obtained the element", index_apex," that is a", apex.label, "!!!")
 
         # Depending on the type of the apex, we adjust the type of the segment on the same axis:
         if apex.type == self.type_Just_stopped:
@@ -1445,7 +1471,7 @@ class RootGrowthModel(Model):
         root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
         root = next(root_gen)
         # We cover all the vertices in the MTG, from the tips to the base:
-        for vid in post_order(g, root):
+        for vid in post_order2(g, root):
 
             # n represents the current root element:
             n = g.node(vid)
@@ -2343,6 +2369,179 @@ class RootGrowthModel(Model):
             n.resp_growth += hexose_consumption * 6. * (1 - self.yield_growth)
 
 
+    def root_hairs_dynamics_opt(self, p, v):
+        """
+        This function computes the evolution of the density and average length of root hairs along each root,
+        and specifies which hairs are alive or dead.
+
+        EDIT : After growth function to should is called in post_growth updating loop
+
+        :return:
+        """
+        # TODO FOR TRISTAN In a second step, consider playing on the density / max. length of root hairs depending on the availability of N in the soil (if relevant)?
+
+        # We also exclude nodules and dead elements from this computation:
+        n_type = p["type"][v]
+        if n_type not in (self.type_Just_dead, self.type_Dead, self.type_Root_nodule) and p["distance_from_tip"][v] > self.growing_zone_factor * p["radius"][v]:
+            # STORE SOME OF THE HANDLES TO AVOID REPEATED LOOKUPS
+            distance_from_tip = p["distance_from_tip"]
+            length = p["length"]
+            radius = p["radius"]
+            
+            # # TODO: Check the consequences of avoiding apex in root hairs dynamics!
+            # # WE ALSO AVOID ROOT APICES - EVEN IF IN THEORY ROOT HAIRS MAY ALSO APPEAR ON THEM:
+            # if n.label == "Apex":
+            #     continue
+            # # Even if root hairs should have already emerge on that root apex, they will appear in the next step (or in a few steps)
+            # # when the element becomes a segment.
+
+            # We calculate the equivalent of a thermal time for the current time step:
+            temperature_time_adjustment = p["temperature_modification"][v]
+
+            elapsed_thermal_time = self.time_step_in_seconds * temperature_time_adjustment
+
+            # We keep in memory the initial total mass of root hairs (possibly including dead hairs):
+            initial_root_hairs_struct_mass = p["root_hairs_struct_mass"][v]
+
+            # We calculate the total number of (newly formed) root hairs (if any) and update their age:
+            # ------------------------------------------------------------------------------------------
+            
+            # CASE 2 - If all root hairs have already been formed:
+            if p["all_root_hairs_formed"][v]:
+                # Then we simply increase the time since root hairs emergence started:
+                p["actual_time_since_root_hairs_emergence_started"][v] += self.time_step_in_seconds
+                p["thermal_time_since_root_hairs_emergence_started"][v] += elapsed_thermal_time
+                p["actual_time_since_root_hairs_emergence_stopped"][v] += self.time_step_in_seconds
+                p["thermal_time_since_root_hairs_emergence_stopped"][v] += elapsed_thermal_time
+                total_root_hairs_number = p["total_root_hairs_number"][v]
+            # CASE 3 - If the theoretical growing zone limit is located somewhere within the root element:
+            elif distance_from_tip[v] - length[v] < self.growing_zone_factor * radius[v]:
+                # We first record the previous length of the root hair zone within the element:
+                initial_length_with_hairs = p["actual_length_with_hairs"][v]
+                # Then the new length of the root hair zone is calculated:
+                p["actual_length_with_hairs"][v] = distance_from_tip[v] - self.growing_zone_factor * radius[v]
+                net_increase_in_root_hairs_length = p["actual_length_with_hairs"][v] - initial_length_with_hairs
+                # The corresponding number of root hairs is calculated:
+                total_root_hairs_number = self.root_hairs_density * radius[v] * p["actual_length_with_hairs"][v]
+                p["total_root_hairs_number"][v] = total_root_hairs_number
+                # The time since root hair formation started is then calculated, using the recent increase in the length
+                # of the current root hair zone and the elongation rate of the corresponding root tip. The latter is
+                # calculated using the difference between the new distance_from_tip of the element and the previous one:
+                elongation_rate_in_actual_time = (distance_from_tip[v] - p["former_distance_from_tip"][v]) / self.time_step_in_seconds
+                elongation_rate_in_thermal_time = (distance_from_tip[v] - p["former_distance_from_tip"][v]) / elapsed_thermal_time
+                # SUBCASE 3.1 - If root hairs had not emerged at the previous time step:
+                if elongation_rate_in_actual_time > 0. and initial_length_with_hairs <= 0.:
+                    # We increase the time since root hairs emerged by only the fraction of the time step corresponding to the growth of hairs:
+                    p["actual_time_since_root_hairs_emergence_started"][v] += \
+                        self.time_step_in_seconds - net_increase_in_root_hairs_length / elongation_rate_in_actual_time
+                    p["thermal_time_since_root_hairs_emergence_started"][v] += \
+                        elapsed_thermal_time - net_increase_in_root_hairs_length / elongation_rate_in_thermal_time
+                # SUBCASE 3.2 - the hairs had already started to grow:
+                else:
+                    # Consequently, the full time elapsed during this time step can be added to the age:
+                    p["actual_time_since_root_hairs_emergence_started"][v] += self.time_step_in_seconds
+                    p["thermal_time_since_root_hairs_emergence_started"][v] += elapsed_thermal_time
+            # CASE 4 - the element is now "full" with root hairs as the limit of root elongation is located further down:
+            else:
+                # The actual time since root hairs emergence started is first increased:
+                p["actual_time_since_root_hairs_emergence_started"][v] += self.time_step_in_seconds
+                p["thermal_time_since_root_hairs_emergence_started"][v] += elapsed_thermal_time
+                # We then record the previous length of the root hair zone within the root element:
+                initial_length_with_hairs = p["actual_length_with_hairs"][v]
+                # And the new length of the root hair zone is necessarily the full length of the root element:
+                p["actual_length_with_hairs"][v] = length[v]
+                net_increase_in_root_hairs_length = p["actual_length_with_hairs"][v] - initial_length_with_hairs
+                # The total number of hairs is defined according to the radius and total length of the element:
+                total_root_hairs_number = self.root_hairs_density * radius[v] * length[v]
+                p["total_root_hairs_number"][v] = total_root_hairs_number
+                # The elongation of the corresponding root tip is calculated as the difference between the new
+                # distance_from_tip of the element and the previous one:
+                elongation_rate_in_actual_time = (distance_from_tip[v] - p["former_distance_from_tip"][v]) / self.time_step_in_seconds
+                elongation_rate_in_thermal_time = (distance_from_tip[v] - p["former_distance_from_tip"][v]) / elapsed_thermal_time
+                # The actual time since root hairs emergence has stopped is then calculated:
+                if elongation_rate_in_actual_time > 0.:
+                    p["actual_time_since_root_hairs_emergence_stopped"][v] += \
+                        self.time_step_in_seconds - net_increase_in_root_hairs_length / elongation_rate_in_actual_time
+                    p["thermal_time_since_root_hairs_emergence_stopped"][v] += \
+                        elapsed_thermal_time - net_increase_in_root_hairs_length / elongation_rate_in_thermal_time
+                else:
+                    p["actual_time_since_root_hairs_emergence_stopped"][v] += self.time_step_in_seconds
+                    p["thermal_time_since_root_hairs_emergence_stopped"][v] += elapsed_thermal_time
+                # At this stage, all root hairs that could be formed have been formed, so we record this:
+                p["all_root_hairs_formed"][v] = True
+
+            # We now calculate the number of living and dead root hairs:
+            # -----------------------------------------------------------
+            # Root hairs are dying when the time since they emerged is higher than their lifespan.
+            # If the time since root hairs emergence started is lower than the lifespan,
+            # no root hair should be dead:
+            if p["thermal_time_since_root_hairs_emergence_started"][v] <= p["root_hairs_lifespan"][v]:
+                p["dead_root_hairs_number"][v] = 0.
+            # Otherwise, if the time since root hairs emergence stopped is higher than the lifespan:
+            elif p["thermal_time_since_root_hairs_emergence_stopped"][v] > p["root_hairs_lifespan"][v]:
+                # Then all the root hairs of the root element must now be dead:
+                p["dead_root_hairs_number"][v] = total_root_hairs_number
+            # In the intermediate case, there are currently both dead and living root hairs on the root element:
+            else:
+                # We assume that there is a linear decrease of root hair age between the first hair that has emerged
+                # and the last one that has emerged:
+                time_since_first_death = p["thermal_time_since_root_hairs_emergence_started"][v] - p["root_hairs_lifespan"][v]
+                dead_fraction = time_since_first_death / (p["thermal_time_since_root_hairs_emergence_started"][v]
+                                                            - p["thermal_time_since_root_hairs_emergence_stopped"][v])
+                p["dead_root_hairs_number"][v] = total_root_hairs_number * dead_fraction
+
+            # In all cases, the number of the living root hairs is then calculated by difference with the total hair number:
+            living_root_hairs_number = total_root_hairs_number - p["dead_root_hairs_number"][v]
+            p["living_root_hairs_number"][v] = living_root_hairs_number
+
+            # We calculate the new average root hairs length, if needed:
+            # ----------------------------------------------------------
+            # If the root hairs had not reached their maximal length:
+            if p["root_hair_length"][v] < self.root_hair_max_length:
+                # The new potential root hairs length is calculated according to the elongation rate,
+                # corrected by temperature and modulated by the concentration of hexose (in the same way as for root
+                # elongation) available in the root hair zone on the root element:
+                new_length = p["root_hair_length"][v] + self.root_hairs_elongation_rate * self.root_hair_radius \
+                                * p["C_hexose_root"][v] * (p["actual_length_with_hairs"][v] / length[v]) \
+                                / (self.Km_elongation + p["C_hexose_root"][v]) * elapsed_thermal_time
+                # If the new calculated length is higher than the maximal length:
+                if new_length > self.root_hair_max_length:
+                    # We set the root hairs length to the maximal length:
+                    root_hair_length = self.root_hair_max_length
+                else:
+                    # Otherwise, we record the new calculated length:
+                    root_hair_length = new_length
+                p["root_hair_length"][v] = root_hair_length
+
+            else:
+                root_hair_length = p["root_hair_length"][v]
+
+            # We finally calculate the total external surface (m2), volume (m3) and mass (g) of root hairs:
+            # ----------------------------------------------------------------------------------------------
+            # In the calculation of surface, we consider the root hair to be a cylinder, and include the lateral section,
+            # but exclude the section of the cylinder at the tip:
+            root_hairs_volume = (self.root_hair_radius ** 2 * pi) * root_hair_length * total_root_hairs_number
+            p["root_hairs_volume"][v] = root_hairs_volume
+            root_hairs_struct_mass = root_hairs_volume * p["root_tissue_density"][v]
+            p["root_hairs_struct_mass"][v] = root_hairs_struct_mass
+            if total_root_hairs_number > 0.:
+                p["living_root_hairs_struct_mass"][v] = root_hairs_struct_mass * living_root_hairs_number / total_root_hairs_number
+            else:
+                p["living_root_hairs_struct_mass"][v] = 0.
+
+            # We calculate the mass of hairs that has been effectively produced, including from root hairs that may have died since then:
+            # ----------------------------------------------------------------------------------------------------------------------------
+            # We calculate the new production as the difference between initial and final mass:
+            root_hairs_struct_mass_produced = root_hairs_struct_mass - initial_root_hairs_struct_mass
+            p["root_hairs_struct_mass_produced"][v] = root_hairs_struct_mass_produced
+
+            # We add the cost of producing the new living root hairs (if any) to the hexose consumption by growth:
+            hexose_consumption = root_hairs_struct_mass_produced * self.struct_mass_C_content / self.yield_growth / 6.
+            p["hexose_consumption_by_growth_amount"][v] += hexose_consumption
+            p["hexose_consumption_by_growth"][v] += hexose_consumption / self.time_step_in_seconds
+            p["resp_growth"][v] += hexose_consumption * 6. * (1 - self.yield_growth)
+
+
     def compute_mtg_axes_id(self):
         g = self.g
         props = self.props
@@ -2401,7 +2600,7 @@ class RootGrowthModel(Model):
         root = next(root_gen)
 
         # We cover all the vertices in the MTG:
-        for vid in post_order(self.g, root):
+        for vid in post_order2(self.g, root):
             # n represents the current root element:
             n = self.g.node(vid)
 
@@ -2449,7 +2648,7 @@ class RootGrowthModel(Model):
         # -------------------------------
 
         # We cover all the vertices in the MTG:
-        for vid in post_order(self.g, root):
+        for vid in post_order2(self.g, root):
 
             # n represents the current root element:
             n = self.g.node(vid)
@@ -2539,8 +2738,8 @@ class RootGrowthModel(Model):
 
         return nodule
 
-    @postsegmentation
-    @state
+    # @postsegmentation
+    # @state
     def update_distance_from_tip(self):
         """
         The function "distance_from_tip" computes the distance (in meter) of a given vertex from the apex
@@ -2548,32 +2747,32 @@ class RootGrowthModel(Model):
         Note that the dist-to-tip of an apex is defined as its length (and not as 0).
         :return: the MTG with an updated property 'distance_from_tip'
         """
+        g = self.g
 
         # We define "root" as the starting point of the loop below:
         root_gen = self.g.component_roots_at_scale_iter(self.g.root, scale=1)
         root = next(root_gen)
 
         # We travel in the MTG from the root tips to the base:
-        for vid in post_order(self.g, root):
+        for vid in post_order2(self.g, root):
             # We define the current root element as n:
-            n = self.g.node(vid)
+            n = g.node(vid)
             # We define its direct successor as son:
-            son_id = self.g.Successor(vid)
-            son = self.g.node(son_id)
+            son_id = g.Successor(vid)
+            son = g.node(son_id)
 
             # We record the initial distance_from_tip as the "former" one (to be used by other functions):
-            if hasattr(n, "distance_from_tip"):
-                # Only if this is not the first time it is computed
-                n.former_distance_from_tip = n.distance_from_tip
+            n.former_distance_from_tip = n.distance_from_tip
 
-            # We try to get the value of distance_from_tip for the neighbouring root element located closer to the apex of the root:
-            try:
-                # We calculate the new distance from the tip by adding its length to the distance of the successor:
-                n.distance_from_tip = son.distance_from_tip + n.length
-            except:
+            if n.label == self.label_Apex or n.type == self.type_Root_nodule:
                 # If there is no successor because the element is an apex or a root nodule:
                 # Then we simply define the distance to the tip as the length of the element:
                 n.distance_from_tip = n.length
+                n.axis_apex_id = vid
+            else:
+                # We calculate the new distance from the tip by adding its length to the distance of the successor:
+                n.distance_from_tip = son.distance_from_tip + n.length
+                n.axis_apex_id = son.axis_apex_id
 
 
     # Adding a new root element with pre-defined properties:
@@ -2863,7 +3062,7 @@ class RootGrowthModel(Model):
         root = next(root_gen)
 
         # We travel in the MTG from the root tips to the base:
-        for vid in post_order(self.g, root):
+        for vid in post_order2(self.g, root):
             n = self.g.node(vid)
 
             # If at root tip, for every axis based on its radius we...
@@ -2947,12 +3146,14 @@ class RootGrowthModel(Model):
             processed_length += n.length
 
 
-    def post_growth_updating(self, modules_to_update=[], soil_boundaries_to_infer=[], optional_for_plot=False):
+    def post_growth_updating_old(self, modules_to_update=[], soil_boundaries_to_infer=[], optional_for_plot=False):
         
         # Repeated calls
         g = self.g
         props = self.props
         root_hairs_dynamics = self.root_hairs_dynamics
+
+        # accessed_properties
 
         for module in modules_to_update:
             setattr(module, "vertices", self.vertices)
@@ -2972,57 +3173,76 @@ class RootGrowthModel(Model):
             and props["type"][vid] in filter["type"])]
 
         if optional_for_plot:
-            iterator = pre_order2(g, root)
+            iterator = pre_order2(g, root) # TODO: Not functionnal anymore since we blended with distance from tip
         else:
-            iterator = props["focus_elements"] # It has just been computed by the Choregrapher so stick to it
+            iterator = post_order2(g, root)
+            focus_set = props["focus_elements"] # It has just been computed by the Choregrapher so stick to it
 
         # from root base to tips
         for vid in iterator:
             n = g.node(vid)
 
-            # Update the living struct mass
-            n.living_struct_mass = n.struct_mass + n.living_root_hairs_struct_mass
+            # We define its direct successor as son:
+            son_id = g.Successor(vid)
+            son = g.node(son_id)
 
-            # Update root hairs
-            root_hairs_dynamics(segment=n)
+            # We record the initial distance_from_tip as the "former" one (to be used by other functions):
+            n.former_distance_from_tip = n.distance_from_tip
 
-            # We need to get the parent to compute mass partitionning.
-            if vid in self.collar_children:
-                parent = 1
+            if n.label == self.label_Apex or n.type == self.type_Root_nodule:
+                # If there is no successor because the element is an apex or a root nodule:
+                # Then we simply define the distance to the tip as the length of the element:
+                n.distance_from_tip = n.length
+                n.axis_apex_id = vid
             else:
-                parent = g.parent(vid)
-            p = g.node(parent)
-            
-            if n.type == self.type_Base_of_the_root_system or p is None:
-                n.axis_type = 'seminal'
-            else:
-                if optional_for_plot:
-                    
-                    if n.root_order == 1:
-                        # We have to introduce this to get proper axis type
-                        graph_parent = g.node(g.parent(vid))
+                # We calculate the new distance from the tip by adding its length to the distance of the successor:
+                n.distance_from_tip = son.distance_from_tip + n.length
+                n.axis_apex_id = son.axis_apex_id
 
-                        # First exception for pivot root that could be taken for a nodal otherwise
-                        # (Given the structure of the first fake supporting elements)
-                        if vid == max(self.collar_children):
-                            n.axis_type = 'seminal'
-                        elif n.type == self.type_Support_for_seminal_root or n.type == self.type_Support_for_adventitious_root:
-                            n.axis_type = 'seminal'
-                        elif graph_parent.type == self.type_Support_for_seminal_root:
-                            n.axis_type = 'seminal'
-                        elif graph_parent.type == self.type_Support_for_adventitious_root:
-                            n.axis_type = 'nodal'
-                        elif graph_parent.axis_type == 'seminal':
-                            n.axis_type = 'seminal'
-                        elif graph_parent.axis_type == 'nodal':
-                            n.axis_type = 'nodal'
+            if vid in focus_set:
+
+                # Update the living struct mass
+                n.living_struct_mass = n.struct_mass + n.living_root_hairs_struct_mass
+
+                # Update root hairs
+                root_hairs_dynamics(segment=n)
+
+                # We need to get the parent to compute mass partitionning.
+                if vid in self.collar_children:
+                    parent = 1
+                else:
+                    parent = g.parent(vid)
+                p = g.node(parent)
+                
+                if n.type == self.type_Base_of_the_root_system or p is None:
+                    n.axis_type = 'seminal'
+                else:
+                    if optional_for_plot:
+                        
+                        if n.root_order == 1:
+                            # We have to introduce this to get proper axis type
+                            graph_parent = g.node(g.parent(vid))
+
+                            # First exception for pivot root that could be taken for a nodal otherwise
+                            # (Given the structure of the first fake supporting elements)
+                            if vid == max(self.collar_children):
+                                n.axis_type = 'seminal'
+                            elif n.type == self.type_Support_for_seminal_root or n.type == self.type_Support_for_adventitious_root:
+                                n.axis_type = 'seminal'
+                            elif graph_parent.type == self.type_Support_for_seminal_root:
+                                n.axis_type = 'seminal'
+                            elif graph_parent.type == self.type_Support_for_adventitious_root:
+                                n.axis_type = 'nodal'
+                            elif graph_parent.axis_type == 'seminal':
+                                n.axis_type = 'seminal'
+                            elif graph_parent.axis_type == 'nodal':
+                                n.axis_type = 'nodal'
+                            else:
+                                print('Uncaught exception')
                         else:
-                            print('Uncaught exception')
-                    else:
-                        n.axis_type = 'lateral'
-                    
-                if n.struct_mass > 0:
-                    if vid not in self.collar_skip:
+                            n.axis_type = 'lateral'
+                        
+                    if (n.struct_mass > 0) and (vid not in self.collar_skip):
                         # For every vertex we update the considered living struct_mass for other modules.
                         props["total_living_struct_mass"][1] += n.living_struct_mass
 
@@ -3031,6 +3251,12 @@ class RootGrowthModel(Model):
                                 
                                 # We increment the vertex identifiers to be accesses in deficits
                                 n.vertex_index = vid
+                                if p.type in (self.type_Support_for_adventitious_root, self.type_Support_for_seminal_root) and vid not in self.collar_children:
+                                    print("new collar children")
+                                    self.collar_children += [vid]
+                                    self.collar_skip += [parent]
+                                    parent = 1
+                                n.parent_id = parent if parent is not None else -1
                                 
                                 mass_fraction = n.living_struct_mass / (n.living_struct_mass + p.living_struct_mass)
 
@@ -3090,6 +3316,12 @@ class RootGrowthModel(Model):
                                     
                                     if n.vertex_index is None:
                                         n.vertex_index = vid
+                                        if p.type in (self.type_Support_for_adventitious_root, self.type_Support_for_seminal_root) and vid not in self.collar_children:
+                                            print("new collar children")
+                                            self.collar_children += [vid]
+                                            self.collar_skip += [parent]
+                                            parent = 1
+                                        n.parent_id = parent if parent is not None else -1
                                         
                                         mass_fraction = n.living_struct_mass / (n.living_struct_mass + p.living_struct_mass)
 
@@ -3121,13 +3353,289 @@ class RootGrowthModel(Model):
 
                             n.tissue_formation_time = n.thermal_time_since_cells_formation / 3600 / 24
 
-        if optional_for_plot:
-            self.compute_mtg_axes_id()
+            if optional_for_plot:
+                self.compute_mtg_axes_id()
 
-    
+
+
+    def post_growth_updating(self, modules_to_update=[], soil_boundaries_to_infer=[], optional_for_plot=False):
+        ### CACHING NECESSARY OBJECTS
+        # Repeated calls
+        g = self.g
+        props = self.props
+        root_hairs_dynamics = self.root_hairs_dynamics_opt
+
+        # accessed_properties
+        props["former_distance_from_tip"].assign_all(props["distance_from_tip"].values_array())
+        label = g.property("label")
+        type = g.property("type")
+        distance_from_tip = g.property("distance_from_tip")
+        length = g.property("length")
+        axis_apex_id = g.property("axis_apex_id")
+        living_struct_mass = g.property("living_struct_mass")
+        struct_mass = g.property("struct_mass")
+        living_root_hairs_struct_mass = g.property("living_root_hairs_struct_mass")
+        axis_type = g.property("axis_type")
+        vertex_index = g.property("vertex_index")
+        parent_id = g.property("parent_id")
+        initial_struct_mass = g.property("initial_struct_mass")
+        initial_living_root_hairs_struct_mass = g.property("initial_living_root_hairs_struct_mass")
+
+        if optional_for_plot:
+            root_order = g.property("root_order")
+            actual_time_since_formation = g.property("actual_time_since_formation")
+            radius = g.property("radius")
+            tissue_formation_time = g.property("tissue_formation_time")
+            thermal_time_since_cells_formation = g.property("thermal_time_since_cells_formation")
+            axis_index = g.property("axis_index")
+
+            seminal_id = 1
+            adventitious_id = 1
+            lateral_id = 1            
+            processed_vids = []
+
+        # For non explicitely named handles, we also cache them previous to the loop
+        module_handles = [dict(
+                massic=[props[p] for p in module.massic_concentration],
+                extensive=[props[p] for p in module.extensive_variables],
+                descriptor=[props[p] for p in module.descriptor],
+                non_inertial_intensive=[props[p] for p in module.non_inertial_intensive],
+                non_inertial_extensive=[props[p] for p in module.non_inertial_extensive],
+            ) for module in modules_to_update]
+        soil_boundaries_handle = [props[p] for p in soil_boundaries_to_infer]
+
+
+        # update modules vertices from what has been updated by the growth model NOTE : this is not enough we also need to update the "vertices_index" property bellow
+        for module in modules_to_update:
+            setattr(module, "vertices", self.vertices)
+
+        # Select the base of the root
+        root = next(g.component_roots_at_scale_iter(g.root, scale=1))
+
+        if debug: print(self.step_elongating_elements, self.step_new_apices)
+
+        # if "focus_elements" not in props.keys():
+        filter =  {"label": [1, 2], "type":[1, 7, 8, 9, 10, 11, 12]} # in line with choregrapger
+        props["focus_elements"] = [vid for vid, value in struct_mass.items() if (
+            value > 0. # NOTE : Check if robust, don't we need any calculation for non emerged elements?
+            and label[vid] in filter["label"] 
+            and type[vid] in filter["type"])]
+
+        if optional_for_plot:
+            iterator = pre_order2(g, root) # TODO: Not functionnal anymore since we blended with distance from tip
+        else:
+            iterator = post_order2(g, root)
+
+        # Sets are way more efficient than list to interrogate vid membership
+        focus_set = set(props["focus_elements"]) # It has just been computed by the Choregrapher so stick to it
+        collar_children = set(self.collar_children)       
+        collar_skip = set(self.collar_skip) 
+        step_new_apices = set(self.step_new_apices)
+        step_elongating_elements = set(self.step_elongating_elements)
+        known_vertices = props["vertex_index"].values_array()
+
+
+        # from root base to tips
+        for v in iterator:
+            # n = g.node(vid)
+
+            # We define its direct successor as son:
+            son_id = g.Successor(v)
+            son = g.node(son_id)
+
+            # We record the initial distance_from_tip as the "former" one (to be used by other functions):
+            # n.former_distance_from_tip = n.distance_from_tip
+
+            if label[v] == self.label_Apex or type[v] == self.type_Root_nodule:
+                # If there is no successor because the element is an apex or a root nodule:
+                # Then we simply define the distance to the tip as the length of the element:
+                distance_from_tip[v] = length[v]
+                axis_apex_id[v] = v
+            else:
+                # We calculate the new distance from the tip by adding its length to the distance of the successor:
+                distance_from_tip[v] = distance_from_tip[son_id] + length[v]
+                axis_apex_id[v] = axis_apex_id[son_id]
+
+            if v in focus_set:
+
+                # Update root hairs
+                root_hairs_dynamics(p=props, v=v)
+
+                # Update the living struct mass
+                living_struct_mass[v] = struct_mass[v] + living_root_hairs_struct_mass[v]
+
+                # We need to get the parent to compute mass partitionning.
+                if v in collar_children:
+                    parent = 1
+                else:
+                    parent = g.parent(v)
+                
+                if type[v] == self.type_Base_of_the_root_system or parent is None:
+                    axis_type[v] = 'seminal'
+                else:
+                    if optional_for_plot:
+                        if root_order[v] == 1:
+                            # We have to introduce this to get proper axis type
+                            graph_parent = g.parent(v)
+
+                            # First exception for pivot root that could be taken for a nodal otherwise
+                            # (Given the structure of the first fake supporting elements)
+                            if v == max(collar_children):
+                                axis_type[v] = 'seminal'
+                            elif type[v] == self.type_Support_for_seminal_root or type[v] == self.type_Support_for_adventitious_root:
+                                axis_type[v] = 'seminal'
+                            elif type[graph_parent] == self.type_Support_for_seminal_root:
+                                axis_type[v] = 'seminal'
+                            elif type[graph_parent] == self.type_Support_for_adventitious_root:
+                                axis_type[v] = 'nodal'
+                            elif axis_type[graph_parent] == 'seminal':
+                                axis_type[v] = 'seminal'
+                            elif axis_type[graph_parent] == 'nodal':
+                                axis_type[v] = 'nodal'
+                            else:
+                                print('Uncaught exception')
+                        else:
+                            axis_type[v] = 'lateral'
+                        
+                    if (struct_mass[v] > 0) and (v not in collar_skip):
+
+                        if len(modules_to_update) > 0: # Only relevant if the growth model has been coupled, otherwise all properties have already been updated
+                            if v in step_new_apices and v not in known_vertices:
+                                
+                                # We increment the vertex identifiers to be accesses in deficits
+                                vertex_index[v] = v
+                                if type[parent] in (self.type_Support_for_adventitious_root, self.type_Support_for_seminal_root) and v not in collar_children:
+                                    print("new collar children")
+                                    self.collar_children += [v]
+                                    self.collar_skip += [parent]
+                                    parent = 1
+                                parent_id[v] = parent if parent is not None else -1
+                                
+                                mass_fraction = living_struct_mass[v] / (living_struct_mass[v] + living_struct_mass[parent])
+
+                                for module_handle in module_handles:
+                                    for prop in module_handle["massic"]:
+                                        if mass_fraction > 0:
+                                            initial_metabolite_amount = prop[parent] * (initial_struct_mass[parent] + initial_living_root_hairs_struct_mass[parent])
+                                            prop[v] = initial_metabolite_amount * mass_fraction / living_struct_mass[v]
+                                            prop[parent] = initial_metabolite_amount * (1-mass_fraction) / living_struct_mass[parent]
+
+                                        else:
+                                            prop[v] = prop[parent]
+                                            
+                                    for prop in module_handle["extensive"]:
+                                        initial_amount = prop[parent]
+                                        prop[v] = initial_amount * mass_fraction
+                                        prop[parent] = initial_amount * (1-mass_fraction)
+                                        
+                                    for prop in module_handle["descriptor"]:
+                                        prop[v] = None
+
+                                    # New for ArrayDicts but optional if coming back to dicts
+                                    for prop in module_handle["non_inertial_intensive"]:
+                                        prop[v] = prop[parent]
+                                    
+                                    for prop in module_handle["non_inertial_extensive"]:
+                                        prop[v] = mass_fraction * prop[parent]
+                                    
+
+                                # For soil related inputs, given new elements have been formed and we will not compute soil interception now, we infer the values from those of the parent
+                                for prop in soil_boundaries_handle:
+                                    prop[v] = prop[parent]
+
+
+                            elif v in step_elongating_elements:
+                                # If this is an already emerged segment, it has its own dynamic regarless of parents
+                                if initial_struct_mass[v] > 0:
+                                    for module_handle in module_handles:
+                                        for prop in module_handle["massic"]:
+                                            prop[v] = prop[v] * (initial_struct_mass[v] + initial_living_root_hairs_struct_mass[v]) / living_struct_mass[v]
+
+                                # Else if it elongated from a null structural mass, it shared ressources with its parent and we deal with it as for new apex creation
+                                else:
+                                    
+                                    mass_fraction = living_struct_mass[v] / (living_struct_mass[v] + living_struct_mass[parent])
+
+                                    for module_handle in module_handles:
+                                        for prop in module_handle["massic"]:
+                                            initial_metabolite_amount = prop[parent] * (initial_struct_mass[parent] + initial_living_root_hairs_struct_mass[parent])
+                                            prop[v] = initial_metabolite_amount * mass_fraction / living_struct_mass[v]
+                                            prop[parent] = initial_metabolite_amount * (1-mass_fraction) / living_struct_mass[parent]
+                                                
+                                        for prop in module_handle["extensive"]:
+                                            initial_amount = prop[parent]
+                                            prop[v] = initial_amount * mass_fraction
+                                            prop[parent] = initial_amount * (1-mass_fraction)
+
+                                    
+                                    if v not in known_vertices:
+                                        vertex_index[v] = v
+                                        if type[parent] in (self.type_Support_for_adventitious_root, self.type_Support_for_seminal_root) and v not in collar_children:
+                                            print("new collar children")
+                                            self.collar_children += [v]
+                                            self.collar_skip += [parent]
+                                            parent = 1
+                                        parent_id[v] = parent if parent is not None else -1
+
+                                        for module_handle in module_handles:
+                                            for prop in module_handle["non_inertial_intensive"]:
+                                                prop[v] = prop[parent]
+
+                                            for prop in module_handle["non_inertial_extensive"]:
+                                                prop[v] = mass_fraction * prop[parent]
+                                            
+                                    # If first elongation but primordia was formed earlier, needs access to soil states
+                                    for prop in soil_boundaries_handle:
+                                        prop[v] = prop[parent]
+                            
+                        if optional_for_plot:
+                            #TODO remove, just for a figure
+                            if label[v] != self.label_Apex:
+                                if v not in actual_time_since_formation.keys():
+                                    actual_time_since_formation[v] = 0
+                                else:
+                                    actual_time_since_formation[v] += self.time_step_in_seconds / 3600 / 24
+                            else:
+                                if v not in actual_time_since_formation.keys():
+                                    actual_time_since_formation[v] = 0
+                                non_meristem_length = radius[v] * 2 * 1.3 #Kozlova et al. (2020), the length of the meristematic region 1.3 times the diameter of the tip
+                                if non_meristem_length < length[v]:
+                                    aging_length = length[v] - non_meristem_length
+                                    actual_time_since_formation[v] += (self.time_step_in_seconds / 3600 / 24) * aging_length / length[v]
+
+                            tissue_formation_time[v] = thermal_time_since_cells_formation[v] / 3600 / 24
+
+            if optional_for_plot:
+                if v not in processed_vids:
+                    axis = g.Axis(v)
+                    insertion_id = g.parent(min(axis))
+
+                    if insertion_id:
+                        if type[insertion_id] == self.type_Support_for_seminal_root:
+                            axis_index.update({v: f"seminal_{seminal_id}" for v in axis})
+                            seminal_id += 1
+                        elif type[insertion_id] == self.type_Support_for_adventitious_root:
+                            axis_index.update({v: f"adventitious_{adventitious_id}" for v in axis})
+                            adventitious_id += 1
+                        else:
+                            if root_order[min(axis)] > 1:
+                                axis_index.update({v: f"lateral_{lateral_id}" for v in axis})
+                                lateral_id += 1
+                            else:
+                                print("Uncaptured exception on ", v)
+                    else:
+                        # If parent is None we now this is the main seminal axis
+                        axis_index.update({v: f"seminal_{seminal_id}" for v in axis})
+                        seminal_id += 1
+                    
+                    processed_vids += axis
+
+        props["total_living_struct_mass"][1] = living_struct_mass.values_array().sum()
 
 
     def __call__(self, *args, modules_to_update=[], soil_boundaries_to_infer=[]):
         super().__call__(*args)
+        t1 = time.time()
         self.post_growth_updating(modules_to_update=modules_to_update, soil_boundaries_to_infer=soil_boundaries_to_infer)
+        print("post", time.time() - t1)
     
