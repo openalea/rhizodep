@@ -15,7 +15,6 @@ from openalea.fspm.utility.plot import analyze_data
 
 
 if __name__ == "__main__":
-    # scenarios = ms.from_table(file_path="inputs/Scenarios_24_11_10.xlsx", which=["RB_ref"])
     scenarios = ms.from_table(file_path="inputs/Scenario_plant_and_soil.xlsx", which=["test_1_rhizodep"])
     custom_output_folder = "outputs"
 
