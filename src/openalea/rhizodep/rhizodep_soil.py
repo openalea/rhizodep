@@ -1,5 +1,5 @@
 # Soil model
-from rhizodep.soil_module_autonomous import SoilModel
+from openalea.rhizodep.soil_module_autonomous import SoilModel
 
 # Utilities
 from openalea.metafspm.composite_wrapper import CompositeModel

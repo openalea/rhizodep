@@ -2,16 +2,16 @@ name: build_publish_anaconda
 
 on:
   push:
-    branches:
+    branches: 
       - '**'
     tags:
       - 'v*'
   pull_request:
-    branches:
+    branches: 
       - '**'
 
 jobs:
   build:
     uses: openalea/github-action-conda-build/.github/workflows/conda-package-build.yml@main
-    secrets:
+    secrets: 
       anaconda_token: ${{ secrets.ANACONDA_TOKEN }}

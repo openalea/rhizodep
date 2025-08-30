@@ -4,8 +4,8 @@ import time
 
 # Model packages
 import rhizodep
-from rhizodep.rhizodep import RhizoDep
-from rhizodep.rhizodep_soil import RhizoDepSoil
+from openalea.rhizodep.rhizodep import RhizoDep
+from openalea.rhizodep.rhizodep_soil import RhizoDepSoil
 
 # Utility packages
 from openalea.fspm.utility.scenario.initialize import MakeScenarios as ms

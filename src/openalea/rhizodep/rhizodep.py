@@ -3,8 +3,8 @@ import numpy as np
 from openalea.metafspm.utils import ArrayDict, mtg_to_arraydict
 
 # Modules / components
-from rhizodep.root_carbon import RootCarbonModel
-from rhizodep.root_growth import RootGrowthModel
+from openalea.rhizodep.root_carbon import RootCarbonModel
+from openalea.rhizodep.root_growth import RootGrowthModel
 from openalea.rootcynaps import RootAnatomy
 
 # Utilities
