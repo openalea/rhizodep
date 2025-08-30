@@ -1,6 +1,9 @@
 RootAnatomy:
+
   RootAnatomy: {}
+  
   RootCarbonModel: {}
+  
   RootGrowthModel:
     distance_from_tip:
       distance_from_tip: 1.0
@@ -10,22 +13,25 @@ RootAnatomy:
       radius: 1.0
     root_hair_length:
       root_hair_length: 1.0
-    struct_mass:
-      struct_mass: 1.0
     total_root_hairs_number:
       total_root_hairs_number: 1.0
+
   SoilModel: {}
+
+
 RootCarbonModel:
   RootAnatomy:
-    apoplasmic_exchange_surface:
-      apoplasmic_exchange_surface: 1.0
-    root_exchange_surface:
-      root_exchange_surface: 1.0
     phloem_exchange_surface:
       phloem_exchange_surface: 1.0
+    root_exchange_surface:
+      root_exchange_surface: 1.0
     symplasmic_volume:
       symplasmic_volume: 1.0
+    phloem_volume:
+      phloem_volume: 1.0
+
   RootCarbonModel: {}
+
   RootGrowthModel:
     distance_from_tip:
       distance_from_tip: 1.0
@@ -33,20 +39,23 @@ RootCarbonModel:
       hexose_consumption_by_growth: 1.0
     hexose_consumption_by_fungus:
       hexose_consumption_by_fungus: 1.0
-    initial_struct_mass:
-      initial_struct_mass: 1.0
     length:
       length: 1.0
-    living_root_hairs_struct_mass:
-      living_root_hairs_struct_mass: 1.0
+    living_struct_mass:
+      living_struct_mass: 1.0
     radius:
       radius: 1.0
-    struct_mass:
-      struct_mass: 1.0
     type:
       type: 1.0
+    thermal_time_since_emergence:
+      thermal_time_since_emergence: 1.0
+    amino_acids_consumption_by_growth:
+      amino_acids_consumption_by_growth: 1.0
     vertex_index:
       vertex_index: 1.0
+    total_living_struct_mass:
+      total_living_struct_mass: 1.0
+
   SoilModel:
     C_hexose_soil:
       C_hexose_soil: 1.0
@@ -56,33 +65,49 @@ RootCarbonModel:
       Cs_mucilage_soil: 1.0
     soil_temperature:
       soil_temperature: 1.0
+
+
 RootGrowthModel:
   RootAnatomy:
     root_tissue_density:
       root_tissue_density: 1.0
+
   RootCarbonModel: {}
+
   RootGrowthModel: {}
+
   SoilModel:
     soil_temperature:
       soil_temperature: 1.0
+
+
 SoilModel:
   RootAnatomy:
     root_exchange_surface:
       root_exchange_surface: 1.0
+
   RootCarbonModel:
     cells_release:
       cells_release: 1.0
     hexose_exudation:
-      hexose_exudation: 1.0
+      hexose_exudation: 12 * 6 # C molar mass * number of atoms 
     hexose_uptake_from_soil:
-      hexose_uptake_from_soil: 1.0
+      hexose_uptake_from_soil: 12 * 6 # C molar mass * number of atoms 
     mucilage_secretion:
       mucilage_secretion: 1.0
     phloem_hexose_exudation:
-      phloem_hexose_exudation: 1.0
+      phloem_hexose_exudation: 12 * 6 # C molar mass * number of atoms 
     phloem_hexose_uptake_from_soil:
-      phloem_hexose_uptake_from_soil: 1.0
+      phloem_hexose_uptake_from_soil: 12 * 6 # C molar mass * number of atoms 
+
   RootGrowthModel:
+    length:
+      length: 1.0
+    initial_length:
+      initial_length: 1.0
     struct_mass:
       struct_mass: 1.0
+    living_struct_mass:
+      living_struct_mass: 1.0
+
   SoilModel: {}

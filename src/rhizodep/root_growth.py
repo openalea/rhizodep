@@ -119,6 +119,9 @@ class RootGrowthModel(Model):
     hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth is coupled to a root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
+    hexose_consumption_by_growth_amount: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth is coupled to a root growth model", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     resp_growth: float = declare(default=0., unit="mol.s-1", unit_comment="of C", description="respiration rate during growth", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
@@ -427,7 +430,9 @@ class RootGrowthModel(Model):
         if g is None:
             self.g = self.initiate_mtg()
         else:
-            self.g = g  
+            self.g = g
+            # We have to make sure the labels from the MTG are converted to integers, to ensure backward compatibility with previous RhizoDep versions
+            self.to_integer_types_and_labels()
 
         self.props = self.g.properties()
         self.time_step_in_seconds = time_step_in_seconds
@@ -763,6 +768,7 @@ class RootGrowthModel(Model):
         return g
 
     def initiate_heterogeneous_variables(self):
+        mtg_to_arraydict(self.g, ignore=self.descriptor)
         g = self.g
         self.step_new_apices = []
         self.step_elongating_elements = []
@@ -786,6 +792,64 @@ class RootGrowthModel(Model):
         self.update_distance_from_tip()
         # self.initiate_heterogeneous_struct_mass_production()
         self.post_growth_updating()
+
+    def to_integer_types_and_labels(self):
+
+        for v in self.g.vertices_iter(scale=1):
+            n = self.g.node(v)
+            # Convert labels
+            if n.label == "Segment":
+                n.label = self.label_Segment
+            elif n.label == "Apex":
+                n.label = self.label_Apex
+            elif isinstance(n.label, str):
+                print("Warning, unlnown label string", n.label)
+            elif n.label not in (self.label_Apex, self.label_Segment) and isinstance(n.label, int):
+                print("Warning, unlnown label integer", n.label)
+            else:
+                print("Warning, unlnown label format", n.label)
+
+            # Convert 
+
+            if n.type == "Base_of_the_root_system":
+                n.type = self.type_Base_of_the_root_system
+            elif n.type == "Support_for_seminal_root":
+                n.type = self.type_Support_for_seminal_root
+            elif n.type == "Seminal_root_before_emergence":
+                n.type = self.type_Seminal_root_before_emergence
+            elif n.type == "Support_for_adventitious_root":
+                n.type = self.type_Support_for_adventitious_root
+            elif n.type == "Adventitious_root_before_emergence":
+                n.type = self.type_Adventitious_root_before_emergence
+            elif n.type == "Normal_root_before_emergence":
+                n.type = self.type_Normal_root_before_emergence
+            elif n.type == "Normal_root_after_emergence":
+                n.type = self.type_Normal_root_after_emergence
+            elif n.type == "Stopped":
+                n.type = self.type_Stopped
+            elif n.type == "Just_stopped":
+                n.type = self.type_Just_stopped
+            elif n.type == "Dead":
+                n.type = self.type_Dead
+            elif n.type == "Just_dead":
+                n.type = self.type_Just_dead
+            elif n.type == "Root_nodule":
+                n.type = self.type_Root_nodule
+            elif isinstance(n.type, str):
+                print("Warning, unlnown label string", n.type)
+            elif n.type not in (self.type_Base_of_the_root_system, self.type_Support_for_seminal_root,
+                                 self.type_Seminal_root_before_emergence, self.type_Support_for_adventitious_root,
+                                 self.type_Adventitious_root_before_emergence, self.type_Normal_root_before_emergence,
+                                 self.type_Normal_root_after_emergence, self.type_Stopped,
+                                 self.type_Just_stopped, self.type_Dead,
+                                 self.type_Just_dead, self.type_Root_nodule) and isinstance(n.type, int):
+                print("Warning, unlnown label integer", n.type)
+            else:
+                print("Warning, unlnown type format", n.type)
+            
+
+            
+                
     
 
     # SUBDIVISIONS OF THE SCHEDULING LOOP
@@ -2769,7 +2833,7 @@ class RootGrowthModel(Model):
             # We record the initial distance_from_tip as the "former" one (to be used by other functions):
             n.former_distance_from_tip = n.distance_from_tip
 
-            if n.label == self.label_Apex or n.type == self.type_Root_nodule:
+            if n.label == self.label_Apex or n.type == self.type_Root_nodule or son is None:
                 # If there is no successor because the element is an apex or a root nodule:
                 # Then we simply define the distance to the tip as the length of the element:
                 n.distance_from_tip = n.length
@@ -3446,12 +3510,11 @@ class RootGrowthModel(Model):
 
             # We define its direct successor as son:
             son_id = g.Successor(v)
-            son = g.node(son_id)
 
             # We record the initial distance_from_tip as the "former" one (to be used by other functions):
             # n.former_distance_from_tip = n.distance_from_tip
 
-            if label[v] == self.label_Apex or type[v] == self.type_Root_nodule:
+            if label[v] == self.label_Apex or type[v] == self.type_Root_nodule or son_id is None:
                 # If there is no successor because the element is an apex or a root nodule:
                 # Then we simply define the distance to the tip as the length of the element:
                 distance_from_tip[v] = length[v]

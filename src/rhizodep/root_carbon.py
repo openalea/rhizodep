@@ -78,9 +78,9 @@ class RootCarbonModel(Model):
         92a6f7ad927ffa0acf01aef645f9297a4531878c
     """
 
-    # --- INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
+    # --- @note INPUTS STATE VARIABLES FROM OTHER COMPONENTS : default values are provided if not superimposed by model coupling ---
     # FROM SOIL MODEL
-    soil_temperature: float = declare(default=15, unit="°C", unit_comment="", description="soil temperature in contact with roots", 
+    soil_temperature: float = declare(default=10, unit="°C", unit_comment="", description="soil temperature in contact with roots", 
                                                 min_value="", max_value="", value_comment="", references="", DOI="",
                                                  variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
     C_hexose_soil: float = declare(default=2.4e-3, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil",
@@ -137,12 +137,16 @@ class RootCarbonModel(Model):
     symplasmic_volume: float = declare(default=1e-9, unit="m3", unit_comment="", description="symplasmic volume for water content of root elements", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
                             variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user")
+    phloem_volume: float = declare(default=1e-9, unit="m3", unit_comment="", description="symplasmic volume for water content of root elements", 
+                            min_value="", max_value="", value_comment="", references="", DOI="",
+                            variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user")
 
-    # --- INITIALIZE MODEL STATE VARIABLES ---
+
+    # --- @note INITIALIZE MODEL STATE VARIABLES ---
 
     # LOCAL VARIABLES
     # Pools initial size
-    C_sucrose_root: float = declare(default=0.01 / 12.01 / 12, unit="mol.g-1", unit_comment="of sucrose", description="Sucrose concentration in root",
+    C_sucrose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="of sucrose", description="Sucrose concentration in root",
                                     min_value="", max_value="", value_comment="", references="0.0025 is a plausible value according to the results of Gauthier (2019, pers. communication), but here, we use a plausible sucrose concentration (10 mgC g-1) in roots according to various experimental results.", DOI="",
                                     variable_type="state_variable", by="model_carbon", state_variable_type="massic_concentration", edit_by="user")
     C_hexose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="of labile hexose", description="Hexose concentration in root",
@@ -611,7 +615,7 @@ class RootCarbonModel(Model):
     # considering that 2 mol of hexose are produced for 1 mol of sucrose.
     @rate
     def _hexose_diffusion_from_phloem(self, type, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
-                                             hexose_consumption_by_growth, soil_temperature, global_sucrose_deficit):
+                                             hexose_consumption_by_growth, soil_temperature):
         
 
         phloem_permeability = self.phloem_permeability * (1 + hexose_consumption_by_growth /
@@ -623,13 +627,13 @@ class RootCarbonModel(Model):
                                                                 C=self.phloem_unloading_C)
 
             
-        return np.where((length <= 0.) | (phloem_exchange_surface <= 0.) | (type == self.type_Just_Dead) | (type == self.type_Dead) | (np.any(global_sucrose_deficit > 0.)) | (C_sucrose_root <= C_hexose_root / 2.), 0.,
+        return np.where((length <= 0.) | (phloem_exchange_surface <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead) | (self.props["global_sucrose_deficit"][1] > 0.) | (C_sucrose_root <= C_hexose_root / 2.), 0.,
                         2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) * phloem_exchange_surface)
             
 
     @rate
     def _hexose_active_production_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
-                                                     hexose_consumption_by_growth, soil_temperature, global_sucrose_deficit):
+                                                     hexose_consumption_by_growth, soil_temperature):
         
         max_unloading_rate = self.max_unloading_rate * (1 + hexose_consumption_by_growth /
                                                         self.reference_rate_of_hexose_consumption_by_growth)
@@ -639,7 +643,7 @@ class RootCarbonModel(Model):
                                                             B=self.phloem_unloading_B,
                                                             C=self.phloem_unloading_C)
         
-        return np.where((length <= 0.) | (phloem_exchange_surface <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead) | (np.any(global_sucrose_deficit > 0.)) | (C_sucrose_root <= C_hexose_root / 2.), 0.,
+        return np.where((length <= 0.) | (phloem_exchange_surface <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead) | (self.props["global_sucrose_deficit"][1] > 0.) | (C_sucrose_root <= C_hexose_root / 2.), 0.,
                         np.maximum(2. * max_unloading_rate * C_sucrose_root * phloem_exchange_surface / (
                             self.Km_unloading + C_sucrose_root), 0))
             
@@ -767,10 +771,10 @@ class RootCarbonModel(Model):
         
 
     @rate
-    def _phloem_hexose_exudation(self, living_struct_mass, length, symplasmic_volume, root_exchange_surface, C_hexose_root, C_sucrose_root,
+    def _phloem_hexose_exudation(self, living_struct_mass, length, phloem_volume, root_exchange_surface, C_hexose_root, C_sucrose_root,
                                         C_hexose_soil, phloem_exchange_surface, soil_temperature):
         
-        corrected_P_max_apex = self.Pmax_apex * self.temperature_modification(
+        corrected_P_max_apex = (self.Pmax_apex / 10 / 8) * self.temperature_modification(
                                                                 soil_temperature=soil_temperature,
                                                                 T_ref=self.permeability_coeff_T_ref,
                                                                 A=self.permeability_coeff_A,
@@ -782,9 +786,9 @@ class RootCarbonModel(Model):
         #     corrected_permeability_coeff = corrected_P_max_apex \
         #                          / (1 + (distance_from_tip - length / 2.) / original_radius) ** param.gamma_exudation
         corrected_permeability_coeff = corrected_P_max_apex
-
+        # The two crossed symplasmic surfaces are accounted for in series
         return np.where((length <= 0) | (root_exchange_surface <= 0.) | (C_hexose_root <= 0.), 0.,
-                        corrected_permeability_coeff * ((2 * C_sucrose_root * living_struct_mass / symplasmic_volume) - C_hexose_soil) * phloem_exchange_surface)
+                        corrected_permeability_coeff * ((2 * C_sucrose_root * living_struct_mass / phloem_volume) - C_hexose_soil) * phloem_exchange_surface)
     
 
     # Uptake of hexose from the soil by the root:
