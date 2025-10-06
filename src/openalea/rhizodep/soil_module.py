@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from openalea.metafspm.component import Model, declare
 from openalea.metafspm.component_factory import *
-from log.visualize import plot_mtg
+from openalea.fspm.utility.plot import plot_mtg
 
 
 family = "soil"
