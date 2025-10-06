@@ -116,6 +116,9 @@ class RootGrowthModel(Model):
     total_root_hairs_number: float = declare(default=30 * (1.6e-4 / 3.5e-4) * 3.e-3 * 1e3, unit="adim", unit_comment="", description="Example root hairs number on segment external surface", 
                                                     min_value="", max_value="", value_comment="30 * (1.6e-4 / radius) * length * 1e3", references=" According to the work of Gahoonia et al. (1997), the root hair density is about 30 hairs per mm for winter wheat, for a root radius of about 0.16 mm.", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
+    growing_zone_C_hexose_root: float = declare(default=0., unit="mol.g-1", unit_comment="", description="Hexose availability in the growing zone", 
+                                                    min_value="", max_value="", value_comment="", references="", DOI="",
+                                                    variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
     hexose_consumption_by_growth: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by growth is coupled to a root growth model", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="state_variable", by="model_growth", state_variable_type="NonInertialExtensive", edit_by="user")
@@ -288,7 +291,7 @@ class RootGrowthModel(Model):
     IPD: float = declare(default=0.00474, unit="m", unit_comment="", description="Inter-primordia distance", 
                                                     min_value="", max_value="", value_comment="", references="IPD = 7.6 mm (??)", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
-    new_root_tissue_density: float = declare(default=0.10 * 1e6, unit="g.m3", unit_comment="of structural mass", description="root_tissue_density", 
+    new_root_tissue_density: float = declare(default=0.14 * 1e6, unit="g.m-3", unit_comment="of structural mass", description="root_tissue_density", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
 
@@ -414,7 +417,7 @@ class RootGrowthModel(Model):
                                                     variable_type="parameter", by="model_growth", state_variable_type="", edit_by="user")
     
 
-    def __init__(self, g=None, time_step_in_seconds: int=3600, **scenario: dict):
+    def __init__(self, g=None, time_step_in_seconds: int=3600, convert_label_and_types:bool = False, **scenario: dict):
         """
         DESCRIPTION
         -----------
@@ -431,8 +434,9 @@ class RootGrowthModel(Model):
             self.g = self.initiate_mtg()
         else:
             self.g = g
-            # We have to make sure the labels from the MTG are converted to integers, to ensure backward compatibility with previous RhizoDep versions
-            self.to_integer_types_and_labels()
+            if convert_label_and_types:
+                # We have to make sure the labels from the MTG are converted to integers, to ensure backward compatibility with previous RhizoDep versions
+                self.to_integer_types_and_labels()
 
         self.props = self.g.properties()
         self.time_step_in_seconds = time_step_in_seconds

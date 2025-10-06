@@ -44,9 +44,9 @@ class RhizoDep(CompositeModel):
 
         # INIT INDIVIDUAL MODULES
         if len(scenario["input_mtg"]) > 0:
-            self.root_growth = RootGrowthModel(g=scenario["input_mtg"]["root_mtg_file"], time_step=time_step, **root_parameters)
+            self.root_growth = RootGrowthModel(g=scenario["input_mtg"]["root_mtg_file"], time_step=time_step, convert_label_and_types=True, **root_parameters)
         else:
-            self.root_growth = RootGrowthModel(g=None, time_step=time_step, **root_parameters)
+            self.root_growth = RootGrowthModel(g=None, time_step=time_step, convert_label_and_types=True, **root_parameters)
         self.g_root = self.root_growth.g
         # We have to update the coordinates of the new / imported MTG for other model's initialization
         plot_mtg(self.g_root)
