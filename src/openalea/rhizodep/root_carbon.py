@@ -86,10 +86,10 @@ class RootCarbonModel(Model):
     C_hexose_soil: float = declare(default=2.4e-3, unit="mol.m-3", unit_comment="of hexose", description="Hexose concentration in soil",
                                   min_value="", max_value="", value_comment="", references="Fischer et al 2007, water leaching estimation", DOI="",
                                    variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
-    Cs_mucilage_soil: float = declare(default=15, unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
+    Cs_mucilage_soil: float = declare(default=0., unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
                                      min_value="", max_value="", value_comment="", references="", DOI="",
                                       variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
-    Cs_cells_soil: float = declare(default=15, unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
+    Cs_cells_soil: float = declare(default=0., unit="mol.m-3", unit_comment="of equivalent hexose", description="Mucilage concentration in soil", 
                                   min_value="", max_value="", value_comment="", references="", DOI="",
                                    variable_type="input", by="model_soil", state_variable_type="", edit_by="user")
 
