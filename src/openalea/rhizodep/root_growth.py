@@ -1139,6 +1139,7 @@ class RootGrowthModel(Model):
                 else:
                     # Then the apex is declared "Just dead":
                     apex.type = self.type_Just_dead
+                    print(f"apex {apex} just died")
                     # The exact time since the apex died is calculated:
                     apex.thermal_time_since_death = apex.thermal_time_since_growth_stopped + time_step_in_seconds * temperature_time_adjustment - apex.life_duration
                     apex.actual_time_since_death = apex.thermal_time_since_death / temperature_time_adjustment
