@@ -146,7 +146,7 @@ class RootCarbonModel(Model):
 
     # LOCAL VARIABLES
     # Pools initial size
-    C_sucrose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="of sucrose", description="Sucrose concentration in root",
+    C_sucrose_root: float = declare(default=1e-4 / 10, unit="mol.g-1", unit_comment="of sucrose", description="Sucrose concentration in root",
                                     min_value="", max_value="", value_comment="", references="0.0025 is a plausible value according to the results of Gauthier (2019, pers. communication), but here, we use a plausible sucrose concentration (10 mgC g-1) in roots according to various experimental results.", DOI="",
                                     variable_type="state_variable", by="model_carbon", state_variable_type="massic_concentration", edit_by="user")
     C_hexose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="of labile hexose", description="Hexose concentration in root",
