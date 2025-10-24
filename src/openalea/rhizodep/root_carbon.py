@@ -905,7 +905,7 @@ class RootCarbonModel(Model):
                             hexose_active_production_from_phloem, phloem_hexose_exudation, sucrose_loading_in_phloem,
                             phloem_hexose_uptake_from_soil, deficit_sucrose_root) -> tuple[float, str, float]:
         
-        # print({k: v for k, v in locals().items() if k != 'self'})
+        # TODO as in Root-BRIDGES and for C_hexose_reserve, change the way balance is computed for Rhizodep to avoid root system balance issues
         
         balance = C_sucrose_root + (self.time_step / living_struct_mass) * (
                 - hexose_diffusion_from_phloem / 2.
@@ -925,15 +925,29 @@ class RootCarbonModel(Model):
     @state
     def _C_hexose_reserve(self, C_hexose_reserve, living_struct_mass, hexose_immobilization_as_reserve,
                               hexose_mobilization_from_reserve, deficit_hexose_reserve) -> tuple[float, str, float]:
-        balance = C_hexose_reserve + (self.time_step / living_struct_mass) * (
-                hexose_immobilization_as_reserve
-                - hexose_mobilization_from_reserve
-                - deficit_hexose_reserve)
+
+        f = 1e13 # arbitrary
+        _hexose_immobilization_as_reserve = hexose_immobilization_as_reserve * f
+        _hexose_mobilization_from_reserve = hexose_mobilization_from_reserve * f
+        _deficit_hexose_reserve = deficit_hexose_reserve * f
+
+        inflow = _hexose_immobilization_as_reserve
+                
+        outflow = (_hexose_mobilization_from_reserve + _deficit_hexose_reserve)
+
+        netflow = inflow - outflow
+
+        _living_struct_mass = 1e6 * living_struct_mass # µg
+
+        derivative = (self.time_step / _living_struct_mass) * netflow
+        derivative = derivative * 1e-7
+        raw_balance = C_hexose_reserve + derivative
         
-        
-        deficit = - balance * living_struct_mass / self.time_step
-        deficit = np.where(deficit > 1e-20, deficit, 0.)
-        balance = np.maximum(balance, 0.)
+        is_neg = raw_balance < 0.0
+        deficit = np.where(is_neg, -raw_balance * (living_struct_mass / self.time_step), 0.0)
+        # deficit = np.where(deficit > 1e-20, deficit, 0.0)
+
+        balance = np.where(is_neg, 0.0, raw_balance)
 
         return balance, 'deficit_hexose_reserve', deficit
     
@@ -944,6 +958,9 @@ class RootCarbonModel(Model):
                            hexose_consumption_by_growth, hexose_consumption_by_fungus, hexose_diffusion_from_phloem,
                            hexose_active_production_from_phloem, sucrose_loading_in_phloem,
                            hexose_mobilization_from_reserve, hexose_immobilization_as_reserve, deficit_hexose_root) -> tuple[float, str, float]:
+
+        # TODO as in Root-BRIDGES and for C_hexose_reserve, change the way balance is computed for Rhizodep to avoid root system balance issues
+
         balance = C_hexose_root + (self.time_step / living_struct_mass) * (
                 - hexose_exudation
                 + hexose_uptake_from_soil
