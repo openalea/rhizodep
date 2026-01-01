@@ -123,8 +123,8 @@ class RootCarbonModel(Model):
                                             variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     
     # FROM SHOOT MODEL
-    sucrose_input_rate: float = declare(default=1e-10, unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", 
-                                       min_value="", max_value="", value_comment="", references="", DOI="",
+    sucrose_input_rate: float = declare(default=None, unit="mol.s-1", unit_comment="", description="Sucrose input rate in phloem at collar point", 
+                                       min_value="", max_value="", value_comment="None initialization, only superimposed by data enforcing or coupling", references="", DOI="",
                                         variable_type="input", by="model_shoot", state_variable_type="", edit_by="user")
 
     # FROM ANATOMY MODEL
