@@ -16,9 +16,9 @@ import pandas as pd
 
 import openalea.plantgl.all as pgl
 
-from . import model
-from .tool import alternative_plotting, tools
-from . import parameters as param
+from openalea.rhizodep import model
+from openalea.rhizodep.tool import alternative_plotting, tools
+from openalea.rhizodep import parameters as param
 
 # We define the main tutorial program:
 def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
@@ -208,36 +208,46 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
     # In case of renewal of the soil solution, we initialize a counter for determining when the renewal will happen:
     renewal_counter_in_seconds = 0
 
+    # HANDLING FOLDERS:
+    # We define the path of the directory that will contain the outputs of the model:
+    # If the folder doesn't exist:
+    if not os.path.exists(outputs_directory):
+        # We create it:
+        os.mkdir(outputs_directory)
+
     if recording_images:
-        # We define the directory of root images if it doesn't exist:
-        if not os.path.exists(root_images_directory):
-            # Then we create it:
-            os.mkdir(root_images_directory)
+        path = os.path.join(root_images_directory)
+        # We define the directory if it doesn't exist:
+        if not os.path.exists(path):
+            # We create it:
+            os.mkdir(path)
         else:
             # Otherwise, we delete all the images that are already present inside:
-            for root, dirs, files in os.walk(root_images_directory):
+            for root, dirs, files in os.walk(path):
                 for file in files:
                     os.remove(os.path.join(root, file))
 
     if recording_g:
-        # If the directory "MTG_files" doesn't exist:
-        if not os.path.exists(g_directory):
-            # Then we create it:
-            os.mkdir(g_directory)
+        path = os.path.join(g_directory)
+        # We define the directory if it doesn't exist:
+        if not os.path.exists(path):
+            # We create it:
+            os.mkdir(path)
         else:
-            # Otherwise, we delete all the files that are already present inside:
-            for root, dirs, files in os.walk(g_directory):
+            # Otherwise, we delete all the images that are already present inside:
+            for root, dirs, files in os.walk(path):
                 for file in files:
                     os.remove(os.path.join(root, file))
 
     if recording_g_properties:
-        # If the directory "MTG_properties" doesn't exist:
-        if not os.path.exists(g_properties_directory):
-            # Then we create it:
-            os.mkdir(g_properties_directory)
+        path = os.path.join(g_properties_directory)
+        # We define the directory if it doesn't exist:
+        if not os.path.exists(path):
+            # We create it:
+            os.mkdir(path)
         else:
-            # Otherwise, we delete all the files that are already present inside:
-            for root, dirs, files in os.walk(g_properties_directory):
+            # Otherwise, we delete all the images that are already present inside:
+            for root, dirs, files in os.walk(path):
                 for file in files:
                     os.remove(os.path.join(root, file))
 
@@ -733,7 +743,7 @@ def main_simulation(g, simulation_period_in_days=20., time_step_in_days=1.,
 
                 # 2d - SPECIFIC MYCORRHIZAL FUNGI DYNAMICS:
                 # =========================================
-                # If the dynamics of fungus is considered, we let the fungus grow and exchnage C with the roots:
+                # If the dynamics of fungus is considered, we let the fungus grow and exchange C with the roots:
                 if mycorrhizal_fungus:
                     mycorrhizae.mycorrhizal_interaction(root_MTG=g, fungus=fungus_MTG,
                                                         step=step, time_step_in_seconds=time_step_in_seconds)
