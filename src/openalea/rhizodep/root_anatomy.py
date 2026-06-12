@@ -2,12 +2,12 @@ import numpy as np
 from math import pi
 from dataclasses import dataclass, field
 
-from openalea.metafspm.component import Model, declare
+from openalea.metafspm.component import FunctionalComponent, declare
 from openalea.metafspm.component_factory import *
 
 
 @dataclass
-class RootAnatomy(Model):
+class RootAnatomy(FunctionalComponent):
     """
     Root anatomy model originating from both Rhizodep shoot.py and Root_CyNAPS model_topology.py
 

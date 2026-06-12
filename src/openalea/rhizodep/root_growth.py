@@ -23,13 +23,14 @@ from openalea.mtg import *
 from openalea.mtg.traversal import pre_order2, post_order2
 from openalea.mtg import turtle as turt
 
-from openalea.metafspm.component import Model, declare
+from openalea.metafspm.component import StructuralComponent, declare
 from openalea.metafspm.component_factory import *
+from openalea.rhizodep.temperature import TemperatureModel
 
 debug = False
 
 @dataclass
-class RootGrowthModel(Model):
+class RootGrowthModel(StructuralComponent, TemperatureModel):
     """
     DESCRIPTION
     -----------

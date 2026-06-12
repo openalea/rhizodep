@@ -62,13 +62,13 @@ import inspect as ins
 from functools import partial
 from math import pi
 
-from openalea.metafspm.component import Model, declare
+from openalea.metafspm.component import FunctionalComponent, declare
 from openalea.metafspm.component_factory import *
-
+from openalea.rhizodep.temperature import TemperatureModel
 
 
 @dataclass
-class RootCarbonModel(Model):
+class RootCarbonModel(FunctionalComponent, TemperatureModel):
     """
     Root carbon balance model originating from Rhizodep shoot.py
     TODO adapt differential equation system
@@ -198,7 +198,7 @@ class RootCarbonModel(Model):
     maintenance_respiration: float = declare(default=0., unit="mol.s-1", unit_comment="of carbon", description="", 
                                             min_value="", max_value="", value_comment="", references="", DOI="",
                                              variable_type="state_variable", by="model_carbon", state_variable_type="NonInertialExtensive", edit_by="user")
-
+    
     # Deficits
     deficit_sucrose_root: float = declare(default=0., unit="mol.s-1", unit_comment="of sucrose", description="Sucrose deficit rate in root", 
                                          min_value="", max_value="", value_comment="", references="Hypothesis of no initial deficit", DOI="",
@@ -217,7 +217,7 @@ class RootCarbonModel(Model):
     global_sucrose_deficit: float = declare(default=0., unit="mol.s-1", unit_comment="of sucrose", description="Summed sucrose deficit at root system level", 
                                            min_value="", max_value="", value_comment="", references="", DOI="",
                                             variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user")
-
+    
     # --- INITIALIZES MODEL PARAMETERS ---
 
     # Temperature
