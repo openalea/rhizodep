@@ -111,7 +111,7 @@ class RootCarbonModel(Model):
                                                   variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     hexose_consumption_by_fungus: float = declare(default=0., unit="mol.s-1", unit_comment="", description="Hexose consumption rate by fungus", 
                                                     min_value="", max_value="", value_comment="", references="", DOI="",
-                                                    variable_type="input", by="model_growth", state_variable_type="extensive", edit_by="user")
+                                                    variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
     distance_from_tip: float = declare(default=3.e-3, unit="m", unit_comment="", description="Example distance from tip", 
                                       min_value="", max_value="", value_comment="", references="", DOI="",
                                        variable_type="input", by="model_growth", state_variable_type="", edit_by="user")
@@ -130,16 +130,16 @@ class RootCarbonModel(Model):
     # FROM ANATOMY MODEL
     root_exchange_surface: float = declare(default=0., unit="m2", unit_comment="", description="Exchange surface between soil and symplasmic parenchyma.", 
                                           min_value="", max_value="", value_comment="", references="", DOI="",
-                                           variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user")
+                                           variable_type="input", by="model_anatomy", state_variable_type="", edit_by="user")
     phloem_exchange_surface: float = declare(default=0., unit="m2", unit_comment="", description="Exchange surface between root parenchyma and apoplasmic xylem vessels.", 
                                             min_value="", max_value="", value_comment="", references="", DOI="",
                                              variable_type="state_variable", by="model_anatomy", state_variable_type="input", edit_by="user")
     symplasmic_volume: float = declare(default=1e-9, unit="m3", unit_comment="", description="symplasmic volume for water content of root elements", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
-                            variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user")
+                            variable_type="input", by="model_anatomy", state_variable_type="", edit_by="user")
     phloem_volume: float = declare(default=1e-9, unit="m3", unit_comment="", description="symplasmic volume for water content of root elements", 
                             min_value="", max_value="", value_comment="", references="", DOI="",
-                            variable_type="input", by="model_anatomy", state_variable_type="extensive", edit_by="user")
+                            variable_type="input", by="model_anatomy", state_variable_type="", edit_by="user")
 
 
     # --- @note INITIALIZE MODEL STATE VARIABLES ---
@@ -213,10 +213,10 @@ class RootCarbonModel(Model):
     # SUMMED STATE VARIABLES
     total_sucrose_phloem: float = declare(default=0., unit="mol", unit_comment="of sucrose", description="Summed sucrose root at root system level", 
                                        min_value="", max_value="", value_comment="", references="", DOI="",
-                                        variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                        variable_type="plant_scale_state", by="model_carbon", state_variable_type="", edit_by="user")
     global_sucrose_deficit: float = declare(default=0., unit="mol.s-1", unit_comment="of sucrose", description="Summed sucrose deficit at root system level", 
                                            min_value="", max_value="", value_comment="", references="", DOI="",
-                                            variable_type="plant_scale_state", by="model_carbon", state_variable_type="extensive", edit_by="user")
+                                            variable_type="plant_scale_state", by="model_carbon", state_variable_type="", edit_by="user")
 
     # --- INITIALIZES MODEL PARAMETERS ---
 

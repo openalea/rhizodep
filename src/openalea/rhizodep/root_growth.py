@@ -3445,6 +3445,7 @@ class RootGrowthModel(Model):
         type = g.property("type")
         distance_from_tip = g.property("distance_from_tip")
         length = g.property("length")
+        radius = g.property("radius")
         axis_apex_id = g.property("axis_apex_id")
         living_struct_mass = g.property("living_struct_mass")
         struct_mass = g.property("struct_mass")
@@ -3458,7 +3459,6 @@ class RootGrowthModel(Model):
         if optional_for_plot:
             root_order = g.property("root_order")
             actual_time_since_formation = g.property("actual_time_since_formation")
-            radius = g.property("radius")
             tissue_formation_time = g.property("tissue_formation_time")
             thermal_time_since_cells_formation = g.property("thermal_time_since_cells_formation")
             axis_index = g.property("axis_index")
@@ -3529,179 +3529,193 @@ class RootGrowthModel(Model):
                 distance_from_tip[v] = distance_from_tip[son_id] + length[v]
                 axis_apex_id[v] = axis_apex_id[son_id]
 
-            if v in focus_set:
+            focused = (v in focus_set) and (v not in collar_skip)
 
-                # Update root hairs
+            # Update root hairs
+            if focused:
                 root_hairs_dynamics(p=props, v=v)
 
-                # Update the living struct mass
-                living_struct_mass[v] = struct_mass[v] + living_root_hairs_struct_mass[v]
+            # Update the living struct mass
+            living_struct_mass[v] = struct_mass[v] + living_root_hairs_struct_mass[v]
 
-                # We need to get the parent to compute mass partitionning.
-                if v in collar_children:
-                    parent = 1
-                else:
-                    parent = g.parent(v)
-                
-                if type[v] == self.type_Base_of_the_root_system or parent is None:
-                    axis_type[v] = 'seminal'
-                else:
-                    if optional_for_plot:
-                        if root_order[v] == 1:
-                            # We have to introduce this to get proper axis type
-                            graph_parent = g.parent(v)
+            # We need to get the parent to compute mass partitionning.
+            if v in collar_children:
+                parent = 1
+            else:
+                parent = g.parent(v)
+            
+            if type[v] == self.type_Base_of_the_root_system or parent is None:
+                axis_type[v] = 'seminal'
+            else:
+                # if optional_for_plot:
+                #     if root_order[v] == 1:
+                #         # We have to introduce this to get proper axis type
+                #         graph_parent = g.parent(v)
 
-                            # First exception for pivot root that could be taken for a nodal otherwise
-                            # (Given the structure of the first fake supporting elements)
-                            if v == max(collar_children):
-                                axis_type[v] = 'seminal'
-                            elif type[v] == self.type_Support_for_seminal_root or type[v] == self.type_Support_for_adventitious_root:
-                                axis_type[v] = 'seminal'
-                            elif type[graph_parent] == self.type_Support_for_seminal_root:
-                                axis_type[v] = 'seminal'
-                            elif type[graph_parent] == self.type_Support_for_adventitious_root:
-                                axis_type[v] = 'nodal'
-                            elif axis_type[graph_parent] == 'seminal':
-                                axis_type[v] = 'seminal'
-                            elif axis_type[graph_parent] == 'nodal':
-                                axis_type[v] = 'nodal'
-                            else:
-                                print('Uncaught exception')
-                        else:
-                            axis_type[v] = 'lateral'
+                #         # First exception for pivot root that could be taken for a nodal otherwise
+                #         # (Given the structure of the first fake supporting elements)
+                #         if v == max(collar_children):
+                #             axis_type[v] = 'seminal'
+                #         elif type[v] == self.type_Support_for_seminal_root or type[v] == self.type_Support_for_adventitious_root:
+                #             axis_type[v] = 'seminal'
+                #         elif type[graph_parent] == self.type_Support_for_seminal_root:
+                #             axis_type[v] = 'seminal'
+                #         elif type[graph_parent] == self.type_Support_for_adventitious_root:
+                #             axis_type[v] = 'nodal'
+                #         elif axis_type[graph_parent] == 'seminal':
+                #             axis_type[v] = 'seminal'
+                #         elif axis_type[graph_parent] == 'nodal':
+                #             axis_type[v] = 'nodal'
+                #         else:
+                #             print('Uncaught exception')
+                #     else:
+                #         axis_type[v] = 'lateral'
+
+                if len(modules_to_update) > 0: # Only relevant if the growth model has been coupled, otherwise all properties have already been updated
+                    # Bellow we initialize properties even for non emerged elements to ensure all arrays' length and indexing are properly aligned for the whole model
+                    if v in step_new_apices and v not in known_vertices:
                         
-                    if (struct_mass[v] > 0) and (v not in collar_skip):
+                        # We increment the vertex identifiers to be accesses in deficits
+                        vertex_index[v] = v
+                        if type[parent] in (self.type_Support_for_adventitious_root, self.type_Support_for_seminal_root) and v not in collar_children:
+                            self.collar_children += [v]
+                            self.collar_skip += [parent]
+                            parent = 1
+                        parent_id[v] = parent if parent is not None else -1
+                        
+                        if focused:
+                            mass_fraction = living_struct_mass[v] / (living_struct_mass[v] + living_struct_mass[parent])
 
-                        if len(modules_to_update) > 0: # Only relevant if the growth model has been coupled, otherwise all properties have already been updated
-                            if v in step_new_apices and v not in known_vertices:
+                        for module_handle in module_handles:
+                            for prop in module_handle["massic"]:
+                                if focused:
+                                    if mass_fraction > 0:
+                                        initial_metabolite_amount = prop[parent] * (initial_struct_mass[parent] + initial_living_root_hairs_struct_mass[parent])
+                                        prop[v] = initial_metabolite_amount * mass_fraction / living_struct_mass[v]
+                                        prop[parent] = initial_metabolite_amount * (1-mass_fraction) / living_struct_mass[parent]
+
+                                    else:
+                                        prop[v] = prop[parent]
+                                else:
+                                    prop[v]=0.
+                                    
+                            for prop in module_handle["extensive"]:
+                                if focused:
+                                    initial_amount = prop[parent]
+                                    prop[v] = initial_amount * mass_fraction
+                                    prop[parent] = initial_amount * (1-mass_fraction)
+                                else:
+                                    prop[v]=0.
                                 
-                                # We increment the vertex identifiers to be accesses in deficits
+                            for prop in module_handle["descriptor"]:
+                                prop[v] = None
+
+                            # New for ArrayDicts but optional if coming back to dicts
+                            for prop in module_handle["non_inertial_intensive"]:
+                                if focused:
+                                    prop[v] = prop[parent]
+                                else:
+                                    prop[v]=0.
+                            
+                            for prop in module_handle["non_inertial_extensive"]:
+                                if focused:
+                                    prop[v] = mass_fraction * prop[parent]
+                                else:
+                                    prop[v]=0.
+                            
+
+                        # For soil related inputs, given new elements have been formed and we will not compute soil interception now, we infer the values from those of the parent
+                        for prop in soil_boundaries_handle:
+                            if focused:
+                                prop[v] = prop[parent]
+                            else:
+                                prop[v]=0.
+
+
+                    elif v in step_elongating_elements:
+                        # If this is an already emerged segment, it has its own dynamic regarless of parents
+                        if initial_struct_mass[v] > 0:
+                            for module_handle in module_handles:
+                                for prop in module_handle["massic"]:
+                                    prop[v] = prop[v] * (initial_struct_mass[v] + initial_living_root_hairs_struct_mass[v]) / living_struct_mass[v]
+
+                        # Else if it elongated from a null structural mass, it shared ressources with its parent and we deal with it as for new apex creation
+                        else:
+                            
+                            mass_fraction = living_struct_mass[v] / (living_struct_mass[v] + living_struct_mass[parent])
+
+                            for module_handle in module_handles:
+                                for prop in module_handle["massic"]:
+                                    initial_metabolite_amount = prop[parent] * (initial_struct_mass[parent] + initial_living_root_hairs_struct_mass[parent])
+                                    prop[v] = initial_metabolite_amount * mass_fraction / living_struct_mass[v]
+                                    prop[parent] = initial_metabolite_amount * (1-mass_fraction) / living_struct_mass[parent]
+                                        
+                                for prop in module_handle["extensive"]:
+                                    initial_amount = prop[parent]
+                                    prop[v] = initial_amount * mass_fraction
+                                    prop[parent] = initial_amount * (1-mass_fraction)
+
+                            
+                            if v not in known_vertices:
                                 vertex_index[v] = v
                                 if type[parent] in (self.type_Support_for_adventitious_root, self.type_Support_for_seminal_root) and v not in collar_children:
-                                    print("new collar children")
                                     self.collar_children += [v]
                                     self.collar_skip += [parent]
                                     parent = 1
                                 parent_id[v] = parent if parent is not None else -1
-                                
-                                mass_fraction = living_struct_mass[v] / (living_struct_mass[v] + living_struct_mass[parent])
 
                                 for module_handle in module_handles:
-                                    for prop in module_handle["massic"]:
-                                        if mass_fraction > 0:
-                                            initial_metabolite_amount = prop[parent] * (initial_struct_mass[parent] + initial_living_root_hairs_struct_mass[parent])
-                                            prop[v] = initial_metabolite_amount * mass_fraction / living_struct_mass[v]
-                                            prop[parent] = initial_metabolite_amount * (1-mass_fraction) / living_struct_mass[parent]
-
-                                        else:
-                                            prop[v] = prop[parent]
-                                            
-                                    for prop in module_handle["extensive"]:
-                                        initial_amount = prop[parent]
-                                        prop[v] = initial_amount * mass_fraction
-                                        prop[parent] = initial_amount * (1-mass_fraction)
-                                        
-                                    for prop in module_handle["descriptor"]:
-                                        prop[v] = None
-
-                                    # New for ArrayDicts but optional if coming back to dicts
                                     for prop in module_handle["non_inertial_intensive"]:
                                         prop[v] = prop[parent]
-                                    
+
                                     for prop in module_handle["non_inertial_extensive"]:
                                         prop[v] = mass_fraction * prop[parent]
                                     
-
-                                # For soil related inputs, given new elements have been formed and we will not compute soil interception now, we infer the values from those of the parent
-                                for prop in soil_boundaries_handle:
-                                    prop[v] = prop[parent]
-
-
-                            elif v in step_elongating_elements:
-                                # If this is an already emerged segment, it has its own dynamic regarless of parents
-                                if initial_struct_mass[v] > 0:
-                                    for module_handle in module_handles:
-                                        for prop in module_handle["massic"]:
-                                            prop[v] = prop[v] * (initial_struct_mass[v] + initial_living_root_hairs_struct_mass[v]) / living_struct_mass[v]
-
-                                # Else if it elongated from a null structural mass, it shared ressources with its parent and we deal with it as for new apex creation
-                                else:
-                                    
-                                    mass_fraction = living_struct_mass[v] / (living_struct_mass[v] + living_struct_mass[parent])
-
-                                    for module_handle in module_handles:
-                                        for prop in module_handle["massic"]:
-                                            initial_metabolite_amount = prop[parent] * (initial_struct_mass[parent] + initial_living_root_hairs_struct_mass[parent])
-                                            prop[v] = initial_metabolite_amount * mass_fraction / living_struct_mass[v]
-                                            prop[parent] = initial_metabolite_amount * (1-mass_fraction) / living_struct_mass[parent]
-                                                
-                                        for prop in module_handle["extensive"]:
-                                            initial_amount = prop[parent]
-                                            prop[v] = initial_amount * mass_fraction
-                                            prop[parent] = initial_amount * (1-mass_fraction)
-
-                                    
-                                    if v not in known_vertices:
-                                        vertex_index[v] = v
-                                        if type[parent] in (self.type_Support_for_adventitious_root, self.type_Support_for_seminal_root) and v not in collar_children:
-                                            print("new collar children")
-                                            self.collar_children += [v]
-                                            self.collar_skip += [parent]
-                                            parent = 1
-                                        parent_id[v] = parent if parent is not None else -1
-
-                                        for module_handle in module_handles:
-                                            for prop in module_handle["non_inertial_intensive"]:
-                                                prop[v] = prop[parent]
-
-                                            for prop in module_handle["non_inertial_extensive"]:
-                                                prop[v] = mass_fraction * prop[parent]
-                                            
-                                    # If first elongation but primordia was formed earlier, needs access to soil states
-                                    for prop in soil_boundaries_handle:
-                                        prop[v] = prop[parent]
+                            # If first elongation but primordia was formed earlier, needs access to soil states
+                            for prop in soil_boundaries_handle:
+                                prop[v] = prop[parent]
                             
-                        if optional_for_plot:
-                            #TODO remove, just for a figure
-                            if label[v] != self.label_Apex:
-                                if v not in actual_time_since_formation.keys():
-                                    actual_time_since_formation[v] = 0
-                                else:
-                                    actual_time_since_formation[v] += self.time_step_in_seconds / 3600 / 24
-                            else:
-                                if v not in actual_time_since_formation.keys():
-                                    actual_time_since_formation[v] = 0
-                                non_meristem_length = radius[v] * 2 * 1.3 #Kozlova et al. (2020), the length of the meristematic region 1.3 times the diameter of the tip
-                                if non_meristem_length < length[v]:
-                                    aging_length = length[v] - non_meristem_length
-                                    actual_time_since_formation[v] += (self.time_step_in_seconds / 3600 / 24) * aging_length / length[v]
+                        # if optional_for_plot:
+                        #     #TODO remove, just for a figure
+                        #     if label[v] != self.label_Apex:
+                        #         if v not in actual_time_since_formation.keys():
+                        #             actual_time_since_formation[v] = 0
+                        #         else:
+                        #             actual_time_since_formation[v] += self.time_step_in_seconds / 3600 / 24
+                        #     else:
+                        #         if v not in actual_time_since_formation.keys():
+                        #             actual_time_since_formation[v] = 0
+                        #         non_meristem_length = radius[v] * 2 * 1.3 #Kozlova et al. (2020), the length of the meristematic region 1.3 times the diameter of the tip
+                        #         if non_meristem_length < length[v]:
+                        #             aging_length = length[v] - non_meristem_length
+                        #             actual_time_since_formation[v] += (self.time_step_in_seconds / 3600 / 24) * aging_length / length[v]
 
-                            tissue_formation_time[v] = thermal_time_since_cells_formation[v] / 3600 / 24
+                        #     tissue_formation_time[v] = thermal_time_since_cells_formation[v] / 3600 / 24
 
-            if optional_for_plot:
-                if v not in processed_vids:
-                    axis = g.Axis(v)
-                    insertion_id = g.parent(min(axis))
+            # if optional_for_plot:
+            #     if v not in processed_vids:
+            #         axis = g.Axis(v)
+            #         insertion_id = g.parent(min(axis))
 
-                    if insertion_id:
-                        if type[insertion_id] == self.type_Support_for_seminal_root:
-                            axis_index.update({v: f"seminal_{seminal_id}" for v in axis})
-                            seminal_id += 1
-                        elif type[insertion_id] == self.type_Support_for_adventitious_root:
-                            axis_index.update({v: f"adventitious_{adventitious_id}" for v in axis})
-                            adventitious_id += 1
-                        else:
-                            if root_order[min(axis)] > 1:
-                                axis_index.update({v: f"lateral_{lateral_id}" for v in axis})
-                                lateral_id += 1
-                            else:
-                                print("Uncaptured exception on ", v)
-                    else:
-                        # If parent is None we now this is the main seminal axis
-                        axis_index.update({v: f"seminal_{seminal_id}" for v in axis})
-                        seminal_id += 1
+            #         if insertion_id:
+            #             if type[insertion_id] == self.type_Support_for_seminal_root:
+            #                 axis_index.update({v: f"seminal_{seminal_id}" for v in axis})
+            #                 seminal_id += 1
+            #             elif type[insertion_id] == self.type_Support_for_adventitious_root:
+            #                 axis_index.update({v: f"adventitious_{adventitious_id}" for v in axis})
+            #                 adventitious_id += 1
+            #             else:
+            #                 if root_order[min(axis)] > 1:
+            #                     axis_index.update({v: f"lateral_{lateral_id}" for v in axis})
+            #                     lateral_id += 1
+            #                 else:
+            #                     print("Uncaptured exception on ", v)
+            #         else:
+            #             # If parent is None we now this is the main seminal axis
+            #             axis_index.update({v: f"seminal_{seminal_id}" for v in axis})
+            #             seminal_id += 1
                     
-                    processed_vids += axis
+            #         processed_vids += axis
 
         props["total_living_struct_mass"][1] = living_struct_mass.values_array().sum()
 
