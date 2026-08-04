@@ -3543,6 +3543,14 @@ class RootGrowthModel(Model):
                 parent = 1
             else:
                 parent = g.parent(v)
+
+            if not focused: # Only in this case we need the grandparent in case the carrying element of a non emerged element has been initialized at the same time-step
+                if parent is None:
+                    grandparent = None
+                elif parent in collar_children:
+                    grandparent = 1
+                else:
+                    grandparent = g.parent(parent)
             
             if type[v] == self.type_Base_of_the_root_system or parent is None:
                 axis_type[v] = 'seminal'
@@ -3597,7 +3605,10 @@ class RootGrowthModel(Model):
                                     else:
                                         prop[v] = prop[parent]
                                 else:
-                                    prop[v]=0.
+                                    if parent in prop.keys():
+                                        prop[v] = prop[parent]
+                                    else:
+                                        prop[v] = prop[grandparent]
                                     
                             for prop in module_handle["extensive"]:
                                 if focused:
@@ -3605,7 +3616,7 @@ class RootGrowthModel(Model):
                                     prop[v] = initial_amount * mass_fraction
                                     prop[parent] = initial_amount * (1-mass_fraction)
                                 else:
-                                    prop[v]=0.
+                                    prop[v] = 0.
                                 
                             for prop in module_handle["descriptor"]:
                                 prop[v] = None
@@ -3615,7 +3626,10 @@ class RootGrowthModel(Model):
                                 if focused:
                                     prop[v] = prop[parent]
                                 else:
-                                    prop[v]=0.
+                                    if parent in prop.keys():
+                                        prop[v] = prop[parent]
+                                    else:
+                                        prop[v] = prop[grandparent]
                             
                             for prop in module_handle["non_inertial_extensive"]:
                                 if focused:
@@ -3629,7 +3643,10 @@ class RootGrowthModel(Model):
                             if focused:
                                 prop[v] = prop[parent]
                             else:
-                                prop[v]=0.
+                                if parent in prop.keys():
+                                    prop[v] = prop[parent]
+                                else:
+                                    prop[v] = prop[grandparent]
 
 
                     elif v in step_elongating_elements:
