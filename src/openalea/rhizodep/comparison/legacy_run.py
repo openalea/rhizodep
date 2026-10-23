@@ -27,6 +27,8 @@ Two things the composite provides are set here, the legacy needing them standalo
 """
 import copy
 import functools
+
+import numpy as np
 from dataclasses import dataclass, field
 
 from openalea.rhizodep.legacy import RootGrowthModel
@@ -40,6 +42,7 @@ class Snapshot:
     edge_type: dict
     props: dict
     plant: dict
+    meta: dict = field(default_factory=dict)        # the legacy's state outside its MTG (numpy's generator, lists)
 
 
 @dataclass
@@ -81,7 +84,9 @@ def snapshot(model):
     plant = {name: g.property(name).get(1) for name in PLANT_SCALE}
     parent = {vid: g.parent(vid) for vid in vertices}
     edge_type = {vid: g.edge_type(vid) for vid in vertices}
-    return Snapshot(vertices=vertices, parent=parent, edge_type=edge_type, props=props, plant=plant)
+    meta = {"random_state": np.random.get_state(),
+            "step_elongating_elements": list(getattr(model, "step_elongating_elements", []))}
+    return Snapshot(vertices=vertices, parent=parent, edge_type=edge_type, props=props, plant=plant, meta=meta)
 
 
 def write_C_hexose_root(model, step, C_hexose_root):

@@ -169,6 +169,13 @@ class FromLegacy(StructuralComponent):
             g.property("vertex_index")[vid] = v
             stack.extend(reversed(children[v]))
         g.property("total_living_struct_mass")[plant] = snap.plant["total_living_struct_mass"]
+        # The legacy's state outside its MTG: numpy's global generator, its elements elongated in actual growth
+        stream = np.random.RandomState()
+        if "random_state" in snap.meta:
+            stream.set_state(snap.meta["random_state"])
+        g.property("legacy_random")[plant] = stream
+        for v in snap.meta.get("step_elongating_elements", []):
+            g.property("step_elongating")[vids[v]] = 1
 
 
 class TransplantModel(GrowthOnly):
