@@ -593,6 +593,14 @@ class RootGrowth(StructuralComponent):
     root_order_treshold: int = parameter(**doc('adim', 'the root order above which new lateral roots cannot be formed'),
                                          by=BY, default=2)
 
+    # Coupled, the other components' variables are shared between the elements once per call, as the legacy's
+    # post_growth_updating does it, but conservatively (metafspm's repartition; devplan §19, g17): by the living
+    # structural mass after the call, against the living mass at its start (partition_basis None). For an element
+    # that only elongated it is the legacy's basis (its initial masses); for one segmentation split, the legacy's
+    # initial_struct_mass is already shared out, which would lose amounts
+    partition_weight = "living_struct_mass"
+    repartition = "end_of_call"
+
     # What the legacy's new elements start with at 0 (RootGrowthModel.ADDING_A_CHILD(nil_properties=True)), whatever
     # the declared defaults
     NIL = ("potential_length", "initial_length", "volume", "dist_to_ramif", "distance_from_tip",
