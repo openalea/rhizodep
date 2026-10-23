@@ -3,11 +3,11 @@ import numpy as np
 import pytest
 
 from openalea.rhizodep.comparison.legacy_run import legacy_stages
-from openalea.rhizodep.comparison.parameter_sets import variants
+from openalea.rhizodep.comparison.parameter_sets import GB_SOIL_1_0, variants
 from openalea.rhizodep.comparison.port_run import run_stage, snapshot, transplant_scene
 from openalea.rhizodep.growth import RootGrowth
 
-from stages import COVERAGE, assert_stage_exact
+from stages import COVERAGE, assert_stage_exact, varying_C
 
 
 @pytest.mark.parametrize("name", sorted(variants()))
@@ -18,6 +18,12 @@ def test_parameter_sets(name):
 @pytest.mark.parametrize("simple", [False, True])
 def test_stops_deaths_nodules(simple):
     assert_stage_exact(dict(COVERAGE, simple_growth_duration=simple), "potential", every=6)
+
+
+@pytest.mark.parametrize("C", [2e-5, varying_C], ids=["low", "varying"])
+@pytest.mark.parametrize("parameters", [GB_SOIL_1_0, COVERAGE], ids=["GB_soil_1.0", "coverage"])
+def test_hexose_limited(parameters, C):
+    assert_stage_exact(parameters, "potential", every=12, C_hexose_root=C)
 
 
 def test_pipe_model_without_the_legacy_bug(monkeypatch):

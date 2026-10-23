@@ -34,7 +34,7 @@ import pandas as pd
 
 from openalea.metafspm.coupling.component import StructuralComponent, input_variable, parameter, state_variable
 from openalea.metafspm.data_structure.configs import PropsConfig, ScalesConfig
-from openalea.metafspm.solve.decorator import potential
+from openalea.metafspm.solve.decorator import actual, potential
 
 SubOrgan = ScalesConfig.SubOrgan
 NII, NIE, DESCRIPTOR, MASSIC = "NonInertialIntensive", "NonInertialExtensive", "descriptor", "massic_concentration"
@@ -1116,3 +1116,131 @@ class RootGrowth(StructuralComponent):
                 "actual_time_since_cells_formation", atcf, "thermal_time_since_cells_formation", ttcf,
                 "actual_time_since_growth_stopped", atgs, "thermal_time_since_growth_stopped", ttgs,
                 "actual_time_since_death", atd, "thermal_time_since_death", ttd)
+
+    # ── Actual growth (RootGrowthModel.actual_growth_and_corresponding_respiration) ───────────────────────────
+
+    @staticmethod
+    def _volume(type, radius, length):
+        """RootGrowthModel.volume_from_radius_and_length: a cylinder, a sphere for a nodule."""
+        return np.where(type == TYPE_NODULE, 4 / 3. * pi * radius ** 3, pi * radius ** 2 * length)
+
+    @actual
+    def _length(self, type, length, radius, initial_length, initial_radius, potential_length, potential_radius,
+                volume, struct_mass, initial_struct_mass, root_tissue_density, C_hexose_root, temperature_modification,
+                hexose_possibly_required_for_elongation, struct_mass_contributing_to_elongation,
+                hexose_available_for_thickening, hexose_growth_demand, hexose_consumption_by_growth_amount,
+                hexose_consumption_by_growth, resp_growth, struct_mass_produced,
+                thermal_potential_time_since_emergence, thermal_time_since_emergence, actual_time_since_emergence,
+                actual_elongation, actual_elongation_rate, dist_to_ramif, growing_zone_factor, struct_mass_C_content,
+                yield_growth, C_hexose_min_for_elongation, C_hexose_min_for_thickening) -> outputs(15):
+        """
+        Growth limited by the hexose of the supply zone (elongation) and of the element (thickening), its cost
+        taken from the suppliers in proportion to their hexose, plus the growth respiration; the primordia that
+        elongate emerge. The costs are scattered in the legacy's visiting order (children first), so that each
+        element's sums are the legacy's, bit for bit.
+        """
+        ds = self.data_structure
+        ts = float(self.time_step)
+        rtd, Cc, y = root_tissue_density, struct_mass_C_content, yield_growth
+        volume_of = self._volume
+        with np.errstate(divide="ignore", invalid="ignore"):
+            initial_volume = volume_of(type, initial_radius, initial_length)
+            potential_volume = volume_of(type, potential_radius, potential_length)
+            grows = ~np.isin(type, (TYPE_DEAD, TYPE_JUST_DEAD, TYPE_SEMINAL_SUPPORT, TYPE_ADVENTITIOUS_SUPPORT))
+            grows &= ~((potential_length <= initial_length) & (potential_radius <= initial_radius))
+            demand = np.array(hexose_growth_demand)
+            demand[grows] = ((potential_volume - initial_volume) * rtd * Cc / y * 1 / 6.)[grows]
+            negative = grows & (demand < 0.)
+            demand[negative] = 0.
+            grows &= demand > 0.
+
+            elongates = grows & (potential_length > length)
+            for_elongation = np.where(elongates, np.maximum(hexose_possibly_required_for_elongation
+                                                            - struct_mass_contributing_to_elongation
+                                                            * C_hexose_min_for_elongation, 0.), 0.)
+            thickens = grows & (potential_radius > radius)
+            for_thickening = np.where(thickens, np.maximum(hexose_available_for_thickening
+                                                           - struct_mass * C_hexose_min_for_thickening, 0.), 0.)
+            grows &= (for_elongation + for_thickening) > 0.
+
+            # Elongation, limited by the supply zone's hexose
+            length_, radius_ = np.array(length), np.array(radius)
+            volume_max = initial_volume + for_elongation * 6. / (rtd * Cc) * y
+            length_max = volume_max / (pi * initial_radius ** 2)
+            m = grows & (potential_length > initial_length)
+            length_[m] = np.where(potential_length[m] >= length_max[m], length_max[m], potential_length[m])
+            elongation_cost = 1. / 6. * (volume_of(type, initial_radius, length_) - initial_volume) * rtd * Cc / y
+            supplied = m & (length_ > initial_length)
+
+            # Thickening, limited by the element's hexose
+            m = grows & (potential_radius > initial_radius)
+            increase = for_thickening * 6. * y / (rtd * Cc)
+            volume_max = volume_of(type, initial_radius, length_) + increase
+            possible = np.where(type == TYPE_NODULE, (3. / (4. * pi)) ** (1. / 3.), np.sqrt(volume_max / (length_ * pi)))
+            fits = possible <= potential_radius
+            radius_[m] = np.where(fits[m], possible[m], potential_radius[m])
+            net = volume_of(type, radius_, length_) - volume_of(type, initial_radius, length_)
+            thickening_cost = np.where(fits, for_thickening, 1. / 6. * net * rtd * Cc / y)
+            own_share = thickening_cost * ((C_hexose_root * initial_struct_mass) / for_thickening)
+            parents = np.asarray(ds.parents())
+            nodule = m & (type == TYPE_NODULE)
+            parent_share = thickening_cost * ((C_hexose_root[parents] * initial_struct_mass[parents]) / for_thickening)
+
+        # The costs, in the legacy's order: per element visited (children first), its elongation's suppliers (tip
+        # to base), then its own thickening, then a nodule's parent
+        visit = ds.order("post", convention="openalea")
+        rank = np.empty(visit.size, dtype=np.int64)
+        rank[visit] = np.arange(visit.size)
+        budget = growing_zone_factor * radius * radius ** 2 * pi
+        owner, supplier, contribution = ds.path_contributions(budget, volume, C_hexose_root * struct_mass,
+                                                              where=supplied, include=length > 0.)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            elongation_events = elongation_cost[owner] * contribution / hexose_possibly_required_for_elongation[owner]
+        own = np.flatnonzero(m)
+        nod = np.flatnonzero(nodule)
+        event_owner = np.concatenate([owner, own, nod])
+        target = np.concatenate([supplier, own, parents[nod]])
+        value = np.concatenate([elongation_events, own_share[own], parent_share[nod]])
+        kind = np.concatenate([np.zeros(owner.size), np.ones(own.size), np.full(nod.size, 2.)])
+        order = np.lexsort((np.arange(event_owner.size), kind, rank[event_owner]))
+        target, value = target[order], value[order]
+        amount, rate, respiration = (np.array(hexose_consumption_by_growth_amount),
+                                     np.array(hexose_consumption_by_growth), np.array(resp_growth))
+        np.add.at(amount, target, value)
+        np.add.at(rate, target, value / ts)
+        np.add.at(respiration, target, value * (1 - y[target]) * 6.)
+
+        # The new structure
+        volume_, mass, produced = np.array(volume), np.array(struct_mass), np.array(struct_mass_produced)
+        initial_mass = np.array(initial_struct_mass)
+        g = grows
+        volume_[g] = volume_of(type, radius_, length_)[g]
+        mass[g] = volume_[g] * rtd[g]
+        produced[g] = (volume_[g] - initial_volume[g]) * rtd[g]
+        shrinks = g & (mass < initial_struct_mass) & (produced > 0.)
+        initial_mass[shrinks] = mass[shrinks]
+
+        # Emergence, elongation
+        type_, tte, ate = np.array(type), np.array(thermal_time_since_emergence), np.array(actual_time_since_emergence)
+        elongation, elongation_rate, ramif = np.array(actual_elongation), np.array(actual_elongation_rate), np.array(
+            dist_to_ramif)
+        longer = g & (length_ > initial_length)
+        emerges = longer & np.isin(type, (TYPE_SEMINAL_BEFORE_EMERGENCE, TYPE_ADVENTITIOUS_BEFORE_EMERGENCE,
+                                          TYPE_BEFORE_EMERGENCE))
+        type_[emerges] = TYPE_EMERGED
+        tte[emerges] = thermal_potential_time_since_emergence[emerges]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ate[emerges] = tte[emerges] / temperature_modification[emerges]
+            elongation[emerges] = length_[emerges] - initial_length[emerges]
+            elongation_rate[emerges] = elongation[emerges] / ate[emerges]
+        emerged = longer & (type == TYPE_EMERGED)
+        elongation[emerged] = length_[emerged] - initial_length[emerged]
+        elongation_rate[emerged] = elongation[emerged] / ts
+        ramif[longer] += elongation[longer]
+
+        return (length_, "radius", radius_, "volume", volume_, "struct_mass", mass, "struct_mass_produced", produced,
+                "initial_struct_mass", initial_mass, "hexose_growth_demand", demand,
+                "hexose_consumption_by_growth_amount", amount, "hexose_consumption_by_growth", rate,
+                "resp_growth", respiration, "type", type_, "thermal_time_since_emergence", tte,
+                "actual_time_since_emergence", ate, "actual_elongation", elongation,
+                "actual_elongation_rate", elongation_rate, "dist_to_ramif", ramif)
