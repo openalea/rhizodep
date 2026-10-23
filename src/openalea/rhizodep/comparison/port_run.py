@@ -3,7 +3,7 @@ The port run as the legacy is (legacy_run), its records in the legacy's form, to
 (devplan_metafspm.md).
 
     run = port_run(parameters, n_steps=48, C_hexose_root=1e-3)
-    run.scene              the metafspm Scene (one plant, the GrowthOnly model)
+    run.scene              the metafspm Scene (one plant, growth_model(): the component alone)
     run.steps[i]           Snapshots as legacy_run's, keyed by the legacy's vertex ids (vertex_index):
                            the SubOrgans, their parents through the MPG's topology (the `+` across axes included),
                            every declared variable, decoded where the port codes it (the MPG label as the legacy's
@@ -39,16 +39,27 @@ AXIS = {AXIS_SEMINAL: "seminal", AXIS_NODAL: "nodal", AXIS_LATERAL: "lateral"}
 LABEL_SEGMENT, LABEL_APEX = 1, 2
 
 
-class GrowthOnly:
-    """A plant model of the growth component alone, the hexose given (as the legacy's harness does)."""
-    initiators = (RootGrowth,)
+_MODELS = {}
 
-    def __init__(self, data_structure, time_step):
-        self.growth = RootGrowth(data_structure=data_structure, time_step=time_step)
-        self.components = [self.growth]
 
-    def run(self):
-        self.growth()
+def growth_model(component=RootGrowth, transplant=False):
+    """A plant model of the growth component *component* (RootGrowth or a subclass) alone, its resources given (as
+    the legacy's harness gives them); its plant built by the component, or from a legacy record (*transplant*)."""
+    key = (component, transplant)
+    if key not in _MODELS:
+        def __init__(self, data_structure, time_step):
+            self.growth = component(data_structure=data_structure, time_step=time_step)
+            self.components = [self.growth]
+
+        def run(self):
+            self.growth()
+
+        initiators = (type(f"FromLegacy{component.__name__}", (FromLegacy,), {"component": component}),
+                      ) if transplant else (component,)
+        name = f"{component.__name__}{'Transplant' if transplant else 'Only'}"
+        _MODELS[key] = type(name, (), dict(initiators=initiators, __init__=__init__, run=run,
+                                           __doc__=growth_model.__doc__))
+    return _MODELS[key]
 
 
 @dataclass
@@ -58,8 +69,8 @@ class PortRun:
     recorded_steps: list = field(default_factory=list)
 
 
-def port_scene(parameters=None, time_step=3600):
-    table = pd.DataFrame([dict(plant="p0", model=GrowthOnly, x=0., y=0., z=0., rotation=0.,
+def port_scene(parameters=None, time_step=3600, component=RootGrowth):
+    table = pd.DataFrame([dict(plant="p0", model=growth_model(component), x=0., y=0., z=0., rotation=0.,
                                scenario={"parameters": dict(parameters or {})})])
     table.attrs.update(xrange=1., yrange=1.)
     return Scene(table, time_step=time_step)
@@ -85,7 +96,7 @@ def snapshot(scene) -> Snapshot:
             else:
                 props[name] = {legacy_of[v]: x.item() for v, x in zip(ids, values)}
     props["label"] = {legacy_of[v]: LABEL_APEX if g.label(v) == apex_label else LABEL_SEGMENT for v in ids.tolist()}
-    for name in RootGrowth.ELEMENT_PARAMETERS:
+    for name in type(growth).ELEMENT_PARAMETERS:
         values = np.asarray(growth.parameter_values(name))
         props[name] = {legacy_of[v]: x.item() for v, x in zip(ids, values)}
     parent, edge_type = {}, {}
@@ -98,15 +109,22 @@ def snapshot(scene) -> Snapshot:
                     plant=plant)
 
 
-def port_run(parameters=None, n_steps=24, C_hexose_root=1e-3, time_step=3600, record_every=1, record=True):
-    """*n_steps* steps of the port; the records every *record_every* steps (and the last), as legacy_run's."""
-    scene = port_scene(parameters, time_step)
+def port_run(parameters=None, n_steps=24, C_hexose_root=1e-3, time_step=3600, record_every=1, record=True,
+             component=RootGrowth, given=None, setup=None):
+    """*n_steps* steps of the port; the records every *record_every* steps (and the last), as legacy_run's.
+    *given*: other inputs written before each step ({name: a number, or a function as C_hexose_root}); *setup*: a
+    function of the scene, called once it is built."""
+    scene = port_scene(parameters, time_step, component)
+    if setup is not None:
+        setup(scene)
     run = PortRun(scene=scene)
     if record:
         run.steps.append(snapshot(scene))
         run.recorded_steps.append(0)
     for step in range(n_steps):
-        write_C_hexose_root(scene, step, C_hexose_root)
+        write_given(scene, step, "C_hexose_root", C_hexose_root)
+        for name, value in (given or {}).items():
+            write_given(scene, step, name, value)
         scene.run()
         if record and ((step + 1) % record_every == 0 or step == n_steps - 1):
             run.steps.append(snapshot(scene))
@@ -124,22 +142,26 @@ class _LegacyIds:
         return list(self.ids)
 
 
-def write_C_hexose_root(scene, step, C_hexose_root):
-    """The given hexose on every element, as legacy_run writes it (a number, or a function of the step and the
+def write_given(scene, step, name, value):
+    """A given input on every element, as legacy_run writes the hexose (a number, or a function of the step and the
     legacy's ids)."""
     ds = scene.populations[0].data_structure
     index = np.asarray(ds.get("vertex_index")).astype(int)
-    if callable(C_hexose_root):
-        values = C_hexose_root(step, _LegacyIds(index.tolist()))
+    if callable(value):
+        values = value(step, _LegacyIds(index.tolist()))
         if isinstance(values, dict):
-            current = np.array(ds.get("C_hexose_root"), dtype=float)
+            current = np.array(ds.get(name), dtype=float)
             for i, legacy_id in enumerate(index.tolist()):
                 if legacy_id in values:
                     current[i] = values[legacy_id]
-            ds.set("C_hexose_root", current)
+            ds.set(name, current)
             return
-        C_hexose_root = values
-    ds.set("C_hexose_root", np.full(index.size, float(C_hexose_root)))
+        value = values
+    ds.set(name, np.full(index.size, float(value)))
+
+
+def write_C_hexose_root(scene, step, C_hexose_root):
+    write_given(scene, step, "C_hexose_root", C_hexose_root)
 
 
 # ── State transplant: the port on a legacy state (devplan §14) ──────────────────────────────────────────────────
@@ -153,25 +175,26 @@ class FromLegacy(StructuralComponent):
     RootGrowth.initiate_plant groups its seedling: an Organ per `<` chain, an Axis per first-order root (an element
     branched with root_order 1), a lateral's Organ in its bearer's Axis."""
     scenario_keys = ("legacy_snapshot",)
+    component = RootGrowth                              # the growth component whose variables the record gives
 
     @classmethod
     def initiate_plant(cls, g, plant, parameters):
         record = parameters["legacy_snapshot"]
         # The scenario's growth parameters are read, as RootGrowth.initiate_plant reads them: the inputs a scenario
         # sets (root_tissue_density) are then the initiator's, the values themselves coming from the record
-        RootGrowth.plant_parameters(parameters)
+        cls.component.plant_parameters(parameters)
         scales, labels = g.scales, g.labels
         children = {legacy_id: [] for legacy_id in record.vertices}
         roots = []
         for legacy_id in record.vertices:
             parent = record.parent[legacy_id]
             (children[parent] if parent is not None else roots).append(legacy_id)
-        names = [f for f, spec in RootGrowth.__dataclass_fields__.items()
+        names = [f for f, spec in cls.component.__dataclass_fields__.items()
                  if spec.metadata.get("variable_type") in ("state_variable", "input")
                  and spec.metadata.get("scale") == scales.SubOrgan]
 
-        def under(complex_, scales):
-            for scale, label in scales:
+        def under(complex_, levels):
+            for scale, label in levels:
                 complex_ = g.add_component(complex_, **PropsConfig(scale=scale, edge_type='/', label=label))
             return complex_
 
@@ -212,15 +235,16 @@ class FromLegacy(StructuralComponent):
         g.property("legacy_random")[plant] = stream
         for legacy_id in record.meta.get("step_elongating_elements", []):
             g.property("step_elongating")[vids[legacy_id]] = 1
+        # The component's own state outside the record's variables, if it has any (a subclass's)
+        transplanted = getattr(cls.component, "transplanted", None)
+        if transplanted is not None:
+            transplanted(g, plant, record, vids)
 
 
-class TransplantModel(GrowthOnly):
-    initiators = (FromLegacy,)
-
-
-def transplant_scene(record, parameters=None, time_step=3600):
-    """A Scene of the port whose plant is the legacy record *record* (parameters: the legacy run's)."""
-    table = pd.DataFrame([dict(plant="p0", model=TransplantModel, x=0., y=0., z=0., rotation=0.,
+def transplant_scene(record, parameters=None, time_step=3600, component=RootGrowth):
+    """A Scene of the port (*component*) whose plant is the legacy record *record* (parameters: the legacy run's)."""
+    table = pd.DataFrame([dict(plant="p0", model=growth_model(component, transplant=True), x=0., y=0., z=0.,
+                               rotation=0.,
                                scenario={"parameters": dict(parameters or {}, legacy_snapshot=record)})])
     table.attrs.update(xrange=1., yrange=1.)
     return Scene(table, time_step=time_step)

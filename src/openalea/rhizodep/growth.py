@@ -68,9 +68,57 @@ def doc(unit, description, unit_comment="", min_value="", max_value="", value_co
                 max_value=max_value, value_comment=value_comment, references=references, DOI=DOI)
 
 
+def power(values, exponent):
+    """values ** exponent as the legacy's Python computes it (the C library's pow): numpy's ** squares an array by
+    x * x, which differs from pow in the last bit for about 0.1 % of values; float_power calls pow."""
+    return np.float_power(values, exponent)
+
+
 def outputs(k):
     """The return annotation of a step with k outputs besides its own: (values, name, values, ...)."""
     return tuple[(np.ndarray,) + (str, np.ndarray) * k]
+
+
+@dataclass(frozen=True)
+class Resource:
+    """
+    A resource of growth (devplan §21): the declared variables that hold it, by role. The growth component limits
+    elongation and thickening by its resources, takes their costs from the elements that supply them, and gives the
+    elements it creates their concentration (copied from the mother, 0 in a primordium).
+
+    concentration            its concentration in the element (an input, e.g. from a carbon or nitrogen model)
+    zone                     its concentration in an apex's supply zone
+    required                 its amount in an apex's supply zone
+    available_for_thickening its amount available to an element's thickening
+    demand                   its demand of an element's potential growth
+    consumption_amount       its amount consumed by growth in the step, on the supplying elements
+    consumption              its rate of consumption by growth, on the supplying elements
+    minimum_for_elongation   the parameter of its concentration kept in the supply zone (None: none)
+    minimum_for_thickening   the parameter of its concentration kept in the element (None: none)
+    copied_by_new_elements   whether an element created by segmentation copies its mother's required amount,
+                             demand and consumptions (the legacy's hexose), or starts them at 0
+    costs_by_available       whether its elongation cost is shared between the suppliers by its amount available
+                             (net of the minimum) rather than its amount required
+    """
+    concentration: str
+    zone: str
+    required: str
+    available_for_thickening: str
+    demand: str
+    consumption_amount: str
+    consumption: str
+    minimum_for_elongation: str = None
+    minimum_for_thickening: str = None
+    copied_by_new_elements: bool = True
+    costs_by_available: bool = False
+
+
+HEXOSE = Resource(concentration="C_hexose_root", zone="growing_zone_C_hexose_root",
+                  required="hexose_possibly_required_for_elongation",
+                  available_for_thickening="hexose_available_for_thickening", demand="hexose_growth_demand",
+                  consumption_amount="hexose_consumption_by_growth_amount", consumption="hexose_consumption_by_growth",
+                  minimum_for_elongation="C_hexose_min_for_elongation",
+                  minimum_for_thickening="C_hexose_min_for_thickening")
 
 
 EVENTS = ("primordium_formation", "emergence", "cells_formation", "growth_stopped", "death")
@@ -106,7 +154,7 @@ def temperature_modification(soil_temperature, process_at_T_ref, T_ref, A, B, C)
     0 when C is neither 0 nor 1, or when C = 1 and A (T - T_ref) + B < 0.
     """
     x = A * (soil_temperature - T_ref) + B
-    modified = process_at_T_ref * x ** (1 - C) * x ** (C * (soil_temperature - T_ref) / 10.)
+    modified = process_at_T_ref * power(x, 1 - C) * power(x, C * (soil_temperature - T_ref) / 10.)
     return np.where(((C != 0) & (C != 1)) | ((C == 1) & (x < 0.)), 0., np.maximum(modified, 0.))
 
 
@@ -648,6 +696,14 @@ class RootGrowth(StructuralComponent):
     # True reproduces it, until the reviewed fixes (devplan §6)
     legacy_pipe_model = True
 
+    # The resources of growth (devplan §21); the first one is the carbon: growth respiration comes from its costs
+    resources = (HEXOSE,)
+    # Options that are the legacy's by default, and reviewed fixes otherwise (devplan §6): the supply zone of an apex
+    # reaching the collar continues into the collar's other children by volume (Root_BRIDGES', g9), and an element
+    # created as a primordium takes its mother's soil temperature ("mother") rather than 7.8 °C (g3)
+    collar_supply = False
+    new_element_soil_temperature = 7.8
+
     # The legacy's per-element copies of these parameters are the parameters themselves (never changed per element)
     ELEMENT_PARAMETERS = ("root_hair_radius", "root_hairs_lifespan")
 
@@ -740,7 +796,8 @@ class RootGrowth(StructuralComponent):
             emergence_cost=0., angle_down=angle_down, angle_roll=angle_roll, length=length, radius=radius,
             original_radius=radius, potential_length=0., theoretical_radius=radius, potential_radius=radius,
             initial_length=0., initial_radius=radius, volume=0., struct_mass=0., initial_struct_mass=0.,
-            C_hexose_root=0., soil_temperature=7.8, root_tissue_density=tissue_density,                 # g3
+            **{resource.concentration: 0. for resource in cls.resources},
+            soil_temperature=7.8, root_tissue_density=tissue_density,                                   # g3
             growth_duration=parameters["GDs"] * (2 * radius) ** 2,
             life_duration=parameters["LDs"] * 2. * radius * tissue_density, temperature_modification=0.)}
 
@@ -856,22 +913,147 @@ class RootGrowth(StructuralComponent):
         lookup[vertex_index] = np.arange(vertex_index.size)
         return lookup
 
-    def _elongated_length(self, initial_length, radius, C, time, EL, Km_elongation, C_hexose_min_for_elongation):
-        """RootGrowthModel.elongated_length: C-free with simple_growth_duration, else Michaelis-Menten above the
-        threshold (no elongation below)."""
+    def _parameter(self, name, selected=None):
+        """A per-plant parameter's value on each element (on the *selected* ones), for the hooks."""
+        values = self.parameter_values(name)
+        return values if selected is None else values[selected]
+
+    def _resource_values(self, role) -> dict:
+        """{resource concentration: its variable of *role* (a Resource field) on every element}."""
+        ds = self.data_structure
+        return {resource.concentration: np.array(ds.get(getattr(resource, role)), dtype=float)
+                for resource in self.resources}
+
+    # ── Hooks (devplan §21): the legacy's by default; a subclass overrides them, e.g. for nitrogen ──────────────
+    #
+    # Each takes arrays (on every element, or on the selected ones) and returns arrays; the parameters it needs are
+    # read with self._parameter. A hook may also write variables its subclass declares (self.data_structure.set).
+
+    # Whether the last element of a supply zone (the fraction of it the zone takes) is subject to supply_included
+    supply_gates_the_last_element = False
+
+    def supply_included(self, length, contributions):
+        """The elements a supply zone takes from when it walks through them (the legacy: those with a length).
+        *contributions*: {resource concentration: its amount in each element}."""
+        return length > 0.
+
+    def elongated_length(self, selected, start_length, radius, time, zone):
+        """RootGrowthModel.elongated_length on the *selected* apices: C-free with simple_growth_duration, else
+        Michaelis-Menten on the supply zone's hexose above its threshold (no elongation below). *zone*: {resource
+        concentration: its concentration in each apex's supply zone}."""
+        EL = self._parameter("EL", selected)
         if self.simple_growth_duration:
             elongation = EL * 2. * radius * time
         else:
+            C = zone["C_hexose_root"][selected]
+            Km = self._parameter("Km_elongation", selected)
             with np.errstate(divide="ignore", invalid="ignore"):
-                elongation = np.where(C > C_hexose_min_for_elongation,
-                                      EL * 2. * radius * C / (Km_elongation + C) * time, 0.)
-        return initial_length + elongation
+                elongation = np.where(C > self._parameter("C_hexose_min_for_elongation", selected),
+                                      EL * 2. * radius * C / (Km + C) * time, 0.)
+        return start_length + elongation
+
+    def synchronise_emergence(self, type, thermal_time_since_primordium_formation, emergence_delay_in_thermal_time):
+        """The primordia's times and emergence delays before their emergence is tested (the legacy: unchanged; a
+        shoot model may synchronise the nodal roots' emergence with its phytomers)."""
+        return thermal_time_since_primordium_formation, emergence_delay_in_thermal_time
+
+    def thickening_rate(self, selected):
+        """The relative thickening rate (s-1, before the temperature factor) of the *selected* segments: Michaelis-
+        Menten on their hexose."""
+        C = self.data_structure.get("C_hexose_root")[selected]
+        return (self._parameter("relative_root_thickening_rate_max", selected) * C
+                / (self._parameter("Km_thickening", selected) + C))
+
+    def nodule_thickening_rate(self, selected, regulating):
+        """The relative thickening rate of the *selected* nodules, from *regulating*: {resource concentration: its
+        concentration in the nodule and its bearer together}. Michaelis-Menten on hexose."""
+        C = regulating["C_hexose_root"]
+        return (self._parameter("relative_nodule_thickening_rate_max", selected) * C
+                / (self._parameter("Km_nodule_thickening", selected) + C))
+
+    # ── The supply zones ───────────────────────────────────────────────────────────────────────────────────────
+
+    def _supply(self, supplied, radius, length, volume, struct_mass, growing_zone_factor):
+        """
+        The supply zones of the apices *supplied* (RootGrowthModel.calculating_supply_for_elongation), element by
+        element in the legacy's order (the apices visited children first, each zone from the tip to the base):
+        (owner, supplier, {resource concentration: contribution}, mass contribution).
+        """
+        ds = self.data_structure
+        concentrations = {r.concentration: np.asarray(ds.get(r.concentration), dtype=float) for r in self.resources}
+        amounts = {name: concentration * struct_mass for name, concentration in concentrations.items()}
+        include = np.asarray(self.supply_included(length, amounts), dtype=bool)
+        budget = growing_zone_factor * radius * power(radius, 2) * pi
+        if self.collar_supply:
+            return self._supply_with_collar(supplied, budget, length, volume, struct_mass, amounts, include)
+        owner, supplier, mass = ds.path_contributions(budget, volume, struct_mass, where=supplied, include=include)
+        contributions = {name: ds.path_contributions(budget, volume, amount, where=supplied, include=include)[2]
+                         for name, amount in amounts.items()}
+        if self.supply_gates_the_last_element:
+            kept = include[supplier]
+            mass = np.where(kept, mass, 0.)
+            contributions = {name: np.where(kept, values, 0.) for name, values in contributions.items()}
+        return owner, supplier, contributions, mass
+
+    def _supply_with_collar(self, supplied, budget, length, volume, struct_mass, amounts, include):
+        """The supply zones walked element by element, a zone reaching the base continuing into the collar's other
+        children by volume (Root_BRIDGES' calculating_supply_for_elongation_opt, the collar_supply option)."""
+        ds = self.data_structure
+        parents = np.asarray(ds.parents())
+        vertex_index = np.asarray(ds.get("vertex_index"))
+        owner_plant = np.asarray(ds.owner("Plant"))
+        # The collar's children (the legacy's collar_children): borne by a zero-length support, their legacy parent
+        # the base; in the legacy's order (ascending ids)
+        collar = (np.asarray(ds.get("parent_id")) == 1) & (parents >= 0) & (vertex_index[np.maximum(parents, 0)] != 1)
+        collar = collar[np.argsort(vertex_index, kind="stable")]
+        collar_children = np.argsort(vertex_index, kind="stable")[collar]
+        names = list(amounts)
+        events = []                                     # (owner, supplier, fraction of the supplier)
+        visit = ds.order("post", convention="openalea")
+        for apex in visit[supplied[visit]].tolist():
+            remaining, current, previous = budget[apex], apex, apex
+            while remaining > 0:
+                if remaining > volume[current]:
+                    if length[current] > 0.:
+                        if include[current]:
+                            events.append((apex, current, None))
+                            remaining = remaining - volume[current]
+                        if parents[current] < 0:            # the base: the collar's other children
+                            children = [k for k in collar_children.tolist()
+                                        if owner_plant[k] == owner_plant[apex] and k != previous and length[k] > 0.]
+                            # Python's sum of floats (compensated since 3.12), as Root_BRIDGES sums them
+                            total = sum([float(volume[k]) for k in children])
+                            for child in children:
+                                source = min(remaining * volume[child] / total, volume[child])
+                                events.append((apex, child, source))
+                            if remaining <= total:
+                                remaining = 0.
+                    if parents[current] < 0:
+                        break
+                    previous, current = current, parents[current]
+                else:
+                    events.append((apex, current, remaining))
+                    remaining = 0.
+                    break
+        owner = np.array([e[0] for e in events], dtype=np.int64)
+        supplier = np.array([e[1] for e in events], dtype=np.int64)
+        contributions, mass = {name: np.empty(len(events)) for name in names}, np.empty(len(events))
+        for k, (_, element, source) in enumerate(events):
+            for name in names:
+                contributions[name][k] = (amounts[name][element] if source is None
+                                          else amounts[name][element] * source / volume[element])
+            mass[k] = struct_mass[element] if source is None else struct_mass[element] * source / volume[element]
+        kept = include[supplier]
+        if self.supply_gates_the_last_element and kept.size:
+            mass = np.where(kept, mass, 0.)
+            contributions = {name: np.where(kept, values, 0.) for name, values in contributions.items()}
+        return owner, supplier, contributions, mass
 
     # ── Potential growth (RootGrowthModel.potential_growth; devplan §14) ───────────────────────────────────────
 
     @potential
     def _initial_length(self, length, radius, struct_mass, living_root_hairs_struct_mass, soil_temperature,
-                        parent_id, vertex_index, process_at_T_ref, T_ref, A, B, C) -> outputs(18):
+                        parent_id, vertex_index, process_at_T_ref, T_ref, A, B, C) -> outputs(14):
         """The step's start: the fluxes zeroed, the initial and potential values copied, the temperature factor; a
         zero-length apex takes its parent's soil temperature (the collar's children, the base's: parent_id)."""
         ds = self.data_structure
@@ -883,40 +1065,42 @@ class RootGrowth(StructuralComponent):
         soil[zero_apex] = soil_temperature[parent[zero_apex]]
         factor = temperature_modification(soil, process_at_T_ref, T_ref, A, B, C)
         zero = np.zeros(length.shape)
+        for resource in self.resources:                 # each resource's consumptions, demand and supply zone
+            for role in ("consumption_amount", "consumption", "required", "demand"):
+                ds.set(getattr(resource, role), zero)
         return (np.array(length), "initial_radius", np.array(radius), "potential_radius", np.array(radius),
                 "theoretical_radius", np.array(radius), "potential_length", np.array(length),
                 "initial_struct_mass", np.array(struct_mass),
                 "initial_living_root_hairs_struct_mass", np.array(living_root_hairs_struct_mass),
                 "soil_temperature", soil, "temperature_modification", factor,
-                "hexose_consumption_by_growth_amount", zero, "hexose_consumption_by_growth", zero,
-                "hexose_possibly_required_for_elongation", zero, "resp_growth", zero, "struct_mass_produced", zero,
-                "root_hairs_struct_mass_produced", zero, "hexose_growth_demand", zero, "actual_elongation", zero,
-                "actual_elongation_rate", zero, "hexose_consumption_by_fungus", zero)
+                "resp_growth", zero, "struct_mass_produced", zero, "root_hairs_struct_mass_produced", zero,
+                "actual_elongation", zero, "actual_elongation_rate", zero, "hexose_consumption_by_fungus", zero)
 
     @potential
     def _potential_length(self, type, length, radius, initial_length, initial_radius, potential_length, volume,
-                          struct_mass, C_hexose_root, temperature_modification, emergence_delay_in_thermal_time,
+                          struct_mass, temperature_modification, emergence_delay_in_thermal_time,
                           growth_duration, life_duration, thermal_time_since_primordium_formation,
                           actual_time_since_primordium_formation, thermal_potential_time_since_emergence,
                           thermal_time_since_emergence, actual_time_since_emergence,
                           thermal_time_since_growth_stopped, actual_time_since_growth_stopped,
                           thermal_time_since_cells_formation, actual_time_since_cells_formation,
-                          thermal_time_since_death, actual_time_since_death, growing_zone_C_hexose_root,
-                          hexose_possibly_required_for_elongation, struct_mass_contributing_to_elongation,
+                          thermal_time_since_death, actual_time_since_death, struct_mass_contributing_to_elongation,
                           lateral_root_emergence_possibility, lateral_primordium_index, vertex_index,
-                          emergence_delay, growing_zone_factor, EL, Km_elongation,
-                          C_hexose_min_for_elongation) -> outputs(17):
+                          emergence_delay, growing_zone_factor) -> outputs(16):
         """
         The apices (RootGrowthModel.potential_apex_development): the state machine as masked branches, the supply
         zone of those elongating (calculating_supply_for_elongation, by path windows), their potential length; a
         lateral primordium emerging marks its bearer (the last one visited when several emerge on one bearer).
         The branches are chosen on the state at the step's start (the arguments); each element is in one branch.
+        The resources' supply zones (their zone and required variables) are written for each resource.
         """
         ds = self.data_structure
         time_step = float(self.time_step)
         temperature_factor = temperature_modification
         thermal_time_step = time_step * temperature_factor
         apex = self._apex()
+        thermal_time_since_primordium_formation, emergence_delay_in_thermal_time = self.synchronise_emergence(
+            type, np.array(thermal_time_since_primordium_formation), np.array(emergence_delay_in_thermal_time))
         clocks = Clocks(locals())                       # the times since events, from the arguments
         new_type = np.array(type)
         new_potential_length = np.array(potential_length)
@@ -939,21 +1123,25 @@ class RootGrowth(StructuralComponent):
 
         # The supply zone of the apices that elongate (order-free: it reads what this loop does not change)
         supplied = primordium_emerges | lateral_emerges | growing | just_stopped
-        budget = growing_zone_factor * radius * radius ** 2 * pi
-        include = length > 0.
-        hexose = ds.path_window(budget, volume, C_hexose_root * struct_mass, where=supplied, include=include)
-        mass = ds.path_window(budget, volume, struct_mass, where=supplied, include=include)
-        required = np.array(hexose_possibly_required_for_elongation)
+        owner, _, contributions, mass_contributions = self._supply(supplied, radius, length, volume, struct_mass,
+                                                                   growing_zone_factor)
+        mass = np.zeros(length.size)
+        np.add.at(mass, owner, mass_contributions)
         contributing = np.array(struct_mass_contributing_to_elongation)
-        zone_concentration = np.array(growing_zone_C_hexose_root)
-        required[supplied], contributing[supplied] = hexose[supplied], mass[supplied]
-        with np.errstate(divide="ignore", invalid="ignore"):
-            zone_concentration[supplied] = np.where(mass[supplied] > 0., hexose[supplied] / mass[supplied], 0.)
+        contributing[supplied] = mass[supplied]
+        required, zone = self._resource_values("required"), self._resource_values("zone")
+        for resource in self.resources:
+            name = resource.concentration
+            amount = np.zeros(length.size)
+            np.add.at(amount, owner, contributions[name])
+            required[name][supplied] = amount[supplied]
+            with np.errstate(divide="ignore", invalid="ignore"):
+                zone[name][supplied] = np.where(mass[supplied] > 0., amount[supplied] / mass[supplied], 0.)
+            ds.set(resource.required, required[name])
+            ds.set(resource.zone, zone[name])
 
         def elongated(selected, start_length, start_radius, time):
-            return self._elongated_length(start_length[selected], start_radius[selected],
-                                          zone_concentration[selected], time, EL[selected], Km_elongation[selected],
-                                          C_hexose_min_for_elongation[selected])
+            return self.elongated_length(selected, start_length[selected], start_radius[selected], time, zone)
 
         def capped(time, selected):
             return np.where(time > thermal_time_step[selected], thermal_time_step[selected], time)
@@ -1029,7 +1217,7 @@ class RootGrowth(StructuralComponent):
 
         return (new_potential_length, "type", new_type,
                 "thermal_potential_time_since_emergence", potential_time_since_emergence, *clocks.outputs(),
-                "growing_zone_C_hexose_root", zone_concentration, "hexose_possibly_required_for_elongation", required,
+                "emergence_delay_in_thermal_time", emergence_delay_in_thermal_time,
                 "struct_mass_contributing_to_elongation", contributing,
                 "lateral_root_emergence_possibility", possibility, "lateral_primordium_index", primordium_index)
 
@@ -1041,8 +1229,7 @@ class RootGrowth(StructuralComponent):
                             thermal_time_since_cells_formation, actual_time_since_cells_formation,
                             thermal_time_since_growth_stopped, actual_time_since_growth_stopped,
                             thermal_time_since_death, actual_time_since_death, SGC, C_hexose_min_for_thickening,
-                            relative_root_thickening_rate_max, Km_thickening, relative_nodule_thickening_rate_max,
-                            Km_nodule_thickening, nodule_max_radius) -> outputs(14):
+                            nodule_max_radius) -> outputs(13):
         """
         The segments (RootGrowthModel.potential_segment_development): the type of their axis apex (stopped), death
         when all their children are dead, the pipe model, children first (a fold up the tree), then the potential
@@ -1059,17 +1246,24 @@ class RootGrowth(StructuralComponent):
         normal = segment & ~nodule
         new_theoretical_radius = np.array(theoretical_radius)
         new_potential_radius, new_radius = np.array(potential_radius), np.array(radius)
-        available = C_hexose_root * struct_mass
+        # Each resource's amount available to thickening: the element's; a nodule's and its bearer's
+        available = {}
+        for resource in self.resources:
+            concentration = np.asarray(ds.get(resource.concentration), dtype=float)
+            available[resource.concentration] = concentration * struct_mass
+            if nodule.any():
+                bearer = parents[nodule]
+                available[resource.concentration][nodule] = (concentration[bearer] * struct_mass[bearer]
+                                                             + concentration[nodule] * struct_mass[nodule])
+            ds.set(resource.available_for_thickening, available[resource.concentration])
 
         # Nodules
         selected = nodule
         if selected.any():
             bearer = parents[selected]
-            available[selected] = (C_hexose_root[bearer] * struct_mass[bearer]
-                                   + C_hexose_root[selected] * struct_mass[selected])
-            regulating = available[selected] / (struct_mass[bearer] + struct_mass[selected])
-            rate = (relative_nodule_thickening_rate_max[selected] * regulating
-                    / (Km_nodule_thickening[selected] + regulating))
+            regulating = {name: values[selected] / (struct_mass[bearer] + struct_mass[selected])
+                          for name, values in available.items()}
+            rate = self.nodule_thickening_rate(selected, regulating)
             rate = rate * temperature_factor[selected]
             new_theoretical_radius[selected] = radius[selected] * (1 + rate * time_step)
             new_potential_radius[selected] = np.where(new_theoretical_radius[selected] > nodule_max_radius[selected],
@@ -1106,7 +1300,7 @@ class RootGrowth(StructuralComponent):
                 if self.legacy_pipe_model:
                     successor_section = lateral_sections = np.zeros(nodes.size)
                 else:
-                    section = out[:, 0] ** 2 * pi
+                    section = power(out[:, 0], 2) * pi
                     successor_section = level.children(section, op="sum", edge="<")
                     lateral_sections = level.children(section, op="sum", edge="+",
                                                       where=(length > 0.) & (child_type != TYPE_NODULE))
@@ -1132,8 +1326,7 @@ class RootGrowth(StructuralComponent):
             else:
                 selected = (normal & (length > 0.) & (new_theoretical_radius > radius)
                             & (C_hexose_root > C_hexose_min_for_thickening))
-                rate = (relative_root_thickening_rate_max[selected] * C_hexose_root[selected]
-                        / (Km_thickening[selected] + C_hexose_root[selected]))
+                rate = self.thickening_rate(selected)
                 rate = rate * temperature_factor[selected]
                 largest = (1 + rate * time_step) * initial_radius[selected]
                 new_potential_radius[selected] = np.where(new_theoretical_radius[selected] > largest, largest,
@@ -1156,103 +1349,157 @@ class RootGrowth(StructuralComponent):
         clocks.thermal["death"][selected] += thermal_time_step[selected]
 
         return (new_theoretical_radius, "type", new_type, "potential_radius", new_potential_radius,
-                "radius", new_radius, "hexose_available_for_thickening", available, *clocks.outputs())
+                "radius", new_radius, *clocks.outputs())
 
     # ── Actual growth (RootGrowthModel.actual_growth_and_corresponding_respiration) ───────────────────────────
 
     @staticmethod
     def _volume(type, radius, length):
         """RootGrowthModel.volume_from_radius_and_length: a cylinder, a sphere for a nodule."""
-        return np.where(type == TYPE_NODULE, 4 / 3. * pi * radius ** 3, pi * radius ** 2 * length)
+        return np.where(type == TYPE_NODULE, 4 / 3. * pi * power(radius, 3), pi * power(radius, 2) * length)
+
+    # Hooks of actual growth (devplan §21): the legacy's, by hexose alone
+
+    def growth_demand(self, delta_volume, root_tissue_density) -> dict:
+        """{resource concentration: its demand} for the potential growth of *delta_volume* (m3): the hexose of its
+        structural carbon and of the respiration of its growth."""
+        return {"C_hexose_root": delta_volume * root_tissue_density * self._parameter("struct_mass_C_content")
+                / self._parameter("yield_growth") * 1 / 6.}
+
+    def growth_continues(self, demand) -> np.ndarray:
+        """The elements whose growth goes on, from their demands (the legacy: a positive hexose demand)."""
+        return demand["C_hexose_root"] > 0.
+
+    def can_grow(self, for_elongation, for_thickening) -> np.ndarray:
+        """The elements with enough of their resources available to grow at all (the legacy: some hexose)."""
+        return (for_elongation["C_hexose_root"] + for_thickening["C_hexose_root"]) > 0.
+
+    def elongation_volume_max(self, initial_volume, for_elongation, root_tissue_density) -> np.ndarray:
+        """The largest volume the resources available to elongation allow."""
+        return (initial_volume + for_elongation["C_hexose_root"] * 6.
+                / (root_tissue_density * self._parameter("struct_mass_C_content")) * self._parameter("yield_growth"))
+
+    def elongation_costs(self, delta_volume, root_tissue_density) -> dict:
+        """{resource concentration: its amount consumed} by an elongation of *delta_volume*."""
+        return {"C_hexose_root": 1. / 6. * delta_volume * root_tissue_density
+                * self._parameter("struct_mass_C_content") / self._parameter("yield_growth")}
+
+    def thickening(self, type, initial_radius, length, potential_radius, root_tissue_density, for_thickening):
+        """The radius thickening reaches (with the element's new *length*), limited by the resources available to
+        it, and {resource concentration: its amount consumed}, on every element."""
+        volume_of = self._volume
+        C_content, yield_growth = self._parameter("struct_mass_C_content"), self._parameter("yield_growth")
+        available = for_thickening["C_hexose_root"]
+        increase = available * 6. * yield_growth / (root_tissue_density * C_content)
+        volume_max = volume_of(type, initial_radius, length) + increase
+        possible_radius = np.where(type == TYPE_NODULE, (3. / (4. * pi)) ** (1. / 3.),             # g5
+                                   np.sqrt(volume_max / (length * pi)))
+        fits = possible_radius <= potential_radius
+        radius = np.where(fits, possible_radius, potential_radius)
+        net_increase = volume_of(type, radius, length) - volume_of(type, initial_radius, length)
+        cost = np.where(fits, available, 1. / 6. * net_increase * root_tissue_density * C_content / yield_growth)
+        return radius, {"C_hexose_root": cost}
 
     @actual
     def _length(self, type, length, radius, initial_length, initial_radius, potential_length, potential_radius,
-                volume, struct_mass, initial_struct_mass, root_tissue_density, C_hexose_root, temperature_modification,
-                hexose_possibly_required_for_elongation, struct_mass_contributing_to_elongation,
-                hexose_available_for_thickening, hexose_growth_demand, hexose_consumption_by_growth_amount,
-                hexose_consumption_by_growth, resp_growth, struct_mass_produced,
+                volume, struct_mass, initial_struct_mass, root_tissue_density, temperature_modification,
+                struct_mass_contributing_to_elongation, resp_growth, struct_mass_produced,
                 thermal_potential_time_since_emergence, thermal_time_since_emergence, actual_time_since_emergence,
-                actual_elongation, actual_elongation_rate, dist_to_ramif, growing_zone_factor, struct_mass_C_content,
-                yield_growth, C_hexose_min_for_elongation, C_hexose_min_for_thickening) -> outputs(16):
+                actual_elongation, actual_elongation_rate, dist_to_ramif, growing_zone_factor,
+                yield_growth) -> outputs(13):
         """
-        Growth limited by the hexose of the supply zone (elongation) and of the element (thickening), its cost
-        taken from the suppliers in proportion to their hexose, plus the growth respiration; the primordia that
-        elongate emerge. The costs are scattered in the legacy's visiting order (children first), so that each
-        element's sums are the legacy's, bit for bit.
+        Growth limited by the resources of the supply zone (elongation) and of the element (thickening), their cost
+        taken from the suppliers in proportion to what each supplies, plus the growth respiration; the primordia
+        that elongate emerge. The costs are scattered in the legacy's visiting order (children first), so that each
+        element's sums are the legacy's, bit for bit. Each resource's demand and consumptions are written.
         """
         ds = self.data_structure
         time_step = float(self.time_step)
         volume_of = self._volume
-        hexose_per_volume = root_tissue_density * struct_mass_C_content          # mol of C per m3 of structure
+        resources = self.resources
+        concentrations = {r.concentration: np.asarray(ds.get(r.concentration), dtype=float) for r in resources}
+        required = self._resource_values("required")
         with np.errstate(divide="ignore", invalid="ignore"):
             initial_volume = volume_of(type, initial_radius, initial_length)
             potential_volume = volume_of(type, potential_radius, potential_length)
             grows = ~np.isin(type, (TYPE_DEAD, TYPE_JUST_DEAD, TYPE_SEMINAL_SUPPORT, TYPE_ADVENTITIOUS_SUPPORT))
             grows &= ~((potential_length <= initial_length) & (potential_radius <= initial_radius))
-            demand = np.array(hexose_growth_demand)
-            demand[grows] = ((potential_volume - initial_volume) * root_tissue_density * struct_mass_C_content
-                             / yield_growth * 1 / 6.)[grows]
-            demand[grows & (demand < 0.)] = 0.
-            grows &= demand > 0.
+            demand = self._resource_values("demand")
+            computed = self.growth_demand(potential_volume - initial_volume, root_tissue_density)
+            for name, values in computed.items():
+                demand[name][grows] = np.where(values < 0., 0., values)[grows]
+            grows &= self.growth_continues(demand)
 
-            for_elongation = np.where(grows & (potential_length > length), np.maximum(
-                hexose_possibly_required_for_elongation
-                - struct_mass_contributing_to_elongation * C_hexose_min_for_elongation, 0.), 0.)
-            for_thickening = np.where(grows & (potential_radius > radius), np.maximum(
-                hexose_available_for_thickening - struct_mass * C_hexose_min_for_thickening, 0.), 0.)
-            grows &= (for_elongation + for_thickening) > 0.
+            for_elongation, for_thickening = {}, {}
+            elongates, thickens = grows & (potential_length > length), grows & (potential_radius > radius)
+            for resource in resources:
+                name = resource.concentration
+                minimum = (self._parameter(resource.minimum_for_elongation) if resource.minimum_for_elongation
+                           else 0.)
+                for_elongation[name] = np.where(elongates, np.maximum(
+                    required[name] - struct_mass_contributing_to_elongation * minimum, 0.), 0.)
+                available = np.asarray(ds.get(resource.available_for_thickening), dtype=float)
+                if resource.minimum_for_thickening:
+                    available = np.maximum(available - struct_mass * self._parameter(resource.minimum_for_thickening),
+                                           0.)
+                for_thickening[name] = np.where(thickens, available, 0.)
+            grows &= self.can_grow(for_elongation, for_thickening)
 
-            # Elongation, limited by the supply zone's hexose
-            new_length, new_radius = np.array(length), np.array(radius)
-            volume_max = initial_volume + for_elongation * 6. / hexose_per_volume * yield_growth
-            length_max = volume_max / (pi * initial_radius ** 2)
+            # Elongation, limited by the supply zone's resources
+            new_length = np.array(length)
+            length_max = (self.elongation_volume_max(initial_volume, for_elongation, root_tissue_density)
+                          / (pi * power(initial_radius, 2)))
             elongating = grows & (potential_length > initial_length)
             new_length[elongating] = np.where(potential_length[elongating] >= length_max[elongating],
                                               length_max[elongating], potential_length[elongating])
-            elongation_cost = (1. / 6. * (volume_of(type, initial_radius, new_length) - initial_volume)
-                               * root_tissue_density * struct_mass_C_content / yield_growth)
+            elongation_cost = self.elongation_costs(volume_of(type, initial_radius, new_length) - initial_volume,
+                                                    root_tissue_density)
             supplied = elongating & (new_length > initial_length)
 
-            # Thickening, limited by the element's hexose
+            # Thickening, limited by the element's resources
             thickening = grows & (potential_radius > initial_radius)
-            increase = for_thickening * 6. * yield_growth / hexose_per_volume
-            volume_max = volume_of(type, initial_radius, new_length) + increase
-            possible_radius = np.where(type == TYPE_NODULE, (3. / (4. * pi)) ** (1. / 3.),        # g5
-                                       np.sqrt(volume_max / (new_length * pi)))
-            fits = possible_radius <= potential_radius
-            new_radius[thickening] = np.where(fits[thickening], possible_radius[thickening],
-                                              potential_radius[thickening])
-            net_increase = volume_of(type, new_radius, new_length) - volume_of(type, initial_radius, new_length)
-            thickening_cost = np.where(fits, for_thickening, 1. / 6. * net_increase * root_tissue_density
-                                       * struct_mass_C_content / yield_growth)
-            own_share = thickening_cost * ((C_hexose_root * initial_struct_mass) / for_thickening)
+            reached, thickening_cost = self.thickening(type, initial_radius, new_length, potential_radius,
+                                                       root_tissue_density, for_thickening)
+            new_radius = np.array(radius)
+            new_radius[thickening] = reached[thickening]
             parents = np.asarray(ds.parents())
             nodule = thickening & (type == TYPE_NODULE)
-            parent_share = thickening_cost * ((C_hexose_root[parents] * initial_struct_mass[parents]) / for_thickening)
 
         # The costs, in the legacy's order: per element visited (children first), its elongation's suppliers (tip
         # to base), then its own thickening, then a nodule's parent
         visit = ds.order("post", convention="openalea")
         rank = np.empty(visit.size, dtype=np.int64)
         rank[visit] = np.arange(visit.size)
-        budget = growing_zone_factor * radius * radius ** 2 * pi
-        owner, supplier, contribution = ds.path_contributions(budget, volume, C_hexose_root * struct_mass,
-                                                              where=supplied, include=length > 0.)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            elongation_events = elongation_cost[owner] * contribution / hexose_possibly_required_for_elongation[owner]
-        thickened = np.flatnonzero(thickening)
-        nodules = np.flatnonzero(nodule)
+        owner, supplier, contributions, _ = self._supply(supplied, radius, length, volume, struct_mass,
+                                                         growing_zone_factor)
+        thickened, nodules = np.flatnonzero(thickening), np.flatnonzero(nodule)
         event_owner = np.concatenate([owner, thickened, nodules])
         target = np.concatenate([supplier, thickened, parents[nodules]])
-        value = np.concatenate([elongation_events, own_share[thickened], parent_share[nodules]])
         kind = np.concatenate([np.zeros(owner.size), np.ones(thickened.size), np.full(nodules.size, 2.)])
         order = np.lexsort((np.arange(event_owner.size), kind, rank[event_owner]))
-        target, value = target[order], value[order]
-        consumed, consumption_rate, respiration = (np.array(hexose_consumption_by_growth_amount),
-                                                   np.array(hexose_consumption_by_growth), np.array(resp_growth))
-        np.add.at(consumed, target, value)
-        np.add.at(consumption_rate, target, value / time_step)
-        np.add.at(respiration, target, value * (1 - yield_growth[target]) * 6.)
+        target = target[order]
+        respiration = np.array(resp_growth)
+        for index, resource in enumerate(resources):
+            name = resource.concentration
+            denominator = for_elongation[name] if resource.costs_by_available else required[name]
+            share = concentrations[name] * initial_struct_mass
+            with np.errstate(divide="ignore", invalid="ignore"):
+                elongation_events = np.where(denominator[owner] > 0., elongation_cost[name][owner]
+                                             * contributions[name] / denominator[owner], 0.)
+                own_share = np.where(for_thickening[name] > 0., thickening_cost[name]
+                                     * (share / for_thickening[name]), 0.)
+                parent_share = np.where(for_thickening[name] > 0., thickening_cost[name]
+                                        * (share[parents] / for_thickening[name]), 0.)
+            value = np.concatenate([elongation_events, own_share[thickened], parent_share[nodules]])[order]
+            consumed = np.array(ds.get(resource.consumption_amount), dtype=float)
+            consumption_rate = np.array(ds.get(resource.consumption), dtype=float)
+            np.add.at(consumed, target, value)
+            np.add.at(consumption_rate, target, value / time_step)
+            if index == 0:                                  # the carbon: growth respiration
+                np.add.at(respiration, target, value * (1 - yield_growth[target]) * 6.)
+            ds.set(resource.consumption_amount, consumed)
+            ds.set(resource.consumption, consumption_rate)
+            ds.set(resource.demand, demand[name])
 
         # The new structure
         new_volume, new_mass = np.array(volume), np.array(struct_mass)
@@ -1285,8 +1532,7 @@ class RootGrowth(StructuralComponent):
 
         return (new_length, "radius", new_radius, "volume", new_volume, "struct_mass", new_mass,
                 "struct_mass_produced", produced, "initial_struct_mass", new_initial_mass,
-                "hexose_growth_demand", demand, "hexose_consumption_by_growth_amount", consumed,
-                "hexose_consumption_by_growth", consumption_rate, "resp_growth", respiration, "type", new_type,
+                "resp_growth", respiration, "type", new_type,
                 "thermal_time_since_emergence", time_since_emergence, "actual_time_since_emergence",
                 actual_since_emergence, "actual_elongation", elongation, "actual_elongation_rate", elongation_rate,
                 "dist_to_ramif", new_dist_to_ramif, "step_elongating", elongating.astype(int))
@@ -1321,7 +1567,10 @@ class RootGrowth(StructuralComponent):
               "root_hairs_struct_mass", "root_hairs_struct_mass_produced", "living_root_hairs_struct_mass",
               "living_root_hairs_number", "dead_root_hairs_number", "total_root_hairs_number", "hexose_growth_demand",
               "hexose_consumption_by_growth_amount", "hexose_consumption_by_growth", "hexose_consumption_by_fungus")
-    INPUTS_OF_NEW = ("soil_temperature", "root_tissue_density", "C_hexose_root")
+    def _inputs_of_new(self) -> tuple:
+        """The inputs a new element gets from segmentation: the soil's and the anatomy's, each resource's
+        concentration."""
+        return ("soil_temperature", "root_tissue_density") + tuple(r.concentration for r in self.resources)
     SEGMENTATION_PARAMETERS = ("segment_length", "random_choice", "IPD", "Dmin", "RMD", "CVDD", "root_order_treshold",
                                "GDs", "LDs", "main_roots_growth_extender", "new_root_tissue_density", "GD_highest",
                                "GD_high", "GD_medium", "GD_low", "GD_prob_low", "GD_prob_medium",
@@ -1378,7 +1627,7 @@ class RootGrowth(StructuralComponent):
         context["next_index"][plant] += 1
         inputs = {}
         for name, value in values.items():
-            if name in self.INPUTS_OF_NEW:
+            if name in self._inputs_of_new():
                 inputs[name] = value
             elif name not in self.ELEMENT_PARAMETERS:
                 properties[name][vid] = value
@@ -1396,6 +1645,11 @@ class RootGrowth(StructuralComponent):
         """RootGrowthModel.ADDING_A_CHILD('<', label Apex, identical_properties=True)."""
         radius = properties["radius"][mother]
         values = {name: self._value(properties, name, mother) for name in self.COPIED}
+        for resource in self.resources:
+            values[resource.concentration] = self._value(properties, resource.concentration, mother)
+            if not resource.copied_by_new_elements:
+                for role in ("required", "demand", "consumption_amount", "consumption"):
+                    values[getattr(resource, role)] = 0.
         values.update(type=type_, root_order=root_order, lateral_root_emergence_possibility=EMERGENCE_IMPOSSIBLE,
                       emergence_cost=0., angle_down=angle_down, angle_roll=angle_roll, length=length,
                       radius=radius, original_radius=radius, potential_length=length, initial_length=length,
@@ -1551,9 +1805,11 @@ class RootGrowth(StructuralComponent):
             time_since_formation = 0.
         values = self._nil_values(parameters, TYPE_BEFORE_EMERGENCE, root_order + 1, primordium_angle_down,
                                   primordium_angle_roll, 0., potential_radius)
+        self._new_element_soil_temperature(properties, values, apex)
         ramif = self._new_element(g, properties, apex, "+", True, values, context)
         if self.simple_growth_duration:
             properties["growth_duration"][ramif] = (parameters["GDs"] * (2. * potential_radius) ** 2
+                                                    * self.lateral_growth_duration_factor(properties, apex)
                                                     * parameters["main_roots_growth_extender"])
         else:
             properties["growth_duration"][ramif] = self._growth_duration(
@@ -1563,6 +1819,19 @@ class RootGrowth(StructuralComponent):
                                                                * properties["temperature_modification"][apex])
         properties["dist_to_ramif"][apex] = elongation_since_last_ramif
         return [apex, ramif]
+
+    def _new_element_soil_temperature(self, properties, values, mother):
+        """A primordium's soil temperature: the legacy's 7.8 °C (g3), or its mother's (new_element_soil_temperature
+        = "mother", Root_BRIDGES')."""
+        if self.new_element_soil_temperature == "mother":
+            values["soil_temperature"] = self._value(properties, "soil_temperature", mother)
+        else:
+            values["soil_temperature"] = self.new_element_soil_temperature
+
+    def lateral_growth_duration_factor(self, properties, apex):
+        """Hook: the factor of a lateral primordium's growth duration with simple_growth_duration, from its bearing
+        apex (*properties*: the MPG's; the legacy: 1)."""
+        return 1.
 
     def _growth_duration(self, radius, legacy_id, root_order, parameters, stream):
         """RootGrowthModel.calculate_growth_duration (not simple_growth_duration), with its if/if (g4)."""
@@ -1591,6 +1860,7 @@ class RootGrowth(StructuralComponent):
         """RootGrowthModel.nodule_formation: a nodule, a lateral segment without apex."""
         parameters = context["parameters"]
         values = self._nil_values(parameters, TYPE_NODULE, properties["root_order"][mother] + 1, 90, 0, 0, 0)
+        self._new_element_soil_temperature(properties, values, mother)
         radius = properties["radius"][mother]
         values.update(length=radius, radius=radius, original_radius=radius)
         values["volume"] = 4 / 3. * pi * radius ** 3
@@ -1598,21 +1868,22 @@ class RootGrowth(StructuralComponent):
         return self._new_element(g, properties, mother, "+", False, values, context)
 
     @segmentation
-    def _soil_temperature(self, soil_temperature, root_tissue_density, C_hexose_root) -> outputs(2):
-        """The inputs of the elements segmentation created: copied from their mother, or the legacy's values for a
-        primordium (7.8 °C, g3; new_root_tissue_density; no hexose)."""
+    def _soil_temperature(self, soil_temperature, root_tissue_density) -> outputs(1):
+        """The inputs of the elements segmentation created: copied from their mother, or a primordium's (7.8 °C or
+        its mother's, new_root_tissue_density, no resource); each resource's concentration written."""
         pending = self.__dict__.get("_new_inputs") or {}
-        soil, density, C = np.array(soil_temperature), np.array(root_tissue_density), np.array(C_hexose_root)
+        ds = self.data_structure
+        values = {"soil_temperature": np.array(soil_temperature), "root_tissue_density": np.array(root_tissue_density)}
+        values.update({r.concentration: np.array(ds.get(r.concentration), dtype=float) for r in self.resources})
         if pending:
-            ds = self.data_structure
-            index = dict(zip(np.asarray(ds.entity_ids("node")).tolist(), range(soil.size)))
+            index = dict(zip(np.asarray(ds.entity_ids("node")).tolist(), range(values["soil_temperature"].size)))
             for vid, inputs in pending.items():
-                i = index[vid]
-                soil[i] = inputs.get("soil_temperature", soil[i])
-                density[i] = inputs.get("root_tissue_density", density[i])
-                C[i] = inputs.get("C_hexose_root", C[i])
+                for name, value in inputs.items():
+                    values[name][index[vid]] = value
         self.__dict__["_new_inputs"] = {}
-        return soil, "root_tissue_density", density, "C_hexose_root", C
+        for resource in self.resources:
+            ds.set(resource.concentration, values[resource.concentration])
+        return values["soil_temperature"], "root_tissue_density", values["root_tissue_density"]
 
     # ── After growth (RootGrowthModel.post_growth_updating, standalone: the repartition is metafspm's) ─────────
 
@@ -1639,19 +1910,36 @@ class RootGrowth(StructuralComponent):
         return (folded[:, 0], "axis_apex_id", folded[:, 1].astype(np.int64),
                 "former_distance_from_tip", np.array(distance_from_tip))
 
+    # Hooks of the root hairs (devplan §21)
+
+    def root_hair_elongation(self, selected, root_hair_length, share_with_hairs, elapsed_thermal_time):
+        """The new root hair length of the *selected* elements (whose hairs are shorter than their maximum), from
+        the share of their length bearing hairs and the thermal time elapsed: Michaelis-Menten on their hexose,
+        capped at the maximal length."""
+        C = self.data_structure.get("C_hexose_root")[selected]
+        maximum = self._parameter("root_hair_max_length", selected)
+        new_length = (root_hair_length + self._parameter("root_hairs_elongation_rate", selected)
+                      * self._parameter("root_hair_radius", selected) * C * share_with_hairs
+                      / (self._parameter("Km_elongation", selected) + C) * elapsed_thermal_time)
+        return np.where(new_length > maximum, maximum, new_length)
+
+    def root_hair_costs(self, produced) -> dict:
+        """{resource concentration: its amount consumed} by the root hairs' structural mass *produced*."""
+        return {"C_hexose_root": produced * self._parameter("struct_mass_C_content")
+                / self._parameter("yield_growth") / 6.}
+
     @postsegmentation
     def _root_hair_length(self, type, length, radius, struct_mass, distance_from_tip,
-                          former_distance_from_tip, temperature_modification, C_hexose_root, root_tissue_density,
+                          former_distance_from_tip, temperature_modification, root_tissue_density,
                           root_hair_length, actual_length_with_hairs, total_root_hairs_number, dead_root_hairs_number,
                           living_root_hairs_number, all_root_hairs_formed, root_hairs_struct_mass,
                           living_root_hairs_struct_mass, root_hairs_struct_mass_produced, root_hairs_volume,
                           actual_time_since_root_hairs_emergence_started,
                           thermal_time_since_root_hairs_emergence_started,
                           actual_time_since_root_hairs_emergence_stopped,
-                          thermal_time_since_root_hairs_emergence_stopped, hexose_consumption_by_growth_amount,
-                          hexose_consumption_by_growth, resp_growth, growing_zone_factor, root_hairs_density,
-                          root_hair_max_length, root_hairs_elongation_rate, root_hair_radius, root_hairs_lifespan,
-                          Km_elongation, struct_mass_C_content, yield_growth) -> outputs(16):
+                          thermal_time_since_root_hairs_emergence_stopped, resp_growth, growing_zone_factor,
+                          root_hairs_density, root_hair_max_length, root_hair_radius, root_hairs_lifespan,
+                          yield_growth) -> outputs(14):
         """RootGrowthModel.root_hairs_dynamics_opt on the elements of the legacy's focus (a structural mass, a
         Segment or Apex label, an emerged, stopped, dead or nodule type; not a collar's zero-length support):
         emergence along the element beyond the growing zone, death after their lifespan, their elongation limited
@@ -1677,9 +1965,7 @@ class RootGrowth(StructuralComponent):
             started=actual_time_since_root_hairs_emergence_started,
             thermal_started=thermal_time_since_root_hairs_emergence_started,
             stopped=actual_time_since_root_hairs_emergence_stopped,
-            thermal_stopped=thermal_time_since_root_hairs_emergence_stopped,
-            amount=hexose_consumption_by_growth_amount, rate=hexose_consumption_by_growth,
-            resp=resp_growth).items()}
+            thermal_stopped=thermal_time_since_root_hairs_emergence_stopped, resp=resp_growth).items()}
         initial_mass = np.array(root_hairs_struct_mass, dtype=float)
         total = np.array(total_root_hairs_number, dtype=float)
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -1726,23 +2012,28 @@ class RootGrowth(StructuralComponent):
             out["dead_root_hairs_number"][selected] = dead[selected]
             living = total - out["dead_root_hairs_number"]
             out["living_root_hairs_number"][selected] = living[selected]
-            # Elongation, limited by hexose
+            # Elongation, limited by the resources
             short = selected & (root_hair_length < root_hair_max_length)
-            new_length = (root_hair_length + root_hairs_elongation_rate * root_hair_radius * C_hexose_root
-                          * (out["actual_length_with_hairs"] / length) / (Km_elongation + C_hexose_root) * elapsed)
-            out["root_hair_length"][short] = np.where(new_length > root_hair_max_length, root_hair_max_length,
-                                                      new_length)[short]
-            volume = (root_hair_radius ** 2 * pi) * out["root_hair_length"] * total
+            out["root_hair_length"][short] = self.root_hair_elongation(short, root_hair_length[short], (
+                out["actual_length_with_hairs"] / length)[short], elapsed[short])
+            volume = (power(root_hair_radius, 2) * pi) * out["root_hair_length"] * total
             out["root_hairs_volume"][selected] = volume[selected]
             mass = volume * root_tissue_density
             out["root_hairs_struct_mass"][selected] = mass[selected]
             out["living_root_hairs_struct_mass"][selected] = np.where(total > 0., mass * living / total, 0.)[selected]
             produced = mass - initial_mass
             out["root_hairs_struct_mass_produced"][selected] = produced[selected]
-            cost = produced * struct_mass_C_content / yield_growth / 6.
-            out["amount"][selected] += cost[selected]
-            out["rate"][selected] += (cost / time_step)[selected]
-            out["resp"][selected] += (cost * 6. * (1 - yield_growth))[selected]
+            costs = self.root_hair_costs(produced)
+            for index, resource in enumerate(self.resources):
+                cost = costs[resource.concentration]
+                consumed = np.array(ds.get(resource.consumption_amount), dtype=float)
+                consumption_rate = np.array(ds.get(resource.consumption), dtype=float)
+                consumed[selected] += cost[selected]
+                consumption_rate[selected] += (cost / time_step)[selected]
+                ds.set(resource.consumption_amount, consumed)
+                ds.set(resource.consumption, consumption_rate)
+                if index == 0:                              # the carbon: growth respiration
+                    out["resp"][selected] += (cost * 6. * (1 - yield_growth))[selected]
         return (out["root_hair_length"], "actual_length_with_hairs", out["actual_length_with_hairs"],
                 "total_root_hairs_number", out["total_root_hairs_number"],
                 "dead_root_hairs_number", out["dead_root_hairs_number"],
@@ -1756,7 +2047,6 @@ class RootGrowth(StructuralComponent):
                 "thermal_time_since_root_hairs_emergence_started", out["thermal_started"],
                 "actual_time_since_root_hairs_emergence_stopped", out["stopped"],
                 "thermal_time_since_root_hairs_emergence_stopped", out["thermal_stopped"],
-                "hexose_consumption_by_growth_amount", out["amount"], "hexose_consumption_by_growth", out["rate"],
                 "resp_growth", out["resp"])
 
     @postsegmentation
