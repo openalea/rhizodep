@@ -31,6 +31,35 @@ The folder ‘src/openalea/rhizodep’ contains the main files for running Rhizo
 mamba install -c openalea3 -c conda-forge openalea.rhizodep
 ```
 
+### The growth component on metafspm (branch `to_metafspm`)
+
+On this branch, rhizodep's growth component (`root_growth.py`) is being ported to the current metafspm: a
+StructuralComponent growing the root system in metafspm's multiscale plant graph (MPG), its steps vectorised
+(`openalea.rhizodep.growth.RootGrowth`, see `devplan_metafspm.md`). metafspm is not installable from `openalea3` in
+this version yet: clone the repositories side by side on their working branches and install them from source.
+
+```bash
+mkdir fspm && cd fspm
+git clone -b data_structure_api https://github.com/openalea/metafspm.git metafspm
+git clone -b to_metafspm https://github.com/openalea/rhizodep.git rhizodep
+
+mamba env create -f rhizodep/conda/environment.yaml      # rhizodep's dependencies and metafspm's
+mamba activate rhizodep
+pip install -e metafspm
+pip install -e rhizodep
+```
+
+The original component is kept, frozen, as `openalea.rhizodep.legacy` (with the former metafspm it was written on,
+vendored): the reference the port is compared with, bit for bit (`test/comparison/`). To see both side by side:
+
+```bash
+cd rhizodep/example/comparison
+python compare_root_systems.py --days 10        # figures in outputs/root_systems/
+```
+
+The other models of this package (`root_carbon.py`, `rhizodep.py`, ...) are still written on the former metafspm
+API: they are imported on first access only.
+
 ### Contributors
 
 <a href="https://github.com/openalea/rhizodep/graphs/contributors">
