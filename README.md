@@ -55,6 +55,7 @@ vendored): the reference the port is compared with, bit for bit (`test/compariso
 ```bash
 cd rhizodep/example/comparison
 python compare_root_systems.py --days 10        # figures in outputs/root_systems/
+python profile_growth.py --days 15              # the cost of each, per step and stage: outputs/profiling/
 ```
 
 The other models of this package (`root_carbon.py`, `rhizodep.py`, ...) are still written on the former metafspm
