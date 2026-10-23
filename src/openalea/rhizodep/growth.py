@@ -73,6 +73,31 @@ def outputs(k):
     return tuple[(np.ndarray,) + (str, np.ndarray) * k]
 
 
+EVENTS = ("primordium_formation", "emergence", "cells_formation", "growth_stopped", "death")
+
+
+class Clocks:
+    """
+    The elements' actual and thermal times since events (actual_time_since_<event>, thermal_time_since_<event>),
+    copied from a step's arguments and advanced together: the actual time by the time step, the thermal one by the
+    time step times the temperature factor.
+    """
+
+    def __init__(self, arguments: dict, events=EVENTS):
+        self.actual = {event: np.array(arguments[f"actual_time_since_{event}"], dtype=float) for event in events}
+        self.thermal = {event: np.array(arguments[f"thermal_time_since_{event}"], dtype=float) for event in events}
+
+    def advance(self, selected, time_step, thermal_time_step, *events):
+        for event in events:
+            self.actual[event][selected] += time_step
+            self.thermal[event][selected] += thermal_time_step[selected]
+
+    def outputs(self) -> tuple:
+        """("actual_time_since_<event>", values, "thermal_time_since_<event>", values, ...), for a step's return."""
+        return tuple(item for event in self.actual for item in (f"actual_time_since_{event}", self.actual[event],
+                                                                f"thermal_time_since_{event}", self.thermal[event]))
+
+
 def temperature_modification(soil_temperature, process_at_T_ref, T_ref, A, B, C):
     """
     The factor of a process at *soil_temperature* (°C), the legacy's Model.temperature_modification: the process at
@@ -629,25 +654,26 @@ class RootGrowth(StructuralComponent):
     @classmethod
     def plant_parameters(cls, parameters) -> dict:
         """The class's defaults (parameters, and the inputs a scenario may set) overridden by *parameters*."""
-        p = {}
+        values = {}
         for f in fields(cls):
             kind = f.metadata.get("variable_type")
             if kind in ("parameter", "input") or f.name == "volume":
-                p[f.name] = parameters.get(f.name, f.default)
-        return p
+                values[f.name] = parameters.get(f.name, f.default)
+        return values
 
     @classmethod
-    def seedling(cls, p, stream=None) -> list:
+    def seedling(cls, parameters, stream=None) -> list:
         """
         The legacy's initial elements (RootGrowthModel.initiate_mtg, then its initiate_heterogeneous_variables and
-        the post-growth they end with) for the parameters *p*: a list, in the legacy's creation order, of dicts
-        with "vertex_index", "parent" (its vertex_index or None), "edge" ('<' / '+'), "apex" (a RootApex) and
-        "values" ({state variable: value}).
+        the post-growth they end with) for the plant's *parameters*: a list, in the legacy's creation order, of
+        dicts with "vertex_index", "parent" (its vertex_index or None), "edge" ('<' / '+'), "apex" (a RootApex) and
+        "values" ({state variable: value}). *stream*: the plant's random stream, seeded as the legacy seeds numpy.
         """
         defaults = {f.name: f.default for f in fields(cls) if f.metadata.get("variable_type") == "state_variable"
                     and f.metadata.get("scale") == SubOrgan}
         elements = []
-        nrtd = p["new_root_tissue_density"]
+        tissue_density = parameters["new_root_tissue_density"]
+        stream = stream if stream is not None else np.random.RandomState()
 
         def add(parent, edge, apex, values):
             element = dict(vertex_index=len(elements) + 1, parent=parent, edge=edge, apex=apex,
@@ -657,148 +683,151 @@ class RootGrowth(StructuralComponent):
 
         def nil_child(parent, edge, apex, type_, angle_down, angle_roll, length, radius):
             return add(parent["vertex_index"], edge, apex,
-                       cls._nil_values(p, type_, 1, angle_down, angle_roll, length, radius))
+                       cls._nil_values(parameters, type_, 1, angle_down, angle_roll, length, radius))
+
+        def main_root_durations(radius):
+            """The growth and life durations of a first-order root (with the legacy's extender)."""
+            return dict(growth_duration=(parameters["GDs"] * (2. * radius) ** 2
+                                         * parameters["main_roots_growth_extender"]),
+                        life_duration=parameters["LDs"] * (2. * radius) * tissue_density)
 
         # The base segment
-        r0 = p["D_ini"] / 2.
-        length = p["initial_segment_length"]
+        base_radius = parameters["D_ini"] / 2.
+        length = parameters["initial_segment_length"]
+        initial_mass = parameters["volume"] * tissue_density
         segment = add(None, "/", False, dict(
             type=TYPE_BASE, root_order=1, lateral_root_emergence_possibility=EMERGENCE_IMPOSSIBLE, emergence_cost=0.,
-            angle_down=0., angle_roll=0., length=length, radius=r0, original_radius=r0, initial_length=length,
-            initial_radius=r0, distance_from_tip=length, former_distance_from_tip=length, dist_to_ramif=0.,
-            actual_elongation=length, actual_elongation_rate=0., volume=p["volume"],
-            struct_mass=p["volume"] * nrtd, initial_struct_mass=p["volume"] * nrtd,
-            growth_duration=p["GDs"] * (2. * r0) ** 2 * p["main_roots_growth_extender"],
-            life_duration=p["LDs"] * (2. * r0) * nrtd))
+            angle_down=0., angle_roll=0., length=length, radius=base_radius, original_radius=base_radius,
+            initial_length=length, initial_radius=base_radius, distance_from_tip=length,
+            former_distance_from_tip=length, dist_to_ramif=0., actual_elongation=length, actual_elongation_rate=0.,
+            volume=parameters["volume"], struct_mass=initial_mass, initial_struct_mass=initial_mass,
+            **main_root_durations(base_radius)))
 
         # The seminal, then the nodal (adventitious) roots, each on a zero-length support
         for kind in ("seminal", "adventitious"):
-            n = p[f"n_{kind}_roots"]
-            forcing = p[f"forcing_{kind}_roots_events"]
-            if not (n > (1 if kind == "seminal" else 0) or not forcing):
+            number_of_roots = parameters[f"n_{kind}_roots"]
+            forcing = parameters[f"forcing_{kind}_roots_events"]
+            if not (number_of_roots > (1 if kind == "seminal" else 0) or not forcing):
                 continue
-            events = cls._emergence_events(p, kind)
-            ratio = p["D_sem_to_D_ini_ratio" if kind == "seminal" else "D_adv_to_D_ini_ratio"]
+            events = cls._emergence_events(parameters, kind)
+            ratio = parameters["D_sem_to_D_ini_ratio" if kind == "seminal" else "D_adv_to_D_ini_ratio"]
             support_type, apex_type = ((TYPE_SEMINAL_SUPPORT, TYPE_SEMINAL_BEFORE_EMERGENCE) if kind == "seminal" else
                                        (TYPE_ADVENTITIOUS_SUPPORT, TYPE_ADVENTITIOUS_BEFORE_EMERGENCE))
-            for i, (delay, number) in enumerate(events):
-                for j in range(int(number)):
+            for i, (delay, roots_per_event) in enumerate(events):
+                for j in range(int(roots_per_event)):
                     # the legacy's np.random.seed(random_choice + i j (· 3)), on the plant's stream
-                    rng = stream if stream is not None else np.random.RandomState()
-                    rng.seed(int(p["random_choice"]) + i * j * (1 if kind == "seminal" else 3))
+                    stream.seed(int(parameters["random_choice"]) + i * j * (1 if kind == "seminal" else 3))
                     segment = nil_child(segment, "<", False, support_type, 0,
-                                        abs(rng.normal(180 if kind == "seminal" else 0, 180)), 0., r0)
-                    mean = p["D_ini"] / 2. * ratio
-                    radius = abs(rng.normal(mean, mean * p["CVDD"])) if p["random"] else mean
-                    apex = nil_child(segment, "+", True, apex_type, abs(rng.normal(60, 10)), 5, 0., radius)
-                    apex["values"].update(
-                        growth_duration=p["GDs"] * (2. * radius) ** 2 * p["main_roots_growth_extender"],
-                        life_duration=p["LDs"] * (2. * radius) * nrtd, emergence_delay_in_thermal_time=delay)
+                                        abs(stream.normal(180 if kind == "seminal" else 0, 180)), 0., base_radius)
+                    mean = parameters["D_ini"] / 2. * ratio
+                    radius = abs(stream.normal(mean, mean * parameters["CVDD"])) if parameters["random"] else mean
+                    apex = nil_child(segment, "+", True, apex_type, abs(stream.normal(60, 10)), 5, 0., radius)
+                    apex["values"].update(emergence_delay_in_thermal_time=delay, **main_root_durations(radius))
 
         # The primary root's apex
-        apex = nil_child(segment, "<", True, TYPE_EMERGED, 0, 0, p["initial_apex_length"], r0)
-        apex["values"].update(
-            growth_duration=p["GDs"] * (2. * r0) ** 2 * p["main_roots_growth_extender"],
-            life_duration=p["LDs"] * (2. * r0) * nrtd,
-            initial_struct_mass=p["volume"] * nrtd)
+        apex = nil_child(segment, "<", True, TYPE_EMERGED, 0, 0, parameters["initial_apex_length"], base_radius)
+        apex["values"].update(initial_struct_mass=initial_mass, **main_root_durations(base_radius))
 
-        cls._initial_values(p, elements)
+        cls._initial_values(parameters, elements)
         return elements
 
     @classmethod
-    def _nil_values(cls, p, type_, root_order, angle_down, angle_roll, length, radius) -> dict:
+    def _nil_values(cls, parameters, type_, root_order, angle_down, angle_roll, length, radius) -> dict:
         """A new element's values, RootGrowthModel.ADDING_A_CHILD(nil_properties=True)."""
-        nrtd = p["new_root_tissue_density"]
+        tissue_density = parameters["new_root_tissue_density"]
         return {**dict.fromkeys(cls.NIL, 0.), **dict(
             type=type_, root_order=root_order, lateral_root_emergence_possibility=EMERGENCE_IMPOSSIBLE,
             emergence_cost=0., angle_down=angle_down, angle_roll=angle_roll, length=length, radius=radius,
             original_radius=radius, potential_length=0., theoretical_radius=radius, potential_radius=radius,
             initial_length=0., initial_radius=radius, volume=0., struct_mass=0., initial_struct_mass=0.,
-            C_hexose_root=0., soil_temperature=7.8, root_tissue_density=nrtd,
-            growth_duration=p["GDs"] * (2 * radius) ** 2, life_duration=p["LDs"] * 2. * radius * nrtd,
-            temperature_modification=0.)}
+            C_hexose_root=0., soil_temperature=7.8, root_tissue_density=tissue_density,                 # g3
+            growth_duration=parameters["GDs"] * (2 * radius) ** 2,
+            life_duration=parameters["LDs"] * 2. * radius * tissue_density, temperature_modification=0.)}
 
     @classmethod
-    def _emergence_events(cls, p, kind) -> list:
+    def _emergence_events(cls, parameters, kind) -> list:
         """[(emergence delay in thermal time, number of roots)]: the CSV table of input_file_path when it exists and
         the events are not forced, else built from n_<kind>_roots and ER (RootGrowthModel.initiate_mtg)."""
-        path = os.path.join(p["input_file_path"], p[f"{kind}_roots_events_file"])
-        if os.path.exists(path) and not p[f"forcing_{kind}_roots_events"]:
+        path = os.path.join(parameters["input_file_path"], parameters[f"{kind}_roots_events_file"])
+        if os.path.exists(path) and not parameters[f"forcing_{kind}_roots_events"]:
             table = pd.read_csv(path)
             return list(zip(table.emergence_delay_in_thermal_time, table[f"number_of_{kind}_roots_per_event"]))
         if kind == "seminal":
-            return [(x * 1 / p["ER"], 1) for x in range(1, int(p["n_seminal_roots"]))]
-        start = p["starting_time_for_adventitious_roots_emergence"]
-        return [(start + x * 1 / p["ER"], 1) for x in range(0, int(p["n_adventitious_roots"]))]
+            return [(x * 1 / parameters["ER"], 1) for x in range(1, int(parameters["n_seminal_roots"]))]
+        start = parameters["starting_time_for_adventitious_roots_emergence"]
+        return [(start + x * 1 / parameters["ER"], 1) for x in range(0, int(parameters["n_adventitious_roots"]))]
 
     @classmethod
-    def _initial_values(cls, p, elements) -> None:
+    def _initial_values(cls, parameters, elements) -> None:
         """What the legacy derives at its initiation: the inputs everywhere, the elements' volume, masses,
         temperature factor, legacy parent, distance from tip and axis apex, the hexose of the apex."""
-        by_index = {e["vertex_index"]: e for e in elements}
-        children = {e["vertex_index"]: [] for e in elements}
-        for e in elements:
-            if e["parent"] is not None:
-                children[e["parent"]].append(e["vertex_index"])
+        by_index = {element["vertex_index"]: element for element in elements}
+        children = {index: [] for index in by_index}
+        for element in elements:
+            if element["parent"] is not None:
+                children[element["parent"]].append(element["vertex_index"])
         # The collar (RootGrowthModel.__init__): the zero-length segments with children are skipped, their children
         # that are not such segments have the base as parent
-        zero_segment = {v: (not e["apex"]) and e["values"]["length"] == 0 for v, e in by_index.items()}
-        collar_children = {c for v in by_index if zero_segment[v] and children[v] for c in children[v]
-                           if not zero_segment[c]}
-        factor = float(temperature_modification(p["soil_temperature"], p["process_at_T_ref"], p["T_ref"], p["A"],
-                                                p["B"], p["C"]))
-        for e in elements:
-            v = e["values"]
-            v.update(soil_temperature=p["soil_temperature"], root_tissue_density=p["root_tissue_density"],
-                     C_hexose_root=0.)
-            v["vertex_index"] = e["vertex_index"]
-            v["parent_id"] = 1 if e["vertex_index"] in collar_children else (e["parent"] or -1)
-            volume = (4 / 3. * pi * v["radius"] ** 3 if v["type"] == TYPE_NODULE else
-                      pi * v["radius"] ** 2 * v["length"])
-            v["volume"] = volume
-            v["struct_mass"] = volume * p["new_root_tissue_density"]
-            v["living_struct_mass"] = v["struct_mass"] + v["living_root_hairs_struct_mass"]
-            v["temperature_modification"] = factor
-        elements[0]["values"]["C_hexose_root"] = p["initial_C_hexose_root"]
-        if p["initial_apex_length"] > 0.:
-            elements[-1]["values"]["C_hexose_root"] = p["initial_C_hexose_root"]
+        zero_segment = {index: (not element["apex"]) and element["values"]["length"] == 0
+                        for index, element in by_index.items()}
+        collar_children = {child for index in by_index if zero_segment[index] and children[index]
+                           for child in children[index] if not zero_segment[child]}
+        factor = float(temperature_modification(parameters["soil_temperature"], parameters["process_at_T_ref"],
+                                                parameters["T_ref"], parameters["A"], parameters["B"],
+                                                parameters["C"]))
+        for element in elements:
+            values = element["values"]
+            values.update(soil_temperature=parameters["soil_temperature"],
+                          root_tissue_density=parameters["root_tissue_density"], C_hexose_root=0.)
+            values["vertex_index"] = element["vertex_index"]
+            values["parent_id"] = (1 if element["vertex_index"] in collar_children else (element["parent"] or -1))
+            volume = (4 / 3. * pi * values["radius"] ** 3 if values["type"] == TYPE_NODULE else
+                      pi * values["radius"] ** 2 * values["length"])
+            values["volume"] = volume
+            values["struct_mass"] = volume * parameters["new_root_tissue_density"]
+            values["living_struct_mass"] = values["struct_mass"] + values["living_root_hairs_struct_mass"]
+            values["temperature_modification"] = factor
+        elements[0]["values"]["C_hexose_root"] = parameters["initial_C_hexose_root"]
+        if parameters["initial_apex_length"] > 0.:
+            elements[-1]["values"]["C_hexose_root"] = parameters["initial_C_hexose_root"]
         # Distance from tip and axis apex: children before parents, along the successors ('<')
-        successor = {e["parent"]: e["vertex_index"] for e in elements if e["edge"] == "<"}
-        for e in reversed(elements):
-            v, son = e["values"], successor.get(e["vertex_index"])
-            if e["apex"] or v["type"] == TYPE_NODULE or son is None:
-                v["distance_from_tip"], v["axis_apex_id"] = v["length"], e["vertex_index"]
+        successor_of = {element["parent"]: element["vertex_index"] for element in elements if element["edge"] == "<"}
+        for element in reversed(elements):
+            values, successor = element["values"], successor_of.get(element["vertex_index"])
+            if element["apex"] or values["type"] == TYPE_NODULE or successor is None:
+                values["distance_from_tip"], values["axis_apex_id"] = values["length"], element["vertex_index"]
             else:
-                s = by_index[son]["values"]
-                v["distance_from_tip"], v["axis_apex_id"] = s["distance_from_tip"] + v["length"], s["axis_apex_id"]
-            v["former_distance_from_tip"] = v["distance_from_tip"]
+                successor_values = by_index[successor]["values"]
+                values["distance_from_tip"] = successor_values["distance_from_tip"] + values["length"]
+                values["axis_apex_id"] = successor_values["axis_apex_id"]
+            values["former_distance_from_tip"] = values["distance_from_tip"]
 
     @classmethod
     def initiate_plant(cls, g, plant, parameters):
         """The legacy's seedling under *plant* (the class docstring's structure), its values on the MPG."""
-        p = cls.plant_parameters(parameters)
+        parameters = cls.plant_parameters(parameters)
         stream = np.random.RandomState()
-        elements = cls.seedling(p, stream)
+        elements = cls.seedling(parameters, stream)
         g.property("legacy_random")[plant] = stream
-        s, labels = g.scales, g.labels
+        scales, labels = g.scales, g.labels
         vids = {}
 
         def new_organ():
             complex_ = plant
-            for scale, label in ((s.Axis, labels.Axis.Root), (s.GrowthUnit, labels.GrowthUnit.Root),
-                                 (s.Phytomer, labels.Phytomer.Root), (s.Organ, labels.Organ.RootInternode)):
+            for scale, label in ((scales.Axis, labels.Axis.Root), (scales.GrowthUnit, labels.GrowthUnit.Root),
+                                 (scales.Phytomer, labels.Phytomer.Root), (scales.Organ, labels.Organ.RootInternode)):
                 complex_ = g.add_component(complex_, **PropsConfig(scale=scale, edge_type='/', label=label))
             return complex_
 
         for e in elements:
             label = labels.SubOrgan.RootApex if e["apex"] else labels.SubOrgan.RootSegment
             if e["parent"] is None:
-                vid = g.add_component(new_organ(), **PropsConfig(scale=s.SubOrgan, edge_type='/', label=label))
+                vid = g.add_component(new_organ(), **PropsConfig(scale=scales.SubOrgan, edge_type='/', label=label))
             elif e["edge"] == "<":
-                vid = g.add_child(vids[e["parent"]], **PropsConfig(scale=s.SubOrgan, edge_type='<', label=label))
+                vid = g.add_child(vids[e["parent"]], **PropsConfig(scale=scales.SubOrgan, edge_type='<', label=label))
             else:
                 vid = g.add_component_with_topo(new_organ(), vids[e["parent"]],
-                                                **PropsConfig(scale=s.SubOrgan, edge_type='+', label=label))
+                                                **PropsConfig(scale=scales.SubOrgan, edge_type='+', label=label))
             vids[e["vertex_index"]] = vid
             for name, value in e["values"].items():
                 g.property(name)[vid] = value
@@ -881,30 +910,27 @@ class RootGrowth(StructuralComponent):
         The apices (RootGrowthModel.potential_apex_development): the state machine as masked branches, the supply
         zone of those elongating (calculating_supply_for_elongation, by path windows), their potential length; a
         lateral primordium emerging marks its bearer (the last one visited when several emerge on one bearer).
+        The branches are chosen on the state at the step's start (the arguments); each element is in one branch.
         """
         ds = self.data_structure
-        ts = float(self.time_step)
+        time_step = float(self.time_step)
+        temperature_factor = temperature_modification
+        thermal_time_step = time_step * temperature_factor
         apex = self._apex()
-        T = temperature_modification
-        tsT = ts * T
-        type_ = np.array(type)
-        ttpf, atpf = np.array(thermal_time_since_primordium_formation), np.array(actual_time_since_primordium_formation)
-        tpte = np.array(thermal_potential_time_since_emergence)
-        tte, ate = np.array(thermal_time_since_emergence), np.array(actual_time_since_emergence)
-        ttgs, atgs = np.array(thermal_time_since_growth_stopped), np.array(actual_time_since_growth_stopped)
-        ttcf, atcf = np.array(thermal_time_since_cells_formation), np.array(actual_time_since_cells_formation)
-        ttd, atd = np.array(thermal_time_since_death), np.array(actual_time_since_death)
-        potential = np.array(potential_length)
+        clocks = Clocks(locals())                       # the times since events, from the arguments
+        new_type = np.array(type)
+        new_potential_length = np.array(potential_length)
+        potential_time_since_emergence = np.array(thermal_potential_time_since_emergence)
 
-        # The branches, on the state at the step's start
+        # The branches
         primordium = apex & ((type == TYPE_SEMINAL_BEFORE_EMERGENCE) | (type == TYPE_ADVENTITIOUS_BEFORE_EMERGENCE))
         lateral = apex & (type == TYPE_BEFORE_EMERGENCE)
         other = apex & ~primordium & ~lateral
-        primordium_emerges = primordium & (thermal_time_since_primordium_formation + tsT
+        primordium_emerges = primordium & (thermal_time_since_primordium_formation + thermal_time_step
                                            >= emergence_delay_in_thermal_time)
-        lateral_emerges = lateral & (thermal_time_since_primordium_formation + tsT > emergence_delay)
-        growing = other & (thermal_time_since_emergence + tsT < growth_duration)
-        living = other & ~growing & (thermal_time_since_growth_stopped + tsT < life_duration)
+        lateral_emerges = lateral & (thermal_time_since_primordium_formation + thermal_time_step > emergence_delay)
+        growing = other & (thermal_time_since_emergence + thermal_time_step < growth_duration)
+        living = other & ~growing & (thermal_time_since_growth_stopped + thermal_time_step < life_duration)
         stopped = living & ((type == TYPE_STOPPED) | (type == TYPE_JUST_STOPPED))
         just_stopped = living & ~stopped
         dying = other & ~growing & ~living
@@ -917,94 +943,93 @@ class RootGrowth(StructuralComponent):
         include = length > 0.
         hexose = ds.path_window(budget, volume, C_hexose_root * struct_mass, where=supplied, include=include)
         mass = ds.path_window(budget, volume, struct_mass, where=supplied, include=include)
-        required, contributing = np.array(hexose_possibly_required_for_elongation), np.array(
-            struct_mass_contributing_to_elongation)
-        zone_C = np.array(growing_zone_C_hexose_root)
+        required = np.array(hexose_possibly_required_for_elongation)
+        contributing = np.array(struct_mass_contributing_to_elongation)
+        zone_concentration = np.array(growing_zone_C_hexose_root)
         required[supplied], contributing[supplied] = hexose[supplied], mass[supplied]
         with np.errstate(divide="ignore", invalid="ignore"):
-            zone_C[supplied] = np.where(mass[supplied] > 0., hexose[supplied] / mass[supplied], 0.)
-        elongation = (EL, Km_elongation, C_hexose_min_for_elongation)
+            zone_concentration[supplied] = np.where(mass[supplied] > 0., hexose[supplied] / mass[supplied], 0.)
+
+        def elongated(selected, start_length, start_radius, time):
+            return self._elongated_length(start_length[selected], start_radius[selected],
+                                          zone_concentration[selected], time, EL[selected], Km_elongation[selected],
+                                          C_hexose_min_for_elongation[selected])
+
+        def capped(time, selected):
+            return np.where(time > thermal_time_step[selected], thermal_time_step[selected], time)
 
         # Seminal and nodal primordia
-        m = primordium_emerges
-        tpte[m] = thermal_time_since_primordium_formation[m] + tsT[m] - emergence_delay_in_thermal_time[m]
-        tpte[m] = np.where(tpte[m] > tsT[m], tsT[m], tpte[m])
-        potential[m] = self._elongated_length(initial_length[m], initial_radius[m], zone_C[m], tpte[m],
-                                              *(x[m] for x in elongation))
+        selected = primordium_emerges
+        potential_time_since_emergence[selected] = capped(
+            thermal_time_since_primordium_formation[selected] + thermal_time_step[selected]
+            - emergence_delay_in_thermal_time[selected], selected)
+        new_potential_length[selected] = elongated(selected, initial_length, initial_radius,
+                                                   potential_time_since_emergence[selected])
         if self.simple_growth_duration:
-            type_[m] = TYPE_EMERGED
-        atpf[primordium] += ts
-        ttpf[primordium] += tsT[primordium]
+            new_type[selected] = TYPE_EMERGED
+        clocks.advance(primordium, time_step, thermal_time_step, "primordium_formation")
 
         # Lateral primordia
-        atpf[lateral] += ts
-        ttpf[lateral] += tsT[lateral]
-        m = lateral_emerges
-        tpte[m] = ttpf[m] - emergence_delay[m]
-        tpte[m] = np.where(tpte[m] > tsT[m], tsT[m], tpte[m])
-        potential[m] = self._elongated_length(initial_length[m], initial_radius[m], zone_C[m], tpte[m],
-                                              *(x[m] for x in elongation))
+        clocks.advance(lateral, time_step, thermal_time_step, "primordium_formation")
+        selected = lateral_emerges
+        potential_time_since_emergence[selected] = capped(
+            clocks.thermal["primordium_formation"][selected] - emergence_delay[selected], selected)
+        new_potential_length[selected] = elongated(selected, initial_length, initial_radius,
+                                                   potential_time_since_emergence[selected])
         possibility, primordium_index = np.array(lateral_root_emergence_possibility), np.array(
             lateral_primordium_index)
         if self.simple_growth_duration:
-            type_[m] = TYPE_EMERGED
+            new_type[selected] = TYPE_EMERGED
         else:
             visit = ds.order("post", convention="openalea")
-            emerging = visit[m[visit]]
+            emerging = visit[selected[visit]]
             bearers = np.asarray(ds.parents())[emerging]
             last = bearers.size - 1 - np.unique(bearers[::-1], return_index=True)[1]   # last visited per bearer
             possibility[bearers[last]] = EMERGENCE_POSSIBLE
             primordium_index[bearers[last]] = vertex_index[emerging[last]]
 
         # Growing apices
-        m = growing
-        atpf[m] += ts; ttpf[m] += tsT[m]; ate[m] += ts; tte[m] += tsT[m]
-        potential[m] = self._elongated_length(length[m], radius[m], zone_C[m], tsT[m], *(x[m] for x in elongation))
+        selected = growing
+        clocks.advance(selected, time_step, thermal_time_step, "primordium_formation", "emergence")
+        new_potential_length[selected] = elongated(selected, length, radius, thermal_time_step[selected])
 
         # Stopped
-        m = stopped
-        atgs[m] += ts; ttgs[m] += tsT[m]
-        type_[m] = TYPE_STOPPED
-        atpf[m] += ts; ttpf[m] += tsT[m]; ate[m] += ts; tte[m] += tsT[m]; atcf[m] += ts; ttcf[m] += tsT[m]
+        selected = stopped
+        new_type[selected] = TYPE_STOPPED
+        clocks.advance(selected, time_step, thermal_time_step, "growth_stopped", "primordium_formation", "emergence",
+                       "cells_formation")
 
         # Just stopped: the elongation until the growth duration
-        m = just_stopped
-        type_[m] = TYPE_JUST_STOPPED
-        ttgs[m] = thermal_time_since_emergence[m] + tsT[m] - growth_duration[m]
+        selected = just_stopped
+        new_type[selected] = TYPE_JUST_STOPPED
+        stopped_since = thermal_time_since_emergence[selected] + thermal_time_step[selected] - growth_duration[selected]
+        clocks.thermal["growth_stopped"][selected] = stopped_since
         with np.errstate(divide="ignore", invalid="ignore"):
-            atgs[m] = ttgs[m] / T[m]
-        remaining = tsT[m] - ttgs[m]
-        potential[m] = np.where(remaining < 0., initial_length[m],
-                                self._elongated_length(length[m], radius[m], zone_C[m], remaining,
-                                                       *(x[m] for x in elongation)))
-        atpf[m] += ts; ate[m] += ts; ttpf[m] += tsT[m]; tte[m] += tsT[m]; atcf[m] += ts; ttcf[m] += tsT[m]
+            clocks.actual["growth_stopped"][selected] = stopped_since / temperature_factor[selected]
+        remaining = thermal_time_step[selected] - stopped_since
+        new_potential_length[selected] = np.where(remaining < 0., initial_length[selected],
+                                                  elongated(selected, length, radius, remaining))
+        clocks.advance(selected, time_step, thermal_time_step, "primordium_formation", "emergence", "cells_formation")
 
         # Dead
-        m = dead
-        type_[m] = TYPE_DEAD
-        for actual in (atpf, ate, atcf, atgs, atd):
-            actual[m] += ts
-        for thermal in (ttpf, tte, ttcf, ttgs, ttd):
-            thermal[m] += tsT[m]
+        selected = dead
+        new_type[selected] = TYPE_DEAD
+        clocks.advance(selected, time_step, thermal_time_step, "primordium_formation", "emergence", "cells_formation",
+                       "growth_stopped", "death")
 
         # Just dead
-        m = just_dead
-        type_[m] = TYPE_JUST_DEAD
-        ttd[m] = thermal_time_since_growth_stopped[m] + tsT[m] - life_duration[m]
+        selected = just_dead
+        new_type[selected] = TYPE_JUST_DEAD
+        dead_since = thermal_time_since_growth_stopped[selected] + thermal_time_step[selected] - life_duration[selected]
+        clocks.thermal["death"][selected] = dead_since
         with np.errstate(divide="ignore", invalid="ignore"):
-            atd[m] = ttd[m] / T[m]
-        for actual in (atpf, ate, atcf, atgs):
-            actual[m] += ts
-        for thermal in (ttpf, tte, ttcf, ttgs):
-            thermal[m] += tsT[m]
+            clocks.actual["death"][selected] = dead_since / temperature_factor[selected]
+        clocks.advance(selected, time_step, thermal_time_step, "primordium_formation", "emergence", "cells_formation",
+                       "growth_stopped")
 
-        return (potential, "type", type_, "thermal_potential_time_since_emergence", tpte,
-                "thermal_time_since_primordium_formation", ttpf, "actual_time_since_primordium_formation", atpf,
-                "thermal_time_since_emergence", tte, "actual_time_since_emergence", ate,
-                "thermal_time_since_growth_stopped", ttgs, "actual_time_since_growth_stopped", atgs,
-                "thermal_time_since_cells_formation", ttcf, "actual_time_since_cells_formation", atcf,
-                "thermal_time_since_death", ttd, "actual_time_since_death", atd,
-                "growing_zone_C_hexose_root", zone_C, "hexose_possibly_required_for_elongation", required,
+        return (new_potential_length, "type", new_type,
+                "thermal_potential_time_since_emergence", potential_time_since_emergence, *clocks.outputs(),
+                "growing_zone_C_hexose_root", zone_concentration, "hexose_possibly_required_for_elongation", required,
                 "struct_mass_contributing_to_elongation", contributing,
                 "lateral_root_emergence_possibility", possibility, "lateral_primordium_index", primordium_index)
 
@@ -1024,39 +1049,43 @@ class RootGrowth(StructuralComponent):
         radius limited by hexose, the supports' radius, the times; the nodules' thickening.
         """
         ds = self.data_structure
-        ts = float(self.time_step)
-        T = temperature_modification
-        tsT = ts * T
-        apex = self._apex()
+        time_step = float(self.time_step)
+        temperature_factor = temperature_modification
+        thermal_time_step = time_step * temperature_factor
+        clocks = Clocks(locals())                       # the times since events, from the arguments
         parents = np.asarray(ds.parents())
-        segment = ~apex
+        segment = ~self._apex()
         nodule = segment & (type == TYPE_NODULE)
         normal = segment & ~nodule
-        theoretical, potential_r, radius_ = np.array(theoretical_radius), np.array(potential_radius), np.array(radius)
+        new_theoretical_radius = np.array(theoretical_radius)
+        new_potential_radius, new_radius = np.array(potential_radius), np.array(radius)
         available = C_hexose_root * struct_mass
 
         # Nodules
-        m = nodule
-        if m.any():
-            p = parents[m]
-            available[m] = C_hexose_root[p] * struct_mass[p] + C_hexose_root[m] * struct_mass[m]
-            regulating = available[m] / (struct_mass[p] + struct_mass[m])
-            rate = relative_nodule_thickening_rate_max[m] * regulating / (Km_nodule_thickening[m] + regulating)
-            rate = rate * T[m]
-            theoretical[m] = radius[m] * (1 + rate * ts)
-            potential_r[m] = np.where(theoretical[m] > nodule_max_radius[m], nodule_max_radius[m], theoretical[m])
+        selected = nodule
+        if selected.any():
+            bearer = parents[selected]
+            available[selected] = (C_hexose_root[bearer] * struct_mass[bearer]
+                                   + C_hexose_root[selected] * struct_mass[selected])
+            regulating = available[selected] / (struct_mass[bearer] + struct_mass[selected])
+            rate = (relative_nodule_thickening_rate_max[selected] * regulating
+                    / (Km_nodule_thickening[selected] + regulating))
+            rate = rate * temperature_factor[selected]
+            new_theoretical_radius[selected] = radius[selected] * (1 + rate * time_step)
+            new_potential_radius[selected] = np.where(new_theoretical_radius[selected] > nodule_max_radius[selected],
+                                                      nodule_max_radius[selected], new_theoretical_radius[selected])
 
         # The axis apex's stop
-        type_ = np.array(type)
+        new_type = np.array(type)
         node_of = self._node_of(vertex_index)
         apex_node = node_of[np.clip(np.asarray(axis_apex_id, dtype=np.int64), 0, node_of.size - 1)]
         apex_type = np.where(apex_node >= 0, type[np.maximum(apex_node, 0)], -1)
-        type_[normal & (apex_type == TYPE_JUST_STOPPED)] = TYPE_JUST_STOPPED
-        type_[normal & (apex_type == TYPE_STOPPED)] = TYPE_STOPPED
+        new_type[normal & (apex_type == TYPE_JUST_STOPPED)] = TYPE_JUST_STOPPED
+        new_type[normal & (apex_type == TYPE_STOPPED)] = TYPE_STOPPED
 
         # Children first: death, time since death, the pipe model
-        radial, simple = self.radial_growth, self.simple_growth_duration
-        columns = np.column_stack([theoretical, type_.astype(float), np.array(actual_time_since_death, dtype=float)])
+        columns = np.column_stack([new_theoretical_radius, new_type.astype(float),
+                                   np.array(actual_time_since_death, dtype=float)])
 
         def update(level, out):
             nodes = level.nodes
@@ -1069,76 +1098,65 @@ class RootGrowth(StructuralComponent):
             n_children = level.children(np.ones(out.shape[0]), op="sum")
             n_dead = level.children(dead_child.astype(float), op="sum")
             first_death = level.children(out[:, 2], op="min", where=dead_child, fill=0.)
-            own = rows[:, 1]
+            own_type = rows[:, 1]
             all_dead = todo & (n_dead == n_children)
-            new_type = np.where(all_dead, np.where((own == TYPE_JUST_DEAD) | (own == TYPE_DEAD), TYPE_DEAD,
-                                                   TYPE_JUST_DEAD), own)
-            if radial:
+            dead_type = np.where((own_type == TYPE_JUST_DEAD) | (own_type == TYPE_DEAD), TYPE_DEAD, TYPE_JUST_DEAD)
+            level_type = np.where(all_dead, dead_type, own_type)
+            if self.radial_growth:
                 if self.legacy_pipe_model:
-                    son = laterals = np.zeros(nodes.size)
+                    successor_section = lateral_sections = np.zeros(nodes.size)
                 else:
                     section = out[:, 0] ** 2 * pi
-                    son = level.children(section, op="sum", edge="<")
-                    laterals = level.children(section, op="sum", edge="+",
-                                              where=(length > 0.) & (child_type != TYPE_NODULE))
-                th = np.sqrt(son / pi + SGC[nodes] * laterals / pi)
-                th = np.where((th - initial_radius[nodes]) <= 0.001 * initial_radius[nodes], initial_radius[nodes], th)
-                rows[todo, 0] = th[todo]
-            rows[todo, 1] = new_type[todo]
+                    successor_section = level.children(section, op="sum", edge="<")
+                    lateral_sections = level.children(section, op="sum", edge="+",
+                                                      where=(length > 0.) & (child_type != TYPE_NODULE))
+                pipe_radius = np.sqrt(successor_section / pi + SGC[nodes] * lateral_sections / pi)
+                start_radius = initial_radius[nodes]
+                pipe_radius = np.where((pipe_radius - start_radius) <= 0.001 * start_radius, start_radius, pipe_radius)
+                rows[todo, 0] = pipe_radius[todo]
+            rows[todo, 1] = level_type[todo]
             death = rows[:, 2]
-            death = np.where(todo & (new_type == TYPE_JUST_DEAD), np.where(n_children > 0, first_death, 0.), death)
-            death = np.where(todo & (new_type == TYPE_DEAD), death + ts, death)
+            death = np.where(todo & (level_type == TYPE_JUST_DEAD), np.where(n_children > 0, first_death, 0.), death)
+            death = np.where(todo & (level_type == TYPE_DEAD), death + time_step, death)
             rows[:, 2] = death
             return rows
 
         folded = ds.fold(update, columns, direction="up")
-        theoretical[normal] = folded[normal, 0]
-        type_[normal] = folded[normal, 1].astype(type_.dtype)
-        atd, ttd = np.array(actual_time_since_death), np.array(thermal_time_since_death)
-        atd[normal] = folded[normal, 2]
+        new_theoretical_radius[normal] = folded[normal, 0]
+        new_type[normal] = folded[normal, 1].astype(new_type.dtype)
 
         # The potential radius
-        if radial:
-            if simple:
-                potential_r[normal] = theoretical[normal]
+        if self.radial_growth:
+            if self.simple_growth_duration:
+                new_potential_radius[normal] = new_theoretical_radius[normal]
             else:
-                m = normal & (length > 0.) & (theoretical > radius) & (C_hexose_root > C_hexose_min_for_thickening)
-                rate = relative_root_thickening_rate_max[m] * C_hexose_root[m] / (Km_thickening[m] + C_hexose_root[m])
-                rate = rate * T[m]
-                largest = (1 + rate * ts) * initial_radius[m]
-                potential_r[m] = np.where(theoretical[m] > largest, largest, theoretical[m])
-            support = normal & ((type_ == TYPE_SEMINAL_SUPPORT) | (type_ == TYPE_ADVENTITIOUS_SUPPORT))
-            radius_[support] = potential_r[support]
+                selected = (normal & (length > 0.) & (new_theoretical_radius > radius)
+                            & (C_hexose_root > C_hexose_min_for_thickening))
+                rate = (relative_root_thickening_rate_max[selected] * C_hexose_root[selected]
+                        / (Km_thickening[selected] + C_hexose_root[selected]))
+                rate = rate * temperature_factor[selected]
+                largest = (1 + rate * time_step) * initial_radius[selected]
+                new_potential_radius[selected] = np.where(new_theoretical_radius[selected] > largest, largest,
+                                                          new_theoretical_radius[selected])
+            support = normal & ((new_type == TYPE_SEMINAL_SUPPORT) | (new_type == TYPE_ADVENTITIOUS_SUPPORT))
+            new_radius[support] = new_potential_radius[support]
 
         # The times
-        atpf, ttpf = np.array(actual_time_since_primordium_formation), np.array(thermal_time_since_primordium_formation)
-        ate, tte = np.array(actual_time_since_emergence), np.array(thermal_time_since_emergence)
-        atcf, ttcf = np.array(actual_time_since_cells_formation), np.array(thermal_time_since_cells_formation)
-        atgs, ttgs = np.array(actual_time_since_growth_stopped), np.array(thermal_time_since_growth_stopped)
-        m = normal
-        for actual in (atpf, ate, atcf):
-            actual[m] += ts
-        for thermal in (ttpf, tte, ttcf):
-            thermal[m] += tsT[m]
-        m = normal & (type_ == TYPE_JUST_STOPPED)
-        source = actual_time_since_growth_stopped[np.maximum(apex_node, 0)]
-        atgs[m] = source[m]
-        ttgs[m] = source[m] * T[m]
-        m = normal & ((type_ == TYPE_STOPPED) | (type_ == TYPE_JUST_DEAD) | (type_ == TYPE_DEAD))
-        atgs[m] += ts
-        ttgs[m] += tsT[m]
-        m = normal & (type_ == TYPE_JUST_DEAD)
-        ttd[m] = atd[m] * T[m]
-        m = normal & (type_ == TYPE_DEAD)
-        ttd[m] += tsT[m]
+        clocks.advance(normal, time_step, thermal_time_step, "primordium_formation", "emergence", "cells_formation")
+        selected = normal & (new_type == TYPE_JUST_STOPPED)
+        apex_stopped_since = actual_time_since_growth_stopped[np.maximum(apex_node, 0)]
+        clocks.actual["growth_stopped"][selected] = apex_stopped_since[selected]
+        clocks.thermal["growth_stopped"][selected] = apex_stopped_since[selected] * temperature_factor[selected]
+        selected = normal & np.isin(new_type, (TYPE_STOPPED, TYPE_JUST_DEAD, TYPE_DEAD))
+        clocks.advance(selected, time_step, thermal_time_step, "growth_stopped")
+        clocks.actual["death"][normal] = folded[normal, 2]
+        selected = normal & (new_type == TYPE_JUST_DEAD)
+        clocks.thermal["death"][selected] = clocks.actual["death"][selected] * temperature_factor[selected]
+        selected = normal & (new_type == TYPE_DEAD)
+        clocks.thermal["death"][selected] += thermal_time_step[selected]
 
-        return (theoretical, "type", type_, "potential_radius", potential_r, "radius", radius_,
-                "hexose_available_for_thickening", available,
-                "actual_time_since_primordium_formation", atpf, "thermal_time_since_primordium_formation", ttpf,
-                "actual_time_since_emergence", ate, "thermal_time_since_emergence", tte,
-                "actual_time_since_cells_formation", atcf, "thermal_time_since_cells_formation", ttcf,
-                "actual_time_since_growth_stopped", atgs, "thermal_time_since_growth_stopped", ttgs,
-                "actual_time_since_death", atd, "thermal_time_since_death", ttd)
+        return (new_theoretical_radius, "type", new_type, "potential_radius", new_potential_radius,
+                "radius", new_radius, "hexose_available_for_thickening", available, *clocks.outputs())
 
     # ── Actual growth (RootGrowthModel.actual_growth_and_corresponding_respiration) ───────────────────────────
 
@@ -1163,51 +1181,53 @@ class RootGrowth(StructuralComponent):
         element's sums are the legacy's, bit for bit.
         """
         ds = self.data_structure
-        ts = float(self.time_step)
-        rtd, Cc, y = root_tissue_density, struct_mass_C_content, yield_growth
+        time_step = float(self.time_step)
         volume_of = self._volume
+        hexose_per_volume = root_tissue_density * struct_mass_C_content          # mol of C per m3 of structure
         with np.errstate(divide="ignore", invalid="ignore"):
             initial_volume = volume_of(type, initial_radius, initial_length)
             potential_volume = volume_of(type, potential_radius, potential_length)
             grows = ~np.isin(type, (TYPE_DEAD, TYPE_JUST_DEAD, TYPE_SEMINAL_SUPPORT, TYPE_ADVENTITIOUS_SUPPORT))
             grows &= ~((potential_length <= initial_length) & (potential_radius <= initial_radius))
             demand = np.array(hexose_growth_demand)
-            demand[grows] = ((potential_volume - initial_volume) * rtd * Cc / y * 1 / 6.)[grows]
-            negative = grows & (demand < 0.)
-            demand[negative] = 0.
+            demand[grows] = ((potential_volume - initial_volume) * root_tissue_density * struct_mass_C_content
+                             / yield_growth * 1 / 6.)[grows]
+            demand[grows & (demand < 0.)] = 0.
             grows &= demand > 0.
 
-            elongates = grows & (potential_length > length)
-            for_elongation = np.where(elongates, np.maximum(hexose_possibly_required_for_elongation
-                                                            - struct_mass_contributing_to_elongation
-                                                            * C_hexose_min_for_elongation, 0.), 0.)
-            thickens = grows & (potential_radius > radius)
-            for_thickening = np.where(thickens, np.maximum(hexose_available_for_thickening
-                                                           - struct_mass * C_hexose_min_for_thickening, 0.), 0.)
+            for_elongation = np.where(grows & (potential_length > length), np.maximum(
+                hexose_possibly_required_for_elongation
+                - struct_mass_contributing_to_elongation * C_hexose_min_for_elongation, 0.), 0.)
+            for_thickening = np.where(grows & (potential_radius > radius), np.maximum(
+                hexose_available_for_thickening - struct_mass * C_hexose_min_for_thickening, 0.), 0.)
             grows &= (for_elongation + for_thickening) > 0.
 
             # Elongation, limited by the supply zone's hexose
-            length_, radius_ = np.array(length), np.array(radius)
-            volume_max = initial_volume + for_elongation * 6. / (rtd * Cc) * y
+            new_length, new_radius = np.array(length), np.array(radius)
+            volume_max = initial_volume + for_elongation * 6. / hexose_per_volume * yield_growth
             length_max = volume_max / (pi * initial_radius ** 2)
-            m = grows & (potential_length > initial_length)
-            elongating = m
-            length_[m] = np.where(potential_length[m] >= length_max[m], length_max[m], potential_length[m])
-            elongation_cost = 1. / 6. * (volume_of(type, initial_radius, length_) - initial_volume) * rtd * Cc / y
-            supplied = m & (length_ > initial_length)
+            elongating = grows & (potential_length > initial_length)
+            new_length[elongating] = np.where(potential_length[elongating] >= length_max[elongating],
+                                              length_max[elongating], potential_length[elongating])
+            elongation_cost = (1. / 6. * (volume_of(type, initial_radius, new_length) - initial_volume)
+                               * root_tissue_density * struct_mass_C_content / yield_growth)
+            supplied = elongating & (new_length > initial_length)
 
             # Thickening, limited by the element's hexose
-            m = grows & (potential_radius > initial_radius)
-            increase = for_thickening * 6. * y / (rtd * Cc)
-            volume_max = volume_of(type, initial_radius, length_) + increase
-            possible = np.where(type == TYPE_NODULE, (3. / (4. * pi)) ** (1. / 3.), np.sqrt(volume_max / (length_ * pi)))
-            fits = possible <= potential_radius
-            radius_[m] = np.where(fits[m], possible[m], potential_radius[m])
-            net = volume_of(type, radius_, length_) - volume_of(type, initial_radius, length_)
-            thickening_cost = np.where(fits, for_thickening, 1. / 6. * net * rtd * Cc / y)
+            thickening = grows & (potential_radius > initial_radius)
+            increase = for_thickening * 6. * yield_growth / hexose_per_volume
+            volume_max = volume_of(type, initial_radius, new_length) + increase
+            possible_radius = np.where(type == TYPE_NODULE, (3. / (4. * pi)) ** (1. / 3.),        # g5
+                                       np.sqrt(volume_max / (new_length * pi)))
+            fits = possible_radius <= potential_radius
+            new_radius[thickening] = np.where(fits[thickening], possible_radius[thickening],
+                                              potential_radius[thickening])
+            net_increase = volume_of(type, new_radius, new_length) - volume_of(type, initial_radius, new_length)
+            thickening_cost = np.where(fits, for_thickening, 1. / 6. * net_increase * root_tissue_density
+                                       * struct_mass_C_content / yield_growth)
             own_share = thickening_cost * ((C_hexose_root * initial_struct_mass) / for_thickening)
             parents = np.asarray(ds.parents())
-            nodule = m & (type == TYPE_NODULE)
+            nodule = thickening & (type == TYPE_NODULE)
             parent_share = thickening_cost * ((C_hexose_root[parents] * initial_struct_mass[parents]) / for_thickening)
 
         # The costs, in the legacy's order: per element visited (children first), its elongation's suppliers (tip
@@ -1220,55 +1240,56 @@ class RootGrowth(StructuralComponent):
                                                               where=supplied, include=length > 0.)
         with np.errstate(divide="ignore", invalid="ignore"):
             elongation_events = elongation_cost[owner] * contribution / hexose_possibly_required_for_elongation[owner]
-        own = np.flatnonzero(m)
-        nod = np.flatnonzero(nodule)
-        event_owner = np.concatenate([owner, own, nod])
-        target = np.concatenate([supplier, own, parents[nod]])
-        value = np.concatenate([elongation_events, own_share[own], parent_share[nod]])
-        kind = np.concatenate([np.zeros(owner.size), np.ones(own.size), np.full(nod.size, 2.)])
+        thickened = np.flatnonzero(thickening)
+        nodules = np.flatnonzero(nodule)
+        event_owner = np.concatenate([owner, thickened, nodules])
+        target = np.concatenate([supplier, thickened, parents[nodules]])
+        value = np.concatenate([elongation_events, own_share[thickened], parent_share[nodules]])
+        kind = np.concatenate([np.zeros(owner.size), np.ones(thickened.size), np.full(nodules.size, 2.)])
         order = np.lexsort((np.arange(event_owner.size), kind, rank[event_owner]))
         target, value = target[order], value[order]
-        amount, rate, respiration = (np.array(hexose_consumption_by_growth_amount),
-                                     np.array(hexose_consumption_by_growth), np.array(resp_growth))
-        np.add.at(amount, target, value)
-        np.add.at(rate, target, value / ts)
-        np.add.at(respiration, target, value * (1 - y[target]) * 6.)
+        consumed, consumption_rate, respiration = (np.array(hexose_consumption_by_growth_amount),
+                                                   np.array(hexose_consumption_by_growth), np.array(resp_growth))
+        np.add.at(consumed, target, value)
+        np.add.at(consumption_rate, target, value / time_step)
+        np.add.at(respiration, target, value * (1 - yield_growth[target]) * 6.)
 
         # The new structure
-        volume_, mass, produced = np.array(volume), np.array(struct_mass), np.array(struct_mass_produced)
-        initial_mass = np.array(initial_struct_mass)
-        g = grows
-        volume_[g] = volume_of(type, radius_, length_)[g]
-        mass[g] = volume_[g] * rtd[g]
-        produced[g] = (volume_[g] - initial_volume[g]) * rtd[g]
-        shrinks = g & (mass < initial_struct_mass) & (produced > 0.)
-        initial_mass[shrinks] = mass[shrinks]
+        new_volume, new_mass = np.array(volume), np.array(struct_mass)
+        produced, new_initial_mass = np.array(struct_mass_produced), np.array(initial_struct_mass)
+        new_volume[grows] = volume_of(type, new_radius, new_length)[grows]
+        new_mass[grows] = new_volume[grows] * root_tissue_density[grows]
+        produced[grows] = (new_volume[grows] - initial_volume[grows]) * root_tissue_density[grows]
+        shrinks = grows & (new_mass < initial_struct_mass) & (produced > 0.)
+        new_initial_mass[shrinks] = new_mass[shrinks]
 
         # Emergence, elongation
-        type_, tte, ate = np.array(type), np.array(thermal_time_since_emergence), np.array(actual_time_since_emergence)
-        elongation, elongation_rate, ramif = np.array(actual_elongation), np.array(actual_elongation_rate), np.array(
-            dist_to_ramif)
-        longer = g & (length_ > initial_length)
+        new_type = np.array(type)
+        time_since_emergence = np.array(thermal_time_since_emergence)
+        actual_since_emergence = np.array(actual_time_since_emergence)
+        elongation, elongation_rate = np.array(actual_elongation), np.array(actual_elongation_rate)
+        new_dist_to_ramif = np.array(dist_to_ramif)
+        longer = grows & (new_length > initial_length)
         emerges = longer & np.isin(type, (TYPE_SEMINAL_BEFORE_EMERGENCE, TYPE_ADVENTITIOUS_BEFORE_EMERGENCE,
                                           TYPE_BEFORE_EMERGENCE))
-        type_[emerges] = TYPE_EMERGED
-        tte[emerges] = thermal_potential_time_since_emergence[emerges]
+        new_type[emerges] = TYPE_EMERGED
+        time_since_emergence[emerges] = thermal_potential_time_since_emergence[emerges]
         with np.errstate(divide="ignore", invalid="ignore"):
-            ate[emerges] = tte[emerges] / temperature_modification[emerges]
-            elongation[emerges] = length_[emerges] - initial_length[emerges]
-            elongation_rate[emerges] = elongation[emerges] / ate[emerges]
+            actual_since_emergence[emerges] = time_since_emergence[emerges] / temperature_modification[emerges]
+            elongation[emerges] = new_length[emerges] - initial_length[emerges]
+            elongation_rate[emerges] = elongation[emerges] / actual_since_emergence[emerges]
         emerged = longer & (type == TYPE_EMERGED)
-        elongation[emerged] = length_[emerged] - initial_length[emerged]
-        elongation_rate[emerged] = elongation[emerged] / ts
-        ramif[longer] += elongation[longer]
+        elongation[emerged] = new_length[emerged] - initial_length[emerged]
+        elongation_rate[emerged] = elongation[emerged] / time_step
+        new_dist_to_ramif[longer] += elongation[longer]
 
-        return (length_, "radius", radius_, "volume", volume_, "struct_mass", mass, "struct_mass_produced", produced,
-                "initial_struct_mass", initial_mass, "hexose_growth_demand", demand,
-                "hexose_consumption_by_growth_amount", amount, "hexose_consumption_by_growth", rate,
-                "resp_growth", respiration, "type", type_, "thermal_time_since_emergence", tte,
-                "actual_time_since_emergence", ate, "actual_elongation", elongation,
-                "actual_elongation_rate", elongation_rate, "dist_to_ramif", ramif,
-                "step_elongating", elongating.astype(int))
+        return (new_length, "radius", new_radius, "volume", new_volume, "struct_mass", new_mass,
+                "struct_mass_produced", produced, "initial_struct_mass", new_initial_mass,
+                "hexose_growth_demand", demand, "hexose_consumption_by_growth_amount", consumed,
+                "hexose_consumption_by_growth", consumption_rate, "resp_growth", respiration, "type", new_type,
+                "thermal_time_since_emergence", time_since_emergence, "actual_time_since_emergence",
+                actual_since_emergence, "actual_elongation", elongation, "actual_elongation_rate", elongation_rate,
+                "dist_to_ramif", new_dist_to_ramif, "step_elongating", elongating.astype(int))
 
     # ── Segmentation and primordia (RootGrowthModel.segmentation_and_primordia_formation) ─────────────────────
     #
@@ -1310,7 +1331,7 @@ class RootGrowth(StructuralComponent):
     def _segmentation_and_primordia_formation(self):
         ds = self.data_structure
         g = self.mtg
-        P = g.properties()
+        properties = g.properties()
         vids = np.asarray(ds.entity_ids("node"))
         visit = ds.order("post", convention="openalea")
         candidate = self._apex() & (np.asarray(ds.get("type")) == TYPE_EMERGED) & (
@@ -1332,96 +1353,97 @@ class RootGrowth(StructuralComponent):
             plant = plant_of[apex]
             if plant not in streams:
                 streams[plant] = np.random.RandomState()
-            context = dict(p={name: values[name][apex] for name in values}, plant=plant, next_index=next_index,
+            context = dict(parameters={name: values[name][apex] for name in values}, plant=plant, next_index=next_index,
                            stream=streams[plant])
-            new = self._segment_apex(g, P, apex, context)
+            new = self._segment_apex(g, properties, apex, context)
             for v in new:
                 if v not in self.__dict__["_step_new_apices"]:
                     self.__dict__["_step_new_apices"].append(v)
 
-    def _new_element(self, g, P, mother, edge, apex, values, context):
+    def _new_element(self, g, properties, mother, edge, apex, values, context):
         """A new element under *mother* ('<' in its Organ; '+' a new Organ of its Axis, a lateral or a nodule), its
         legacy id the plant's next one, and *values* on the MPG (its inputs kept for _inputs_of_new_elements)."""
-        s, labels = g.scales, g.labels
+        scales, labels = g.scales, g.labels
         label = labels.SubOrgan.RootApex if apex else labels.SubOrgan.RootSegment
         if edge == "<":
-            vid = g.add_child(mother, **PropsConfig(scale=s.SubOrgan, edge_type='<', label=label))
+            vid = g.add_child(mother, **PropsConfig(scale=scales.SubOrgan, edge_type='<', label=label))
         else:
-            organ = g.add_component(g.complex_at_scale(mother, s.Phytomer),
-                                    **PropsConfig(scale=s.Organ, edge_type='/', label=labels.Organ.RootInternode))
-            vid = g.add_component_with_topo(organ, mother, **PropsConfig(scale=s.SubOrgan, edge_type='+',
+            organ = g.add_component(g.complex_at_scale(mother, scales.Phytomer),
+                                    **PropsConfig(scale=scales.Organ, edge_type='/', label=labels.Organ.RootInternode))
+            vid = g.add_component_with_topo(organ, mother, **PropsConfig(scale=scales.SubOrgan, edge_type='+',
                                                                          label=label))
         plant = context["plant"]
-        P["vertex_index"][vid] = context["next_index"][plant]
-        P["parent_id"][vid] = P["vertex_index"][mother]
+        properties["vertex_index"][vid] = context["next_index"][plant]
+        properties["parent_id"][vid] = properties["vertex_index"][mother]
         context["next_index"][plant] += 1
         inputs = {}
         for name, value in values.items():
             if name in self.INPUTS_OF_NEW:
                 inputs[name] = value
             elif name not in self.ELEMENT_PARAMETERS:
-                P[name][vid] = value
+                properties[name][vid] = value
         self.__dict__["_new_inputs"][vid] = inputs
         return vid
 
-    def _value(self, P, name, vid):
+    def _value(self, properties, name, vid):
         """An element's value, its pending one for a new element's input."""
         pending = self.__dict__["_new_inputs"].get(vid)
         if pending is not None and name in pending:
             return pending[name]
-        return P[name][vid]
+        return properties[name][vid]
 
-    def _copy_child(self, g, P, mother, type_, root_order, angle_down, angle_roll, length, context):
+    def _copy_child(self, g, properties, mother, type_, root_order, angle_down, angle_roll, length, context):
         """RootGrowthModel.ADDING_A_CHILD('<', label Apex, identical_properties=True)."""
-        radius = P["radius"][mother]
-        values = {name: self._value(P, name, mother) for name in self.COPIED}
+        radius = properties["radius"][mother]
+        values = {name: self._value(properties, name, mother) for name in self.COPIED}
         values.update(type=type_, root_order=root_order, lateral_root_emergence_possibility=EMERGENCE_IMPOSSIBLE,
                       emergence_cost=0., angle_down=angle_down, angle_roll=angle_roll, length=length,
                       radius=radius, original_radius=radius, potential_length=length, initial_length=length,
                       initial_radius=radius, volume=0.)
-        return self._new_element(g, P, mother, "<", True, values, context)
+        return self._new_element(g, properties, mother, "<", True, values, context)
 
-    def _segment_apex(self, g, P, apex, context) -> list:
+    def _segment_apex(self, g, properties, apex, context) -> list:
         """RootGrowthModel.segmentation_and_primordium_formation: the elements it creates or returns."""
-        p, rng = context["p"], context["stream"]
-        ts = float(self.time_step)
-        T = P["temperature_modification"][apex]
-        legacy_id = int(P["vertex_index"][apex])
+        parameters, stream = context["parameters"], context["stream"]
+        time_step = float(self.time_step)
+        temperature_factor = properties["temperature_modification"][apex]
+        legacy_id = int(properties["vertex_index"][apex])
         if self.random:
-            rng.seed(int(p["random_choice"]) * legacy_id)
-            segment_angle_down = rng.normal(0, 5)
-            segment_angle_roll = rng.normal(0, 5)
-            rng.normal(0, 5)                    # the legacy's apex_angle_down and apex_angle_roll, unused
-            rng.normal(0, 5)
+            stream.seed(int(parameters["random_choice"]) * legacy_id)
+            segment_angle_down = stream.normal(0, 5)
+            segment_angle_roll = stream.normal(0, 5)
+            stream.normal(0, 5)                    # the legacy's apex_angle_down and apex_angle_roll, unused
+            stream.normal(0, 5)
         else:
             segment_angle_down = segment_angle_roll = 0
         new = []
-        root_order = P["root_order"][apex]
-        initial_length = P["length"][apex]
-        initial_dist_to_ramif = P["dist_to_ramif"][apex]
-        initial_elongation = P["actual_elongation"][apex]
-        initial_elongation_rate = P["actual_elongation_rate"][apex]
-        shared = {name: P[name][apex] for name in self.SHARED}
+        root_order = properties["root_order"][apex]
+        initial_length = properties["length"][apex]
+        initial_dist_to_ramif = properties["dist_to_ramif"][apex]
+        initial_elongation = properties["actual_elongation"][apex]
+        initial_elongation_rate = properties["actual_elongation_rate"][apex]
+        shared = {name: properties[name][apex] for name in self.SHARED}
         # (g1) the legacy overwrites its initial_struct_mass and initial_living_root_hairs_struct_mass with the apex's
         # values before growth: the mass fraction is relative to the mass before growth, and the living root hairs'
         # mass is shared from their mass before growth
-        initial_struct_mass = P["initial_struct_mass"][apex]
-        shared["living_root_hairs_struct_mass"] = P["initial_living_root_hairs_struct_mass"][apex]
-        segment_length = p["segment_length"]
+        initial_struct_mass = properties["initial_struct_mass"][apex]
+        shared["living_root_hairs_struct_mass"] = properties["initial_living_root_hairs_struct_mass"][apex]
+        segment_length = parameters["segment_length"]
 
         if initial_length <= segment_length:
-            new += self._primordium_formation(g, P, apex, initial_elongation_rate, context)
-            rate = P["actual_elongation_rate"][apex]
+            new += self._primordium_formation(g, properties, apex, initial_elongation_rate, context)
+            rate = properties["actual_elongation_rate"][apex]
             if rate > 0.:
-                age_non_elongated = P["actual_time_since_cells_formation"][apex] + ts
-                age_up = P["actual_elongation"][apex] / rate
+                age_non_elongated = properties["actual_time_since_cells_formation"][apex] + time_step
+                age_up = properties["actual_elongation"][apex] / rate
                 age_elongated = 0.5 * (0 + age_up)
-                length, length0 = P["length"][apex], P["initial_length"][apex]
-                P["actual_time_since_cells_formation"][apex] = (length0 * age_non_elongated
+                length, length0 = properties["length"][apex], properties["initial_length"][apex]
+                properties["actual_time_since_cells_formation"][apex] = (length0 * age_non_elongated
                                                                 + (length - length0) * age_elongated) / length
-                thermal_non_elongated = P["thermal_time_since_cells_formation"][apex] + ts * T
-                thermal_elongated = age_elongated * T
-                P["thermal_time_since_cells_formation"][apex] = (length0 * thermal_non_elongated
+                thermal_non_elongated = (properties["thermal_time_since_cells_formation"][apex]
+                                         + time_step * temperature_factor)
+                thermal_elongated = age_elongated * temperature_factor
+                properties["thermal_time_since_cells_formation"][apex] = (length0 * thermal_non_elongated
                                                                  + (length - length0) * thermal_elongated) / length
             return new
 
@@ -1433,142 +1455,147 @@ class RootGrowth(StructuralComponent):
         final_apex_length = initial_length - n_segments * segment_length
         element = apex
         for i in range(1, n_segments + 1):
-            P["length"][element] = segment_length
-            P["dist_to_ramif"][element] = initial_dist_to_ramif - (initial_length - segment_length * i)
-            self._share_mass(P, element, segment_length, initial_struct_mass, shared)
-            rate = P["actual_elongation_rate"][element]
+            properties["length"][element] = segment_length
+            properties["dist_to_ramif"][element] = initial_dist_to_ramif - (initial_length - segment_length * i)
+            self._share_mass(properties, element, segment_length, initial_struct_mass, shared)
+            rate = properties["actual_elongation_rate"][element]
             if i == 1:
-                age_non_elongated = P["actual_time_since_cells_formation"][element] + ts
-                age_up = P["actual_elongation"][element] / rate
+                age_non_elongated = properties["actual_time_since_cells_formation"][element] + time_step
+                age_up = properties["actual_elongation"][element] / rate
                 age_down = (final_apex_length + (n_segments - 1) * segment_length) / rate
                 age_elongated = 0.5 * (age_down + age_up)
-                length, length0 = P["length"][element], P["initial_length"][element]
-                P["actual_time_since_cells_formation"][element] = (length0 * age_non_elongated + (
+                length, length0 = properties["length"][element], properties["initial_length"][element]
+                properties["actual_time_since_cells_formation"][element] = (length0 * age_non_elongated + (
                     length - length0) * age_elongated) / length
-                thermal_non_elongated = P["thermal_time_since_cells_formation"][element] + ts * T
-                thermal_elongated = age_elongated * T
-                P["thermal_time_since_cells_formation"][element] = (length0 * thermal_non_elongated + (
+                thermal_non_elongated = (properties["thermal_time_since_cells_formation"][element]
+                                         + time_step * temperature_factor)
+                thermal_elongated = age_elongated * temperature_factor
+                properties["thermal_time_since_cells_formation"][element] = (length0 * thermal_non_elongated + (
                     length - length0) * thermal_elongated) / length
             else:
                 age_up = (final_apex_length + (n_segments - i) * segment_length) / rate
                 age_down = (final_apex_length + (n_segments - 1 - i) * segment_length) / rate
-                P["actual_time_since_cells_formation"][element] = 0.5 * (age_down + age_up)
-                P["thermal_time_since_cells_formation"][element] = P["actual_time_since_cells_formation"][element] * T
-            new += self._primordium_formation(g, P, element, initial_elongation_rate, context)
-            P["label"][element] = g.labels.SubOrgan.RootSegment
+                properties["actual_time_since_cells_formation"][element] = 0.5 * (age_down + age_up)
+                properties["thermal_time_since_cells_formation"][element] = (
+                    properties["actual_time_since_cells_formation"][element] * temperature_factor)
+            new += self._primordium_formation(g, properties, element, initial_elongation_rate, context)
+            properties["label"][element] = g.labels.SubOrgan.RootSegment
             if i < n_segments:
-                element = self._copy_child(g, P, element, P["type"][element], root_order, segment_angle_down,
-                                           segment_angle_roll, 0., context)
-                P["actual_elongation"][element] = segment_length * i
-            elif self.nodules and len(g.children(element)) < 2 and rng.random_sample() < p["nodule_formation_probability"]:
-                self._nodule_formation(g, P, element, context)
+                element = self._copy_child(g, properties, element, properties["type"][element], root_order,
+                                           segment_angle_down, segment_angle_roll, 0., context)
+                properties["actual_elongation"][element] = segment_length * i
+            elif (self.nodules and len(g.children(element)) < 2
+                  and stream.random_sample() < parameters["nodule_formation_probability"]):
+                self._nodule_formation(g, properties, element, context)
 
         new_length = initial_length - n_segments * segment_length
-        element = self._copy_child(g, P, element, P["type"][element], root_order, segment_angle_down,
+        element = self._copy_child(g, properties, element, properties["type"][element], root_order, segment_angle_down,
                                    segment_angle_roll, new_length, context)
-        P["potential_length"][element] = new_length
-        P["initial_length"][element] = new_length
-        P["dist_to_ramif"][element] = initial_dist_to_ramif
-        P["actual_elongation"][element] = initial_elongation
-        self._share_mass(P, element, new_length, initial_struct_mass, shared)
-        age_up = final_apex_length / P["actual_elongation_rate"][element]
-        P["actual_time_since_cells_formation"][element] = 0.5 * (0 + age_up)
-        P["thermal_time_since_cells_formation"][element] = P["actual_time_since_cells_formation"][element] * T
-        new += self._primordium_formation(g, P, element, initial_elongation_rate, context)
+        properties["potential_length"][element] = new_length
+        properties["initial_length"][element] = new_length
+        properties["dist_to_ramif"][element] = initial_dist_to_ramif
+        properties["actual_elongation"][element] = initial_elongation
+        self._share_mass(properties, element, new_length, initial_struct_mass, shared)
+        age_up = final_apex_length / properties["actual_elongation_rate"][element]
+        properties["actual_time_since_cells_formation"][element] = 0.5 * (0 + age_up)
+        properties["thermal_time_since_cells_formation"][element] = (
+            properties["actual_time_since_cells_formation"][element] * temperature_factor)
+        new += self._primordium_formation(g, properties, element, initial_elongation_rate, context)
         new.append(element)
         return new
 
-    def _share_mass(self, P, element, length, initial_struct_mass, shared):
+    def _share_mass(self, properties, element, length, initial_struct_mass, shared):
         """A segment's (or the new apex's) volume and mass, and its share of the apex's amounts by its mass."""
-        radius = P["radius"][element]
-        volume = pi * radius ** 2 * length if P["type"][element] != TYPE_NODULE else 4 / 3. * pi * radius ** 3
-        P["volume"][element] = volume
-        P["struct_mass"][element] = volume * self._value(P, "root_tissue_density", element)
-        fraction = P["struct_mass"][element] / initial_struct_mass
+        radius = properties["radius"][element]
+        volume = pi * radius ** 2 * length if properties["type"][element] != TYPE_NODULE else 4 / 3. * pi * radius ** 3
+        properties["volume"][element] = volume
+        properties["struct_mass"][element] = volume * self._value(properties, "root_tissue_density", element)
+        fraction = properties["struct_mass"][element] / initial_struct_mass
         for name, value in shared.items():
-            P[name][element] = value * fraction
+            properties[name][element] = value * fraction
 
-    def _primordium_formation(self, g, P, apex, elongation_rate, context) -> list:
+    def _primordium_formation(self, g, properties, apex, elongation_rate, context) -> list:
         """RootGrowthModel.primordium_formation: a lateral primordium on *apex*, when its distance to the last one,
         its radius and its order allow."""
-        p, rng = context["p"], context["stream"]
+        parameters, stream = context["parameters"], context["stream"]
         if len(g.children(apex)) >= 1:
             return [apex]
-        root_order = P["root_order"][apex]
-        if self.root_order_limitation and root_order + 1 > p["root_order_treshold"]:
+        root_order = properties["root_order"][apex]
+        if self.root_order_limitation and root_order + 1 > parameters["root_order_treshold"]:
             return [apex]
-        radius = P["radius"][apex]
-        Dmin = p["Dmin"]
-        mean = (radius - Dmin / 2.) * p["RMD"] + Dmin / 2.
+        radius = properties["radius"][apex]
+        Dmin = parameters["Dmin"]
+        mean = (radius - Dmin / 2.) * parameters["RMD"] + Dmin / 2.
         if self.random:
-            rng.seed(int(p["random_choice"]) * int(P["vertex_index"][apex]))
-            potential_radius = rng.normal((radius - Dmin / 2.) * p["RMD"] + Dmin / 2.,
-                                          ((radius - Dmin / 2.) * p["RMD"] + Dmin / 2.) * p["CVDD"])
-            apex_angle_roll = abs(rng.normal(120, 10))
-            primordium_angle_down = abs(rng.normal(45, 10)) if root_order == 1 else abs(rng.normal(70, 10))
-            primordium_angle_roll = abs(rng.normal(5, 5))
+            stream.seed(int(parameters["random_choice"]) * int(properties["vertex_index"][apex]))
+            potential_radius = stream.normal((radius - Dmin / 2.) * parameters["RMD"] + Dmin / 2.,
+                                          ((radius - Dmin / 2.) * parameters["RMD"] + Dmin / 2.) * parameters["CVDD"])
+            apex_angle_roll = abs(stream.normal(120, 10))
+            primordium_angle_down = abs(stream.normal(45, 10)) if root_order == 1 else abs(stream.normal(70, 10))
+            primordium_angle_roll = abs(stream.normal(5, 5))
         else:
-            potential_radius = (radius - Dmin / 2) * p["RMD"] + Dmin / 2.
+            potential_radius = (radius - Dmin / 2) * parameters["RMD"] + Dmin / 2.
             apex_angle_roll = 120
             primordium_angle_down = 45 if root_order == 1 else 70
             primordium_angle_roll = 5
         if potential_radius > radius:
             potential_radius = radius
-        dist_to_ramif = P["dist_to_ramif"][apex]
-        if not (dist_to_ramif > p["IPD"] and potential_radius >= Dmin and potential_radius <= radius):
+        dist_to_ramif = properties["dist_to_ramif"][apex]
+        if not (dist_to_ramif > parameters["IPD"] and potential_radius >= Dmin and potential_radius <= radius):
             return []
-        elongation_since_last_ramif = dist_to_ramif - p["IPD"]
-        P["angle_roll"][apex] = apex_angle_roll
-        if P["actual_elongation"][apex] > 0 and elongation_rate > 0.:
+        elongation_since_last_ramif = dist_to_ramif - parameters["IPD"]
+        properties["angle_roll"][apex] = apex_angle_roll
+        if properties["actual_elongation"][apex] > 0 and elongation_rate > 0.:
             time_since_formation = elongation_since_last_ramif / elongation_rate
         else:
             time_since_formation = 0.
-        values = self._nil_values(p, TYPE_BEFORE_EMERGENCE, root_order + 1, primordium_angle_down,
+        values = self._nil_values(parameters, TYPE_BEFORE_EMERGENCE, root_order + 1, primordium_angle_down,
                                   primordium_angle_roll, 0., potential_radius)
-        ramif = self._new_element(g, P, apex, "+", True, values, context)
+        ramif = self._new_element(g, properties, apex, "+", True, values, context)
         if self.simple_growth_duration:
-            P["growth_duration"][ramif] = p["GDs"] * (2. * potential_radius) ** 2 * p["main_roots_growth_extender"]
+            properties["growth_duration"][ramif] = (parameters["GDs"] * (2. * potential_radius) ** 2
+                                                    * parameters["main_roots_growth_extender"])
         else:
-            P["growth_duration"][ramif] = self._growth_duration(potential_radius, int(P["vertex_index"][ramif]),
-                                                                root_order + 1, p, rng)
-        P["actual_time_since_primordium_formation"][ramif] = time_since_formation
-        P["thermal_time_since_primordium_formation"][ramif] = (time_since_formation
-                                                               * P["temperature_modification"][apex])
-        P["dist_to_ramif"][apex] = elongation_since_last_ramif
+            properties["growth_duration"][ramif] = self._growth_duration(
+                potential_radius, int(properties["vertex_index"][ramif]), root_order + 1, parameters, stream)
+        properties["actual_time_since_primordium_formation"][ramif] = time_since_formation
+        properties["thermal_time_since_primordium_formation"][ramif] = (time_since_formation
+                                                               * properties["temperature_modification"][apex])
+        properties["dist_to_ramif"][apex] = elongation_since_last_ramif
         return [apex, ramif]
 
-    def _growth_duration(self, radius, legacy_id, root_order, p, rng):
+    def _growth_duration(self, radius, legacy_id, root_order, parameters, stream):
         """RootGrowthModel.calculate_growth_duration (not simple_growth_duration), with its if/if (g4)."""
-        rng.seed(int(p["random_choice"]) * legacy_id)
-        draw = rng.random_sample()
+        stream.seed(int(parameters["random_choice"]) * legacy_id)
+        draw = stream.random_sample()
         if root_order == 1:
-            return p["GD_highest"]
+            return parameters["GD_highest"]
         if self.GD_by_frequency:
-            if draw < p["GD_prob_low"]:
-                duration = rng.uniform(0., p["GD_low"])
-            if draw < p["GD_prob_medium"]:
-                duration = rng.uniform(p["GD_low"], p["GD_medium"])
+            if draw < parameters["GD_prob_low"]:
+                duration = stream.uniform(0., parameters["GD_low"])
+            if draw < parameters["GD_prob_medium"]:
+                duration = stream.uniform(parameters["GD_low"], parameters["GD_medium"])
             else:
-                duration = rng.uniform(p["GD_medium"], p["GD_high"])
+                duration = stream.uniform(parameters["GD_medium"], parameters["GD_high"])
             return duration
-        if draw < p["GD_prob_low"]:
-            return p["GD_low"]
-        if draw < p["GD_prob_medium"]:
-            return p["GD_medium"]
-        if radius > 2 * p["Dmin"] / 2.:
-            return p["GD_highest"]
+        if draw < parameters["GD_prob_low"]:
+            return parameters["GD_low"]
+        if draw < parameters["GD_prob_medium"]:
+            return parameters["GD_medium"]
+        if radius > 2 * parameters["Dmin"] / 2.:
+            return parameters["GD_highest"]
         raise ValueError(f"no growth duration for a radius of {radius} m (the legacy's calculate_growth_duration "
                          "leaves it unassigned, g4)")
 
-    def _nodule_formation(self, g, P, mother, context):
+    def _nodule_formation(self, g, properties, mother, context):
         """RootGrowthModel.nodule_formation: a nodule, a lateral segment without apex."""
-        p = context["p"]
-        values = self._nil_values(p, TYPE_NODULE, P["root_order"][mother] + 1, 90, 0, 0, 0)
-        radius = P["radius"][mother]
+        parameters = context["parameters"]
+        values = self._nil_values(parameters, TYPE_NODULE, properties["root_order"][mother] + 1, 90, 0, 0, 0)
+        radius = properties["radius"][mother]
         values.update(length=radius, radius=radius, original_radius=radius)
         values["volume"] = 4 / 3. * pi * radius ** 3
-        values["struct_mass"] = values["volume"] * values["root_tissue_density"] * p["struct_mass_C_content"]
-        return self._new_element(g, P, mother, "+", False, values, context)
+        values["struct_mass"] = values["volume"] * values["root_tissue_density"] * parameters["struct_mass_C_content"]
+        return self._new_element(g, properties, mother, "+", False, values, context)
 
     @segmentation
     def _soil_temperature(self, soil_temperature, root_tissue_density, C_hexose_root) -> outputs(2):
@@ -1630,16 +1657,17 @@ class RootGrowth(StructuralComponent):
         emergence along the element beyond the growing zone, death after their lifespan, their elongation limited
         by hexose, their mass and its cost."""
         ds = self.data_structure
-        ts = float(self.time_step)
-        gz = growing_zone_factor * radius
+        time_step = float(self.time_step)
+        growing_zone_length = growing_zone_factor * radius
         focus = (struct_mass > 0.) & np.isin(type, (TYPE_BASE, TYPE_EMERGED, TYPE_STOPPED, TYPE_JUST_STOPPED,
                                                     TYPE_DEAD, TYPE_JUST_DEAD, TYPE_NODULE))
         indptr, _ = ds.children()
         collar = ~self._apex() & (length == 0.) & (np.diff(np.asarray(indptr)) > 0)   # the legacy's collar_skip
-        m = focus & ~collar & ~np.isin(type, (TYPE_JUST_DEAD, TYPE_DEAD, TYPE_NODULE)) & (distance_from_tip > gz)
+        selected = (focus & ~collar & ~np.isin(type, (TYPE_JUST_DEAD, TYPE_DEAD, TYPE_NODULE))
+                    & (distance_from_tip > growing_zone_length))
         adjustment = np.maximum(1e-3, temperature_modification)
-        elapsed = ts * adjustment
-        m &= elapsed > 0.
+        elapsed = time_step * adjustment
+        selected &= elapsed > 0.
         out = {name: np.array(value, dtype=float) for name, value in dict(
             root_hair_length=root_hair_length, actual_length_with_hairs=actual_length_with_hairs,
             total_root_hairs_number=total_root_hairs_number, dead_root_hairs_number=dead_root_hairs_number,
@@ -1656,65 +1684,65 @@ class RootGrowth(StructuralComponent):
         total = np.array(total_root_hairs_number, dtype=float)
         with np.errstate(divide="ignore", invalid="ignore"):
             # All formed: they age
-            a = m & (all_root_hairs_formed != 0)
-            out["started"][a] += ts
-            out["thermal_started"][a] += elapsed[a]
-            out["stopped"][a] += ts
-            out["thermal_stopped"][a] += elapsed[a]
+            all_formed = selected & (all_root_hairs_formed != 0)
+            out["started"][all_formed] += time_step
+            out["thermal_started"][all_formed] += elapsed[all_formed]
+            out["stopped"][all_formed] += time_step
+            out["thermal_stopped"][all_formed] += elapsed[all_formed]
             # Forming: along the part of the element beyond the growing zone
-            b = m & (all_root_hairs_formed == 0) & (distance_from_tip - length < gz)
+            forming = selected & (all_root_hairs_formed == 0) & (distance_from_tip - length < growing_zone_length)
             initial_with_hairs = np.array(actual_length_with_hairs, dtype=float)
-            out["actual_length_with_hairs"][b] = (distance_from_tip - gz)[b]
+            out["actual_length_with_hairs"][forming] = (distance_from_tip - growing_zone_length)[forming]
             increase = out["actual_length_with_hairs"] - initial_with_hairs
-            total[b] = (root_hairs_density * radius * out["actual_length_with_hairs"])[b]
-            rate_actual = (distance_from_tip - former_distance_from_tip) / ts
+            total[forming] = (root_hairs_density * radius * out["actual_length_with_hairs"])[forming]
+            rate_actual = (distance_from_tip - former_distance_from_tip) / time_step
             rate_thermal = (distance_from_tip - former_distance_from_tip) / elapsed
-            first = b & (rate_actual > 0.) & (initial_with_hairs <= 0.)
-            out["started"][first] += (ts - increase / rate_actual)[first]
+            first = forming & (rate_actual > 0.) & (initial_with_hairs <= 0.)
+            out["started"][first] += (time_step - increase / rate_actual)[first]
             out["thermal_started"][first] += (elapsed - increase / rate_thermal)[first]
-            later = b & ~first
-            out["started"][later] += ts
+            later = forming & ~first
+            out["started"][later] += time_step
             out["thermal_started"][later] += elapsed[later]
             # All formed now: along the whole element
-            c = m & (all_root_hairs_formed == 0) & ~(distance_from_tip - length < gz)
-            out["started"][c] += ts
-            out["thermal_started"][c] += elapsed[c]
-            out["actual_length_with_hairs"][c] = length[c]
+            completing = selected & (all_root_hairs_formed == 0) & ~(distance_from_tip - length < growing_zone_length)
+            out["started"][completing] += time_step
+            out["thermal_started"][completing] += elapsed[completing]
+            out["actual_length_with_hairs"][completing] = length[completing]
             increase = out["actual_length_with_hairs"] - initial_with_hairs
-            total[c] = (root_hairs_density * radius * length)[c]
-            moving = c & (rate_actual > 0.)
-            out["stopped"][moving] += (ts - increase / rate_actual)[moving]
+            total[completing] = (root_hairs_density * radius * length)[completing]
+            moving = completing & (rate_actual > 0.)
+            out["stopped"][moving] += (time_step - increase / rate_actual)[moving]
             out["thermal_stopped"][moving] += (elapsed - increase / rate_thermal)[moving]
-            still = c & ~moving
-            out["stopped"][still] += ts
+            still = completing & ~moving
+            out["stopped"][still] += time_step
             out["thermal_stopped"][still] += elapsed[still]
-            out["all_root_hairs_formed"][c] = 1.
-            out["total_root_hairs_number"][b | c] = total[b | c]
+            out["all_root_hairs_formed"][completing] = 1.
+            out["total_root_hairs_number"][forming | completing] = total[forming | completing]
             # Death after their lifespan
             dead = np.where(out["thermal_started"] <= root_hairs_lifespan, 0.,
                             np.where(out["thermal_stopped"] > root_hairs_lifespan, total,
                                      total * ((out["thermal_started"] - root_hairs_lifespan)
                                               / (out["thermal_started"] - out["thermal_stopped"]))))
-            out["dead_root_hairs_number"][m] = dead[m]
+            out["dead_root_hairs_number"][selected] = dead[selected]
             living = total - out["dead_root_hairs_number"]
-            out["living_root_hairs_number"][m] = living[m]
+            out["living_root_hairs_number"][selected] = living[selected]
             # Elongation, limited by hexose
-            short = m & (root_hair_length < root_hair_max_length)
+            short = selected & (root_hair_length < root_hair_max_length)
             new_length = (root_hair_length + root_hairs_elongation_rate * root_hair_radius * C_hexose_root
                           * (out["actual_length_with_hairs"] / length) / (Km_elongation + C_hexose_root) * elapsed)
             out["root_hair_length"][short] = np.where(new_length > root_hair_max_length, root_hair_max_length,
                                                       new_length)[short]
             volume = (root_hair_radius ** 2 * pi) * out["root_hair_length"] * total
-            out["root_hairs_volume"][m] = volume[m]
+            out["root_hairs_volume"][selected] = volume[selected]
             mass = volume * root_tissue_density
-            out["root_hairs_struct_mass"][m] = mass[m]
-            out["living_root_hairs_struct_mass"][m] = np.where(total > 0., mass * living / total, 0.)[m]
+            out["root_hairs_struct_mass"][selected] = mass[selected]
+            out["living_root_hairs_struct_mass"][selected] = np.where(total > 0., mass * living / total, 0.)[selected]
             produced = mass - initial_mass
-            out["root_hairs_struct_mass_produced"][m] = produced[m]
+            out["root_hairs_struct_mass_produced"][selected] = produced[selected]
             cost = produced * struct_mass_C_content / yield_growth / 6.
-            out["amount"][m] += cost[m]
-            out["rate"][m] += (cost / ts)[m]
-            out["resp"][m] += (cost * 6. * (1 - yield_growth))[m]
+            out["amount"][selected] += cost[selected]
+            out["rate"][selected] += (cost / time_step)[selected]
+            out["resp"][selected] += (cost * 6. * (1 - yield_growth))[selected]
         return (out["root_hair_length"], "actual_length_with_hairs", out["actual_length_with_hairs"],
                 "total_root_hairs_number", out["total_root_hairs_number"],
                 "dead_root_hairs_number", out["dead_root_hairs_number"],

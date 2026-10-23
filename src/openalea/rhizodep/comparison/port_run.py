@@ -90,8 +90,8 @@ def snapshot(scene) -> Snapshot:
         props[name] = {legacy_of[v]: x.item() for v, x in zip(ids, values)}
     parent, edge_type = {}, {}
     for v in ids.tolist():
-        p = g.parent(v)
-        parent[legacy_of[v]] = legacy_of.get(p) if p is not None else None
+        mpg_parent = g.parent(v)
+        parent[legacy_of[v]] = legacy_of.get(mpg_parent) if mpg_parent is not None else None
         edge_type[legacy_of[v]] = g.edge_type(v) if parent[legacy_of[v]] is not None else ""
     plant = {"total_living_struct_mass": float(np.asarray(ds.get("total_living_struct_mass"))[0])}
     return Snapshot(vertices=sorted(legacy_of.values()), parent=parent, edge_type=edge_type, props=props,
@@ -156,68 +156,72 @@ class FromLegacy(StructuralComponent):
 
     @classmethod
     def initiate_plant(cls, g, plant, parameters):
-        snap = parameters["legacy_snapshot"]
-        p = RootGrowth.plant_parameters(parameters)
-        s, labels = g.scales, g.labels
-        children = {v: [] for v in snap.vertices}
+        record = parameters["legacy_snapshot"]
+        # The scenario's growth parameters are read, as RootGrowth.initiate_plant reads them: the inputs a scenario
+        # sets (root_tissue_density) are then the initiator's, the values themselves coming from the record
+        RootGrowth.plant_parameters(parameters)
+        scales, labels = g.scales, g.labels
+        children = {legacy_id: [] for legacy_id in record.vertices}
         roots = []
-        for v in snap.vertices:
-            (children[snap.parent[v]].append(v) if snap.parent[v] is not None else roots.append(v))
+        for legacy_id in record.vertices:
+            parent = record.parent[legacy_id]
+            (children[parent] if parent is not None else roots).append(legacy_id)
         names = [f for f, spec in RootGrowth.__dataclass_fields__.items()
                  if spec.metadata.get("variable_type") in ("state_variable", "input")
-                 and spec.metadata.get("scale") == s.SubOrgan]
+                 and spec.metadata.get("scale") == scales.SubOrgan]
 
         def under(complex_, scales):
             for scale, label in scales:
                 complex_ = g.add_component(complex_, **PropsConfig(scale=scale, edge_type='/', label=label))
             return complex_
 
-        axis_scales = ((s.Axis, labels.Axis.Root), (s.GrowthUnit, labels.GrowthUnit.Root),
-                       (s.Phytomer, labels.Phytomer.Root), (s.Organ, labels.Organ.RootInternode))
+        axis_scales = ((scales.Axis, labels.Axis.Root), (scales.GrowthUnit, labels.GrowthUnit.Root),
+                       (scales.Phytomer, labels.Phytomer.Root), (scales.Organ, labels.Organ.RootInternode))
         vids = {}
         stack = list(reversed(roots))
         while stack:
-            v = stack.pop()
-            label = labels.SubOrgan.RootApex if snap.props["label"][v] == LABEL_APEX else labels.SubOrgan.RootSegment
-            parent = snap.parent[v]
+            legacy_id = stack.pop()
+            apex = record.props["label"][legacy_id] == LABEL_APEX
+            label = labels.SubOrgan.RootApex if apex else labels.SubOrgan.RootSegment
+            parent = record.parent[legacy_id]
             if parent is None:
-                vid = g.add_component(under(plant, axis_scales), **PropsConfig(scale=s.SubOrgan, edge_type='/',
+                vid = g.add_component(under(plant, axis_scales), **PropsConfig(scale=scales.SubOrgan, edge_type='/',
                                                                                 label=label))
-            elif snap.edge_type[v] == "<":
-                vid = g.add_child(vids[parent], **PropsConfig(scale=s.SubOrgan, edge_type='<', label=label))
+            elif record.edge_type[legacy_id] == "<":
+                vid = g.add_child(vids[parent], **PropsConfig(scale=scales.SubOrgan, edge_type='<', label=label))
             else:
-                if snap.props["root_order"][v] == 1:
+                if record.props["root_order"][legacy_id] == 1:
                     organ = under(plant, axis_scales)
                 else:
-                    organ = under(g.complex_at_scale(vids[parent], s.Phytomer), axis_scales[-1:])
-                vid = g.add_component_with_topo(organ, vids[parent], **PropsConfig(scale=s.SubOrgan, edge_type='+',
+                    organ = under(g.complex_at_scale(vids[parent], scales.Phytomer), axis_scales[-1:])
+                vid = g.add_component_with_topo(organ, vids[parent], **PropsConfig(scale=scales.SubOrgan, edge_type='+',
                                                                                    label=label))
-            vids[v] = vid
+            vids[legacy_id] = vid
             for name in names:
-                values = snap.props.get(name, {})
-                if v in values:
-                    value = values[v]
+                values = record.props.get(name, {})
+                if legacy_id in values:
+                    value = values[legacy_id]
                     g.property(name)[vid] = CODES[name][value] if name in CODES else value
-            g.property("vertex_index")[vid] = v
-            stack.extend(reversed(children[v]))
-        g.property("total_living_struct_mass")[plant] = snap.plant["total_living_struct_mass"]
+            g.property("vertex_index")[vid] = legacy_id
+            stack.extend(reversed(children[legacy_id]))
+        g.property("total_living_struct_mass")[plant] = record.plant["total_living_struct_mass"]
         # The legacy's state outside its MTG: numpy's global generator, its elements elongated in actual growth
         stream = np.random.RandomState()
-        if "random_state" in snap.meta:
-            stream.set_state(snap.meta["random_state"])
+        if "random_state" in record.meta:
+            stream.set_state(record.meta["random_state"])
         g.property("legacy_random")[plant] = stream
-        for v in snap.meta.get("step_elongating_elements", []):
-            g.property("step_elongating")[vids[v]] = 1
+        for legacy_id in record.meta.get("step_elongating_elements", []):
+            g.property("step_elongating")[vids[legacy_id]] = 1
 
 
 class TransplantModel(GrowthOnly):
     initiators = (FromLegacy,)
 
 
-def transplant_scene(snap, parameters=None, time_step=3600):
-    """A Scene of the port whose plant is the legacy record *snap* (parameters: the legacy run's)."""
+def transplant_scene(record, parameters=None, time_step=3600):
+    """A Scene of the port whose plant is the legacy record *record* (parameters: the legacy run's)."""
     table = pd.DataFrame([dict(plant="p0", model=TransplantModel, x=0., y=0., z=0., rotation=0.,
-                               scenario={"parameters": dict(parameters or {}, legacy_snapshot=snap)})])
+                               scenario={"parameters": dict(parameters or {}, legacy_snapshot=record)})])
     table.attrs.update(xrange=1., yrange=1.)
     return Scene(table, time_step=time_step)
 
