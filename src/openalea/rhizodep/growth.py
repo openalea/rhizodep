@@ -36,7 +36,7 @@ from openalea.metafspm.coupling.component import StructuralComponent, input_vari
 from openalea.metafspm.data_structure.configs import PropsConfig, ScalesConfig
 from math import floor, sqrt
 
-from openalea.metafspm.solve.decorator import actual, potential, segmentation
+from openalea.metafspm.solve.decorator import actual, postsegmentation, potential, segmentation
 
 SubOrgan = ScalesConfig.SubOrgan
 NII, NIE, DESCRIPTOR, MASSIC = "NonInertialIntensive", "NonInertialExtensive", "descriptor", "massic_concentration"
@@ -1303,11 +1303,11 @@ class RootGrowth(StructuralComponent):
         ds = self.data_structure
         g = self.mtg
         P = g.properties()
-        apex_label = g.labels.SubOrgan.RootApex
         vids = np.asarray(ds.entity_ids("node"))
-        visit = vids[ds.order("post", convention="openalea")].tolist()
-        apices = [v for v in visit if P["label"].get(v) == apex_label and P["type"][v] == TYPE_EMERGED
-                  and P["step_elongating"][v] == 1]
+        visit = ds.order("post", convention="openalea")
+        candidate = self._apex() & (np.asarray(ds.get("type")) == TYPE_EMERGED) & (
+            np.asarray(ds.get("step_elongating")) == 1)
+        apices = vids[visit[candidate[visit]]].tolist()
         self.__dict__["_step_new_apices"] = []
         self.__dict__["_new_inputs"] = {}
         if not apices:
@@ -1345,6 +1345,7 @@ class RootGrowth(StructuralComponent):
                                                                          label=label))
         plant = context["plant"]
         P["vertex_index"][vid] = context["next_index"][plant]
+        P["parent_id"][vid] = P["vertex_index"][mother]
         context["next_index"][plant] += 1
         inputs = {}
         for name, value in values.items():
@@ -1577,3 +1578,159 @@ class RootGrowth(StructuralComponent):
                 C[i] = inputs.get("C_hexose_root", C[i])
         self.__dict__["_new_inputs"] = {}
         return soil, "root_tissue_density", density, "C_hexose_root", C
+
+    # ── After growth (RootGrowthModel.post_growth_updating, standalone: the repartition is metafspm's) ─────────
+
+    @postsegmentation
+    def _distance_from_tip(self, length, type, distance_from_tip, vertex_index) -> outputs(2):
+        """Distance from the tip and the axis' apex, along the successors from the tips (a fold up the tree); the
+        former distance kept."""
+        apex = self._apex()
+        stop = apex | (type == TYPE_NODULE)
+        columns = np.column_stack([np.array(length, dtype=float), np.asarray(vertex_index, dtype=float)])
+
+        def update(level, out):
+            nodes = level.nodes
+            successors = level.children(np.ones(out.shape[0]), op="sum", edge="<")
+            son_distance = level.children(out[:, 0], op="sum", edge="<")
+            son_apex = level.children(out[:, 1], op="sum", edge="<")
+            tip = stop[nodes] | (successors == 0)
+            rows = np.empty((nodes.size, 2))
+            rows[:, 0] = np.where(tip, length[nodes], son_distance + length[nodes])
+            rows[:, 1] = np.where(tip, vertex_index[nodes], son_apex)
+            return rows
+
+        folded = self.data_structure.fold(update, columns, direction="up")
+        return (folded[:, 0], "axis_apex_id", folded[:, 1].astype(np.int64),
+                "former_distance_from_tip", np.array(distance_from_tip))
+
+    @postsegmentation
+    def _root_hair_length(self, type, length, radius, struct_mass, distance_from_tip,
+                          former_distance_from_tip, temperature_modification, C_hexose_root, root_tissue_density,
+                          root_hair_length, actual_length_with_hairs, total_root_hairs_number, dead_root_hairs_number,
+                          living_root_hairs_number, all_root_hairs_formed, root_hairs_struct_mass,
+                          living_root_hairs_struct_mass, root_hairs_struct_mass_produced, root_hairs_volume,
+                          actual_time_since_root_hairs_emergence_started,
+                          thermal_time_since_root_hairs_emergence_started,
+                          actual_time_since_root_hairs_emergence_stopped,
+                          thermal_time_since_root_hairs_emergence_stopped, hexose_consumption_by_growth_amount,
+                          hexose_consumption_by_growth, resp_growth, growing_zone_factor, root_hairs_density,
+                          root_hair_max_length, root_hairs_elongation_rate, root_hair_radius, root_hairs_lifespan,
+                          Km_elongation, struct_mass_C_content, yield_growth) -> outputs(16):
+        """RootGrowthModel.root_hairs_dynamics_opt on the elements of the legacy's focus (a structural mass, a
+        Segment or Apex label, an emerged, stopped, dead or nodule type; not a collar's zero-length support):
+        emergence along the element beyond the growing zone, death after their lifespan, their elongation limited
+        by hexose, their mass and its cost."""
+        ds = self.data_structure
+        ts = float(self.time_step)
+        gz = growing_zone_factor * radius
+        focus = (struct_mass > 0.) & np.isin(type, (TYPE_BASE, TYPE_EMERGED, TYPE_STOPPED, TYPE_JUST_STOPPED,
+                                                    TYPE_DEAD, TYPE_JUST_DEAD, TYPE_NODULE))
+        indptr, _ = ds.children()
+        collar = ~self._apex() & (length == 0.) & (np.diff(np.asarray(indptr)) > 0)   # the legacy's collar_skip
+        m = focus & ~collar & ~np.isin(type, (TYPE_JUST_DEAD, TYPE_DEAD, TYPE_NODULE)) & (distance_from_tip > gz)
+        adjustment = np.maximum(1e-3, temperature_modification)
+        elapsed = ts * adjustment
+        m &= elapsed > 0.
+        out = {name: np.array(value, dtype=float) for name, value in dict(
+            root_hair_length=root_hair_length, actual_length_with_hairs=actual_length_with_hairs,
+            total_root_hairs_number=total_root_hairs_number, dead_root_hairs_number=dead_root_hairs_number,
+            living_root_hairs_number=living_root_hairs_number, all_root_hairs_formed=all_root_hairs_formed,
+            root_hairs_struct_mass=root_hairs_struct_mass, living_root_hairs_struct_mass=living_root_hairs_struct_mass,
+            root_hairs_struct_mass_produced=root_hairs_struct_mass_produced, root_hairs_volume=root_hairs_volume,
+            started=actual_time_since_root_hairs_emergence_started,
+            thermal_started=thermal_time_since_root_hairs_emergence_started,
+            stopped=actual_time_since_root_hairs_emergence_stopped,
+            thermal_stopped=thermal_time_since_root_hairs_emergence_stopped,
+            amount=hexose_consumption_by_growth_amount, rate=hexose_consumption_by_growth,
+            resp=resp_growth).items()}
+        initial_mass = np.array(root_hairs_struct_mass, dtype=float)
+        total = np.array(total_root_hairs_number, dtype=float)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            # All formed: they age
+            a = m & (all_root_hairs_formed != 0)
+            out["started"][a] += ts
+            out["thermal_started"][a] += elapsed[a]
+            out["stopped"][a] += ts
+            out["thermal_stopped"][a] += elapsed[a]
+            # Forming: along the part of the element beyond the growing zone
+            b = m & (all_root_hairs_formed == 0) & (distance_from_tip - length < gz)
+            initial_with_hairs = np.array(actual_length_with_hairs, dtype=float)
+            out["actual_length_with_hairs"][b] = (distance_from_tip - gz)[b]
+            increase = out["actual_length_with_hairs"] - initial_with_hairs
+            total[b] = (root_hairs_density * radius * out["actual_length_with_hairs"])[b]
+            rate_actual = (distance_from_tip - former_distance_from_tip) / ts
+            rate_thermal = (distance_from_tip - former_distance_from_tip) / elapsed
+            first = b & (rate_actual > 0.) & (initial_with_hairs <= 0.)
+            out["started"][first] += (ts - increase / rate_actual)[first]
+            out["thermal_started"][first] += (elapsed - increase / rate_thermal)[first]
+            later = b & ~first
+            out["started"][later] += ts
+            out["thermal_started"][later] += elapsed[later]
+            # All formed now: along the whole element
+            c = m & (all_root_hairs_formed == 0) & ~(distance_from_tip - length < gz)
+            out["started"][c] += ts
+            out["thermal_started"][c] += elapsed[c]
+            out["actual_length_with_hairs"][c] = length[c]
+            increase = out["actual_length_with_hairs"] - initial_with_hairs
+            total[c] = (root_hairs_density * radius * length)[c]
+            moving = c & (rate_actual > 0.)
+            out["stopped"][moving] += (ts - increase / rate_actual)[moving]
+            out["thermal_stopped"][moving] += (elapsed - increase / rate_thermal)[moving]
+            still = c & ~moving
+            out["stopped"][still] += ts
+            out["thermal_stopped"][still] += elapsed[still]
+            out["all_root_hairs_formed"][c] = 1.
+            out["total_root_hairs_number"][b | c] = total[b | c]
+            # Death after their lifespan
+            dead = np.where(out["thermal_started"] <= root_hairs_lifespan, 0.,
+                            np.where(out["thermal_stopped"] > root_hairs_lifespan, total,
+                                     total * ((out["thermal_started"] - root_hairs_lifespan)
+                                              / (out["thermal_started"] - out["thermal_stopped"]))))
+            out["dead_root_hairs_number"][m] = dead[m]
+            living = total - out["dead_root_hairs_number"]
+            out["living_root_hairs_number"][m] = living[m]
+            # Elongation, limited by hexose
+            short = m & (root_hair_length < root_hair_max_length)
+            new_length = (root_hair_length + root_hairs_elongation_rate * root_hair_radius * C_hexose_root
+                          * (out["actual_length_with_hairs"] / length) / (Km_elongation + C_hexose_root) * elapsed)
+            out["root_hair_length"][short] = np.where(new_length > root_hair_max_length, root_hair_max_length,
+                                                      new_length)[short]
+            volume = (root_hair_radius ** 2 * pi) * out["root_hair_length"] * total
+            out["root_hairs_volume"][m] = volume[m]
+            mass = volume * root_tissue_density
+            out["root_hairs_struct_mass"][m] = mass[m]
+            out["living_root_hairs_struct_mass"][m] = np.where(total > 0., mass * living / total, 0.)[m]
+            produced = mass - initial_mass
+            out["root_hairs_struct_mass_produced"][m] = produced[m]
+            cost = produced * struct_mass_C_content / yield_growth / 6.
+            out["amount"][m] += cost[m]
+            out["rate"][m] += (cost / ts)[m]
+            out["resp"][m] += (cost * 6. * (1 - yield_growth))[m]
+        return (out["root_hair_length"], "actual_length_with_hairs", out["actual_length_with_hairs"],
+                "total_root_hairs_number", out["total_root_hairs_number"],
+                "dead_root_hairs_number", out["dead_root_hairs_number"],
+                "living_root_hairs_number", out["living_root_hairs_number"],
+                "all_root_hairs_formed", out["all_root_hairs_formed"],
+                "root_hairs_struct_mass", out["root_hairs_struct_mass"],
+                "living_root_hairs_struct_mass", out["living_root_hairs_struct_mass"],
+                "root_hairs_struct_mass_produced", out["root_hairs_struct_mass_produced"],
+                "root_hairs_volume", out["root_hairs_volume"],
+                "actual_time_since_root_hairs_emergence_started", out["started"],
+                "thermal_time_since_root_hairs_emergence_started", out["thermal_started"],
+                "actual_time_since_root_hairs_emergence_stopped", out["stopped"],
+                "thermal_time_since_root_hairs_emergence_stopped", out["thermal_stopped"],
+                "hexose_consumption_by_growth_amount", out["amount"], "hexose_consumption_by_growth", out["rate"],
+                "resp_growth", out["resp"])
+
+    @postsegmentation
+    def _living_struct_mass(self, struct_mass, living_root_hairs_struct_mass, vertex_index) -> outputs(1):
+        """The living structural mass, and the plant's total, summed in the legacy's order (its vertices' ids)."""
+        ds = self.data_structure
+        living = struct_mass + living_root_hairs_struct_mass
+        owner = np.asarray(ds.owner("Plant"))
+        totals = np.zeros(np.asarray(ds.entity_ids("Plant")).size)
+        for plant in np.unique(owner):
+            nodes = np.flatnonzero(owner == plant)
+            totals[plant] = np.sum(living[nodes[np.argsort(vertex_index[nodes], kind="stable")]])
+        return living, "total_living_struct_mass", totals

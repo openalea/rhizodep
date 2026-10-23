@@ -15,8 +15,7 @@ The suptitle says whether the two records are identical. Run from rhizodep/examp
     python compare_root_systems.py [set ...] [--days D] [--C C_hexose_root] [--color property]
     python compare_root_systems.py --list             the sets
 
-Figures in ./outputs/root_systems/. Until the port's growth steps exist (P1-P5), the middle and right panels say so
-and only the legacy is drawn.
+Figures in ./outputs/root_systems/. The properties the port does not have (port_run.LEFT_OUT) are not compared.
 """
 import argparse
 import os
@@ -29,10 +28,7 @@ from openalea.rhizodep.comparison.parameter_sets import variants
 from openalea.rhizodep.comparison.drawing import draw_root_system, positions, totals
 from openalea.rhizodep.comparison.differences import differences
 
-try:
-    from openalea.rhizodep.comparison.port_run import port_run
-except ImportError:
-    port_run = None
+from openalea.rhizodep.comparison.port_run import LEFT_OUT, port_run
 
 OUTPUTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "outputs", "root_systems")
 
@@ -61,7 +57,7 @@ def side_by_side(name, legacy, port, color):
     else:
         draw_root_system(axes[1], last_port, color_by=color, vmin=vmin, vmax=vmax)
         axes[1].set_title(f"port: {len(last_port.vertices)} vertices")
-        diff = differences(last_legacy, last_port)
+        diff = differences(last_legacy, last_port, names=[n for n in last_legacy.props if n not in LEFT_OUT])
         xyz_legacy, xyz_port = positions(last_legacy), positions(last_port)
         for snapshot, xyz, colour in ((last_legacy, xyz_legacy, "black"), (last_port, xyz_port, "tab:blue")):
             lines = draw_root_system(axes[2], snapshot, color_by="length", xyz=xyz, linewidth_by_radius=False)
@@ -128,13 +124,8 @@ def main():
         parameters = sets[name]
         legacy = legacy_run(parameters, n_steps=n_steps, C_hexose_root=args.C, time_step=time_step,
                             record_every=args.every)
-        port = None
-        if port_run is not None:
-            try:
-                port = port_run(parameters, n_steps=n_steps, C_hexose_root=args.C, time_step=time_step,
-                                record_every=args.every)
-            except NotImplementedError:              # the growth steps not ported yet (P2-P5)
-                port = None
+        port = port_run(parameters, n_steps=n_steps, C_hexose_root=args.C, time_step=time_step,
+                        record_every=args.every)
         stem = name.replace("/", "_").replace("=", "-")
         side_by_side(name, legacy, port, args.color).savefig(os.path.join(OUTPUTS, f"{stem}.png"), dpi=130)
         over_time(name, legacy, port, time_step).savefig(os.path.join(OUTPUTS, f"{stem}_totals.png"), dpi=110)

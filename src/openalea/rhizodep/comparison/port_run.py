@@ -105,9 +105,41 @@ def port_run(parameters=None, n_steps=24, C_hexose_root=1e-3, time_step=3600, re
     if record:
         run.steps.append(snapshot(scene))
         run.recorded_steps.append(0)
-    if n_steps:
-        raise NotImplementedError("the port's growth steps come with P2-P5 (devplan §8)")
+    for step in range(n_steps):
+        write_C_hexose_root(scene, step, C_hexose_root)
+        scene.run()
+        if record and ((step + 1) % record_every == 0 or step == n_steps - 1):
+            run.steps.append(snapshot(scene))
+            run.recorded_steps.append(step + 1)
     return run
+
+
+class _LegacyIds:
+    """What a C_hexose_root function of legacy_run reads of the MTG: its vertices' (legacy) ids."""
+
+    def __init__(self, ids):
+        self.ids = ids
+
+    def vertices(self, scale=1):
+        return list(self.ids)
+
+
+def write_C_hexose_root(scene, step, C_hexose_root):
+    """The given hexose on every element, as legacy_run writes it (a number, or a function of the step and the
+    legacy's ids)."""
+    ds = scene.populations[0].data_structure
+    index = np.asarray(ds.get("vertex_index")).astype(int)
+    if callable(C_hexose_root):
+        values = C_hexose_root(step, _LegacyIds(index.tolist()))
+        if isinstance(values, dict):
+            current = np.array(ds.get("C_hexose_root"), dtype=float)
+            for i, legacy_id in enumerate(index.tolist()):
+                if legacy_id in values:
+                    current[i] = values[legacy_id]
+            ds.set("C_hexose_root", current)
+            return
+        C_hexose_root = values
+    ds.set("C_hexose_root", np.full(index.size, float(C_hexose_root)))
 
 
 # ── State transplant: the port on a legacy state (devplan §14) ──────────────────────────────────────────────────
@@ -190,7 +222,7 @@ def transplant_scene(snap, parameters=None, time_step=3600):
     return Scene(table, time_step=time_step)
 
 
-STAGE_INDEX = {"potential": 1, "actual": 4, "segmentation": 5, "postsegmentation": 6}
+STAGE_INDEX = {"potential": 1, "actual": 4, "segmentation": 5, "postsegmentation": 6, "post_growth": 6}
 
 
 def run_stage(scene, stage):
