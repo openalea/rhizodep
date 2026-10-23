@@ -96,11 +96,21 @@ def write_C_hexose_root(model, step, C_hexose_root):
             C[vid] = values
 
 
-def legacy_model(parameters=None, time_step=3600):
-    """The legacy RootGrowthModel on its own seedling, with *parameters* as its scenario."""
+def legacy_model(parameters=None, time_step=3600, before_post_growth=False):
+    """The legacy RootGrowthModel on its own seedling, with *parameters* as its scenario. *before_post_growth*: the
+    model as its __init__ leaves it but for the post_growth_updating that ends it (the initial structure and values,
+    before the root hairs, living masses and distances that post-growth derives)."""
     reset_choregrapher()
     Choregrapher().add_simulation_time_step(time_step)
-    model = RootGrowthModel(time_step_in_seconds=time_step, **(parameters or {}))
+    if before_post_growth:
+        post_growth = RootGrowthModel.post_growth_updating
+        RootGrowthModel.post_growth_updating = lambda self, *args, **kwargs: None
+        try:
+            model = RootGrowthModel(time_step_in_seconds=time_step, **(parameters or {}))
+        finally:
+            RootGrowthModel.post_growth_updating = post_growth
+    else:
+        model = RootGrowthModel(time_step_in_seconds=time_step, **(parameters or {}))
     model.pullable_inputs = {}
     model.props.setdefault("root_hairs_volume", {})
     return model

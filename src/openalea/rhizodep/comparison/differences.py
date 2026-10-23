@@ -4,7 +4,11 @@ comparison's measure of exactness.
 
     diff = differences(legacy, port, names=None, rtol=0., atol=0.)
     diff.topology          the vertices only one side has, and those whose parent or edge type differ
-    diff.values[name]      the vertices where *name* differs (beyond rtol / atol), present on both sides
+    diff.values[name]      the vertices where *name* differs (beyond rtol / atol), present on both sides; a vertex
+                           the first record has no value for is not compared (the legacy leaves some properties
+                           unset on some elements, e.g. potential_length on the base, where the port has its
+                           default), one the second record lacks differs
+    diff.plant             the plant-scale states that differ
     diff.identical         nothing differs
 """
 from dataclasses import dataclass, field
@@ -20,6 +24,7 @@ class Differences:
     edge_type: list = field(default_factory=list)
     values: dict = field(default_factory=dict)
     missing: list = field(default_factory=list)
+    plant: list = field(default_factory=list)
 
     @property
     def topology(self):
@@ -34,7 +39,7 @@ class Differences:
 
     @property
     def identical(self):
-        return not (self.topology or self.missing or any(self.values.values()))
+        return not (self.topology or self.missing or self.plant or any(self.values.values()))
 
     def summary(self, limit=8):
         if self.identical:
@@ -44,6 +49,8 @@ class Differences:
             parts.append(f"{len(self.only_first)} vertices only in the first, {len(self.only_second)} only in the second")
         if self.parent or self.edge_type:
             parts.append(f"{len(self.parent)} parents, {len(self.edge_type)} edge types differ")
+        if self.plant:
+            parts.append(f"plant: {', '.join(self.plant)}")
         if self.missing:
             parts.append(f"missing on one side: {', '.join(self.missing[:limit])}")
         differing = {name: vids for name, vids in self.values.items() if vids}
@@ -79,5 +86,6 @@ def differences(first, second, names=None, rtol=0., atol=0.):
             diff.missing.append(name)
             continue
         pa, pb = first.props[name], second.props[name]
-        diff.values[name] = [v for v in common if not _equal(pa.get(v), pb.get(v), rtol, atol)]
+        diff.values[name] = [v for v in common if v in pa and (v not in pb or not _equal(pa[v], pb[v], rtol, atol))]
+    diff.plant = [name for name in first.plant if not _equal(first.plant[name], second.plant.get(name), rtol, atol)]
     return diff

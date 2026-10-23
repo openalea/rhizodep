@@ -130,8 +130,11 @@ def main():
                             record_every=args.every)
         port = None
         if port_run is not None:
-            port = port_run(parameters, n_steps=n_steps, C_hexose_root=args.C, time_step=time_step,
-                            record_every=args.every)
+            try:
+                port = port_run(parameters, n_steps=n_steps, C_hexose_root=args.C, time_step=time_step,
+                                record_every=args.every)
+            except NotImplementedError:              # the growth steps not ported yet (P2-P5)
+                port = None
         stem = name.replace("/", "_").replace("=", "-")
         side_by_side(name, legacy, port, args.color).savefig(os.path.join(OUTPUTS, f"{stem}.png"), dpi=130)
         over_time(name, legacy, port, time_step).savefig(os.path.join(OUTPUTS, f"{stem}_totals.png"), dpi=110)
