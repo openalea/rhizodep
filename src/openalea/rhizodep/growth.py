@@ -34,6 +34,7 @@ import pandas as pd
 
 from openalea.metafspm.coupling.component import StructuralComponent, input_variable, parameter, state_variable
 from openalea.metafspm.data_structure.configs import PropsConfig, ScalesConfig
+from openalea.metafspm.solve.decorator import potential
 
 SubOrgan = ScalesConfig.SubOrgan
 NII, NIE, DESCRIPTOR, MASSIC = "NonInertialIntensive", "NonInertialExtensive", "descriptor", "massic_concentration"
@@ -63,6 +64,11 @@ def doc(unit, description, unit_comment="", min_value="", max_value="", value_co
     """The documentation entries of a declaration."""
     return dict(unit=unit, unit_comment=unit_comment, description=description, min_value=min_value,
                 max_value=max_value, value_comment=value_comment, references=references, DOI=DOI)
+
+
+def outputs(k):
+    """The return annotation of a step with k outputs besides its own: (values, name, values, ...)."""
+    return tuple[(np.ndarray,) + (str, np.ndarray) * k]
 
 
 def temperature_modification(soil_temperature, process_at_T_ref, T_ref, A, B, C):
@@ -599,6 +605,11 @@ class RootGrowth(StructuralComponent):
            "thermal_time_since_emergence", "thermal_time_since_cells_formation",
            "thermal_potential_time_since_emergence", "thermal_time_since_growth_stopped", "thermal_time_since_death")
 
+    # The legacy's pipe model compares child.edge_type, a method of the MTG's nodes, with '<' and '+': never equal, so
+    # it sees no child's section and the theoretical radius falls back on the initial one (g16: no radial growth).
+    # True reproduces it, until the reviewed fixes (devplan §6)
+    legacy_pipe_model = True
+
     # The legacy's per-element copies of these parameters are the parameters themselves (never changed per element)
     ELEMENT_PARAMETERS = ("root_hair_radius", "root_hairs_lifespan")
 
@@ -770,3 +781,338 @@ class RootGrowth(StructuralComponent):
                 g.property(name)[vid] = value
         g.property("total_living_struct_mass")[plant] = float(sum(e["values"]["living_struct_mass"]
                                                                   for e in elements))
+
+    # ── Shared helpers of the steps ─────────────────────────────────────────────────────────────────────────────
+
+    def _apex(self) -> np.ndarray:
+        """The RootApex nodes (bool per node), read from the MPG's labels once per topology."""
+        ds = self.data_structure
+        key = (ds.topology_version, ds.n_nodes())
+        cache = self.__dict__.get("_apex_cache")
+        if cache is None or cache[0] != key:
+            g = ds._mtg
+            label, apex = g.property("label"), g.labels.SubOrgan.RootApex
+            cache = (key, np.array([label.get(int(v)) == apex for v in ds.entity_ids("node")], dtype=bool))
+            self.__dict__["_apex_cache"] = cache
+        return cache[1]
+
+    @staticmethod
+    def _node_of(vertex_index) -> np.ndarray:
+        """Node index of each legacy vertex id (-1 where there is none)."""
+        vertex_index = np.asarray(vertex_index, dtype=np.int64)
+        lookup = np.full(int(vertex_index.max(initial=0)) + 2, -1, dtype=np.int64)
+        lookup[vertex_index] = np.arange(vertex_index.size)
+        return lookup
+
+    def _elongated_length(self, initial_length, radius, C, time, EL, Km_elongation, C_hexose_min_for_elongation):
+        """RootGrowthModel.elongated_length: C-free with simple_growth_duration, else Michaelis-Menten above the
+        threshold (no elongation below)."""
+        if self.simple_growth_duration:
+            elongation = EL * 2. * radius * time
+        else:
+            with np.errstate(divide="ignore", invalid="ignore"):
+                elongation = np.where(C > C_hexose_min_for_elongation,
+                                      EL * 2. * radius * C / (Km_elongation + C) * time, 0.)
+        return initial_length + elongation
+
+    # ── Potential growth (RootGrowthModel.potential_growth; devplan §14) ───────────────────────────────────────
+
+    @potential
+    def _initial_length(self, length, radius, struct_mass, living_root_hairs_struct_mass, soil_temperature,
+                        parent_id, vertex_index, process_at_T_ref, T_ref, A, B, C) -> outputs(18):
+        """The step's start: the fluxes zeroed, the initial and potential values copied, the temperature factor; a
+        zero-length apex takes its parent's soil temperature (the collar's children, the base's: parent_id)."""
+        ds = self.data_structure
+        parents = np.asarray(ds.parents())
+        base = self._node_of(vertex_index)[1]
+        parent = np.where(np.asarray(parent_id) == 1, base, parents)
+        soil = np.array(soil_temperature, dtype=float)
+        zero_apex = self._apex() & (length == 0.)
+        soil[zero_apex] = soil_temperature[parent[zero_apex]]
+        factor = temperature_modification(soil, process_at_T_ref, T_ref, A, B, C)
+        zero = np.zeros(length.shape)
+        return (np.array(length), "initial_radius", np.array(radius), "potential_radius", np.array(radius),
+                "theoretical_radius", np.array(radius), "potential_length", np.array(length),
+                "initial_struct_mass", np.array(struct_mass),
+                "initial_living_root_hairs_struct_mass", np.array(living_root_hairs_struct_mass),
+                "soil_temperature", soil, "temperature_modification", factor,
+                "hexose_consumption_by_growth_amount", zero, "hexose_consumption_by_growth", zero,
+                "hexose_possibly_required_for_elongation", zero, "resp_growth", zero, "struct_mass_produced", zero,
+                "root_hairs_struct_mass_produced", zero, "hexose_growth_demand", zero, "actual_elongation", zero,
+                "actual_elongation_rate", zero, "hexose_consumption_by_fungus", zero)
+
+    @potential
+    def _potential_length(self, type, length, radius, initial_length, initial_radius, potential_length, volume,
+                          struct_mass, C_hexose_root, temperature_modification, emergence_delay_in_thermal_time,
+                          growth_duration, life_duration, thermal_time_since_primordium_formation,
+                          actual_time_since_primordium_formation, thermal_potential_time_since_emergence,
+                          thermal_time_since_emergence, actual_time_since_emergence,
+                          thermal_time_since_growth_stopped, actual_time_since_growth_stopped,
+                          thermal_time_since_cells_formation, actual_time_since_cells_formation,
+                          thermal_time_since_death, actual_time_since_death, growing_zone_C_hexose_root,
+                          hexose_possibly_required_for_elongation, struct_mass_contributing_to_elongation,
+                          lateral_root_emergence_possibility, lateral_primordium_index, vertex_index,
+                          emergence_delay, growing_zone_factor, EL, Km_elongation,
+                          C_hexose_min_for_elongation) -> outputs(17):
+        """
+        The apices (RootGrowthModel.potential_apex_development): the state machine as masked branches, the supply
+        zone of those elongating (calculating_supply_for_elongation, by path windows), their potential length; a
+        lateral primordium emerging marks its bearer (the last one visited when several emerge on one bearer).
+        """
+        ds = self.data_structure
+        ts = float(self.time_step)
+        apex = self._apex()
+        T = temperature_modification
+        tsT = ts * T
+        type_ = np.array(type)
+        ttpf, atpf = np.array(thermal_time_since_primordium_formation), np.array(actual_time_since_primordium_formation)
+        tpte = np.array(thermal_potential_time_since_emergence)
+        tte, ate = np.array(thermal_time_since_emergence), np.array(actual_time_since_emergence)
+        ttgs, atgs = np.array(thermal_time_since_growth_stopped), np.array(actual_time_since_growth_stopped)
+        ttcf, atcf = np.array(thermal_time_since_cells_formation), np.array(actual_time_since_cells_formation)
+        ttd, atd = np.array(thermal_time_since_death), np.array(actual_time_since_death)
+        potential = np.array(potential_length)
+
+        # The branches, on the state at the step's start
+        primordium = apex & ((type == TYPE_SEMINAL_BEFORE_EMERGENCE) | (type == TYPE_ADVENTITIOUS_BEFORE_EMERGENCE))
+        lateral = apex & (type == TYPE_BEFORE_EMERGENCE)
+        other = apex & ~primordium & ~lateral
+        primordium_emerges = primordium & (thermal_time_since_primordium_formation + tsT
+                                           >= emergence_delay_in_thermal_time)
+        lateral_emerges = lateral & (thermal_time_since_primordium_formation + tsT > emergence_delay)
+        growing = other & (thermal_time_since_emergence + tsT < growth_duration)
+        living = other & ~growing & (thermal_time_since_growth_stopped + tsT < life_duration)
+        stopped = living & ((type == TYPE_STOPPED) | (type == TYPE_JUST_STOPPED))
+        just_stopped = living & ~stopped
+        dying = other & ~growing & ~living
+        dead = dying & ((type == TYPE_DEAD) | (type == TYPE_JUST_DEAD))
+        just_dead = dying & ~dead
+
+        # The supply zone of the apices that elongate (order-free: it reads what this loop does not change)
+        supplied = primordium_emerges | lateral_emerges | growing | just_stopped
+        budget = growing_zone_factor * radius * radius ** 2 * pi
+        include = length > 0.
+        hexose = ds.path_window(budget, volume, C_hexose_root * struct_mass, where=supplied, include=include)
+        mass = ds.path_window(budget, volume, struct_mass, where=supplied, include=include)
+        required, contributing = np.array(hexose_possibly_required_for_elongation), np.array(
+            struct_mass_contributing_to_elongation)
+        zone_C = np.array(growing_zone_C_hexose_root)
+        required[supplied], contributing[supplied] = hexose[supplied], mass[supplied]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            zone_C[supplied] = np.where(mass[supplied] > 0., hexose[supplied] / mass[supplied], 0.)
+        elongation = (EL, Km_elongation, C_hexose_min_for_elongation)
+
+        # Seminal and nodal primordia
+        m = primordium_emerges
+        tpte[m] = thermal_time_since_primordium_formation[m] + tsT[m] - emergence_delay_in_thermal_time[m]
+        tpte[m] = np.where(tpte[m] > tsT[m], tsT[m], tpte[m])
+        potential[m] = self._elongated_length(initial_length[m], initial_radius[m], zone_C[m], tpte[m],
+                                              *(x[m] for x in elongation))
+        if self.simple_growth_duration:
+            type_[m] = TYPE_EMERGED
+        atpf[primordium] += ts
+        ttpf[primordium] += tsT[primordium]
+
+        # Lateral primordia
+        atpf[lateral] += ts
+        ttpf[lateral] += tsT[lateral]
+        m = lateral_emerges
+        tpte[m] = ttpf[m] - emergence_delay[m]
+        tpte[m] = np.where(tpte[m] > tsT[m], tsT[m], tpte[m])
+        potential[m] = self._elongated_length(initial_length[m], initial_radius[m], zone_C[m], tpte[m],
+                                              *(x[m] for x in elongation))
+        possibility, primordium_index = np.array(lateral_root_emergence_possibility), np.array(
+            lateral_primordium_index)
+        if self.simple_growth_duration:
+            type_[m] = TYPE_EMERGED
+        else:
+            visit = ds.order("post", convention="openalea")
+            emerging = visit[m[visit]]
+            bearers = np.asarray(ds.parents())[emerging]
+            last = bearers.size - 1 - np.unique(bearers[::-1], return_index=True)[1]   # last visited per bearer
+            possibility[bearers[last]] = EMERGENCE_POSSIBLE
+            primordium_index[bearers[last]] = vertex_index[emerging[last]]
+
+        # Growing apices
+        m = growing
+        atpf[m] += ts; ttpf[m] += tsT[m]; ate[m] += ts; tte[m] += tsT[m]
+        potential[m] = self._elongated_length(length[m], radius[m], zone_C[m], tsT[m], *(x[m] for x in elongation))
+
+        # Stopped
+        m = stopped
+        atgs[m] += ts; ttgs[m] += tsT[m]
+        type_[m] = TYPE_STOPPED
+        atpf[m] += ts; ttpf[m] += tsT[m]; ate[m] += ts; tte[m] += tsT[m]; atcf[m] += ts; ttcf[m] += tsT[m]
+
+        # Just stopped: the elongation until the growth duration
+        m = just_stopped
+        type_[m] = TYPE_JUST_STOPPED
+        ttgs[m] = thermal_time_since_emergence[m] + tsT[m] - growth_duration[m]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            atgs[m] = ttgs[m] / T[m]
+        remaining = tsT[m] - ttgs[m]
+        potential[m] = np.where(remaining < 0., initial_length[m],
+                                self._elongated_length(length[m], radius[m], zone_C[m], remaining,
+                                                       *(x[m] for x in elongation)))
+        atpf[m] += ts; ate[m] += ts; ttpf[m] += tsT[m]; tte[m] += tsT[m]; atcf[m] += ts; ttcf[m] += tsT[m]
+
+        # Dead
+        m = dead
+        type_[m] = TYPE_DEAD
+        for actual in (atpf, ate, atcf, atgs, atd):
+            actual[m] += ts
+        for thermal in (ttpf, tte, ttcf, ttgs, ttd):
+            thermal[m] += tsT[m]
+
+        # Just dead
+        m = just_dead
+        type_[m] = TYPE_JUST_DEAD
+        ttd[m] = thermal_time_since_growth_stopped[m] + tsT[m] - life_duration[m]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            atd[m] = ttd[m] / T[m]
+        for actual in (atpf, ate, atcf, atgs):
+            actual[m] += ts
+        for thermal in (ttpf, tte, ttcf, ttgs):
+            thermal[m] += tsT[m]
+
+        return (potential, "type", type_, "thermal_potential_time_since_emergence", tpte,
+                "thermal_time_since_primordium_formation", ttpf, "actual_time_since_primordium_formation", atpf,
+                "thermal_time_since_emergence", tte, "actual_time_since_emergence", ate,
+                "thermal_time_since_growth_stopped", ttgs, "actual_time_since_growth_stopped", atgs,
+                "thermal_time_since_cells_formation", ttcf, "actual_time_since_cells_formation", atcf,
+                "thermal_time_since_death", ttd, "actual_time_since_death", atd,
+                "growing_zone_C_hexose_root", zone_C, "hexose_possibly_required_for_elongation", required,
+                "struct_mass_contributing_to_elongation", contributing,
+                "lateral_root_emergence_possibility", possibility, "lateral_primordium_index", primordium_index)
+
+    @potential
+    def _theoretical_radius(self, type, length, radius, initial_radius, theoretical_radius, potential_radius,
+                            C_hexose_root, struct_mass, temperature_modification, axis_apex_id, vertex_index,
+                            thermal_time_since_primordium_formation, actual_time_since_primordium_formation,
+                            thermal_time_since_emergence, actual_time_since_emergence,
+                            thermal_time_since_cells_formation, actual_time_since_cells_formation,
+                            thermal_time_since_growth_stopped, actual_time_since_growth_stopped,
+                            thermal_time_since_death, actual_time_since_death, SGC, C_hexose_min_for_thickening,
+                            relative_root_thickening_rate_max, Km_thickening, relative_nodule_thickening_rate_max,
+                            Km_nodule_thickening, nodule_max_radius) -> outputs(14):
+        """
+        The segments (RootGrowthModel.potential_segment_development): the type of their axis apex (stopped), death
+        when all their children are dead, the pipe model, children first (a fold up the tree), then the potential
+        radius limited by hexose, the supports' radius, the times; the nodules' thickening.
+        """
+        ds = self.data_structure
+        ts = float(self.time_step)
+        T = temperature_modification
+        tsT = ts * T
+        apex = self._apex()
+        parents = np.asarray(ds.parents())
+        segment = ~apex
+        nodule = segment & (type == TYPE_NODULE)
+        normal = segment & ~nodule
+        theoretical, potential_r, radius_ = np.array(theoretical_radius), np.array(potential_radius), np.array(radius)
+        available = C_hexose_root * struct_mass
+
+        # Nodules
+        m = nodule
+        if m.any():
+            p = parents[m]
+            available[m] = C_hexose_root[p] * struct_mass[p] + C_hexose_root[m] * struct_mass[m]
+            regulating = available[m] / (struct_mass[p] + struct_mass[m])
+            rate = relative_nodule_thickening_rate_max[m] * regulating / (Km_nodule_thickening[m] + regulating)
+            rate = rate * T[m]
+            theoretical[m] = radius[m] * (1 + rate * ts)
+            potential_r[m] = np.where(theoretical[m] > nodule_max_radius[m], nodule_max_radius[m], theoretical[m])
+
+        # The axis apex's stop
+        type_ = np.array(type)
+        node_of = self._node_of(vertex_index)
+        apex_node = node_of[np.clip(np.asarray(axis_apex_id, dtype=np.int64), 0, node_of.size - 1)]
+        apex_type = np.where(apex_node >= 0, type[np.maximum(apex_node, 0)], -1)
+        type_[normal & (apex_type == TYPE_JUST_STOPPED)] = TYPE_JUST_STOPPED
+        type_[normal & (apex_type == TYPE_STOPPED)] = TYPE_STOPPED
+
+        # Children first: death, time since death, the pipe model
+        radial, simple = self.radial_growth, self.simple_growth_duration
+        columns = np.column_stack([theoretical, type_.astype(float), np.array(actual_time_since_death, dtype=float)])
+
+        def update(level, out):
+            nodes = level.nodes
+            rows = out[nodes].copy()
+            todo = normal[nodes]
+            if not todo.any():
+                return rows
+            child_type = out[:, 1]
+            dead_child = (child_type == TYPE_JUST_DEAD) | (child_type == TYPE_DEAD)
+            n_children = level.children(np.ones(out.shape[0]), op="sum")
+            n_dead = level.children(dead_child.astype(float), op="sum")
+            first_death = level.children(out[:, 2], op="min", where=dead_child, fill=0.)
+            own = rows[:, 1]
+            all_dead = todo & (n_dead == n_children)
+            new_type = np.where(all_dead, np.where((own == TYPE_JUST_DEAD) | (own == TYPE_DEAD), TYPE_DEAD,
+                                                   TYPE_JUST_DEAD), own)
+            if radial:
+                if self.legacy_pipe_model:
+                    son = laterals = np.zeros(nodes.size)
+                else:
+                    section = out[:, 0] ** 2 * pi
+                    son = level.children(section, op="sum", edge="<")
+                    laterals = level.children(section, op="sum", edge="+",
+                                              where=(length > 0.) & (child_type != TYPE_NODULE))
+                th = np.sqrt(son / pi + SGC[nodes] * laterals / pi)
+                th = np.where((th - initial_radius[nodes]) <= 0.001 * initial_radius[nodes], initial_radius[nodes], th)
+                rows[todo, 0] = th[todo]
+            rows[todo, 1] = new_type[todo]
+            death = rows[:, 2]
+            death = np.where(todo & (new_type == TYPE_JUST_DEAD), np.where(n_children > 0, first_death, 0.), death)
+            death = np.where(todo & (new_type == TYPE_DEAD), death + ts, death)
+            rows[:, 2] = death
+            return rows
+
+        folded = ds.fold(update, columns, direction="up")
+        theoretical[normal] = folded[normal, 0]
+        type_[normal] = folded[normal, 1].astype(type_.dtype)
+        atd, ttd = np.array(actual_time_since_death), np.array(thermal_time_since_death)
+        atd[normal] = folded[normal, 2]
+
+        # The potential radius
+        if radial:
+            if simple:
+                potential_r[normal] = theoretical[normal]
+            else:
+                m = normal & (length > 0.) & (theoretical > radius) & (C_hexose_root > C_hexose_min_for_thickening)
+                rate = relative_root_thickening_rate_max[m] * C_hexose_root[m] / (Km_thickening[m] + C_hexose_root[m])
+                rate = rate * T[m]
+                largest = (1 + rate * ts) * initial_radius[m]
+                potential_r[m] = np.where(theoretical[m] > largest, largest, theoretical[m])
+            support = normal & ((type_ == TYPE_SEMINAL_SUPPORT) | (type_ == TYPE_ADVENTITIOUS_SUPPORT))
+            radius_[support] = potential_r[support]
+
+        # The times
+        atpf, ttpf = np.array(actual_time_since_primordium_formation), np.array(thermal_time_since_primordium_formation)
+        ate, tte = np.array(actual_time_since_emergence), np.array(thermal_time_since_emergence)
+        atcf, ttcf = np.array(actual_time_since_cells_formation), np.array(thermal_time_since_cells_formation)
+        atgs, ttgs = np.array(actual_time_since_growth_stopped), np.array(thermal_time_since_growth_stopped)
+        m = normal
+        for actual in (atpf, ate, atcf):
+            actual[m] += ts
+        for thermal in (ttpf, tte, ttcf):
+            thermal[m] += tsT[m]
+        m = normal & (type_ == TYPE_JUST_STOPPED)
+        source = actual_time_since_growth_stopped[np.maximum(apex_node, 0)]
+        atgs[m] = source[m]
+        ttgs[m] = source[m] * T[m]
+        m = normal & ((type_ == TYPE_STOPPED) | (type_ == TYPE_JUST_DEAD) | (type_ == TYPE_DEAD))
+        atgs[m] += ts
+        ttgs[m] += tsT[m]
+        m = normal & (type_ == TYPE_JUST_DEAD)
+        ttd[m] = atd[m] * T[m]
+        m = normal & (type_ == TYPE_DEAD)
+        ttd[m] += tsT[m]
+
+        return (theoretical, "type", type_, "potential_radius", potential_r, "radius", radius_,
+                "hexose_available_for_thickening", available,
+                "actual_time_since_primordium_formation", atpf, "thermal_time_since_primordium_formation", ttpf,
+                "actual_time_since_emergence", ate, "thermal_time_since_emergence", tte,
+                "actual_time_since_cells_formation", atcf, "thermal_time_since_cells_formation", ttcf,
+                "actual_time_since_growth_stopped", atgs, "thermal_time_since_growth_stopped", ttgs,
+                "actual_time_since_death", atd, "thermal_time_since_death", ttd)

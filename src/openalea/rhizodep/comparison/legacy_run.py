@@ -130,3 +130,40 @@ def legacy_run(parameters=None, n_steps=24, C_hexose_root=1e-3, time_step=3600, 
             run.steps.append(snapshot(model))
             run.recorded_steps.append(step + 1)
     return run
+
+
+STAGES = ("potential", "actual", "segmentation", "post_growth")
+
+
+def _run_stage(model, stage):
+    if stage == "potential":
+        model.potential_growth()
+    elif stage == "actual":
+        model.actual_growth_and_corresponding_respiration()
+    elif stage == "segmentation":
+        model.segmentation_and_primordia_formation()
+    else:
+        model.post_growth_updating(modules_to_update=[], soil_boundaries_to_infer=[])
+
+
+def legacy_stages(parameters=None, n_steps=240, C_hexose_root=1e-3, time_step=3600, every=12, first=0):
+    """
+    The legacy run step by step as its Choregrapher and __call__ do (potential_growth, actual growth, segmentation,
+    post_growth_updating), recorded around each stage every *every* steps from step *first*: a list of
+    (step, {"start": Snapshot, "potential": ..., "actual": ..., "segmentation": ..., "post_growth": ...}), each
+    record after that stage. The stages of the port are compared on these (devplan §14, state transplant).
+    """
+    model = legacy_model(parameters, time_step)
+    out = []
+    for step in range(n_steps):
+        write_C_hexose_root(model, step, C_hexose_root)
+        model.pull_available_inputs()
+        recorded = step >= first and (step - first) % every == 0
+        records = {"start": snapshot(model)} if recorded else None
+        for stage in STAGES:
+            _run_stage(model, stage)
+            if recorded:
+                records[stage] = snapshot(model)
+        if recorded:
+            out.append((step, records))
+    return out
