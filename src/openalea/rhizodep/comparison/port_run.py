@@ -69,9 +69,15 @@ class PortRun:
     recorded_steps: list = field(default_factory=list)
 
 
-def port_scene(parameters=None, time_step=3600, component=RootGrowth):
+def reference_parameters(parameters, component, legacy=True):
+    """*parameters* with the component's LEGACY preset first (the behaviours of the reference it is compared with:
+    the legacy's for RootGrowth; devplan §25), unless *legacy* is False."""
+    return dict(getattr(component, "LEGACY", {}) if legacy else {}, **(parameters or {}))
+
+
+def port_scene(parameters=None, time_step=3600, component=RootGrowth, legacy=True):
     table = pd.DataFrame([dict(plant="p0", model=growth_model(component), x=0., y=0., z=0., rotation=0.,
-                               scenario={"parameters": dict(parameters or {})})])
+                               scenario={"parameters": reference_parameters(parameters, component, legacy)})])
     table.attrs.update(xrange=1., yrange=1.)
     return Scene(table, time_step=time_step)
 
@@ -79,7 +85,7 @@ def port_scene(parameters=None, time_step=3600, component=RootGrowth):
 def snapshot(scene) -> Snapshot:
     """The port's state in the legacy's form (one plant)."""
     population = scene.populations[0]
-    ds, growth = population.data_structure, population.instance.growth
+    ds, growth = population.data_structure, population.instance.components[0]     # the growth component
     g = ds.mtg
     ids = np.asarray(ds.entity_ids("node"))
     index = np.asarray(ds.get("vertex_index")).astype(int)
@@ -110,11 +116,12 @@ def snapshot(scene) -> Snapshot:
 
 
 def port_run(parameters=None, n_steps=24, C_hexose_root=1e-3, time_step=3600, record_every=1, record=True,
-             component=RootGrowth, given=None, setup=None):
+             component=RootGrowth, given=None, setup=None, legacy=True):
     """*n_steps* steps of the port; the records every *record_every* steps (and the last), as legacy_run's.
     *given*: other inputs written before each step ({name: a number, or a function as C_hexose_root}); *setup*: a
-    function of the scene, called once it is built."""
-    scene = port_scene(parameters, time_step, component)
+    function of the scene, called once it is built; *legacy*: the component's LEGACY preset (the reference's
+    behaviours), else its defaults (the reviewed fixes)."""
+    scene = port_scene(parameters, time_step, component, legacy)
     if setup is not None:
         setup(scene)
     run = PortRun(scene=scene)
@@ -243,11 +250,12 @@ class FromLegacy(StructuralComponent):
             transplanted(g, plant, record, vids)
 
 
-def transplant_scene(record, parameters=None, time_step=3600, component=RootGrowth):
+def transplant_scene(record, parameters=None, time_step=3600, component=RootGrowth, legacy=True):
     """A Scene of the port (*component*) whose plant is the legacy record *record* (parameters: the legacy run's)."""
     table = pd.DataFrame([dict(plant="p0", model=growth_model(component, transplant=True), x=0., y=0., z=0.,
                                rotation=0.,
-                               scenario={"parameters": dict(parameters or {}, legacy_snapshot=record)})])
+                               scenario={"parameters": dict(reference_parameters(parameters, component, legacy),
+                                                            legacy_snapshot=record)})])
     table.attrs.update(xrange=1., yrange=1.)
     return Scene(table, time_step=time_step)
 

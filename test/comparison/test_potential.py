@@ -5,7 +5,6 @@ import pytest
 from openalea.rhizodep.comparison.legacy_run import legacy_stages
 from openalea.rhizodep.comparison.parameter_sets import GB_SOIL_1_0, variants
 from openalea.rhizodep.comparison.port_run import run_stage, snapshot, transplant_scene
-from openalea.rhizodep.growth import RootGrowth
 
 from stages import COVERAGE, assert_stage_exact, varying_C
 
@@ -26,13 +25,12 @@ def test_hexose_limited(parameters, C):
     assert_stage_exact(parameters, "potential", every=12, C_hexose_root=C)
 
 
-def test_pipe_model_without_the_legacy_bug(monkeypatch):
+def test_pipe_model_without_the_legacy_bug():
     """legacy_pipe_model=False (g16 fixed): a segment's theoretical radius from its successor's and its laterals'
     sections, sqrt(r_son² + SGC Σ r_lateral²)."""
     parameters = dict(COVERAGE, nodules=False)
     (_, records), = legacy_stages(parameters, n_steps=118, every=117, first=117)
-    monkeypatch.setattr(RootGrowth, "legacy_pipe_model", False)
-    scene = transplant_scene(records["start"], parameters)
+    scene = transplant_scene(records["start"], dict(parameters, legacy_pipe_model=False))
     run_stage(scene, "potential")
     port = snapshot(scene)
     start = records["start"]

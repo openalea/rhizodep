@@ -55,6 +55,15 @@ pip install -e metafspm
 pip install -e rhizodep
 ```
 
+Tutorial: [the root architecture and its growth in metafspm](example/tutorials/tutorial_metafspm_01_root_growth.ipynb)
+(a plant model and its scenario, the MPG's grouping, RootArchitecture and its satisfaction coefficient, the legacy's
+behaviours and the reviewed fixes, a resource subclass, the coupling with other models). Run it with
+`jupyter lab example/tutorials/`.
+
+Some behaviours of the original component were errors (`devplan_metafspm.md` §6, §25): each is an option
+(`legacy_*`, `collar_supply`), its default the fix; `RootGrowth.LEGACY` reproduces the original, and
+`example/comparison/compare_fixes.py` shows each fix's effect.
+
 The original component is kept, frozen, as `openalea.rhizodep.legacy` (with the former metafspm it was written on,
 vendored): the reference the port is compared with, bit for bit (`test/comparison/`). To see both side by side:
 

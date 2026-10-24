@@ -87,10 +87,11 @@ class RootGrowthN(RootGrowth):
                                                default=0 * 1e-5 * (6 * 12 / 0.44) * 0.005 / 14 / 1.4)
 
     resources = (HEXOSE, AMINO_ACIDS)
-    collar_supply = True
-    new_element_soil_temperature = "mother"
-    legacy_pipe_model = False
     supply_gates_the_last_element = True
+    # Root_BRIDGES' behaviours: the legacy's, but for its pipe model (it sees its children), its primordia's soil
+    # temperature (their mother's) and its collar supply
+    LEGACY = dict(RootGrowth.LEGACY, legacy_pipe_model=False, legacy_primordium_soil_temperature=False,
+                  collar_supply="rootbridges")
 
     @classmethod
     def initiate_plant(cls, g, plant, parameters):

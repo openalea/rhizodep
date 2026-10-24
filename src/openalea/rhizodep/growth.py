@@ -80,16 +80,15 @@ class RootGrowth(RootArchitecture):
 
     # --- State variables, declared by the legacy ---
     growing_zone_C_hexose_root: float = state_variable(**doc('mol.g-1', 'Hexose availability in the growing zone'),
-                                                       state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
+                                                       state_variable_type=NII, initialize=0.0, scale=SubOrgan)  # g8
     hexose_consumption_by_growth: float = state_variable(**doc('mol.s-1',
                                                                'Hexose consumption rate by growth is coupled to a '
                                                                'root growth model'),
                                                          state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    hexose_consumption_by_growth_amount: float = state_variable(**doc('mol.s-1',
-                                                                      'Hexose consumption rate by growth is coupled '
-                                                                      'to a root growth model'),
+    hexose_consumption_by_growth_amount: float = state_variable(**doc('mol',                         # g8
+                                                                      'Hexose consumed by growth in the step'),
                                                                 state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    resp_growth: float = state_variable(**doc('mol.s-1', 'respiration rate during growth', unit_comment='of C'),
+    resp_growth: float = state_variable(**doc('mol', 'Growth respiration in the step', unit_comment='of C'),  # g8
                                         state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
     hexose_consumption_by_fungus: float = state_variable(**doc('mol.s-1', 'Hexose consumption rate by fungus'),
                                                          state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
@@ -190,12 +189,26 @@ class RootGrowth(RootArchitecture):
                                           references='We use the range value (0.75-0.85) proposed by Thornley and '
                                                      'Cannell (2000)'),
                                     by=BY, default=0.8)
-    simple_growth_duration: bool = parameter(**doc('adim', 'Allow growth according to the original Archisimple model',
-                                                   references='(Pagès et al., 2014)'),
-                                             by=BY, default=False)
+    simple_growth_duration: bool = parameter(
+        **doc('adim', "The legacy's merged switch (g10): C-free elongation and thickening, emergence at once, and "
+                      "growth durations GDs·d². The growth duration rule alone is growth_duration_rule; the C-free "
+                      "development is RootArchitecture's",
+              references='(Pagès et al., 2014)'),
+        by=BY, default=False)
+    growth_duration_rule: str = parameter(
+        **doc('adim', "The laterals' growth durations: 'probabilistic' (classes GD_low / GD_medium / GD_high by their "
+                      "probabilities) or 'simple' (GDs·d², ArchiSimple's), the growth staying limited by resources "
+                      "(g10)"),
+        by=BY, default="probabilistic")
     initial_C_hexose_root: float = parameter(**doc('mol.g-1', 'Initial hexose concentration of root segments'),
                                              by=BY, default=0.0001)
 
+
+    # The collar supply (g9): an apex's supply zone reaching the base continues into the collar's other children by
+    # volume ("collar", their own collar child excluded); "rootbridges": Root_BRIDGES', counting an axis' own collar
+    # child again; "none": the legacy's, the zone stops at the base
+    collar_supply: str = parameter(**doc('adim', "The supply zone's continuation into the collar's children (g9)"),
+                                   by=BY, default="collar")
 
     resources = (HEXOSE,)
     ZEROED_AT_START = ("resp_growth", "hexose_consumption_by_fungus")
@@ -206,9 +219,7 @@ class RootGrowth(RootArchitecture):
     SHARED = RootArchitecture.SHARED + ("resp_growth", "hexose_growth_demand", "hexose_consumption_by_growth_amount",
                                         "hexose_consumption_by_growth", "hexose_consumption_by_fungus")
     SEGMENTATION_PARAMETERS = RootArchitecture.SEGMENTATION_PARAMETERS
-    # Root_BRIDGES' option (g9), the legacy's by default: an apex's supply zone reaching the collar continues into the
-    # collar's other children by volume
-    collar_supply = False
+    LEGACY = dict(RootArchitecture.LEGACY, collar_supply="none")
     # Whether the last element of a supply zone (the fraction of it the zone takes) is subject to supply_included
     supply_gates_the_last_element = False
 
@@ -292,7 +303,7 @@ class RootGrowth(RootArchitecture):
         amounts = {name: concentration * struct_mass for name, concentration in concentrations.items()}
         include = np.asarray(self.supply_included(length, amounts), dtype=bool)
         budget = growing_zone_factor * radius * power(radius, 2) * pi
-        if self.collar_supply:
+        if self.collar_supply != "none":
             return self._supply_with_collar(supplied, budget, length, volume, struct_mass, amounts, include)
         owner, supplier, mass = ds.path_contributions(budget, volume, struct_mass, where=supplied, include=include)
         contributions = {name: ds.path_contributions(budget, volume, amount, where=supplied, include=include)[2]
@@ -319,7 +330,8 @@ class RootGrowth(RootArchitecture):
         events = []                                     # (owner, supplier, fraction of the supplier)
         visit = ds.order("post", convention="openalea")
         for apex in visit[supplied[visit]].tolist():
-            remaining, current, previous = budget[apex], apex, apex
+            remaining, current, previous, own = budget[apex], apex, apex, -1
+            collar_set = set(collar_children.tolist())
             while remaining > 0:
                 if remaining > volume[current]:
                     if length[current] > 0.:
@@ -327,8 +339,9 @@ class RootGrowth(RootArchitecture):
                             events.append((apex, current, None))
                             remaining = remaining - volume[current]
                         if parents[current] < 0:            # the base: the collar's other children
+                            excluded = {previous} if self.collar_supply == "rootbridges" else {previous, own}
                             children = [k for k in collar_children.tolist()
-                                        if owner_plant[k] == owner_plant[apex] and k != previous and length[k] > 0.]
+                                        if owner_plant[k] == owner_plant[apex] and k not in excluded and length[k] > 0.]
                             # Python's sum of floats (compensated since 3.12), as Root_BRIDGES sums them
                             total = sum([float(volume[k]) for k in children])
                             for child in children:
@@ -338,6 +351,8 @@ class RootGrowth(RootArchitecture):
                                 remaining = 0.
                     if parents[current] < 0:
                         break
+                    if current in collar_set:
+                        own = current                       # the zone's own collar child
                     previous, current = current, parents[current]
                 else:
                     events.append((apex, current, remaining))
@@ -445,8 +460,11 @@ class RootGrowth(RootArchitecture):
         available = for_thickening["C_hexose_root"]
         increase = available * 6. * yield_growth / (root_tissue_density * C_content)
         volume_max = volume_of(type, initial_radius, length) + increase
-        possible_radius = np.where(type == TYPE_NODULE, (3. / (4. * pi)) ** (1. / 3.),             # g5
-                                   np.sqrt(volume_max / (length * pi)))
+        if self.legacy_nodule_radius:                   # g5: a constant
+            nodule_radius = (3. / (4. * pi)) ** (1. / 3.)
+        else:                                           # the sphere of the volume reached
+            nodule_radius = power(3. * volume_max / (4. * pi), 1. / 3.)
+        possible_radius = np.where(type == TYPE_NODULE, nodule_radius, np.sqrt(volume_max / (length * pi)))
         fits = possible_radius <= potential_radius
         radius = np.where(fits, possible_radius, potential_radius)
         net_increase = volume_of(type, radius, length) - volume_of(type, initial_radius, length)
@@ -575,7 +593,8 @@ class RootGrowth(RootArchitecture):
         new_type[emerges] = TYPE_EMERGED
         time_since_emergence[emerges] = thermal_potential_time_since_emergence[emerges]
         with np.errstate(divide="ignore", invalid="ignore"):
-            actual_since_emergence[emerges] = time_since_emergence[emerges] / temperature_modification[emerges]
+            actual_since_emergence[emerges] = self._actual_time(time_since_emergence[emerges],
+                                                                temperature_modification[emerges])
             elongation[emerges] = new_length[emerges] - initial_length[emerges]
             elongation_rate[emerges] = elongation[emerges] / actual_since_emergence[emerges]
         emerged = longer & (type == TYPE_EMERGED)
