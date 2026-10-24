@@ -1,7 +1,7 @@
 """
-rhizodep's root growth as a metafspm StructuralComponent: the root architecture (openalea.rhizodep.architecture) with
-its growth limited by resources, hexose by default, as the legacy RootGrowthModel computes it (openalea.rhizodep.legacy,
-frozen): bit for bit the same results (devplan_metafspm.md).
+rhizodep's root growth as a metafspm StructuralComponent: ArchiSimple's root architecture (openalea.archisimple) with
+its growth limited by resources, hexose by default, and the root hairs, as the legacy RootGrowthModel computes it
+(openalea.rhizodep.legacy, frozen; devplan_metafspm.md).
 
 The resources (RootGrowth.resources, Resource descriptions) are drawn from each elongating apex's supply zone and from
 each thickening element; their costs are scattered on the elements that supply them. The hooks (devplan §21) let a
@@ -14,11 +14,12 @@ import numpy as np
 
 from openalea.metafspm.coupling.component import input_variable, parameter, state_variable
 from openalea.metafspm.data_structure.configs import ScalesConfig
-from openalea.metafspm.solve.decorator import actual, postsegmentation
-# The architecture's names (codes, helpers) are this module's too, as before the split
-from openalea.rhizodep.architecture import *  # noqa: F401,F403
-from openalea.rhizodep.architecture import (BY, DESCRIPTOR, MASSIC, NIE, NII, SubOrgan, RootArchitecture, doc,
-                                            outputs)
+from openalea.metafspm.data_structure import random_streams
+from openalea.metafspm.solve.decorator import actual, postsegmentation, potential
+# The architecture's names (codes, helpers) are this module's too
+from openalea.archisimple.architecture import *  # noqa: F401,F403
+from openalea.archisimple.architecture import (BY, DESCRIPTOR, MASSIC, NIE, NII, SubOrgan, RootArchitecture, doc,
+                                               outputs)
 
 
 @dataclass(frozen=True)
@@ -209,23 +210,181 @@ class RootGrowth(RootArchitecture):
                                              by=BY, default=0.0001)
 
 
+    # --- The root hairs and the growth duration classes (RootGrowth's; ArchiSimple has neither) ---
+    initial_living_root_hairs_struct_mass: float = state_variable(**doc('g',
+                                                                        'Same as struct_mass but corresponds to the '
+                                                                        'previous time step; it is intended to record'
+                                                                        ' the variation'),
+                                                                  state_variable_type=NIE, initialize=0.0,
+                                                                  scale=SubOrgan)
+    living_root_hairs_struct_mass: float = state_variable(**doc('g',
+                                                                'Example root segment living root hairs structural '
+                                                                'mass'),
+                                                          state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
+    root_hair_length: float = state_variable(**doc('m', 'Example root hair length',
+                                                   references='According to the work of Gahoonia et al. (1997), the '
+                                                              'root hair maximal length for wheat and barley evolves '
+                                                              'between 0.5 and 1.3 mm.'),
+                                             state_variable_type=NII, initialize=0.001, scale=SubOrgan)   # g8
+    total_root_hairs_number: float = state_variable(**doc('adim',
+                                                          'Example root hairs number on segment external surface',
+                                                          value_comment='30 * (1.6e-4 / radius) * length * 1e3',
+                                                          references=' According to the work of Gahoonia et al. '
+                                                                     '(1997), the root hair density is about 30 hairs'
+                                                                     ' per mm for winter wheat, for a root radius of '
+                                                                     'about 0.16 mm.'),
+                                                    state_variable_type=NIE, initialize=41.142857142857146,
+                                                    scale=SubOrgan)
+    root_hairs_struct_mass_produced: float = state_variable(**doc('g', '', unit_comment='of dry weight'),
+                                                            state_variable_type=NIE, initialize=0, scale=SubOrgan)
+    actual_length_with_hairs: float = state_variable(**doc('m', 'Length of the element bearing root hairs'),
+                                                     state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
+    actual_time_since_root_hairs_emergence_started: float = state_variable(**doc('s',
+                                                                                 'Time since root hairs started to '
+                                                                                 'emerge on the element'),
+                                                                           state_variable_type=NII, initialize=0.0,
+                                                                           scale=SubOrgan)
+    actual_time_since_root_hairs_emergence_stopped: float = state_variable(**doc('s',
+                                                                                 'Time since root hairs stopped '
+                                                                                 'emerging on the element'),
+                                                                           state_variable_type=NII, initialize=0.0,
+                                                                           scale=SubOrgan)
+    all_root_hairs_formed: float = state_variable(**doc('adim',
+                                                        '1 when every root hair of the element has formed, else 0'),
+                                                  state_variable_type=NII, initialize=0.0, scale=SubOrgan)
+    dead_root_hairs_number: float = state_variable(**doc('adim', 'Number of dead root hairs on the element'),
+                                                   state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
+    living_root_hairs_number: float = state_variable(**doc('adim', 'Number of living root hairs on the element'),
+                                                     state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
+    root_hairs_struct_mass: float = state_variable(**doc('g', "Structural mass of the element's root hairs"),
+                                                   state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
+    root_hairs_volume: float = state_variable(**doc('m3', "Volume of the element's root hairs"),
+                                              state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
+    thermal_time_since_root_hairs_emergence_started: float = state_variable(**doc('s',
+                                                                                  'Thermal time since root hairs '
+                                                                                  'started to emerge'),
+                                                                            state_variable_type=NII, initialize=0.0,
+                                                                            scale=SubOrgan)
+    thermal_time_since_root_hairs_emergence_stopped: float = state_variable(**doc('s',
+                                                                                  'Thermal time since root hairs '
+                                                                                  'stopped emerging'),
+                                                                            state_variable_type=NII, initialize=0.0,
+                                                                            scale=SubOrgan)
+
+    root_hair_radius: float = parameter(**doc('m', 'Average radius of root hair',
+                                              references='According to the work of Gahoonia et al. (1997), the root '
+                                                         'hair diameter is relatively constant for different '
+                                                         'genotypes of wheat and barley, i.e. 12 microns'),
+                                        by=BY, default=6e-06)
+    root_hairs_lifespan: float = parameter(**doc('s', 'Average lifespan of a root hair',
+                                                 unit_comment='time equivalent at temperature of T_ref',
+                                                 references='According to the data from McElgunn and Harrison (1969),'
+                                                            ' the lifespan of wheat root hairs is 40-55h, depending '
+                                                            'on the temperature. For a temperature of 20 degree '
+                                                            'Celsius, the linear regression from this data gives 46h.'),
+                                           by=BY, default=165600.0)
+    GD_highest: float = parameter(**doc('s.m-2',
+                                        'For seminal and adventitious roots, a longer growth duration is applied',
+                                        unit_comment='time equivalent at temperature of T_ref',
+                                        value_comment='Expected growth duration of a seminal root'),
+                                  by=BY, default=5184000.0)
+    GD_high: float = parameter(**doc('s.m-2',
+                                     'The growth duration has a probability of [1-GD_prob_medium] to equal GD_high',
+                                     unit_comment='time equivalent at temperature of T_ref',
+                                     references='Estimated the longest observed lateral wheat roots observed in '
+                                                'rhizoboxes (Rees et al., unpublished)'),
+                               by=BY, default=518400.0)
+    GD_medium: float = parameter(**doc('s.m-2',
+                                       'The growth duration has a probability of [GD_prob_medium - GD_prob_low] to '
+                                       'equal GD_medium',
+                                       unit_comment='time equivalent at temperature of T_ref',
+                                       references='Estimated from the medium lateral wheat roots observed in '
+                                                  'rhizoboxes (Rees et al., unpublished)'),
+                                 by=BY, default=60479.99999999999)
+    GD_low: float = parameter(**doc('s.m-2', 'The growth duration has a probability of [GD_prob_low] to equal GD_low',
+                                    unit_comment='time equivalent at temperature of T_ref',
+                                    references='Estimated from the shortest lateral wheat roots observed in '
+                                               'rhizoboxes (Rees et al., unpublished)'),
+                              by=BY, default=21600.0)
+    GD_by_frequency: bool = parameter(**doc('adim',
+                                            'As an alternative to using a single value of growth duration depending '
+                                            'on diameter, we offer the possibility to rather define the growth '
+                                            'duration as a random choice between three values (low, medium and high),'
+                                            ' depending on their respective probability'),
+                                      by=BY, default=False)
+    GD_prob_low: float = parameter(**doc('adim', 'Probability for low growth duration',
+                                         references='Estimated from the shortest lateral wheat roots observed in '
+                                                    'rhizoboxes (Rees et al., unpublished)'),
+                                   by=BY, default=0.5)
+    GD_prob_medium: float = parameter(**doc('adim', 'Coefficient of growth duration',
+                                            unit_comment='Probability for medium growth duration',
+                                            references='Estimated from the medium lateral wheat roots observed in '
+                                                       'rhizoboxes (Rees et al., unpublished)'),
+                                      by=BY, default=0.85)
+
     # The collar supply (g9): an apex's supply zone reaching the base continues into the collar's other children by
     # volume ("collar", their own collar child excluded); "none": the legacy's, the zone stops at the base
     collar_supply: str = parameter(**doc('adim', "The supply zone's continuation into the collar's children (g9)"),
                                    by=BY, default="collar")
 
     resources = (HEXOSE,)
-    ZEROED_AT_START = ("resp_growth", "hexose_consumption_by_fungus")
-    NIL = RootArchitecture.NIL + ("resp_growth", "hexose_growth_demand", "hexose_consumption_by_growth_amount",
-                                  "hexose_consumption_by_growth", "hexose_consumption_by_fungus",
-                                  "hexose_possibly_required_for_elongation")
-    COPIED = RootArchitecture.COPIED + ("resp_growth", "hexose_consumption_by_fungus")
-    SHARED = RootArchitecture.SHARED + ("resp_growth", "hexose_growth_demand", "hexose_consumption_by_growth_amount",
-                                        "hexose_consumption_by_growth", "hexose_consumption_by_fungus")
-    SEGMENTATION_PARAMETERS = RootArchitecture.SEGMENTATION_PARAMETERS
+    ZEROED_AT_START = ("resp_growth", "hexose_consumption_by_fungus", "root_hairs_struct_mass_produced")
+    # The root hairs' variables: nil in a primordium, copied by a new segment, shared by segmentation (their amounts)
+    ROOT_HAIRS = ("root_hair_length", "actual_length_with_hairs", "living_root_hairs_number", "dead_root_hairs_number",
+                  "total_root_hairs_number", "actual_time_since_root_hairs_emergence_started",
+                  "thermal_time_since_root_hairs_emergence_started", "actual_time_since_root_hairs_emergence_stopped",
+                  "thermal_time_since_root_hairs_emergence_stopped", "all_root_hairs_formed", "root_hairs_struct_mass",
+                  "root_hairs_struct_mass_produced", "initial_living_root_hairs_struct_mass",
+                  "living_root_hairs_struct_mass")
+    ROOT_HAIRS_SHARED = ("initial_living_root_hairs_struct_mass", "root_hairs_struct_mass",
+                         "root_hairs_struct_mass_produced", "living_root_hairs_struct_mass", "living_root_hairs_number",
+                         "dead_root_hairs_number", "total_root_hairs_number")
+    NIL = RootArchitecture.NIL + ROOT_HAIRS + ("resp_growth", "hexose_growth_demand",
+                                               "hexose_consumption_by_growth_amount", "hexose_consumption_by_growth",
+                                               "hexose_consumption_by_fungus", "hexose_possibly_required_for_elongation")
+    COPIED = RootArchitecture.COPIED + ROOT_HAIRS + ("resp_growth", "hexose_consumption_by_fungus")
+    SHARED = RootArchitecture.SHARED + ROOT_HAIRS_SHARED + ("resp_growth", "hexose_growth_demand",
+                                                           "hexose_consumption_by_growth_amount",
+                                                           "hexose_consumption_by_growth", "hexose_consumption_by_fungus")
+    SEGMENTATION_PARAMETERS = RootArchitecture.SEGMENTATION_PARAMETERS + (
+        "GD_highest", "GD_high", "GD_medium", "GD_low", "GD_prob_low", "GD_prob_medium")
+    ELEMENT_PARAMETERS = ("root_hair_radius", "root_hairs_lifespan")
     resource_limited = True
     # Whether the last element of a supply zone (the fraction of it the zone takes) is subject to supply_included
     supply_gates_the_last_element = False
+
+    def _growth_durations(self, radius, keys, root_order, parameters):
+        """The "probabilistic" rule (RootGrowthModel.calculate_growth_duration): a duration drawn among classes (low,
+        medium, high) by their probabilities, uniformly within the class (GD_by_frequency), or the class's value; the
+        classes exclusive, the thinnest roots taking GD_high (g4). *parameters*: {name: a value per primordium}."""
+        p = parameters
+        draw = random_streams.uniform(keys, stream="growth_duration_class")
+        within = random_streams.uniform(keys, stream="growth_duration")
+        low, medium = draw < p["GD_prob_low"], draw < p["GD_prob_medium"]
+        if self.GD_by_frequency:
+            duration = np.where(low, within * p["GD_low"],
+                                np.where(medium, p["GD_low"] + within * (p["GD_medium"] - p["GD_low"]),
+                                         p["GD_medium"] + within * (p["GD_high"] - p["GD_medium"])))
+        else:
+            duration = np.where(low, p["GD_low"], np.where(medium, p["GD_medium"], np.where(
+                radius > p["Dmin"], p["GD_highest"], p["GD_high"])))
+        return np.where(root_order == 1, p["GD_highest"], duration)
+
+    @potential
+    def _initial_living_root_hairs_struct_mass(self, living_root_hairs_struct_mass):
+        """The root hairs' living mass at the step's start."""
+        return np.array(living_root_hairs_struct_mass)
+
+    @postsegmentation
+    def _living_struct_mass(self, struct_mass, living_root_hairs_struct_mass, type) -> outputs(1):
+        """The living structural mass, the root hairs' included (none for a dead element, g22), and the plant's
+        total."""
+        ds = self.data_structure
+        living = struct_mass + living_root_hairs_struct_mass
+        living = np.where(np.isin(type, (TYPE_DEAD, TYPE_JUST_DEAD)), 0., living)
+        owner = np.asarray(ds.owner("Plant"))
+        totals = np.bincount(owner, weights=living, minlength=np.asarray(ds.entity_ids("Plant")).size)
+        return living, "total_living_struct_mass", totals
 
     @classmethod
     def _initial_resources(cls, parameters, elements) -> None:

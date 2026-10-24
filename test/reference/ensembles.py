@@ -1,6 +1,7 @@
 """
 Ensembles over seeds: the statistical reference of the growth components (devplan §29, D-X2), replacing the bitwise
-comparisons once the code moves away from the legacy's float exactness.
+comparisons once the code moves away from the legacy's float exactness. The architecture's (pea, maize) are
+openalea.archisimple's.
 
     python test/reference/ensembles.py        writes test/reference/ensembles.json, from the code checked out
 
@@ -15,27 +16,20 @@ import os
 
 import numpy as np
 
-from openalea.rhizodep.architecture import RootArchitecture
-from openalea.rhizodep.comparison.drawing import totals
+from openalea.archisimple.drawing import totals
 from openalea.rhizodep.comparison.port_run import port_run
 from openalea.rhizodep.growth import RootGrowth
 from openalea.rhizodep.growth_CN import RootGrowthCN
-from openalea.rhizodep.parameter_sets import MAIZE, PEA, WHEAT_SOISSON
+from openalea.rhizodep.parameter_sets import WHEAT_SOISSON
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SEEDS = range(1, 9)
 DAYS = 10
 
 
-def own(parameters, component):
-    return {k: v for k, v in parameters.items() if k in component.__dataclass_fields__}
-
-
 CONFIGURATIONS = {
     "wheat RootGrowth": (RootGrowth, WHEAT_SOISSON, {}),
     "wheat RootGrowthCN": (RootGrowthCN, WHEAT_SOISSON, {"AA": 1e-3}),
-    "pea RootArchitecture": (RootArchitecture, own(PEA, RootArchitecture), {}),
-    "maize RootArchitecture": (RootArchitecture, own(MAIZE, RootArchitecture), {}),
 }
 METRICS = ("length", "struct_mass", "vertices", "apices", "lateral_apices", "mean_radius", "first_order_radius_spread")
 
@@ -53,7 +47,7 @@ def metrics(record):
 def ensemble(name, seeds=SEEDS, days=DAYS):
     """{metric: [value per seed]} of a configuration."""
     component, parameters, given = CONFIGURATIONS[name]
-    C = None if component is RootArchitecture else 1e-3
+    C = 1e-3
     values = {metric: [] for metric in METRICS}
     for seed in seeds:
         with contextlib.redirect_stdout(io.StringIO()):

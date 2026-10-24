@@ -1,27 +1,22 @@
 """
 The port run as the legacy is (legacy_run), its records in the legacy's form, to compare them and draw them
-(devplan_metafspm.md). The port no longer reproduces the legacy bit for bit (devplan §29, D-X6: the tag port-exact
-does, with its transplant of legacy states and its bitwise suites); the records compare statistically.
+(devplan_metafspm.md): archisimple's run helpers (openalea.archisimple.run) with RootGrowth, its hexose given. The port
+no longer reproduces the legacy bit for bit (devplan §29, D-X6: the tag port-exact does); the records compare
+statistically.
 
     run = port_run(parameters, n_steps=48, C_hexose_root=1e-3)
-    run.scene              the metafspm Scene (one plant, growth_model(): the component alone)
-    run.steps[i]           Snapshots as legacy_run's, keyed by the elements' MPG ids:
-                           the SubOrgans, their parents through the MPG's topology (the `+` across axes included),
-                           every declared variable, decoded where the port codes it (the MPG label as the legacy's
-                           label 1 / 2, the EMERGENCE_* and AXIS_* codes as the legacy's strings), and the
-                           per-element copies of parameters (RootGrowth.ELEMENT_PARAMETERS)
+    run.scene              the metafspm Scene (one plant: the component alone)
+    run.steps[i]           records as legacy_run's, keyed by the elements' MPG ids: the SubOrgans, their parents through
+                           the MPG's topology, every declared variable, decoded where the port codes it (the EMERGENCE_*
+                           and AXIS_* codes as the legacy's strings), the MPG label as the legacy's label (1 / 2), and
+                           the per-element copies of parameters (RootGrowth.ELEMENT_PARAMETERS)
 
     run_stage(scene, "potential")                    only that stage's steps of the port
 
 LEFT_OUT: the legacy properties the port does not have, and why.
 """
-from dataclasses import dataclass, field
-
-import numpy as np
-import pandas as pd
-
-from openalea.metafspm.scene.scene import Scene
-from openalea.rhizodep.comparison.legacy_run import Snapshot
+from openalea.archisimple import run as archisimple_run
+from openalea.archisimple.run import run_stage, write_given  # noqa: F401  (the comparisons' names)
 from openalea.rhizodep.growth import (AXIS_LATERAL, AXIS_NODAL, AXIS_SEMINAL, EMERGENCE_IMPOSSIBLE,
                                       EMERGENCE_POSSIBLE, RootGrowth)
 
@@ -34,153 +29,30 @@ LEFT_OUT = {
 }
 EMERGENCE = {EMERGENCE_IMPOSSIBLE: "Impossible", EMERGENCE_POSSIBLE: "Possible"}
 AXIS = {AXIS_SEMINAL: "seminal", AXIS_NODAL: "nodal", AXIS_LATERAL: "lateral"}
-LABEL_SEGMENT, LABEL_APEX = 1, 2
-
-
-_MODELS = {}
-
-
-def growth_model(component=RootGrowth):
-    """A plant model of the growth component *component* (RootGrowth or a subclass) alone, its resources given (as
-    the legacy's harness gives them)."""
-    if component not in _MODELS:
-        def __init__(self, data_structure, time_step):
-            self.growth = component(data_structure=data_structure, time_step=time_step)
-            self.components = [self.growth]
-
-        def run(self):
-            self.growth()
-
-        _MODELS[component] = type(f"{component.__name__}Only", (), dict(
-            initiators=(component,), __init__=__init__, run=run, __doc__=growth_model.__doc__))
-    return _MODELS[component]
-
-
-@dataclass
-class PortRun:
-    scene: Scene
-    steps: list = field(default_factory=list)
-    recorded_steps: list = field(default_factory=list)
+DECODE = {"lateral_root_emergence_possibility": EMERGENCE, "axis_type": AXIS}
 
 
 def port_scene(parameters=None, time_step=3600, component=RootGrowth):
     """A Scene of the port: one plant, or one per element of *parameters* when it is a list (a population in one
     MPG, each plant its own scenario)."""
-    plants = parameters if isinstance(parameters, list) else [parameters]
-    table = pd.DataFrame([dict(plant=f"p{i}", model=growth_model(component), x=0.1 * i, y=0., z=0., rotation=0.,
-                               scenario={"parameters": dict(p or {})})
-                          for i, p in enumerate(plants)])
-    table.attrs.update(xrange=max(1., 0.1 * len(plants)), yrange=1.)
-    return Scene(table, time_step=time_step)
+    return archisimple_run.scene(parameters, time_step, component)
 
 
-def snapshot(scene, plant=0) -> Snapshot:
+def snapshot(scene, plant=0):
     """The port's state in the legacy's form: the *plant*-th plant's (in the planting table's order)."""
-    population = scene.populations[0]
-    ds, growth = population.data_structure, population.instance.components[0]     # the growth component
-    g = ds.mtg
-    owner = np.asarray(ds.owner("Plant"))
-    ids = np.asarray(ds.entity_ids("node"))[owner == plant]
-    legacy_of = dict(zip(ids.tolist(), ids.tolist()))
-    apex_label = g.labels.SubOrgan.RootApex
-    props = {}
-    for name, spec in growth._variable_specs.items():
-        if spec.variable_type in ("state_variable", "input") and ds.location(name) == "node":
-            values = np.asarray(ds.get(name))[owner == plant]
-            if name == "lateral_root_emergence_possibility":
-                props[name] = {legacy_of[v]: EMERGENCE[int(x)] for v, x in zip(ids, values)}
-            elif name == "axis_type":
-                props[name] = {legacy_of[v]: AXIS[int(x)] for v, x in zip(ids, values)}
-            else:
-                props[name] = {legacy_of[v]: x.item() for v, x in zip(ids, values)}
-    props["label"] = {legacy_of[v]: LABEL_APEX if g.label(v) == apex_label else LABEL_SEGMENT for v in ids.tolist()}
-    for name in type(growth).ELEMENT_PARAMETERS:
-        values = np.asarray(growth.parameter_values(name))[owner == plant]
-        props[name] = {legacy_of[v]: x.item() for v, x in zip(ids, values)}
-    parent, edge_type = {}, {}
-    for v in ids.tolist():
-        mpg_parent = g.parent(v)
-        parent[legacy_of[v]] = legacy_of.get(mpg_parent) if mpg_parent is not None else None
-        edge_type[legacy_of[v]] = g.edge_type(v) if parent[legacy_of[v]] is not None else ""
-    totals = {"total_living_struct_mass": float(np.asarray(ds.get("total_living_struct_mass"))[plant])}
-    return Snapshot(vertices=sorted(legacy_of.values()), parent=parent, edge_type=edge_type, props=props,
-                    plant=totals)
+    return archisimple_run.record(scene, plant, decode=DECODE)
 
 
 def port_run(parameters=None, n_steps=24, C_hexose_root=1e-3, time_step=3600, record_every=1, record=True,
              component=RootGrowth, given=None, setup=None):
     """*n_steps* steps of the port; the records every *record_every* steps (and the last), as legacy_run's (for a
-    population, *parameters* a list of the plants' scenarios: a list of records, one per plant).
-    *given*: other inputs written before each step ({name: a number, or a function as C_hexose_root}); *setup*: a
-    function of the scene, called once it is built."""
-    scene = port_scene(parameters, time_step, component)
-    if setup is not None:
-        setup(scene)
-    run = PortRun(scene=scene)
-    if record:
-        run.steps.append(state_of(scene, parameters))
-        run.recorded_steps.append(0)
-    for step in range(n_steps):
-        write_given(scene, step, "C_hexose_root", C_hexose_root)
-        for name, value in (given or {}).items():
-            write_given(scene, step, name, value)
-        scene.run()
-        if record and ((step + 1) % record_every == 0 or step == n_steps - 1):
-            run.steps.append(state_of(scene, parameters))
-            run.recorded_steps.append(step + 1)
-    return run
-
-
-def state_of(scene, parameters):
-    """The scene's state: a Snapshot, or one per plant when *parameters* gives a population (a list)."""
-    if isinstance(parameters, list):
-        return [snapshot(scene, plant) for plant in range(len(parameters))]
-    return snapshot(scene)
-
-
-class _Ids:
-    """What a C_hexose_root function of legacy_run reads of the MTG: its vertices' ids (here the MPG's)."""
-
-    def __init__(self, ids):
-        self.ids = ids
-
-    def vertices(self, scale=1):
-        return list(self.ids)
-
-
-def write_given(scene, step, name, value):
-    """A given input on every element, as legacy_run writes the hexose (a number, or a function of the step and the
-    elements' ids)."""
-    ds = scene.populations[0].data_structure
-    if value is None or not ds.has(name):              # not given, or not an input of this component
-        return
-    index = np.asarray(ds.entity_ids("node")).astype(int)
-    if callable(value):
-        values = value(step, _Ids(index.tolist()))
-        if isinstance(values, dict):
-            current = np.array(ds.get(name), dtype=float)
-            for i, vid in enumerate(index.tolist()):
-                if vid in values:
-                    current[i] = values[vid]
-            ds.set(name, current)
-            return
-        value = values
-    ds.set(name, np.full(index.size, float(value)))
+    population, *parameters* a list of the plants' scenarios: a list of records, one per plant). *C_hexose_root* and
+    *given*: inputs written before each step (write_given); *setup*: a function of the scene, called once it is
+    built."""
+    inputs = {"C_hexose_root": C_hexose_root, **(given or {})}
+    return archisimple_run.run(parameters, n_steps, time_step, record_every, record, component, inputs, setup,
+                               decode=DECODE)
 
 
 def write_C_hexose_root(scene, step, C_hexose_root):
     write_given(scene, step, "C_hexose_root", C_hexose_root)
-
-
-STAGE_INDEX = {"potential": 1, "actual": 4, "segmentation": 5, "postsegmentation": 6, "post_growth": 6}
-
-
-def run_stage(scene, stage):
-    """Run only the growth component's steps of one stage (its row in the Choregrapher's growth schedule)."""
-    growth = scene.populations[0].instance.growth
-    growth.pull_available_inputs()
-    _, groups = growth.__dict__["_choregraphy"]
-    for priority, functors in groups.items():
-        if eval(priority)[3] == STAGE_INDEX[stage]:
-            for functor in functors:
-                functor()

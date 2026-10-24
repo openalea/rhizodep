@@ -7,7 +7,7 @@ import io
 import numpy as np
 import pytest
 
-from openalea.rhizodep.comparison.drawing import positions
+from openalea.archisimple.drawing import positions
 from openalea.rhizodep.comparison.legacy_run import legacy_run
 from openalea.rhizodep.comparison.port_run import port_run
 from openalea.rhizodep.parameter_sets import WHEAT_SOISSON

@@ -1,26 +1,18 @@
-"""The reviewed fixes of the legacy (devplan §25), now the components' only behaviour (D-X6; the tag port-exact keeps
-the legacy's as options): each fix by its property."""
+"""The reviewed fixes of the legacy (devplan §25) that are RootGrowth's, now its only behaviour (D-X6; the tag
+port-exact keeps the legacy's as options): each fix by its property. The architecture's (g6, g15, g18, g19, g21) are
+tested in openalea.archisimple."""
 import numpy as np
 import pytest
 
 from openalea.metafspm.data_structure import random_streams
-from openalea.rhizodep.architecture import TYPE_NODULE, TYPE_SEMINAL_BEFORE_EMERGENCE
 from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON
 from openalea.rhizodep.comparison.port_run import port_run, port_scene, run_stage, snapshot, write_C_hexose_root
-from openalea.rhizodep.growth import RootGrowth
+from openalea.rhizodep.growth import TYPE_NODULE, RootGrowth
 
 # The life duration of RootGrowth's defaults shortened, so that elements die within the runs
 SHORT_LIVED = dict(WHEAT_SOISSON, LDs=RootGrowth.LDs / 200, main_roots_growth_extender=1)
 
 
-def seminal_radii(record):
-    return {record.props["radius"][v] for v in record.vertices
-            if record.props["type"][v] == TYPE_SEMINAL_BEFORE_EMERGENCE}
-
-
-def test_g15_each_seminal_root_its_own_draws():
-    seedling = port_run(WHEAT_SOISSON, n_steps=0).steps[0]
-    assert len(seminal_radii(seedling)) == WHEAT_SOISSON["n_seminal_roots"] - 1
 
 
 def test_g4_exclusive_duration_classes():
@@ -64,13 +56,6 @@ def test_g1_segmentation_conserves_the_shared_amounts():
     assert sums and all(total == pytest.approx(amount, rel=1e-12) for amount, total in sums)
 
 
-def test_g6_actual_time_at_zero_temperature():
-    scene = port_scene(WHEAT_SOISSON)
-    growth = scene.populations[0].instance.growth
-    assert growth._actual_time(np.array([3600.]), np.array([0.]))[0] == 0.
-    assert growth._actual_time(np.array([3600.]), np.array([0.5]))[0] == 7200.
-
-
 def test_g5_nodules_thicken_to_their_volume():
     """A nodule whose hexose allows less than its potential radius takes the sphere of the volume its hexose
     allows."""
@@ -100,25 +85,6 @@ def test_g10_g18_simple_duration_rule_stays_limited_by_hexose():
         assert last.props["growth_duration"][v] == pytest.approx(WHEAT_SOISSON["GDs"] * diameter ** 2, rel=1e-9)
     limited = port_run(parameters, n_steps=120, C_hexose_root=2e-5, record_every=120).steps[-1]
     assert sum(limited.props["length"].values()) < sum(last.props["length"].values())
-
-
-def test_g19_laterals_by_their_diameter():
-    """Laterals form when their diameter (not radius) reaches Dmin (g19)."""
-    parameters = dict(WHEAT_SOISSON, D_ini=2.4e-4, Dmin=1.6e-4, CVDD=0.3)
-    last = port_run(parameters, n_steps=168, record_every=168).steps[-1]
-    radii = [last.props["original_radius"][v] for v in last.vertices if last.props["root_order"][v] > 1
-             and last.props["label"][v] == 2]
-    assert radii
-    assert all(2 * r >= parameters["Dmin"] for r in radii)
-
-
-def test_g21_life_duration_exponent():
-    scene = port_scene(dict(WHEAT_SOISSON, life_duration_diameter_exponent=2.))
-    ds = scene.populations[0].data_structure
-    radius, life = np.asarray(ds.get("radius")), np.asarray(ds.get("life_duration"))
-    base = 0
-    assert life[base] == pytest.approx(WHEAT_SOISSON["LDs"] * (2 * radius[base]) ** 2 * RootGrowth.new_root_tissue_density,
-                                       rel=1e-12)
 
 
 def test_g22_the_dead_have_no_living_mass():

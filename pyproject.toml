@@ -58,6 +58,7 @@ dependencies = []
 
 dependencies = [
     "openalea.metafspm",
+    "openalea.archisimple",
     "openalea.fspm-utility",
     # Bellow is probably not needed since already a dependency of openalea.fspm-utility
     # Just mentioned for precision for now

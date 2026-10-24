@@ -24,7 +24,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-from openalea.rhizodep.comparison.drawing import draw_root_system, totals
+from openalea.archisimple.drawing import draw_root_system, totals
 from openalea.rhizodep.comparison.legacy_run import legacy_run
 from openalea.rhizodep.comparison.parameter_sets import PARAMETER_SETS
 from openalea.rhizodep.comparison.port_run import port_run

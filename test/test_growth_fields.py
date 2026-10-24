@@ -1,13 +1,11 @@
-"""The growth component's declarations and the seedling's MPG structure (devplan_metafspm.md, §12)."""
+"""The growth component's declarations (devplan_metafspm.md, §12); the seedling's structure is the architecture's,
+tested in openalea.archisimple."""
 from dataclasses import fields
-
-import numpy as np
-import pytest
 
 from openalea.rhizodep.comparison.legacy_run import legacy_run
 from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON
-from openalea.rhizodep.comparison.port_run import LEFT_OUT, port_scene
-from openalea.rhizodep.growth import TYPE_BASE, RootGrowth
+from openalea.rhizodep.comparison.port_run import LEFT_OUT
+from openalea.rhizodep.growth import RootGrowth
 
 DECLARED = {f.name for f in fields(RootGrowth) if "variable_type" in f.metadata}
 
@@ -28,65 +26,3 @@ def test_kinds_and_scales():
             assert meta["scale"] == RootGrowth.__dataclass_fields__["length"].metadata["scale"], f.name
         if meta.get("variable_type") == "state_variable":
             assert meta["state_variable_type"], f.name
-
-
-@pytest.fixture(scope="module")
-def seedling():
-    parameters = dict(WHEAT_SOISSON, n_seminal_roots=3, n_adventitious_roots=4)
-    scene = port_scene(parameters)
-    return scene.populations[0].data_structure, parameters
-
-
-def test_grouping(seedling):
-    """One Axis (and Organ) per first-order root: the primary, each seminal, each nodal (§12)."""
-    ds, p = seedling
-    g = ds.mtg
-    s = g.scales
-    axes = [v for v in g.vertices(scale=s.Axis) if not g.property("isanchor").get(v)]
-    organs = [v for v in g.vertices(scale=s.Organ) if not g.property("isanchor").get(v)]
-    n_roots = 1 + (p["n_seminal_roots"] - 1) + p["n_adventitious_roots"]
-    assert len(axes) == len(organs) == n_roots
-    for axis in axes:
-        assert len([o for o in organs if g.complex_at_scale(o, s.Axis) == axis]) == 1
-
-
-def test_branching_on_the_base(seedling):
-    """Each seminal or nodal root's apex is a RootApex branched (+) on the base segment, in an Organ of its own; the
-    primary's Organ is its `<` chain: the base, the apex (devplan §32.5)."""
-    ds, p = seedling
-    g = ds.mtg
-    s, labels = g.scales, g.labels
-    ids = np.asarray(ds.entity_ids("node")).tolist()
-    types = dict(zip(ids, np.asarray(ds.get("type")).tolist()))
-    base, = [v for v in ids if types[v] == TYPE_BASE]
-    primary = g.complex_at_scale(base, s.Organ)
-    branched = [c for c in g.children(base) if g.edge_type(c) == "+"]
-    assert len(branched) == p["n_seminal_roots"] - 1 + p["n_adventitious_roots"]
-    for apex in branched:
-        assert g.label(apex) == labels.SubOrgan.RootApex
-        assert g.complex_at_scale(apex, s.Organ) != primary
-    chain = sorted(v for v in ids if g.complex_at_scale(v, s.Organ) == primary)
-    assert [g.label(v) for v in chain] == [labels.SubOrgan.RootSegment, labels.SubOrgan.RootApex]
-
-
-def test_keys_are_distinct(seedling):
-    """Each element its own lineage key, and so its own draws (devplan §32.3)."""
-    ds, _ = seedling
-    keys = np.asarray(ds.get("key"))
-    assert (keys >= 0).all() and np.unique(keys).size == keys.size
-
-
-def test_the_first_order_roots_leave_the_base_all_around():
-    """The seminal and nodal roots leave the base in their drawn azimuth (devplan §32.5), not all in one plane: after
-    3 days, their first elements point to both sides in x and in y."""
-    from openalea.rhizodep.comparison.drawing import positions
-    from openalea.rhizodep.comparison.port_run import port_run
-    record = port_run(dict(WHEAT_SOISSON, emergence_delay=0., ER=1e-4), n_steps=72, record_every=72).steps[-1]
-    xyz = positions(record)
-    base = [v for v in record.vertices if record.parent[v] is None][0]
-    first = [v for v in record.vertices if record.parent[v] == base and record.edge_type[v] == "+"
-             and record.props["length"][v] > 0]
-    directions = np.array([xyz[v][1] - xyz[v][0] for v in first])
-    assert len(first) >= 4
-    assert (directions[:, 0] > 0).any() and (directions[:, 0] < 0).any()
-    assert (directions[:, 1] > 0).any() and (directions[:, 1] < 0).any()

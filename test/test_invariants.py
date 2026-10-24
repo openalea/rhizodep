@@ -23,13 +23,6 @@ def test_the_hexose_consumed_makes_the_mass_produced(run):
         assert consumed == pytest.approx(produced * cost, rel=1e-9, abs=1e-18)
 
 
-def test_clocks_never_go_back(run):
-    for before, after in zip(run.steps[:-1], run.steps[1:]):
-        for name in ("thermal_time_since_primordium_formation", "actual_time_since_primordium_formation"):
-            common = [v for v in before.vertices if v in after.vertices]
-            assert all(after.props[name][v] >= before.props[name][v] for v in common), name
-
-
 def test_convergence_with_the_time_step():
     """Halving the time step from 30 to 15 min changes the root system's totals by little (the means over seeds).
     The hourly step is not converged: it grows about 18 % less than finer ones over 5 days, its apices' growth capped

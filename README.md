@@ -37,13 +37,14 @@ On this branch, rhizodep's growth component (`root_growth.py`) is being ported t
 StructuralComponents growing the root system in metafspm's multiscale plant graph (MPG), their steps vectorised
 (see `devplan_metafspm.md`):
 
-- `openalea.rhizodep.architecture.RootArchitecture`: the root architecture, C-free (ArchiSimple: development,
-  segmentation, laterals; growth the potential one times a satisfaction coefficient);
-- `openalea.rhizodep.growth.RootGrowth`: the architecture with its growth limited by resources (hexose), the original
-  component's model; its hooks let a subclass add resources;
+- `openalea.archisimple.architecture.RootArchitecture` (a package of its own,
+  [archisimple](https://github.com/openalea/archisimple)): ArchiSimple's root architecture, C-free (development,
+  segmentation, laterals; growth the potential one times a satisfaction coefficient), its species' parameter sets, its
+  drawings;
+- `openalea.rhizodep.growth.RootGrowth(RootArchitecture)`: the architecture with its growth limited by resources
+  (hexose), and root hairs, the original component's model; its hooks let a subclass add resources;
 - `openalea.rhizodep.growth_CN.RootGrowthCN`: Root_BRIDGES' carbon-nitrogen growth (amino acids co-limiting growth);
-- `openalea.rhizodep.parameter_sets`: a wheat (cv. Soissons, Wheat-BRIDGES' calibration) and ArchiSimple's
-  calibrations of pea, maize and peach (Pagès et al., 2014).
+- `openalea.rhizodep.parameter_sets`: a wheat (cv. Soissons), RhizoDep's calibration in Wheat-BRIDGES.
 
 The port reproduced the original component, and Root_BRIDGES', bit for bit: the tag `port-exact` keeps that state,
 its bitwise tests and the original's behaviours as options. Since then, the port leaves the original's float exactness
@@ -57,16 +58,19 @@ this version yet: clone the repositories side by side on their working branches 
 mkdir fspm && cd fspm
 git clone -b data_structure_api https://github.com/openalea/metafspm.git metafspm
 git clone -b to_metafspm https://github.com/openalea/rhizodep.git rhizodep
+git clone https://github.com/openalea/archisimple.git archisimple
 
 mamba env create -f rhizodep/conda/environment.yaml      # rhizodep's dependencies and metafspm's
 mamba activate rhizodep
 pip install -e metafspm
+pip install -e archisimple
 pip install -e rhizodep
 ```
 
-Tutorial: [the root architecture and its growth in metafspm](example/tutorials/tutorial_metafspm_01_root_growth.ipynb)
+Tutorial: [root growth limited by resources in metafspm](example/tutorials/tutorial_metafspm_01_root_growth.ipynb)
 (a plant model and its scenario, the MPG's grouping, RootArchitecture and its satisfaction coefficient, a resource
-subclass, the coupling with other models, populations, species). Run it with `jupyter lab example/tutorials/`.
+subclass, the coupling with other models, populations). Run it with `jupyter lab example/tutorials/`. The
+architecture's (the satisfaction coefficient, the species) is archisimple's.
 
 Some behaviours of the original component were errors (`devplan_metafspm.md` §6, §25): the port has the fixes only
 (the tag `port-exact` has the original's as options).
