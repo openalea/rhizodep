@@ -271,6 +271,10 @@ class RootArchitecture(StructuralComponent):
                                        state_variable_type=NII, initialize=0.0, scale=SubOrgan)
     angle_roll: float = state_variable(**doc('°', "Roll of the element around its parent's direction"),
                                        state_variable_type=NII, initialize=0.0, scale=SubOrgan)
+    azimuth: float = state_variable(**doc('°', "Roll of the parent's frame around its direction before the element's "
+                                               "pitch (angle_down): the direction a root leaves the base in (the "
+                                               "legacy's support's roll, devplan §32.5)"),
+                                    state_variable_type=DESCRIPTOR, initialize=0.0, scale=SubOrgan)
     dead_root_hairs_number: float = state_variable(**doc('adim', 'Number of dead root hairs on the element'),
                                                    state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
     dist_to_ramif: float = state_variable(**doc('m', 'Length elongated by the apex since its last lateral primordium'),
@@ -631,8 +635,8 @@ class RootArchitecture(StructuralComponent):
                     radius = (float(np.abs(random_streams.normal(key, mean, mean * parameters["CVDD"],
                                                                  stream="lateral_radius"))[0])
                               if parameters["random"] else mean)
-                    apex = add(0, "+", True, cls._nil_values(parameters, apex_type, 1, angle_down, azimuth, 0., radius))
-                    apex["values"].update(emergence_delay_in_thermal_time=delay, key=int(key[0]),
+                    apex = add(0, "+", True, cls._nil_values(parameters, apex_type, 1, angle_down, 5, 0., radius))
+                    apex["values"].update(emergence_delay_in_thermal_time=delay, key=int(key[0]), azimuth=azimuth,
                                           **main_root_durations(radius))
 
         # The primary root's apex

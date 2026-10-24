@@ -74,3 +74,19 @@ def test_keys_are_distinct(seedling):
     ds, _ = seedling
     keys = np.asarray(ds.get("key"))
     assert (keys >= 0).all() and np.unique(keys).size == keys.size
+
+
+def test_the_first_order_roots_leave_the_base_all_around():
+    """The seminal and nodal roots leave the base in their drawn azimuth (devplan §32.5), not all in one plane: after
+    3 days, their first elements point to both sides in x and in y."""
+    from openalea.rhizodep.comparison.drawing import positions
+    from openalea.rhizodep.comparison.port_run import port_run
+    record = port_run(dict(WHEAT_SOISSON, emergence_delay=0., ER=1e-4), n_steps=72, record_every=72).steps[-1]
+    xyz = positions(record)
+    base = [v for v in record.vertices if record.parent[v] is None][0]
+    first = [v for v in record.vertices if record.parent[v] == base and record.edge_type[v] == "+"
+             and record.props["length"][v] > 0]
+    directions = np.array([xyz[v][1] - xyz[v][0] for v in first])
+    assert len(first) >= 4
+    assert (directions[:, 0] > 0).any() and (directions[:, 0] < 0).any()
+    assert (directions[:, 1] > 0).any() and (directions[:, 1] < 0).any()

@@ -6,7 +6,8 @@ Root systems drawn from a record (a Snapshot of legacy_run, or the port's in the
     totals(snapshot)                         {"length": ..., "struct_mass": ..., "apices": ..., "lateral_apices": ...}
 
 The geometry is the one rhizodep's turtle draws (tools.get_root_visitor) without its gravitropism: each element starts
-where its parent ends, turned from its parent's direction by angle_down (pitch) then angle_roll (roll), and goes
+where its parent ends, its parent's frame rolled by its azimuth (the direction it leaves the base in), turned from its
+parent's direction by angle_down (pitch) then angle_roll (roll), and goes
 `length` along that direction; the collar points down. The same function draws both sides, so a difference in the
 drawing is a difference in the topology, the lengths or the angles.
 """
@@ -41,6 +42,9 @@ def positions(snapshot, origin=(0., 0., 0.)):
     stack = [(vid, np.array(origin, dtype=float), np.array([0., 0., -1.]), np.array([0., 1., 0.])) for vid in roots]
     while stack:
         vid, start, heading, left = stack.pop()
+        azimuth = props.get("azimuth", {}).get(vid, 0.) or 0.
+        if azimuth:
+            left = _rotation(heading, azimuth) @ left
         pitch = _rotation(left, props["angle_down"].get(vid, 0.) or 0.)
         heading = pitch @ heading
         roll = _rotation(heading, props["angle_roll"].get(vid, 0.) or 0.)
