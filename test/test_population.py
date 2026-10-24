@@ -1,4 +1,4 @@
-"""A population in one MPG (devplan §28): plants of different scenarios grown together, each identical to the same
+"""A population in one MPG: plants of different scenarios grown together, each identical to the same
 plant grown alone, bit for bit: a plant's development and draws do not depend on its neighbours. The plants of one population differ by their numeric parameters
 (stored per plant); a switch (a boolean option) is the population's: another switch, another population."""
 import pytest

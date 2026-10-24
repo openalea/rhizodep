@@ -1,5 +1,5 @@
 """
-Ensembles over seeds: the statistical reference of the growth components (devplan §29, D-X2), replacing the bitwise
+Ensembles over seeds: the statistical reference of the growth components, replacing the bitwise
 comparisons once the code moves away from the legacy's float exactness. The architecture's (pea, maize) are
 openalea.archisimple's.
 

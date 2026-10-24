@@ -1,7 +1,7 @@
 """
-The port run as the legacy is (legacy_run), its records in the legacy's form, to compare them and draw them
-(devplan_metafspm.md): archisimple's run helpers (openalea.archisimple.run) with RootGrowth, its hexose given. The port
-no longer reproduces the legacy bit for bit (devplan §29, D-X6: the tag port-exact does); the records compare
+The port run as the legacy is (legacy_run), its records in the legacy's form, to compare them and draw them:
+archisimple's run helpers (openalea.archisimple.run) with RootGrowth, its hexose given. The port no longer reproduces
+the legacy bit for bit (the tag port-exact does); the records compare
 statistically.
 
     run = port_run(parameters, n_steps=48, C_hexose_root=1e-3)
@@ -21,10 +21,10 @@ from openalea.rhizodep.growth import (AXIS_LATERAL, AXIS_NODAL, AXIS_SEMINAL, EM
                                       EMERGENCE_POSSIBLE, RootGrowth)
 
 LEFT_OUT = {
-    "list_of_elongation_supporting_elements": "the supply zone's bookkeeping, replaced by path windows (devplan §12)",
+    "list_of_elongation_supporting_elements": "the supply zone's bookkeeping, replaced by path windows",
     "list_of_elongation_supporting_elements_hexose": "idem",
     "list_of_elongation_supporting_elements_mass": "idem",
-    "axis_index": "the Axis vertex (devplan §12); the legacy computes it only for its plots",
+    "axis_index": "the Axis vertex; the legacy computes it only for its plots",
     "edge_type": "the MPG's topology (Snapshot.edge_type)",
 }
 EMERGENCE = {EMERGENCE_IMPOSSIBLE: "Impossible", EMERGENCE_POSSIBLE: "Possible"}

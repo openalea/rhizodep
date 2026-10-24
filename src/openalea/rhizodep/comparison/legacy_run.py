@@ -1,5 +1,5 @@
 """
-The legacy growth component run on its own: the reference the port is compared with (devplan_metafspm.md, P0).
+The legacy growth component run on its own: the reference the port is compared with.
 
     run = legacy_run(parameters, n_steps=48, C_hexose_root=1e-3)
     run.model              the legacy RootGrowthModel (openalea.rhizodep.legacy), after the last step
@@ -11,7 +11,7 @@ The legacy growth component run on its own: the reference the port is compared w
         .props               {name: {vid: value}}: every per-vertex property, declared or not
         .plant               {name: value}: the plant-scale states (total_living_struct_mass)
 
-The growth component is driven as rhizodep's composite drives it, without the other components (Q-R6):
+The growth component is driven as rhizodep's composite drives it, without the other components:
 - the hexose concentration is given: *C_hexose_root* (a number, or a function (step, g) -> {vid: value} or a
   number) is written on every vertex before each step, the carbon model's place;
 - soil_temperature and root_tissue_density are the inputs' defaults, or the scenario's;

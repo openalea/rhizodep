@@ -1,4 +1,4 @@
-"""The growth components against their statistical reference (devplan §29, D-X2): each configuration's ensemble over
+"""The growth components against their statistical reference: each configuration's ensemble over
 seeds, its means within the sampling error of the reference's (computed on the tag port-exact: test/reference)."""
 import json
 import os
@@ -15,7 +15,7 @@ REFERENCE = json.load(open(os.path.join(os.path.dirname(__file__), "reference", 
 
 def supports(name):
     """The zero-length supports the reference's seedlings had (one per seminal root but the primary, one per nodal
-    root), which the elements counted since D-X4 no longer include (devplan §32.5)."""
+    root), which the seedlings no longer have."""
     component, parameters, _ = CONFIGURATIONS[name]
     return (parameters.get("n_seminal_roots", component.n_seminal_roots) - 1
             + parameters.get("n_adventitious_roots", component.n_adventitious_roots))

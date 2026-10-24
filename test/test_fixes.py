@@ -1,5 +1,5 @@
-"""The reviewed fixes of the legacy (devplan §25) that are RootGrowth's, now its only behaviour (D-X6; the tag
-port-exact keeps the legacy's as options): each fix by its property. The architecture's (g6, g15, g18, g19, g21) are
+"""The reviewed fixes of the legacy that are RootGrowth's, now its only behaviour (the tag
+port-exact keeps the legacy's as options): each fix by its property. The architecture's are
 tested in openalea.archisimple."""
 import numpy as np
 import pytest
@@ -15,7 +15,7 @@ SHORT_LIVED = dict(WHEAT_SOISSON, LDs=RootGrowth.LDs / 200, main_roots_growth_ex
 
 
 
-def test_g4_exclusive_duration_classes():
+def test_exclusive_duration_classes():
     """A draw in the low class gives a duration in (0, GD_low): the classes are exclusive."""
     scene = port_scene(dict(WHEAT_SOISSON, GD_by_frequency=True))
     growth = scene.populations[0].instance.growth
@@ -30,7 +30,7 @@ def test_g4_exclusive_duration_classes():
     assert (durations[~low] >= WHEAT_SOISSON["GD_low"]).all()
 
 
-def test_g1_segmentation_conserves_the_shared_amounts():
+def test_segmentation_conserves_the_shared_amounts():
     """The segments of a split apex share its amounts exactly (by their mass after growth)."""
     scene = port_scene(WHEAT_SOISSON)
     for step in range(97):
@@ -56,7 +56,7 @@ def test_g1_segmentation_conserves_the_shared_amounts():
     assert sums and all(total == pytest.approx(amount, rel=1e-12) for amount, total in sums)
 
 
-def test_g5_nodules_thicken_to_their_volume():
+def test_nodules_thicken_to_their_volume():
     """A nodule whose hexose allows less than its potential radius takes the sphere of the volume its hexose
     allows."""
     scene = port_scene(WHEAT_SOISSON)
@@ -73,9 +73,9 @@ def test_g5_nodules_thicken_to_their_volume():
     assert reached[0] < potential[0]
 
 
-def test_g10_g18_simple_duration_rule_stays_limited_by_hexose():
-    """growth_duration_rule = "simple": the laterals' durations are GDs·d², without the main roots' extender (g18),
-    and elongation stays limited by hexose (g10)."""
+def test_simple_duration_rule_stays_limited_by_hexose():
+    """growth_duration_rule = "simple": the laterals' durations are GDs·d², without the main roots' extender,
+    and elongation stays limited by hexose."""
     parameters = dict(WHEAT_SOISSON, growth_duration_rule="simple")
     last = port_run(parameters, n_steps=120, C_hexose_root=1e-3, record_every=120).steps[-1]
     laterals = [v for v in last.vertices if last.props["root_order"][v] > 1 and last.props["label"][v] == 2]
@@ -87,7 +87,7 @@ def test_g10_g18_simple_duration_rule_stays_limited_by_hexose():
     assert sum(limited.props["length"].values()) < sum(last.props["length"].values())
 
 
-def test_g22_the_dead_have_no_living_mass():
+def test_the_dead_have_no_living_mass():
     last = port_run(SHORT_LIVED, n_steps=240, record_every=240).steps[-1]
     dead = [v for v in last.vertices if last.props["type"][v] in (10, 11) and last.props["struct_mass"][v] > 0]
     assert dead

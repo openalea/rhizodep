@@ -1,6 +1,6 @@
 """
 Root growth co-limited by carbon and nitrogen: Root_BRIDGES' growth component (Wheat-BRIDGES' RootGrowthModelCoupled)
-in this package, as a subclass of RootGrowth's hooks (devplan_metafspm.md §21): the amino acids a second resource of
+in this package, as a subclass of RootGrowth's hooks: the amino acids a second resource of
 growth, besides hexose.
 
     RootGrowthCN       hexose and amino acids (AA, an input, e.g. from a nitrogen model) limit elongation (a C/N-weighted
@@ -12,7 +12,7 @@ Root_BRIDGES' formulas are kept as they are (its version at the tag port-exact r
 - its root thickening rate uses the nodules' Km values, and halves the whole rate;
 - its C-limited elongation volume divides the C content net of the amino acids' before the yield, its cost after;
 - its root hairs are regulated by the plain mean of the C and N factors, its elongation by their C share.
-It takes RootGrowth's reviewed fixes (devplan §25), Root_BRIDGES' own included (the pipe model that sees its children,
+It takes RootGrowth's reviewed fixes, Root_BRIDGES' own included (the pipe model that sees its children,
 a primordium's soil temperature from its mother, the collar supply).
 """
 from dataclasses import dataclass

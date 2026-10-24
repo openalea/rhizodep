@@ -1,5 +1,5 @@
-"""Coupled, the other components' variables shared between the elements by metafspm's repartition, once per call
-(devplan §19): conservative, unlike the legacy's (g17)."""
+"""Coupled, the other components' variables shared between the elements by metafspm's repartition, once per call:
+conservative, unlike the legacy's."""
 from dataclasses import dataclass
 
 import numpy as np

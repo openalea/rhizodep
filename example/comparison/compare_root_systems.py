@@ -1,6 +1,6 @@
 """
 rhizodep's growth component against its legacy (openalea.rhizodep.legacy, frozen): the same model, the port with the
-reviewed fixes (devplan §25) and its own draws, so the root systems compare statistically (the tag port-exact
+reviewed fixes and its own draws, so the root systems compare statistically (the tag port-exact
 reproduces the legacy bit for bit). For each parameter set:
 
     figure 1   the legacy's root system and the port's after the run (projected on x-z, widths by radius), coloured

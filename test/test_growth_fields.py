@@ -1,4 +1,4 @@
-"""The growth component's declarations (devplan_metafspm.md, §12); the seedling's structure is the architecture's,
+"""The growth component's declarations; the seedling's structure is the architecture's,
 tested in openalea.archisimple."""
 from dataclasses import fields
 
@@ -12,7 +12,7 @@ DECLARED = {f.name for f in fields(RootGrowth) if "variable_type" in f.metadata}
 
 def test_every_legacy_property_is_declared():
     """Each property the legacy writes over 10 days is a declared variable or parameter of the port, the MPG label,
-    or left out with a reason (the legacy's numbering: the MPG's ids and topology, devplan §32.5)."""
+    or left out with a reason (the legacy's numbering: the MPG's ids and topology)."""
     last = legacy_run(dict(WHEAT_SOISSON, simple_growth_duration=True), n_steps=240, record_every=240).steps[-1]
     missing = sorted(set(last.props) - DECLARED - set(LEFT_OUT) - {"label", "vertex_index", "parent_id"})
     assert missing == []

@@ -34,8 +34,7 @@ mamba install -c openalea3 -c conda-forge openalea.rhizodep
 ### The growth component on metafspm (branch `to_metafspm`)
 
 On this branch, rhizodep's growth component (`root_growth.py`) is being ported to the current metafspm:
-StructuralComponents growing the root system in metafspm's multiscale plant graph (MPG), their steps vectorised
-(see `devplan_metafspm.md`):
+StructuralComponents growing the root system in metafspm's multiscale plant graph (MPG), their steps vectorised:
 
 - `openalea.archisimple.architecture.RootArchitecture` (a package of its own,
   [archisimple](https://github.com/openalea/archisimple)): ArchiSimple's root architecture, C-free (development,
@@ -48,7 +47,7 @@ StructuralComponents growing the root system in metafspm's multiscale plant grap
 
 The port reproduced the original component, and Root_BRIDGES', bit for bit: the tag `port-exact` keeps that state,
 its bitwise tests and the original's behaviours as options. Since then, the port leaves the original's float exactness
-(`devplan_metafspm.md` §29) and is validated statistically against that tag (`test/test_ensembles.py`) and by its
+and is validated statistically against that tag (`test/test_ensembles.py`) and by its
 invariants (`test/test_invariants.py`).
 
 metafspm is not installable from `openalea3` in
@@ -72,7 +71,7 @@ Tutorial: [root growth limited by resources in metafspm](example/tutorials/tutor
 subclass, the coupling with other models, populations). Run it with `jupyter lab example/tutorials/`. The
 architecture's (the satisfaction coefficient, the species) is archisimple's.
 
-Some behaviours of the original component were errors (`devplan_metafspm.md` §6, §25): the port has the fixes only
+Some behaviours of the original component were errors: the port has the fixes only
 (the tag `port-exact` has the original's as options).
 
 The original component is kept, frozen, as `openalea.rhizodep.legacy` (with the former metafspm it was written on,

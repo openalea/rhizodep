@@ -1,10 +1,10 @@
 """
 rhizodep's root growth as a metafspm StructuralComponent: ArchiSimple's root architecture (openalea.archisimple) with
 its growth limited by resources, hexose by default, and the root hairs, as the legacy RootGrowthModel computes it
-(openalea.rhizodep.legacy, frozen; devplan_metafspm.md).
+(openalea.rhizodep.legacy, frozen).
 
 The resources (RootGrowth.resources, Resource descriptions) are drawn from each elongating apex's supply zone and from
-each thickening element; their costs are scattered on the elements that supply them. The hooks (devplan §21) let a
+each thickening element; their costs are scattered on the elements that supply them. The hooks let a
 subclass change the resources and their rules, e.g. nitrogen (test/nitrogen: Root_BRIDGES' regulation).
 """
 from dataclasses import dataclass
@@ -25,7 +25,7 @@ from openalea.archisimple.architecture import (BY, DESCRIPTOR, MASSIC, NIE, NII,
 @dataclass(frozen=True)
 class Resource:
     """
-    A resource of growth (devplan §21): the declared variables that hold it, by role. The growth component limits
+    A resource of growth: the declared variables that hold it, by role. The growth component limits
     elongation and thickening by its resources, takes their costs from the elements that supply them, and gives the
     elements it creates their concentration (copied from the mother, 0 in a primordium).
 
@@ -45,7 +45,7 @@ class Resource:
     supply_rate              the input of its rate of supply to the element during the step (mol g-1 s-1, e.g. a
                              carbon model's import; None: none): a supply zone then holds the elements' amounts plus
                              what they receive over the step, so that the cap on a step's elongation does not depend
-                             on the time step (devplan §31, g23)
+                             on the time step
     """
     concentration: str
     zone: str
@@ -76,7 +76,7 @@ class RootGrowth(RootArchitecture):
     Root growth of rhizodep (Rees et al.; Gérault et al.): the root architecture, its growth limited by its resources
     (hexose by default): the apices' elongation by the hexose of their supply zone, the segments' thickening by theirs,
     the costs and the growth respiration taken from the suppliers; the root hairs. The port of the legacy
-    RootGrowthModel, bit for bit (devplan §8).
+    RootGrowthModel, bit for bit.
     """
     # --- Inputs ---
     C_hexose_root: float = input_variable(**doc('mol.g-1',
@@ -87,20 +87,20 @@ class RootGrowth(RootArchitecture):
                                                      "Hexose supplied to the element during the step (given by a "
                                                      "carbon model), available to the supply zones it belongs to",
                                                      value_comment="0: the zones hold the elements' hexose only, "
-                                                                   "the legacy's (g23)"),
+                                                                   "the legacy's"),
                                                by='model_carbon', initialize=0., scale=SubOrgan)
 
     # --- State variables, declared by the legacy ---
     growing_zone_C_hexose_root: float = state_variable(**doc('mol.g-1', 'Hexose availability in the growing zone'),
-                                                       state_variable_type=NII, initialize=0.0, scale=SubOrgan)  # g8
+                                                       state_variable_type=NII, initialize=0.0, scale=SubOrgan)
     hexose_consumption_by_growth: float = state_variable(**doc('mol.s-1',
                                                                'Hexose consumption rate by growth is coupled to a '
                                                                'root growth model'),
                                                          state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    hexose_consumption_by_growth_amount: float = state_variable(**doc('mol',                         # g8
+    hexose_consumption_by_growth_amount: float = state_variable(**doc('mol',
                                                                       'Hexose consumed by growth in the step'),
                                                                 state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    resp_growth: float = state_variable(**doc('mol', 'Growth respiration in the step', unit_comment='of C'),  # g8
+    resp_growth: float = state_variable(**doc('mol', 'Growth respiration in the step', unit_comment='of C'),
                                         state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
     hexose_consumption_by_fungus: float = state_variable(**doc('mol.s-1', 'Hexose consumption rate by fungus'),
                                                          state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
@@ -203,8 +203,7 @@ class RootGrowth(RootArchitecture):
                                     by=BY, default=0.8)
     growth_duration_rule: str = parameter(
         **doc('adim', "The laterals' growth durations: 'probabilistic' (classes GD_low / GD_medium / GD_high by their "
-                      "probabilities) or 'simple' (GDs·d², ArchiSimple's), the growth staying limited by resources "
-                      "(g10)"),
+                      "probabilities) or 'simple' (GDs·d², ArchiSimple's), the growth staying limited by resources"),
         by=BY, default="probabilistic")
     initial_C_hexose_root: float = parameter(**doc('mol.g-1', 'Initial hexose concentration of root segments'),
                                              by=BY, default=0.0001)
@@ -225,7 +224,7 @@ class RootGrowth(RootArchitecture):
                                                    references='According to the work of Gahoonia et al. (1997), the '
                                                               'root hair maximal length for wheat and barley evolves '
                                                               'between 0.5 and 1.3 mm.'),
-                                             state_variable_type=NII, initialize=0.001, scale=SubOrgan)   # g8
+                                             state_variable_type=NII, initialize=0.001, scale=SubOrgan)
     total_root_hairs_number: float = state_variable(**doc('adim',
                                                           'Example root hairs number on segment external surface',
                                                           value_comment='30 * (1.6e-4 / radius) * length * 1e3',
@@ -322,9 +321,9 @@ class RootGrowth(RootArchitecture):
                                                        'rhizoboxes (Rees et al., unpublished)'),
                                       by=BY, default=0.85)
 
-    # The collar supply (g9): an apex's supply zone reaching the base continues into the collar's other children by
+    # The collar supply: an apex's supply zone reaching the base continues into the collar's other children by
     # volume ("collar", their own collar child excluded); "none": the legacy's, the zone stops at the base
-    collar_supply: str = parameter(**doc('adim', "The supply zone's continuation into the collar's children (g9)"),
+    collar_supply: str = parameter(**doc('adim', "The supply zone's continuation into the collar's children"),
                                    by=BY, default="collar")
 
     resources = (HEXOSE,)
@@ -356,7 +355,7 @@ class RootGrowth(RootArchitecture):
     def _growth_durations(self, radius, keys, root_order, parameters):
         """The "probabilistic" rule (RootGrowthModel.calculate_growth_duration): a duration drawn among classes (low,
         medium, high) by their probabilities, uniformly within the class (GD_by_frequency), or the class's value; the
-        classes exclusive, the thinnest roots taking GD_high (g4). *parameters*: {name: a value per primordium}."""
+        classes exclusive, the thinnest roots taking GD_high. *parameters*: {name: a value per primordium}."""
         p = parameters
         draw = random_streams.uniform(keys, stream="growth_duration_class")
         within = random_streams.uniform(keys, stream="growth_duration")
@@ -377,7 +376,7 @@ class RootGrowth(RootArchitecture):
 
     @postsegmentation
     def _living_struct_mass(self, struct_mass, living_root_hairs_struct_mass, type) -> outputs(1):
-        """The living structural mass, the root hairs' included (none for a dead element, g22), and the plant's
+        """The living structural mass, the root hairs' included (none for a dead element), and the plant's
         total."""
         ds = self.data_structure
         living = struct_mass + living_root_hairs_struct_mass
@@ -393,7 +392,7 @@ class RootGrowth(RootArchitecture):
         if parameters["initial_apex_length"] > 0.:
             elements[-1]["values"]["C_hexose_root"] = parameters["initial_C_hexose_root"]
 
-    # ── Hooks (devplan §21): the legacy's by default; a subclass overrides them, e.g. for nitrogen ──────────────
+    # ── Hooks: the legacy's by default; a subclass overrides them, e.g. for nitrogen ──────────────
 
     def supply_included(self, length, contributions):
         """The elements a supply zone takes from when it walks through them (the legacy: those with a length).
@@ -455,7 +454,7 @@ class RootGrowth(RootArchitecture):
         """
         The supply zones of the apices *supplied* (RootGrowthModel.calculating_supply_for_elongation): from each apex
         towards the base, the elements' volumes until the zone's (growing_zone_factor · r³ · π), the last one in part;
-        with the collar supply (g9), a zone reaching the base continues into the collar's other children, by their
+        with the collar supply, a zone reaching the base continues into the collar's other children, by their
         volume. (owner, supplier, {resource concentration: contribution}, mass contribution).
         """
         ds = self.data_structure
@@ -572,7 +571,7 @@ class RootGrowth(RootArchitecture):
 
     # ── Actual growth (RootGrowthModel.actual_growth_and_corresponding_respiration) ───────────────────────────
 
-    # Hooks of actual growth (devplan §21): the legacy's, by hexose alone
+    # Hooks of actual growth: the legacy's, by hexose alone
 
     def growth_demand(self, delta_volume, root_tissue_density) -> dict:
         """{resource concentration: its demand} for the potential growth of *delta_volume* (m3): the hexose of its
@@ -606,7 +605,7 @@ class RootGrowth(RootArchitecture):
         available = for_thickening["C_hexose_root"]
         increase = available * 6. * yield_growth / (root_tissue_density * C_content)
         volume_max = volume_of(type, initial_radius, length) + increase
-        nodule_radius = (3. * volume_max / (4. * pi)) ** (1. / 3.)      # the sphere of the volume reached (g5)
+        nodule_radius = (3. * volume_max / (4. * pi)) ** (1. / 3.)      # the sphere of the volume reached
         possible_radius = np.where(type == TYPE_NODULE, nodule_radius, np.sqrt(volume_max / (length * pi)))
         fits = possible_radius <= potential_radius
         radius = np.where(fits, possible_radius, potential_radius)

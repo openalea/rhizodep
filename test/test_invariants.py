@@ -1,4 +1,4 @@
-"""Invariants of the growth components (devplan §29, D-X2), whatever the order of their operations: the hexose growth
+"""Invariants of the growth components, whatever the order of their operations: the hexose growth
 consumes is the structural mass it produces (of the elements and their root hairs) at the cost of its carbon and
 yield; the times since events increase."""
 import numpy as np
@@ -26,7 +26,7 @@ def test_the_hexose_consumed_makes_the_mass_produced(run):
 def test_convergence_with_the_time_step():
     """Halving the time step from 30 to 15 min changes the root system's totals by little (the means over seeds).
     The hourly step is not converged: it grows about 18 % less than finer ones over 5 days, its apices' growth capped
-    by the hexose their supply zones hold at the step's start (devplan §31, g23)."""
+    by the hexose their supply zones hold at the step's start."""
     lengths = {}
     for time_step in (1800, 900):
         values = []
@@ -39,7 +39,7 @@ def test_convergence_with_the_time_step():
 
 
 def test_a_supply_rate_removes_most_of_the_time_step_dependence():
-    """With the hexose its elements receive over the step (hexose_supply_rate, g23), a supply zone's cap no longer
+    """With the hexose its elements receive over the step (hexose_supply_rate), a supply zone's cap no longer
     depends on the time step: hourly and 15-min steps agree within 5 % (about 19 % apart without)."""
     lengths = {}
     for time_step in (3600, 900):
