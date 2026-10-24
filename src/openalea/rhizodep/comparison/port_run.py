@@ -146,6 +146,8 @@ def write_given(scene, step, name, value):
     """A given input on every element, as legacy_run writes the hexose (a number, or a function of the step and the
     legacy's ids)."""
     ds = scene.populations[0].data_structure
+    if value is None or not ds.has(name):              # not given, or not an input of this component
+        return
     index = np.asarray(ds.get("vertex_index")).astype(int)
     if callable(value):
         values = value(step, _LegacyIds(index.tolist()))

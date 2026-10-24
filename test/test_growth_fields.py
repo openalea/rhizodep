@@ -23,7 +23,8 @@ def test_every_legacy_property_is_declared():
 def test_kinds_and_scales():
     for f in fields(RootGrowth):
         meta = f.metadata
-        if meta.get("variable_type") in ("state_variable", "input") and f.name != "total_living_struct_mass":
+        if (meta.get("variable_type") in ("state_variable", "input")
+                and f.name not in ("total_living_struct_mass", "struct_mass_input")):            # the Plant's
             assert meta["scale"] == RootGrowth.__dataclass_fields__["length"].metadata["scale"], f.name
         if meta.get("variable_type") == "state_variable":
             assert meta["state_variable_type"], f.name

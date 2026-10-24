@@ -33,9 +33,15 @@ mamba install -c openalea3 -c conda-forge openalea.rhizodep
 
 ### The growth component on metafspm (branch `to_metafspm`)
 
-On this branch, rhizodep's growth component (`root_growth.py`) is being ported to the current metafspm: a
-StructuralComponent growing the root system in metafspm's multiscale plant graph (MPG), its steps vectorised
-(`openalea.rhizodep.growth.RootGrowth`, see `devplan_metafspm.md`). metafspm is not installable from `openalea3` in
+On this branch, rhizodep's growth component (`root_growth.py`) is being ported to the current metafspm:
+StructuralComponents growing the root system in metafspm's multiscale plant graph (MPG), their steps vectorised
+(see `devplan_metafspm.md`):
+
+- `openalea.rhizodep.architecture.RootArchitecture`: the root architecture, C-free (ArchiSimple: development,
+  segmentation, laterals; growth the potential one times a satisfaction coefficient);
+- `openalea.rhizodep.growth.RootGrowth`: the architecture with its growth limited by resources (hexose), bit for bit
+  the original component's results; its hooks let a subclass add resources (`test/nitrogen`: Root_BRIDGES' nitrogen
+  regulation, bit for bit Root_BRIDGES' results). metafspm is not installable from `openalea3` in
 this version yet: clone the repositories side by side on their working branches and install them from source.
 
 ```bash
