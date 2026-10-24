@@ -33,8 +33,8 @@ def test_clocks_never_go_back(run):
 
 def test_convergence_with_the_time_step():
     """Halving the time step from 30 to 15 min changes the root system's totals by little (the means over seeds).
-    The hourly step is not converged: it grows about 18 % less than finer ones over 5 days, its cause still to find
-    (devplan §31)."""
+    The hourly step is not converged: it grows about 18 % less than finer ones over 5 days, its apices' growth capped
+    by the hexose their supply zones hold at the step's start (devplan §31, g23)."""
     lengths = {}
     for time_step in (1800, 900):
         values = []
