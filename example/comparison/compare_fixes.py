@@ -38,6 +38,10 @@ FIXES = {
     "g15 seedling seeds": dict(legacy_seedling_seeds=False),
     "g3 primordium soil temperature": dict(legacy_primordium_soil_temperature=False),
     "g9 collar supply": dict(collar_supply="collar"),
+    "g18 lateral growth extender": dict(legacy_lateral_growth_extender=False),
+    "g19 lateral diameter threshold": dict(legacy_lateral_diameter_threshold=False),
+    "g20 branching positions": dict(legacy_branching_positions=False),
+    "g22 dead living mass": dict(legacy_dead_living_mass=False),
     "all": {name: RootGrowth.__dataclass_fields__[name].default for name in RootGrowth.LEGACY},   # the defaults
 }
 

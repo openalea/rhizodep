@@ -28,8 +28,8 @@ def _rotation(axis, angle_degrees):
                      [z * x * C - y * s, z * y * C + x * s, c + z * z * C]])
 
 
-def positions(snapshot):
-    """{vid: (start, end)}: the elements' end points, by the turtle above."""
+def positions(snapshot, origin=(0., 0., 0.)):
+    """{vid: (start, end)}: the elements' end points, by the turtle above, from *origin* (the plant's position)."""
     props = snapshot.props
     children = {vid: [] for vid in snapshot.vertices}
     roots = []
@@ -38,7 +38,7 @@ def positions(snapshot):
         (children[parent].append(vid) if parent in children else roots.append(vid))
     out = {}
     # the frame: heading, left
-    stack = [(vid, np.zeros(3), np.array([0., 0., -1.]), np.array([0., 1., 0.])) for vid in roots]
+    stack = [(vid, np.array(origin, dtype=float), np.array([0., 0., -1.]), np.array([0., 1., 0.])) for vid in roots]
     while stack:
         vid, start, heading, left = stack.pop()
         pitch = _rotation(left, props["angle_down"].get(vid, 0.) or 0.)
@@ -53,12 +53,12 @@ def positions(snapshot):
 
 
 def draw_root_system(ax, snapshot, color_by="type", cmap="viridis", plane=(0, 2), linewidth_by_radius=True,
-                     xyz=None, vmin=None, vmax=None):
+                     xyz=None, vmin=None, vmax=None, origin=(0., 0., 0.)):
     """The elements as lines projected on *plane* (axes indices, x-z by default), coloured by *color_by* (a
     per-vertex property); returns the LineCollection (for a colorbar)."""
     from matplotlib.collections import LineCollection
 
-    xyz = positions(snapshot) if xyz is None else xyz
+    xyz = positions(snapshot, origin) if xyz is None else xyz
     vids = [vid for vid in snapshot.vertices if (snapshot.props["length"].get(vid, 0.) or 0.) > 0.]
     i, j = plane
     lines = [((xyz[v][0][i], xyz[v][0][j]), (xyz[v][1][i], xyz[v][1][j])) for v in vids]

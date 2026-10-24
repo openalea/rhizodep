@@ -76,25 +76,30 @@ def reference_parameters(parameters, component, legacy=True):
 
 
 def port_scene(parameters=None, time_step=3600, component=RootGrowth, legacy=True):
-    table = pd.DataFrame([dict(plant="p0", model=growth_model(component), x=0., y=0., z=0., rotation=0.,
-                               scenario={"parameters": reference_parameters(parameters, component, legacy)})])
-    table.attrs.update(xrange=1., yrange=1.)
+    """A Scene of the port: one plant, or one per element of *parameters* when it is a list (a population in one
+    MPG, each plant its own scenario)."""
+    plants = parameters if isinstance(parameters, list) else [parameters]
+    table = pd.DataFrame([dict(plant=f"p{i}", model=growth_model(component), x=0.1 * i, y=0., z=0., rotation=0.,
+                               scenario={"parameters": reference_parameters(p, component, legacy)})
+                          for i, p in enumerate(plants)])
+    table.attrs.update(xrange=max(1., 0.1 * len(plants)), yrange=1.)
     return Scene(table, time_step=time_step)
 
 
-def snapshot(scene) -> Snapshot:
-    """The port's state in the legacy's form (one plant)."""
+def snapshot(scene, plant=0) -> Snapshot:
+    """The port's state in the legacy's form: the *plant*-th plant's (in the planting table's order)."""
     population = scene.populations[0]
     ds, growth = population.data_structure, population.instance.components[0]     # the growth component
     g = ds.mtg
-    ids = np.asarray(ds.entity_ids("node"))
-    index = np.asarray(ds.get("vertex_index")).astype(int)
+    owner = np.asarray(ds.owner("Plant"))
+    ids = np.asarray(ds.entity_ids("node"))[owner == plant]
+    index = np.asarray(ds.get("vertex_index")).astype(int)[owner == plant]
     legacy_of = dict(zip(ids.tolist(), index.tolist()))
     apex_label = g.labels.SubOrgan.RootApex
     props = {}
     for name, spec in growth._variable_specs.items():
         if spec.variable_type in ("state_variable", "input") and ds.location(name) == "node":
-            values = np.asarray(ds.get(name))
+            values = np.asarray(ds.get(name))[owner == plant]
             if name == "lateral_root_emergence_possibility":
                 props[name] = {legacy_of[v]: EMERGENCE[int(x)] for v, x in zip(ids, values)}
             elif name == "axis_type":
@@ -103,21 +108,22 @@ def snapshot(scene) -> Snapshot:
                 props[name] = {legacy_of[v]: x.item() for v, x in zip(ids, values)}
     props["label"] = {legacy_of[v]: LABEL_APEX if g.label(v) == apex_label else LABEL_SEGMENT for v in ids.tolist()}
     for name in type(growth).ELEMENT_PARAMETERS:
-        values = np.asarray(growth.parameter_values(name))
+        values = np.asarray(growth.parameter_values(name))[owner == plant]
         props[name] = {legacy_of[v]: x.item() for v, x in zip(ids, values)}
     parent, edge_type = {}, {}
     for v in ids.tolist():
         mpg_parent = g.parent(v)
         parent[legacy_of[v]] = legacy_of.get(mpg_parent) if mpg_parent is not None else None
         edge_type[legacy_of[v]] = g.edge_type(v) if parent[legacy_of[v]] is not None else ""
-    plant = {"total_living_struct_mass": float(np.asarray(ds.get("total_living_struct_mass"))[0])}
+    totals = {"total_living_struct_mass": float(np.asarray(ds.get("total_living_struct_mass"))[plant])}
     return Snapshot(vertices=sorted(legacy_of.values()), parent=parent, edge_type=edge_type, props=props,
-                    plant=plant)
+                    plant=totals)
 
 
 def port_run(parameters=None, n_steps=24, C_hexose_root=1e-3, time_step=3600, record_every=1, record=True,
              component=RootGrowth, given=None, setup=None, legacy=True):
-    """*n_steps* steps of the port; the records every *record_every* steps (and the last), as legacy_run's.
+    """*n_steps* steps of the port; the records every *record_every* steps (and the last), as legacy_run's (for a
+    population, *parameters* a list of the plants' scenarios: a list of records, one per plant).
     *given*: other inputs written before each step ({name: a number, or a function as C_hexose_root}); *setup*: a
     function of the scene, called once it is built; *legacy*: the component's LEGACY preset (the reference's
     behaviours), else its defaults (the reviewed fixes)."""
@@ -126,7 +132,7 @@ def port_run(parameters=None, n_steps=24, C_hexose_root=1e-3, time_step=3600, re
         setup(scene)
     run = PortRun(scene=scene)
     if record:
-        run.steps.append(snapshot(scene))
+        run.steps.append(state_of(scene, parameters))
         run.recorded_steps.append(0)
     for step in range(n_steps):
         write_given(scene, step, "C_hexose_root", C_hexose_root)
@@ -134,9 +140,16 @@ def port_run(parameters=None, n_steps=24, C_hexose_root=1e-3, time_step=3600, re
             write_given(scene, step, name, value)
         scene.run()
         if record and ((step + 1) % record_every == 0 or step == n_steps - 1):
-            run.steps.append(snapshot(scene))
+            run.steps.append(state_of(scene, parameters))
             run.recorded_steps.append(step + 1)
     return run
+
+
+def state_of(scene, parameters):
+    """The scene's state: a Snapshot, or one per plant when *parameters* gives a population (a list)."""
+    if isinstance(parameters, list):
+        return [snapshot(scene, plant) for plant in range(len(parameters))]
+    return snapshot(scene)
 
 
 class _LegacyIds:

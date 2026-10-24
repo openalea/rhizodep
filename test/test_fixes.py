@@ -112,7 +112,7 @@ def test_g5_nodules_thicken_to_their_volume():
 
 
 def test_g10_growth_duration_rule_without_c_free_growth():
-    """growth_duration_rule = "simple": the laterals' durations are GDs·d² (times the extender), and elongation stays
+    """growth_duration_rule = "simple": the laterals' durations are GDs·d² (no extender, g18), and elongation stays
     limited by hexose (simple_growth_duration, the legacy's merged switch, would make it C-free)."""
     parameters = dict(GB_SOIL_1_0, growth_duration_rule="simple")
     last = port_run(parameters, n_steps=120, C_hexose_root=1e-3, record_every=120, legacy=False).steps[-1]
@@ -120,10 +120,54 @@ def test_g10_growth_duration_rule_without_c_free_growth():
     assert laterals
     for v in laterals[:20]:
         diameter = 2. * last.props["original_radius"][v]
-        assert last.props["growth_duration"][v] == pytest.approx(
-            GB_SOIL_1_0["GDs"] * diameter ** 2 * GB_SOIL_1_0["main_roots_growth_extender"], rel=1e-9)
+        assert last.props["growth_duration"][v] == pytest.approx(GB_SOIL_1_0["GDs"] * diameter ** 2, rel=1e-9)  # g18
     limited = port_run(parameters, n_steps=120, C_hexose_root=2e-5, record_every=120, legacy=False).steps[-1]
     c_free = port_run(dict(parameters, simple_growth_duration=True), n_steps=120, C_hexose_root=2e-5,
                       record_every=120, legacy=False).steps[-1]
     length = sum(limited.props["length"].values())
     assert length < sum(c_free.props["length"].values())        # the hexose limits elongation
+
+
+def test_g18_laterals_without_the_extender():
+    """With the simple duration rule, the laterals' durations are GDs·d² (determinate laterals), not × the extender."""
+    parameters = dict(GB_SOIL_1_0, growth_duration_rule="simple")
+    last = port_run(parameters, n_steps=120, record_every=120, legacy=False).steps[-1]
+    laterals = [v for v in last.vertices if last.props["root_order"][v] > 1 and last.props["label"][v] == 2]
+    assert laterals
+    for v in laterals[:20]:
+        diameter = 2. * last.props["original_radius"][v]
+        assert last.props["growth_duration"][v] == pytest.approx(GB_SOIL_1_0["GDs"] * diameter ** 2, rel=1e-9)
+
+
+@pytest.mark.parametrize("fixed", [True, False])
+def test_g19_g20_thin_laterals(fixed):
+    """Laterals form when their diameter (not radius) reaches Dmin (g19), and a lateral too thin uses its branching
+    position (g20): fewer laterals on thin mothers than the legacy's retries."""
+    options = dict(legacy_lateral_diameter_threshold=not fixed, legacy_branching_positions=not fixed)
+    parameters = dict(GB_SOIL_1_0, D_ini=2.4e-4, Dmin=1.6e-4, CVDD=0.3, **options)
+    last = port_run(parameters, n_steps=168, record_every=168, legacy=False).steps[-1]
+    radii = [last.props["original_radius"][v] for v in last.vertices if last.props["root_order"][v] > 1
+             and last.props["label"][v] == 2]
+    if fixed:
+        assert all(2 * r >= parameters["Dmin"] for r in radii)
+    else:
+        assert all(r >= parameters["Dmin"] for r in radii)
+
+
+def test_g21_life_duration_exponent():
+    scene = port_scene(dict(GB_SOIL_1_0, life_duration_diameter_exponent=2.), legacy=False)
+    ds = scene.populations[0].data_structure
+    radius, life = np.asarray(ds.get("radius")), np.asarray(ds.get("life_duration"))
+    base = 0
+    assert life[base] == pytest.approx(GB_SOIL_1_0["LDs"] * (2 * radius[base]) ** 2 * RootGrowth.new_root_tissue_density,
+                                       rel=1e-12)
+
+
+def test_g22_the_dead_have_no_living_mass():
+    parameters = dict(GB_SOIL_1_0, LDs=RootGrowthModel.LDs / 200, main_roots_growth_extender=1)
+    for legacy in (True, False):
+        last = port_run(dict(parameters, legacy_dead_living_mass=legacy), n_steps=240, record_every=240,
+                        legacy=False).steps[-1]
+        dead = [v for v in last.vertices if last.props["type"][v] in (10, 11) and last.props["struct_mass"][v] > 0]
+        assert dead
+        assert all((last.props["living_struct_mass"][v] > 0) == legacy for v in dead)
