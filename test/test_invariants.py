@@ -43,3 +43,15 @@ def test_convergence_with_the_time_step():
             values.append(sum(run.steps[-1].props["length"].values()))
         lengths[time_step] = np.mean(values)
     assert lengths[900] == pytest.approx(lengths[1800], rel=0.05)
+
+
+def test_a_supply_rate_removes_most_of_the_time_step_dependence():
+    """With the hexose its elements receive over the step (hexose_supply_rate, g23), a supply zone's cap no longer
+    depends on the time step: hourly and 15-min steps agree within 5 % (about 19 % apart without)."""
+    lengths = {}
+    for time_step in (3600, 900):
+        n_steps = int(5 * 86400 / time_step)
+        run = port_run(WHEAT_SOISSON, n_steps=n_steps, time_step=time_step, record_every=n_steps,
+                       given={"hexose_supply_rate": 1e-7})
+        lengths[time_step] = sum(run.steps[-1].props["length"].values())
+    assert lengths[3600] == pytest.approx(lengths[900], rel=0.05)

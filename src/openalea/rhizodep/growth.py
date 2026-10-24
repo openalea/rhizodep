@@ -41,6 +41,10 @@ class Resource:
                              demand and consumptions (the legacy's hexose), or starts them at 0
     costs_by_available       whether its elongation cost is shared between the suppliers by its amount available
                              (net of the minimum) rather than its amount required
+    supply_rate              the input of its rate of supply to the element during the step (mol g-1 s-1, e.g. a
+                             carbon model's import; None: none): a supply zone then holds the elements' amounts plus
+                             what they receive over the step, so that the cap on a step's elongation does not depend
+                             on the time step (devplan §31, g23)
     """
     concentration: str
     zone: str
@@ -53,6 +57,7 @@ class Resource:
     minimum_for_thickening: str = None
     copied_by_new_elements: bool = True
     costs_by_available: bool = False
+    supply_rate: str = None
 
 
 HEXOSE = Resource(concentration="C_hexose_root", zone="growing_zone_C_hexose_root",
@@ -60,7 +65,7 @@ HEXOSE = Resource(concentration="C_hexose_root", zone="growing_zone_C_hexose_roo
                   available_for_thickening="hexose_available_for_thickening", demand="hexose_growth_demand",
                   consumption_amount="hexose_consumption_by_growth_amount", consumption="hexose_consumption_by_growth",
                   minimum_for_elongation="C_hexose_min_for_elongation",
-                  minimum_for_thickening="C_hexose_min_for_thickening")
+                  minimum_for_thickening="C_hexose_min_for_thickening", supply_rate="hexose_supply_rate")
 
 
 
@@ -77,6 +82,12 @@ class RootGrowth(RootArchitecture):
                                                 'Hexose concentration of the element (given by a carbon model)',
                                                 unit_comment='of hexose per gram of structural mass'),
                                           by='model_carbon', initialize=0., scale=SubOrgan, state_variable_type=MASSIC)
+    hexose_supply_rate: float = input_variable(**doc('mol.g-1.s-1',
+                                                     "Hexose supplied to the element during the step (given by a "
+                                                     "carbon model), available to the supply zones it belongs to",
+                                                     value_comment="0: the zones hold the elements' hexose only, "
+                                                                   "the legacy's (g23)"),
+                                               by='model_carbon', initialize=0., scale=SubOrgan)
 
     # --- State variables, declared by the legacy ---
     growing_zone_C_hexose_root: float = state_variable(**doc('mol.g-1', 'Hexose availability in the growing zone'),
@@ -289,8 +300,12 @@ class RootGrowth(RootArchitecture):
         volume. (owner, supplier, {resource concentration: contribution}, mass contribution).
         """
         ds = self.data_structure
-        concentrations = {r.concentration: np.asarray(ds.get(r.concentration), dtype=float) for r in self.resources}
-        amounts = {name: concentration * struct_mass for name, concentration in concentrations.items()}
+        amounts = {}
+        for resource in self.resources:                 # each element's amount, and what it receives in the step
+            amount = np.asarray(ds.get(resource.concentration), dtype=float) * struct_mass
+            if resource.supply_rate is not None:
+                amount = amount + np.asarray(ds.get(resource.supply_rate), dtype=float) * struct_mass * float(self.time_step)
+            amounts[resource.concentration] = amount
         include = np.asarray(self.supply_included(length, amounts), dtype=bool)
         budget = growing_zone_factor * radius * radius ** 2 * pi
         owner, supplier, taken = ds.path_contributions(budget, volume, volume, where=supplied, include=include,
