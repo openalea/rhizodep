@@ -1,7 +1,8 @@
 """
 The cost of rhizodep's growth component, the legacy (openalea.rhizodep.legacy, its loops over the MTG) against the
-port (openalea.rhizodep.growth, vectorised steps on metafspm's DataStructure), on the same run: both are bitwise
-identical (test/comparison), so the difference is the implementation only.
+port (openalea.rhizodep.growth, vectorised steps on metafspm's DataStructure), on the same parameter set: the same
+model (the port with the reviewed fixes and its own draws, so root systems of statistically the same size), so the
+difference is mostly the implementation.
 
     left     the time of each step against the number of elements of the root system, legacy and port
     middle   the cumulative time against the simulated time
@@ -28,7 +29,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from openalea.rhizodep.comparison.legacy_run import STAGES, _run_stage, legacy_model, write_C_hexose_root
-from openalea.rhizodep.comparison.parameter_sets import variants
+from openalea.rhizodep.comparison.parameter_sets import PARAMETER_SETS
 from openalea.rhizodep.comparison.port_run import port_scene, run_stage
 from openalea.rhizodep.comparison.port_run import write_C_hexose_root as write_port_C_hexose_root
 
@@ -111,14 +112,14 @@ def figure(name, days, legacy, port, time_step=3600):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--set", default="wheat_soisson/simple_growth_duration=True", help="the parameter set")
+    parser.add_argument("--set", default="wheat_soisson", help="the parameter set")
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--days", type=float, default=15.)
     parser.add_argument("--C", type=float, default=1e-3, help="the given C_hexose_root (mol.g-1)")
     parser.add_argument("--profile", action="store_true", help="print the costliest functions of each")
     parser.add_argument("--show", action="store_true")
     args = parser.parse_args()
-    sets = variants()
+    sets = PARAMETER_SETS
     if args.list:
         print("\n".join(sets))
         return

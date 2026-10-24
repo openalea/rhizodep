@@ -28,7 +28,6 @@ Two things the composite provides are set here, the legacy needing them standalo
 import copy
 import functools
 
-import numpy as np
 from dataclasses import dataclass, field
 
 from openalea.rhizodep.legacy import RootGrowthModel
@@ -42,7 +41,7 @@ class Snapshot:
     edge_type: dict
     props: dict
     plant: dict
-    meta: dict = field(default_factory=dict)        # the legacy's state outside its MTG (numpy's generator, lists)
+    meta: dict = field(default_factory=dict)        # a record's own information
 
 
 @dataclass
@@ -84,9 +83,7 @@ def snapshot(model):
     plant = {name: g.property(name).get(1) for name in PLANT_SCALE}
     parent = {vid: g.parent(vid) for vid in vertices}
     edge_type = {vid: g.edge_type(vid) for vid in vertices}
-    meta = {"random_state": np.random.get_state(),
-            "step_elongating_elements": list(getattr(model, "step_elongating_elements", []))}
-    return Snapshot(vertices=vertices, parent=parent, edge_type=edge_type, props=props, plant=plant, meta=meta)
+    return Snapshot(vertices=vertices, parent=parent, edge_type=edge_type, props=props, plant=plant)
 
 
 def write_C_hexose_root(model, step, C_hexose_root):
@@ -150,25 +147,3 @@ def _run_stage(model, stage):
     else:
         model.post_growth_updating(modules_to_update=[], soil_boundaries_to_infer=[])
 
-
-def legacy_stages(parameters=None, n_steps=240, C_hexose_root=1e-3, time_step=3600, every=12, first=0):
-    """
-    The legacy run step by step as its Choregrapher and __call__ do (potential_growth, actual growth, segmentation,
-    post_growth_updating), recorded around each stage every *every* steps from step *first*: a list of
-    (step, {"start": Snapshot, "potential": ..., "actual": ..., "segmentation": ..., "post_growth": ...}), each
-    record after that stage. The stages of the port are compared on these (devplan §14, state transplant).
-    """
-    model = legacy_model(parameters, time_step)
-    out = []
-    for step in range(n_steps):
-        write_C_hexose_root(model, step, C_hexose_root)
-        model.pull_available_inputs()
-        recorded = step >= first and (step - first) % every == 0
-        records = {"start": snapshot(model)} if recorded else None
-        for stage in STAGES:
-            _run_stage(model, stage)
-            if recorded:
-                records[stage] = snapshot(model)
-        if recorded:
-            out.append((step, records))
-    return out

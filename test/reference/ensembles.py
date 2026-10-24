@@ -58,7 +58,7 @@ def ensemble(name, seeds=SEEDS, days=DAYS):
     for seed in seeds:
         with contextlib.redirect_stdout(io.StringIO()):
             run = port_run(dict(parameters, random_choice=seed), n_steps=24 * days, C_hexose_root=C,
-                           record_every=24 * days, component=component, given=given, legacy=False)
+                           record_every=24 * days, component=component, given=given)
         for metric, value in metrics(run.steps[-1]).items():
             values[metric].append(value)
     return values

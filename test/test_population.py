@@ -1,10 +1,9 @@
-"""A population in one MPG (devplan §28): plants of different scenarios grown together, each identical to the
-legacy grown alone with its scenario, bit for bit. The plants of one population differ by their numeric parameters
+"""A population in one MPG (devplan §28): plants of different scenarios grown together, each identical to the same
+plant grown alone, bit for bit: a plant's development and draws do not depend on its neighbours. The plants of one population differ by their numeric parameters
 (stored per plant); a switch (a boolean option) is the population's: another switch, another population."""
 import pytest
 
 from openalea.rhizodep.comparison.differences import differences
-from openalea.rhizodep.comparison.legacy_run import legacy_run
 from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON
 from openalea.rhizodep.comparison.port_run import LEFT_OUT, port_run
 
@@ -20,8 +19,8 @@ def population():
 
 
 @pytest.mark.parametrize("plant", range(len(PLANTS)))
-def test_each_plant_is_the_legacy_alone(population, plant):
-    alone = legacy_run(PLANTS[plant], n_steps=120, record_every=120).steps[-1]
+def test_each_plant_is_the_plant_alone(population, plant):
+    alone = port_run(PLANTS[plant], n_steps=120, record_every=120).steps[-1]
     together = population.steps[-1][plant]
     diff = differences(alone, together, names=[name for name in alone.props if name not in LEFT_OUT])
     assert diff.identical, diff.summary()

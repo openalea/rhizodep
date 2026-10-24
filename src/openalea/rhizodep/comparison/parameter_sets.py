@@ -19,14 +19,9 @@ PEA, MAIZE, PEACH
                 Oilseed rape and other legumes: no root architecture calibration in rhizodep, Wheat-BRIDGES or colzette
                 (whose parameters are its shoots'); Pagès et al. (2014) has none for rapeseed.
 
-LEGACY_DEFAULTS the legacy's own defaults (an empty scenario)
-
-The variants (the comparisons with the legacy) switch the legacy's flags on the legacy's sets (simple_growth_duration;
-the nodules stay off).
+PARAMETER_SETS  {name: scenario parameters}, for the examples; "defaults": the components' defaults (the legacy's)
 """
 DAY = 86400.
-
-LEGACY_DEFAULTS = {}
 
 WHEAT_SOISSON = {
     'root_tissue_density': 140000,
@@ -106,16 +101,9 @@ PEACH = archisimple(Di=1.2, EL=14, Dmin=0.15, GDs=150, IPD=3.1, RDM=0.27, CVDD=0
 SPECIES = {"wheat (Soissons)": WHEAT_SOISSON, "pea": PEA, "maize": MAIZE, "peach": PEACH}
 
 PARAMETER_SETS = {
-    "legacy_defaults": LEGACY_DEFAULTS,
+    "defaults": {},
     "wheat_soisson": WHEAT_SOISSON,
+    "pea": PEA,
+    "maize": MAIZE,
+    "peach": PEACH,
 }
-
-
-def variants():
-    """{name: parameters}: each set, with simple_growth_duration off and on."""
-    out = {}
-    for name, parameters in PARAMETER_SETS.items():
-        for flag in (False, True):
-            out[f"{name}/simple_growth_duration={flag}"] = dict(parameters, simple_growth_duration=flag,
-                                                                 nodules=False)
-    return out

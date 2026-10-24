@@ -189,12 +189,6 @@ class RootGrowth(RootArchitecture):
                                           references='We use the range value (0.75-0.85) proposed by Thornley and '
                                                      'Cannell (2000)'),
                                     by=BY, default=0.8)
-    simple_growth_duration: bool = parameter(
-        **doc('adim', "The legacy's merged switch (g10): C-free elongation and thickening, emergence at once, and "
-                      "growth durations GDs·d². The growth duration rule alone is growth_duration_rule; the C-free "
-                      "development is RootArchitecture's",
-              references='(Pagès et al., 2014)'),
-        by=BY, default=False)
     growth_duration_rule: str = parameter(
         **doc('adim', "The laterals' growth durations: 'probabilistic' (classes GD_low / GD_medium / GD_high by their "
                       "probabilities) or 'simple' (GDs·d², ArchiSimple's), the growth staying limited by resources "
@@ -205,8 +199,7 @@ class RootGrowth(RootArchitecture):
 
 
     # The collar supply (g9): an apex's supply zone reaching the base continues into the collar's other children by
-    # volume ("collar", their own collar child excluded); "rootbridges": Root_BRIDGES', counting an axis' own collar
-    # child again; "none": the legacy's, the zone stops at the base
+    # volume ("collar", their own collar child excluded); "none": the legacy's, the zone stops at the base
     collar_supply: str = parameter(**doc('adim', "The supply zone's continuation into the collar's children (g9)"),
                                    by=BY, default="collar")
 
@@ -219,7 +212,7 @@ class RootGrowth(RootArchitecture):
     SHARED = RootArchitecture.SHARED + ("resp_growth", "hexose_growth_demand", "hexose_consumption_by_growth_amount",
                                         "hexose_consumption_by_growth", "hexose_consumption_by_fungus")
     SEGMENTATION_PARAMETERS = RootArchitecture.SEGMENTATION_PARAMETERS
-    LEGACY = dict(RootArchitecture.LEGACY, collar_supply="none")
+    resource_limited = True
     # Whether the last element of a supply zone (the fraction of it the zone takes) is subject to supply_included
     supply_gates_the_last_element = False
 
@@ -238,18 +231,14 @@ class RootGrowth(RootArchitecture):
         return length > 0.
 
     def elongated_length(self, selected, start_length, radius, time, zone):
-        """RootGrowthModel.elongated_length on the *selected* apices: C-free with simple_growth_duration, else
-        Michaelis-Menten on the supply zone's hexose above its threshold (no elongation below). *zone*: {resource
+        """RootGrowthModel.elongated_length on the *selected* apices: Michaelis-Menten on the supply zone's hexose above its threshold (no elongation below). *zone*: {resource
         concentration: its concentration in each apex's supply zone}."""
         EL = self._parameter("EL", selected)
-        if self.simple_growth_duration:
-            elongation = EL * 2. * radius * time
-        else:
-            C = zone["C_hexose_root"][selected]
-            Km = self._parameter("Km_elongation", selected)
-            with np.errstate(divide="ignore", invalid="ignore"):
-                elongation = np.where(C > self._parameter("C_hexose_min_for_elongation", selected),
-                                      EL * 2. * radius * C / (Km + C) * time, 0.)
+        C = zone["C_hexose_root"][selected]
+        Km = self._parameter("Km_elongation", selected)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            elongation = np.where(C > self._parameter("C_hexose_min_for_elongation", selected),
+                                  EL * 2. * radius * C / (Km + C) * time, 0.)
         return start_length + elongation
 
     def thickening_rate(self, selected):
@@ -339,7 +328,7 @@ class RootGrowth(RootArchitecture):
                             events.append((apex, current, None))
                             remaining = remaining - volume[current]
                         if parents[current] < 0:            # the base: the collar's other children
-                            excluded = {previous} if self.collar_supply == "rootbridges" else {previous, own}
+                            excluded = {previous, own}
                             children = [k for k in collar_children.tolist()
                                         if owner_plant[k] == owner_plant[apex] and k not in excluded and length[k] > 0.]
                             # Python's sum of floats (compensated since 3.12), as Root_BRIDGES sums them
@@ -407,22 +396,18 @@ class RootGrowth(RootArchitecture):
 
     def limited_potential_radius(self, normal, theoretical_radius, potential_radius, radius, initial_radius, length,
                                  temperature_factor, time_step) -> None:
-        """The segments' potential radius: their pipe-model radius, at most what their hexose allows in the step
-        (none with simple_growth_duration)."""
+        """The segments' potential radius: their pipe-model radius, at most what their hexose allows in the step."""
         ds = self.data_structure
         new_theoretical_radius, new_potential_radius = theoretical_radius, potential_radius
         C_hexose_root = np.asarray(ds.get("C_hexose_root"), dtype=float)
         C_hexose_min_for_thickening = self._parameter("C_hexose_min_for_thickening")
-        if self.simple_growth_duration:
-            new_potential_radius[normal] = new_theoretical_radius[normal]
-        else:
-            selected = (normal & (length > 0.) & (new_theoretical_radius > radius)
-                        & (C_hexose_root > C_hexose_min_for_thickening))
-            rate = self.thickening_rate(selected)
-            rate = rate * temperature_factor[selected]
-            largest = (1 + rate * time_step) * initial_radius[selected]
-            new_potential_radius[selected] = np.where(new_theoretical_radius[selected] > largest, largest,
-                                                      new_theoretical_radius[selected])
+        selected = (normal & (length > 0.) & (new_theoretical_radius > radius)
+                    & (C_hexose_root > C_hexose_min_for_thickening))
+        rate = self.thickening_rate(selected)
+        rate = rate * temperature_factor[selected]
+        largest = (1 + rate * time_step) * initial_radius[selected]
+        new_potential_radius[selected] = np.where(new_theoretical_radius[selected] > largest, largest,
+                                                  new_theoretical_radius[selected])
 
     # ── Actual growth (RootGrowthModel.actual_growth_and_corresponding_respiration) ───────────────────────────
 
@@ -460,10 +445,7 @@ class RootGrowth(RootArchitecture):
         available = for_thickening["C_hexose_root"]
         increase = available * 6. * yield_growth / (root_tissue_density * C_content)
         volume_max = volume_of(type, initial_radius, length) + increase
-        if self.legacy_nodule_radius:                   # g5: a constant
-            nodule_radius = (3. / (4. * pi)) ** (1. / 3.)
-        else:                                           # the sphere of the volume reached
-            nodule_radius = power(3. * volume_max / (4. * pi), 1. / 3.)
+        nodule_radius = power(3. * volume_max / (4. * pi), 1. / 3.)      # the sphere of the volume reached (g5)
         possible_radius = np.where(type == TYPE_NODULE, nodule_radius, np.sqrt(volume_max / (length * pi)))
         fits = possible_radius <= potential_radius
         radius = np.where(fits, possible_radius, potential_radius)

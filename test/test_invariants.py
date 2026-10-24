@@ -11,8 +11,7 @@ from openalea.rhizodep.parameter_sets import WHEAT_SOISSON
 
 @pytest.fixture(scope="module")
 def run():
-    return port_run(dict(WHEAT_SOISSON, nodules=False), n_steps=96, C_hexose_root=1e-3, record_every=1,
-                    legacy=False)
+    return port_run(dict(WHEAT_SOISSON, nodules=False), n_steps=96, C_hexose_root=1e-3, record_every=1)
 
 
 def test_the_hexose_consumed_makes_the_mass_produced(run):
@@ -40,7 +39,7 @@ def test_convergence_with_the_time_step():
         values = []
         for seed in (1, 2, 3):
             run = port_run(dict(WHEAT_SOISSON, random_choice=seed), n_steps=int(5 * 86400 / time_step),
-                           time_step=time_step, record_every=int(5 * 86400 / time_step), legacy=False)
+                           time_step=time_step, record_every=int(5 * 86400 / time_step))
             values.append(sum(run.steps[-1].props["length"].values()))
         lengths[time_step] = np.mean(values)
     assert lengths[900] == pytest.approx(lengths[1800], rel=0.05)

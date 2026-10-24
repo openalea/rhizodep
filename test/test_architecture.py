@@ -1,13 +1,11 @@
-"""RootArchitecture, the C-free root architecture (ArchiSimple), by its properties (devplan §23, D-P7c): it has no
-legacy to be compared with bit for bit (the legacy's ArchiSimple_growth is never called, and could not segment)."""
+"""RootArchitecture, the C-free root architecture (ArchiSimple), by its properties (devplan §23, D-P7c)."""
 import numpy as np
 import pytest
 
 from openalea.rhizodep.architecture import RootArchitecture, TYPE_BEFORE_EMERGENCE, TYPE_EMERGED
-from openalea.rhizodep.comparison.legacy_run import STAGES, _run_stage, legacy_model, write_C_hexose_root
-from openalea.rhizodep.comparison.legacy_run import snapshot as legacy_snapshot
 from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON
-from openalea.rhizodep.comparison.port_run import port_run, port_scene, run_stage, snapshot, transplant_scene
+from openalea.rhizodep.comparison.drawing import totals
+from openalea.rhizodep.comparison.port_run import port_run, port_scene, run_stage
 from openalea.rhizodep.growth import RootGrowth
 
 # wheat_soisson's parameters the architecture has (the others are its growth's: resources, root hairs)
@@ -68,31 +66,6 @@ def test_half_satisfied_growth_takes_half_the_increments():
     assert np.sum(np.array(ds.get("struct_mass_produced"))) == pytest.approx(demand / 2., rel=1e-9)
 
 
-def test_the_satisfaction_coefficient_is_the_legacy_one():
-    """On the legacy's state after its potential growth, the legacy's satisfaction_coefficient and the port's agree
-    bit for bit (the demand summed in the same order)."""
-    model = legacy_model(WHEAT_SOISSON)
-    for step in range(100):
-        write_C_hexose_root(model, step, 1e-3)
-        for stage in STAGES:
-            _run_stage(model, stage)
-    write_C_hexose_root(model, 100, 1e-3)
-    _run_stage(model, "potential")
-    record = legacy_snapshot(model)
-    demand = 1. / model.satisfaction_coefficient(1.)              # the legacy's demand, from its coefficient
-    offered = 0.4 * demand
-    legacy = model.satisfaction_coefficient(offered)
-    scene = transplant_scene(record, ARCHITECTURE_GB, component=RootArchitecture)
-    ds = scene.populations[0].data_structure
-    ds.set("struct_mass_input", np.full(1, offered))
-    growth = scene.populations[0].instance.growth
-    arrays = [np.array(ds.get(name)) for name in ("type", "initial_radius", "initial_length", "potential_radius",
-                                                   "potential_length", "root_tissue_density")]
-    port = growth.satisfaction_coefficient(*arrays)[0]
-    assert 0. < legacy < 1.
-    assert port == min(legacy, 1.)
-
-
 def test_the_root_system_develops():
     run = port_run(ARCHITECTURE_GB, n_steps=240, C_hexose_root=None, record_every=240, component=RootArchitecture)
     first, last = run.steps[0], run.steps[-1]
@@ -103,14 +76,15 @@ def test_the_root_system_develops():
 
 
 def test_as_root_growth_with_hexose_in_excess():
-    """RootArchitecture against RootGrowth with simple_growth_duration (C-free elongation and durations) and hexose in
-    excess: the same root system, up to the rounding of ArchiSimple's increments (L0 + (L - L0) · 1)."""
-    parameters = dict(WHEAT_SOISSON, simple_growth_duration=True)
-    architecture = port_run({k: v for k, v in parameters.items() if k in RootArchitecture.__dataclass_fields__},
-                            n_steps=120, C_hexose_root=None, record_every=120, component=RootArchitecture).steps[-1]
-    growth = port_run(parameters, n_steps=120, C_hexose_root=1., record_every=120, component=RootGrowth).steps[-1]
-    assert architecture.vertices == growth.vertices
-    assert all(architecture.parent[v] == growth.parent[v] for v in growth.vertices)
-    for name in ("length", "radius", "type"):
-        np.testing.assert_allclose([architecture.props[name][v] for v in growth.vertices],
-                                   [growth.props[name][v] for v in growth.vertices], rtol=1e-9, err_msg=name)
+    """RootArchitecture against RootGrowth with hexose in excess: about the same root system (RootGrowth's laterals
+    emerge one at a time per bearer, its thickening at a limited rate), over seeds."""
+    architecture, growth = [], []
+    for seed in (1, 2, 3):
+        parameters = dict(WHEAT_SOISSON, random_choice=seed)
+        architecture.append(totals(port_run({k: v for k, v in parameters.items()
+                                             if k in RootArchitecture.__dataclass_fields__},
+                                            n_steps=120, C_hexose_root=None, record_every=120,
+                                            component=RootArchitecture).steps[-1])["length"])
+        growth.append(totals(port_run(parameters, n_steps=120, C_hexose_root=1., record_every=120,
+                                      component=RootGrowth).steps[-1])["length"])
+    assert np.mean(growth) == pytest.approx(np.mean(architecture), rel=0.05)

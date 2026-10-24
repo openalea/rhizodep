@@ -8,13 +8,12 @@ growth, besides hexose.
                        the laterals' growth durations follow the nitrate transporters' affinity; the nodal roots' emergence
                        can follow the shoot's phytomers (synchronize_adventitious_emergence).
 
-With its LEGACY preset, it reproduces Root_BRIDGES bit for bit (test/nitrogen: its states and whole runs, compared with
-Root_BRIDGES itself in the Wheat-BRIDGES environment), quirks included:
+Root_BRIDGES' formulas are kept as they are (its version at the tag port-exact reproduces Root_BRIDGES bit for bit):
 - its root thickening rate uses the nodules' Km values, and halves the whole rate;
 - its C-limited elongation volume divides the C content net of the amino acids' before the yield, its cost after;
 - its root hairs are regulated by the plain mean of the C and N factors, its elongation by their C share.
-By default, it takes RootGrowth's reviewed fixes (devplan §25), Root_BRIDGES' own fixes included (the pipe model that
-sees its children, a primordium's soil temperature from its mother, the collar supply).
+It takes RootGrowth's reviewed fixes (devplan §25), Root_BRIDGES' own included (the pipe model that sees its children,
+a primordium's soil temperature from its mother, the collar supply).
 """
 from dataclasses import dataclass
 
@@ -94,10 +93,6 @@ class RootGrowthCN(RootGrowth):
 
     resources = (HEXOSE, AMINO_ACIDS)
     supply_gates_the_last_element = True
-    # Root_BRIDGES' behaviours: the legacy's, but for its pipe model (it sees its children), its primordia's soil
-    # temperature (their mother's) and its collar supply
-    LEGACY = dict(RootGrowth.LEGACY, legacy_pipe_model=False, legacy_primordium_soil_temperature=False,
-                  collar_supply="rootbridges")
 
     @classmethod
     def initiate_plant(cls, g, plant, parameters):
@@ -106,15 +101,6 @@ class RootGrowthCN(RootGrowth):
         for vid in g.components_at_scale(plant, g.scales.SubOrgan):
             if g.property("type").get(vid) == TYPE_ADVENTITIOUS_BEFORE_EMERGENCE:
                 awaiting[vid] = 1
-
-    @classmethod
-    def transplanted(cls, g, plant, record, vids):
-        """On a transplanted Root_BRIDGES state: the primordia not synchronised yet (its adventitous_primordia_to_emerge)."""
-        awaiting = g.property("nodal_awaiting_synchronisation")
-        for vid in vids.values():
-            awaiting[vid] = 0
-        for legacy_id in record.meta.get("adventitious_primordia_to_emerge", {}):
-            awaiting[vids[legacy_id]] = 1
 
     def synchronise_emergence(self, type, thermal_time_since_primordium_formation, emergence_delay_in_thermal_time):
         """Root_BRIDGES' synchronisation: when visited, the next nodal primordium (the earliest delay among those
@@ -160,8 +146,6 @@ class RootGrowthCN(RootGrowth):
     def elongated_length(self, selected, start_length, radius, time, zone):
         p = self._parameter
         EL = p("EL", selected)
-        if self.simple_growth_duration:
-            return start_length + EL * 2. * radius * time
         ds = self.data_structure
         C, AA = zone["C_hexose_root"][selected], zone["AA"][selected]
         share = self._C_share_of_amino_acids(selected)

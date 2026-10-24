@@ -337,60 +337,10 @@ class RootArchitecture(StructuralComponent):
               value_comment='infinite by default: no limitation'),
         by='model_shoot', initialize=float("inf"), scale=ScalesConfig.Plant)
 
-    # --- The legacy's behaviours (devplan §6, §25): the reviewed fixes are the defaults; True reproduces the legacy
-    # (LEGACY, the comparisons' preset)
-    legacy_pipe_model: bool = parameter(**doc('adim', "The legacy's pipe model, blind to its children (g16): it "
-                                                      "compares child.edge_type, a method, with '<' and '+', so no "
-                                                      "child's section counts and roots never thicken"),
-                                        by=BY, default=False)
-    legacy_primordium_soil_temperature: bool = parameter(
-        **doc('adim', "A new primordium's soil temperature: the legacy's 7.8 °C (g3), else its mother's"),
-        by=BY, default=False)
-    legacy_segmentation_masses: bool = parameter(
-        **doc('adim', "Segmentation shares an apex's amounts by the segments' mass relative to the apex's mass before "
-                      "growth, its living root hairs' too (g1), which loses amounts; else after growth"),
-        by=BY, default=False)
-    legacy_growth_duration_draws: bool = parameter(
-        **doc('adim', "The probabilistic growth durations' if/if (g4): a low duration drawn, then overwritten; and no "
-                      "duration for a thin root without GD_by_frequency (it raises); else exclusive classes, the "
-                      "thinnest roots taking GD_high"),
-        by=BY, default=False)
-    legacy_nodule_radius: bool = parameter(
-        **doc('adim', "A nodule's thickening to the constant radius (3 / 4π)^(1/3) (g5), else to its volume's"),
-        by=BY, default=False)
-    legacy_zero_temperature: bool = parameter(
-        **doc('adim', "Actual times divided by a zero temperature factor (g6, infinite); else 0 then"),
-        by=BY, default=False)
-    legacy_support_development: bool = parameter(
-        **doc('adim', "The zero-length supports take their axis apex's stop and die with their children (g11); else "
-                      "they keep their type, as rhizodep's main branch guards them"),
-        by=BY, default=False)
-    legacy_lateral_growth_extender: bool = parameter(
-        **doc('adim', "The main roots' growth extender also on the laterals' durations (g18): laterals no longer "
-                      "determinate (ArchiSimple's GDs·d², Pagès et al. 2014, Eq. 2); else on the first-order roots "
-                      "only"),
-        by=BY, default=False)
-    legacy_lateral_diameter_threshold: bool = parameter(
-        **doc('adim', "A lateral formed if its radius reaches Dmin, a diameter (g19: the threshold doubled); else if "
-                      "its diameter does"),
-        by=BY, default=False)
-    legacy_branching_positions: bool = parameter(
-        **doc('adim', "A lateral too thin to form keeps its branching position for the next segment (g20); else the "
-                      "position is used, so branching density falls with the mother's diameter (Pagès et al. 2014, "
-                      "§3.5)"),
-        by=BY, default=False)
-    legacy_dead_living_mass: bool = parameter(
-        **doc('adim', "Dead elements' structural mass counted as living (g22); else none"),
-        by=BY, default=False)
     life_duration_diameter_exponent: float = parameter(
         **doc('adim', "The exponent of the diameter in the life duration LDs·d^e·density: 1, the legacy's and main's; "
                       "2, ArchiSimple's (Pagès et al. 2014, Eq. 3, LDs then recalibrated) (g21)"),
         by=BY, default=1.)
-    legacy_seedling_seeds: bool = parameter(
-        **doc('adim', "The seedling's draws seeded by random_choice + i·j (g15): with one root per emergence event, "
-                      "j = 0, every seminal (nodal) root the same draws; else seeded by its support's id"),
-        by=BY, default=False)
-
     # --- Plant-scale state ---
     total_living_struct_mass: float = state_variable(**doc('g', 'Living structural mass of the root system',
                                                            unit_comment='of dry weight'),
@@ -595,18 +545,11 @@ class RootArchitecture(StructuralComponent):
            "thermal_potential_time_since_emergence", "thermal_time_since_growth_stopped", "thermal_time_since_death")
 
 
-    # The options' values reproducing the legacy (the comparisons' preset; devplan §25)
-    LEGACY = dict(legacy_pipe_model=True, legacy_primordium_soil_temperature=True, legacy_segmentation_masses=True,
-                  legacy_growth_duration_draws=True, legacy_nodule_radius=True, legacy_zero_temperature=True,
-                  legacy_support_development=True, legacy_seedling_seeds=True, legacy_lateral_growth_extender=True,
-                  legacy_lateral_diameter_threshold=True, legacy_branching_positions=True,
-                  legacy_dead_living_mass=True, life_duration_diameter_exponent=1.)
-
     # The resources of growth (RootGrowth's, devplan §21): none, the architecture is C-free
     resources = ()
-    # ArchiSimple's development: C-free elongation, durations from the square diameter, emergence at once (the legacy's
-    # simple_growth_duration branch; RootGrowth makes it a parameter)
-    simple_growth_duration = True
+    # ArchiSimple's development: elongation and thickening not limited by resources, emergence at once (RootGrowth's
+    # is limited by its resources), durations from the square diameter (RootGrowth's: its growth_duration_rule)
+    resource_limited = False
     growth_duration_rule = "simple"
     # Variables zeroed at each step's start besides the resources' (RootGrowth: the respiration, the fungus' share)
     ZEROED_AT_START = ()
@@ -678,11 +621,8 @@ class RootArchitecture(StructuralComponent):
                                        (TYPE_ADVENTITIOUS_SUPPORT, TYPE_ADVENTITIOUS_BEFORE_EMERGENCE))
             for i, (delay, roots_per_event) in enumerate(events):
                 for j in range(int(roots_per_event)):
-                    # the legacy's np.random.seed(random_choice + i j (· 3)), on the plant's stream
-                    if parameters["legacy_seedling_seeds"]:
-                        stream.seed(int(parameters["random_choice"]) + i * j * (1 if kind == "seminal" else 3))
-                    else:                                   # by root: its support's id, the next element's
-                        stream.seed(int(parameters["random_choice"]) * (len(elements) + 1))
+                    # seeded by root: its support's id, the next element's (g15)
+                    stream.seed(int(parameters["random_choice"]) * (len(elements) + 1))
                     segment = nil_child(segment, "<", False, support_type, 0,
                                         abs(stream.normal(180 if kind == "seminal" else 0, 180)), 0., base_radius)
                     mean = parameters["D_ini"] / 2. * ratio
@@ -859,10 +799,7 @@ class RootArchitecture(StructuralComponent):
     # read with self._parameter. A hook may also write variables its subclass declares (self.data_structure.set).
 
     def _actual_time(self, thermal_time, temperature_factor):
-        """The actual time of a thermal time: divided by the temperature factor; 0 when it is 0 (else the legacy's
-        division, g6)."""
-        if self.legacy_zero_temperature:
-            return thermal_time / temperature_factor
+        """The actual time of a thermal time: divided by the temperature factor; 0 when it is 0 (g6)."""
         return np.where(temperature_factor > 0., thermal_time / np.where(temperature_factor > 0., temperature_factor,
                                                                          1.), 0.)
 
@@ -983,7 +920,7 @@ class RootArchitecture(StructuralComponent):
             - emergence_delay_in_thermal_time[selected], selected)
         new_potential_length[selected] = elongated(selected, initial_length, initial_radius,
                                                    potential_time_since_emergence[selected])
-        if self.simple_growth_duration:
+        if not self.resource_limited:
             new_type[selected] = TYPE_EMERGED
         clocks.advance(primordium, time_step, thermal_time_step, "primordium_formation")
 
@@ -996,7 +933,7 @@ class RootArchitecture(StructuralComponent):
                                                    potential_time_since_emergence[selected])
         possibility, primordium_index = np.array(lateral_root_emergence_possibility), np.array(
             lateral_primordium_index)
-        if self.simple_growth_duration:
+        if not self.resource_limited:
             new_type[selected] = TYPE_EMERGED
         else:
             visit = ds.order("post", convention="openalea")
@@ -1081,9 +1018,8 @@ class RootArchitecture(StructuralComponent):
         new_type = np.array(type)
         apex_node = self._nodes_of(vertex_index, axis_apex_id)
         apex_type = np.where(apex_node >= 0, type[np.maximum(apex_node, 0)], -1)
-        developing = normal
-        if not self.legacy_support_development:         # the supports keep their type (rhizodep's main, g11)
-            developing = normal & ~np.isin(type, (TYPE_SEMINAL_SUPPORT, TYPE_ADVENTITIOUS_SUPPORT))
+        # the supports keep their type (rhizodep's main, g11)
+        developing = normal & ~np.isin(type, (TYPE_SEMINAL_SUPPORT, TYPE_ADVENTITIOUS_SUPPORT))
         new_type[developing & (apex_type == TYPE_JUST_STOPPED)] = TYPE_JUST_STOPPED
         new_type[developing & (apex_type == TYPE_STOPPED)] = TYPE_STOPPED
 
@@ -1107,13 +1043,10 @@ class RootArchitecture(StructuralComponent):
             dead_type = np.where((own_type == TYPE_JUST_DEAD) | (own_type == TYPE_DEAD), TYPE_DEAD, TYPE_JUST_DEAD)
             level_type = np.where(all_dead, dead_type, own_type)
             if self.radial_growth:
-                if self.legacy_pipe_model:
-                    successor_section = lateral_sections = np.zeros(nodes.size)
-                else:
-                    section = power(out[:, 0], 2) * pi
-                    successor_section = level.children(section, op="sum", edge="<")
-                    lateral_sections = level.children(section, op="sum", edge="+",
-                                                      where=(length > 0.) & (child_type != TYPE_NODULE))
+                section = power(out[:, 0], 2) * pi
+                successor_section = level.children(section, op="sum", edge="<")
+                lateral_sections = level.children(section, op="sum", edge="+",
+                                                  where=(length > 0.) & (child_type != TYPE_NODULE))
                 pipe_radius = np.sqrt(successor_section / pi + SGC[nodes] * lateral_sections / pi)
                 start_radius = initial_radius[nodes]
                 pipe_radius = np.where((pipe_radius - start_radius) <= 0.001 * start_radius, start_radius, pipe_radius)
@@ -1373,14 +1306,7 @@ class RootArchitecture(StructuralComponent):
         initial_elongation = properties["actual_elongation"][apex]
         initial_elongation_rate = properties["actual_elongation_rate"][apex]
         shared = {name: properties[name][apex] for name in self.SHARED}
-        # (g1) the legacy overwrites its initial_struct_mass and initial_living_root_hairs_struct_mass with the apex's
-        # values before growth: the mass fraction is relative to the mass before growth, and the living root hairs'
-        # mass is shared from their mass before growth
-        if self.legacy_segmentation_masses:
-            initial_struct_mass = properties["initial_struct_mass"][apex]
-            shared["living_root_hairs_struct_mass"] = properties["initial_living_root_hairs_struct_mass"][apex]
-        else:
-            initial_struct_mass = properties["struct_mass"][apex]
+        initial_struct_mass = properties["struct_mass"][apex]          # the mass after growth (g1)
         segment_length = parameters["segment_length"]
 
         if initial_length <= segment_length:
@@ -1494,10 +1420,9 @@ class RootArchitecture(StructuralComponent):
         if potential_radius > radius:
             potential_radius = radius
         dist_to_ramif = properties["dist_to_ramif"][apex]
-        size = potential_radius if self.legacy_lateral_diameter_threshold else 2. * potential_radius      # g19
-        if not (dist_to_ramif > parameters["IPD"] and size >= Dmin and potential_radius <= radius):
-            if dist_to_ramif > parameters["IPD"] and not self.legacy_branching_positions:              # g20
-                properties["dist_to_ramif"][apex] = dist_to_ramif - parameters["IPD"]                  # position used
+        if not (dist_to_ramif > parameters["IPD"] and 2. * potential_radius >= Dmin and potential_radius <= radius):  # g19
+            if dist_to_ramif > parameters["IPD"]:                                     # the position used (g20)
+                properties["dist_to_ramif"][apex] = dist_to_ramif - parameters["IPD"]
             return []
         elongation_since_last_ramif = dist_to_ramif - parameters["IPD"]
         properties["angle_roll"][apex] = apex_angle_roll
@@ -1509,11 +1434,9 @@ class RootArchitecture(StructuralComponent):
                                   primordium_angle_roll, 0., potential_radius)
         self._new_element_soil_temperature(properties, values, apex)
         ramif = self._new_element(g, properties, apex, "+", True, values, context)
-        if self.simple_growth_duration or self.growth_duration_rule == "simple":
+        if self.growth_duration_rule == "simple":                     # determinate laterals, no extender (g18)
             properties["growth_duration"][ramif] = (parameters["GDs"] * (2. * potential_radius) ** 2
-                                                    * self.lateral_growth_duration_factor(properties, apex)
-                                                    * (parameters["main_roots_growth_extender"]
-                                                       if self.legacy_lateral_growth_extender else 1))
+                                                    * self.lateral_growth_duration_factor(properties, apex))
         else:
             properties["growth_duration"][ramif] = self._growth_duration(
                 potential_radius, int(properties["vertex_index"][ramif]), root_order + 1, parameters, stream)
@@ -1524,34 +1447,23 @@ class RootArchitecture(StructuralComponent):
         return [apex, ramif]
 
     def _new_element_soil_temperature(self, properties, values, mother):
-        """A primordium's soil temperature: its mother's (as Root_BRIDGES), or the legacy's 7.8 °C (g3)."""
-        if self.legacy_primordium_soil_temperature:
-            values["soil_temperature"] = 7.8
-        else:
-            values["soil_temperature"] = self._value(properties, "soil_temperature", mother)
+        """A primordium's soil temperature: its mother's (as Root_BRIDGES; g3)."""
+        values["soil_temperature"] = self._value(properties, "soil_temperature", mother)
 
     def lateral_growth_duration_factor(self, properties, apex):
-        """Hook: the factor of a lateral primordium's growth duration with simple_growth_duration, from its bearing
+        """Hook: the factor of a lateral primordium's growth duration with the "simple" rule, from its bearing
         apex (*properties*: the MPG's; the legacy: 1)."""
         return 1.
 
     def _growth_duration(self, radius, legacy_id, root_order, parameters, stream):
-        """RootGrowthModel.calculate_growth_duration (not simple_growth_duration): a duration drawn among classes
+        """RootGrowthModel.calculate_growth_duration (the "probabilistic" rule): a duration drawn among classes
         (low, medium, high) by their probabilities, uniformly within the class (GD_by_frequency), or the class's
-        value. The legacy's if/if and its unassigned branch with legacy_growth_duration_draws (g4)."""
+        value; the classes exclusive, the thinnest roots taking GD_high (g4)."""
         stream.seed(int(parameters["random_choice"]) * legacy_id)
         draw = stream.random_sample()
         if root_order == 1:
             return parameters["GD_highest"]
         if self.GD_by_frequency:
-            if self.legacy_growth_duration_draws:
-                if draw < parameters["GD_prob_low"]:
-                    duration = stream.uniform(0., parameters["GD_low"])
-                if draw < parameters["GD_prob_medium"]:
-                    duration = stream.uniform(parameters["GD_low"], parameters["GD_medium"])
-                else:
-                    duration = stream.uniform(parameters["GD_medium"], parameters["GD_high"])
-                return duration
             if draw < parameters["GD_prob_low"]:
                 return stream.uniform(0., parameters["GD_low"])
             if draw < parameters["GD_prob_medium"]:
@@ -1563,9 +1475,6 @@ class RootArchitecture(StructuralComponent):
             return parameters["GD_medium"]
         if radius > 2 * parameters["Dmin"] / 2.:
             return parameters["GD_highest"]
-        if self.legacy_growth_duration_draws:
-            raise ValueError(f"no growth duration for a radius of {radius} m (the legacy's calculate_growth_duration "
-                             "leaves it unassigned, g4)")
         return parameters["GD_high"]
 
     def _nodule_formation(self, g, properties, mother, context):
@@ -1631,12 +1540,11 @@ class RootArchitecture(StructuralComponent):
     @postsegmentation
     def _living_struct_mass(self, struct_mass, living_root_hairs_struct_mass, vertex_index,
                             type) -> outputs(1):
-        """The living structural mass (none for a dead element, unless legacy_dead_living_mass, g22), and the plant's
+        """The living structural mass (none for a dead element, g22), and the plant's
         total, summed in the legacy's order (its vertices' ids)."""
         ds = self.data_structure
         living = struct_mass + living_root_hairs_struct_mass
-        if not self.legacy_dead_living_mass:
-            living = np.where(np.isin(type, (TYPE_DEAD, TYPE_JUST_DEAD)), 0., living)
+        living = np.where(np.isin(type, (TYPE_DEAD, TYPE_JUST_DEAD)), 0., living)
         owner = np.asarray(ds.owner("Plant"))
         totals = np.zeros(np.asarray(ds.entity_ids("Plant")).size)
         for plant in np.unique(owner):

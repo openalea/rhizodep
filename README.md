@@ -39,12 +39,18 @@ StructuralComponents growing the root system in metafspm's multiscale plant grap
 
 - `openalea.rhizodep.architecture.RootArchitecture`: the root architecture, C-free (ArchiSimple: development,
   segmentation, laterals; growth the potential one times a satisfaction coefficient);
-- `openalea.rhizodep.growth.RootGrowth`: the architecture with its growth limited by resources (hexose), bit for bit
-  the original component's results; its hooks let a subclass add resources;
-- `openalea.rhizodep.growth_CN.RootGrowthCN`: Root_BRIDGES' carbon-nitrogen growth (amino acids co-limiting growth),
-  bit for bit Root_BRIDGES' results with its LEGACY preset (`test/nitrogen`);
+- `openalea.rhizodep.growth.RootGrowth`: the architecture with its growth limited by resources (hexose), the original
+  component's model; its hooks let a subclass add resources;
+- `openalea.rhizodep.growth_CN.RootGrowthCN`: Root_BRIDGES' carbon-nitrogen growth (amino acids co-limiting growth);
 - `openalea.rhizodep.parameter_sets`: a wheat (cv. Soissons, Wheat-BRIDGES' calibration) and ArchiSimple's
-  calibrations of pea, maize and peach (Pagès et al., 2014). metafspm is not installable from `openalea3` in
+  calibrations of pea, maize and peach (Pagès et al., 2014).
+
+The port reproduced the original component, and Root_BRIDGES', bit for bit: the tag `port-exact` keeps that state,
+its bitwise tests and the original's behaviours as options. Since then, the port leaves the original's float exactness
+(`devplan_metafspm.md` §29) and is validated statistically against that tag (`test/test_ensembles.py`) and by its
+invariants (`test/test_invariants.py`).
+
+metafspm is not installable from `openalea3` in
 this version yet: clone the repositories side by side on their working branches and install them from source.
 
 ```bash
@@ -59,20 +65,18 @@ pip install -e rhizodep
 ```
 
 Tutorial: [the root architecture and its growth in metafspm](example/tutorials/tutorial_metafspm_01_root_growth.ipynb)
-(a plant model and its scenario, the MPG's grouping, RootArchitecture and its satisfaction coefficient, the legacy's
-behaviours and the reviewed fixes, a resource subclass, the coupling with other models). Run it with
-`jupyter lab example/tutorials/`.
+(a plant model and its scenario, the MPG's grouping, RootArchitecture and its satisfaction coefficient, a resource
+subclass, the coupling with other models, populations, species). Run it with `jupyter lab example/tutorials/`.
 
-Some behaviours of the original component were errors (`devplan_metafspm.md` §6, §25): each is an option
-(`legacy_*`, `collar_supply`), its default the fix; `RootGrowth.LEGACY` reproduces the original, and
-`example/comparison/compare_fixes.py` shows each fix's effect.
+Some behaviours of the original component were errors (`devplan_metafspm.md` §6, §25): the port has the fixes only
+(the tag `port-exact` has the original's as options).
 
 The original component is kept, frozen, as `openalea.rhizodep.legacy` (with the former metafspm it was written on,
-vendored): the reference the port is compared with, bit for bit (`test/comparison/`). To see both side by side:
+vendored). To see both side by side, and their costs:
 
 ```bash
 cd rhizodep/example/comparison
-python compare_root_systems.py --days 10        # figures in outputs/root_systems/
+python compare_root_systems.py --days 10 --seeds 8   # figures in outputs/root_systems/, totals over seeds
 python profile_growth.py --days 15              # the cost of each, per step and stage: outputs/profiling/
 ```
 

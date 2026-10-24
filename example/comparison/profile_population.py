@@ -1,7 +1,7 @@
 """
 A population in one MPG against the legacy plant by plant: the legacy grows one plant per model (its MTG, its
 loops), so N plants cost N runs; the port grows the N plants together, their elements in the same arrays, each step
-one call (test/test_population.py: each plant identical to the legacy grown alone).
+one call (test/test_population.py: each plant identical to the same plant grown alone).
 
     left     the time of the run against the number of plants, legacy (N runs) and port (one population)
     right    the time per plant
@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from openalea.rhizodep.comparison.legacy_run import legacy_run
-from openalea.rhizodep.comparison.parameter_sets import variants
+from openalea.rhizodep.comparison.parameter_sets import PARAMETER_SETS
 from openalea.rhizodep.comparison.port_run import port_run
 
 OUTPUTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "outputs", "profiling")
@@ -50,7 +50,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--plants", type=int, nargs="*", default=[1, 2, 4, 8, 16, 32])
     parser.add_argument("--days", type=float, default=7.)
-    parser.add_argument("--set", default="wheat_soisson/simple_growth_duration=False")
+    parser.add_argument("--set", default="wheat_soisson")
     parser.add_argument("--show", action="store_true")
     args = parser.parse_args()
     if not args.show:
@@ -59,7 +59,7 @@ def main():
     n_steps = int(round(args.days * 24))
     legacy, port = [], []
     for n in args.plants:
-        plants = scenarios(variants()[args.set], n)
+        plants = scenarios(PARAMETER_SETS[args.set], n)
         legacy.append(time_legacy(plants, n_steps))
         port.append(time_port(plants, n_steps))
         print(f"{n:3d} plants, {legacy[-1][1]} elements: legacy {legacy[-1][0]:7.1f} s, port {port[-1][0]:6.1f} s "
