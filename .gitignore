@@ -77,3 +77,6 @@ saving_outputs
 /src/rhizodep/model_old.py
 /src/rhizodep/simulation_old.py
 /simulations/running_scenarios/outputs
+
+
+/dev*.md

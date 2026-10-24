@@ -4,7 +4,6 @@ The models below are written on the former metafspm API: they are imported on fi
 frozen ``legacy`` growth component, the port) can be imported with the current metafspm installed."""
 _LAZY = {
     "RootCarbonModel": ".root_carbon",
-    "RootGrowthModel": ".root_growth",
     "RhizoInputsSoilModel": ".soil_module",
     "RhizoDep": ".rhizodep",
 }

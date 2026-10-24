@@ -1,0 +1,23 @@
+name: rhizodep
+channels:
+  - openalea3
+  - conda-forge
+dependencies:
+  # Brought by metafpsm
+  - python
+  - pyyaml
+  - numpy
+  - numba
+  - openalea.mtg
+  - scipy
+  - pandas
+  - pip
+  - pytest
+  # openalea.archisimple's drawings
+  - openalea.plantgl
+  - matplotlib
+  # let pip install the rest using pyproject.toml (if you are okay with conda/pip mix)
+  - pip:
+      # openalea.archisimple, beside rhizodep, until it is published in openalea3
+      - -e ../../archisimple
+      - -e .."[doc]"
