@@ -5,11 +5,11 @@ Root systems drawn from a record (a Snapshot of legacy_run, or the port's in the
     draw_root_system(ax, snapshot, color_by="type")
     totals(snapshot)                         {"length": ..., "struct_mass": ..., "apices": ..., "lateral_apices": ...}
 
-The geometry is the one rhizodep's turtle draws (tools.get_root_visitor) without its gravitropism: each element starts
-where its parent ends, its parent's frame rolled by its azimuth (the direction it leaves the base in), turned from its
-parent's direction by angle_down (pitch) then angle_roll (roll), and goes
-`length` along that direction; the collar points down. The same function draws both sides, so a difference in the
-drawing is a difference in the topology, the lengths or the angles.
+The geometry is rhizodep's (tools.plot_mtg and get_root_visitor), drawn by PlantGL's turtle: from the plant's
+position, pointing down, each element turns down by angle_down then rolls by angle_roll (a root leaving the base first
+rolls by its azimuth), bends towards the vertical by its gravitropism (gravitropism · its original radius over the
+base's, Wheat-BRIDGES' 0.06 by default), and goes `length` forward. With gravitropism 0 (or without PlantGL), the same
+turtle without tropism. The same function draws the legacy's records and the port's.
 """
 import numpy as np
 
@@ -29,8 +29,50 @@ def _rotation(axis, angle_degrees):
                      [z * x * C - y * s, z * y * C + x * s, c + z * z * C]])
 
 
-def positions(snapshot, origin=(0., 0., 0.)):
+def positions(snapshot, origin=(0., 0., 0.), gravitropism=0.06):
     """{vid: (start, end)}: the elements' end points, by the turtle above, from *origin* (the plant's position)."""
+    try:
+        from openalea.plantgl.all import PglTurtle, Vector3
+    except ImportError:
+        return _positions_without_tropism(snapshot, origin)
+    if not gravitropism:
+        return _positions_without_tropism(snapshot, origin)
+    props = snapshot.props
+    children = {vid: [] for vid in snapshot.vertices}
+    roots = []
+    for vid in snapshot.vertices:
+        parent = snapshot.parent[vid]
+        (children[parent].append(vid) if parent in children else roots.append(vid))
+    turtle = PglTurtle()
+    turtle.down(180)                                   # rhizodep's plot_mtg: the graph upside down
+    turtle.tropism = (0, 0, -1)
+    start_state = (Vector3(*origin), turtle.getHeading(), turtle.getUp())
+    radius = props.get("original_radius", props["radius"])
+    out = {}
+    for root in roots:
+        base_radius = radius.get(root) or 1.
+        stack = [(root, start_state)]
+        while stack:
+            vid, (position, heading, up) = stack.pop()
+            turtle.move(position)
+            turtle.setHead(heading, up)
+            azimuth = props.get("azimuth", {}).get(vid, 0.) or 0.
+            if azimuth:
+                turtle.rollL(azimuth)
+            turtle.down(props["angle_down"].get(vid, 0.) or 0.)
+            turtle.rollL(props["angle_roll"].get(vid, 0.) or 0.)
+            turtle.elasticity = gravitropism * ((radius.get(vid) or 0.) / base_radius)
+            turtle.F(props["length"].get(vid, 0.) or 0.)
+            end = turtle.getPosition()
+            out[vid] = (np.array([position.x, position.y, position.z]), np.array([end.x, end.y, end.z]))
+            state = (Vector3(end), turtle.getHeading(), turtle.getUp())
+            for child in children[vid]:
+                stack.append((child, state))
+    return out
+
+
+def _positions_without_tropism(snapshot, origin=(0., 0., 0.)):
+    """positions without gravitropism (numpy, without PlantGL)."""
     props = snapshot.props
     children = {vid: [] for vid in snapshot.vertices}
     roots = []
