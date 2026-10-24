@@ -103,26 +103,25 @@ class RootGrowthCN(RootGrowth):
                 awaiting[vid] = 1
 
     def synchronise_emergence(self, type, thermal_time_since_primordium_formation, emergence_delay_in_thermal_time):
-        """Root_BRIDGES' synchronisation: when visited, the next nodal primordium (the earliest delay among those
-        not synchronised yet) takes the shoot's next delay, its time since formation restarting; several in one step
-        if the next one is visited later."""
+        """Root_BRIDGES' synchronisation: the next nodal primordium (the earliest delay among those not synchronised
+        yet) takes the shoot's next delay, its time since formation restarting; the nodal primordia visited in
+        ascending ids (their order of formation, Root_BRIDGES' visit of the collar's children), several in one step
+        if the next one comes later."""
         if not self.synchronize_adventitious_emergence:
             return thermal_time_since_primordium_formation, emergence_delay_in_thermal_time
         ds = self.data_structure
         awaiting = np.array(ds.get("nodal_awaiting_synchronisation"))
-        vertex_index = np.asarray(ds.get("vertex_index"))
         plants = np.asarray(ds.entity_ids("Plant"))[np.asarray(ds.owner("Plant"))]
         delays = self.nodal_emergence_delays or {}
 
         def next_one(plant):
-            candidates = np.flatnonzero((awaiting == 1) & (plants == plant))
+            candidates = np.flatnonzero((awaiting == 1) & (plants == plant))       # ascending ids
             if candidates.size == 0:
                 return None
-            candidates = candidates[np.argsort(vertex_index[candidates], kind="stable")]
             return candidates[np.argmin(emergence_delay_in_thermal_time[candidates])]
 
         following = {plant: next_one(plant) for plant in np.unique(plants).tolist()}
-        for element in ds.order("post", convention="openalea").tolist():
+        for element in np.flatnonzero(type == TYPE_ADVENTITIOUS_BEFORE_EMERGENCE).tolist():
             plant = int(plants[element])
             if (type[element] == TYPE_ADVENTITIOUS_BEFORE_EMERGENCE and element == following[plant]
                     and len(delays.get(plant, [])) > 0):

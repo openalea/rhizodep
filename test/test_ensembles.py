@@ -13,6 +13,14 @@ from ensembles import CONFIGURATIONS, METRICS, ensemble  # noqa: E402
 REFERENCE = json.load(open(os.path.join(os.path.dirname(__file__), "reference", "ensembles.json")))
 
 
+def supports(name):
+    """The zero-length supports the reference's seedlings had (one per seminal root but the primary, one per nodal
+    root), which the elements counted since D-X4 no longer include (devplan §32.5)."""
+    component, parameters, _ = CONFIGURATIONS[name]
+    return (parameters.get("n_seminal_roots", component.n_seminal_roots) - 1
+            + parameters.get("n_adventitious_roots", component.n_adventitious_roots))
+
+
 @pytest.mark.parametrize("name", list(CONFIGURATIONS))
 def test_ensemble_agrees_with_the_reference(name):
     reference = REFERENCE["configurations"][name]
@@ -21,6 +29,7 @@ def test_ensemble_agrees_with_the_reference(name):
     for metric in METRICS:
         new = np.array(values[metric])
         ref = reference[metric]
+        mean = ref["mean"] - (supports(name) if metric == "vertices" else 0.)
         error = np.sqrt((ref["std"] ** 2 + new.std(ddof=1) ** 2) / n)          # the difference of two means
-        tolerance = 3. * error + 1e-9 * abs(ref["mean"])
-        assert abs(new.mean() - ref["mean"]) <= tolerance, (metric, new.mean(), ref["mean"], tolerance)
+        tolerance = 3. * error + 1e-9 * abs(mean)
+        assert abs(new.mean() - mean) <= tolerance, (metric, new.mean(), mean, tolerance)

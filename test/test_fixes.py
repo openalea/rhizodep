@@ -3,8 +3,8 @@ the legacy's as options): each fix by its property."""
 import numpy as np
 import pytest
 
-from openalea.rhizodep.architecture import (TYPE_ADVENTITIOUS_SUPPORT, TYPE_NODULE, TYPE_SEMINAL_BEFORE_EMERGENCE,
-                                            TYPE_SEMINAL_SUPPORT)
+from openalea.metafspm.data_structure import random_streams
+from openalea.rhizodep.architecture import TYPE_NODULE, TYPE_SEMINAL_BEFORE_EMERGENCE
 from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON
 from openalea.rhizodep.comparison.port_run import port_run, port_scene, run_stage, snapshot, write_C_hexose_root
 from openalea.rhizodep.growth import RootGrowth
@@ -27,18 +27,15 @@ def test_g4_exclusive_duration_classes():
     """A draw in the low class gives a duration in (0, GD_low): the classes are exclusive."""
     scene = port_scene(dict(WHEAT_SOISSON, GD_by_frequency=True))
     growth = scene.populations[0].instance.growth
-    p = {name: getattr(RootGrowth, name) for name in ("GD_highest", "GD_high", "GD_medium", "GD_low", "GD_prob_low",
-                                                      "GD_prob_medium", "Dmin")}
-    p.update(random_choice=1, GD_low=WHEAT_SOISSON["GD_low"], GD_medium=WHEAT_SOISSON["GD_medium"])
-    lows = 0
-    for element in range(1, 400):
-        stream = np.random.RandomState()
-        stream.seed(element)
-        if stream.random_sample() < p["GD_prob_low"]:          # a draw in the low class
-            lows += 1
-            duration = growth._growth_duration(1e-4, element, 2, p, np.random.RandomState())
-            assert 0. <= duration <= p["GD_low"]
-    assert lows > 50
+    keys = np.arange(1, 400)
+    p = {name: np.full(keys.size, float(getattr(RootGrowth, name))) for name in (
+        "GD_highest", "GD_high", "GD_medium", "GD_low", "GD_prob_low", "GD_prob_medium", "Dmin")}
+    p.update(GD_low=np.full(keys.size, WHEAT_SOISSON["GD_low"]), GD_medium=np.full(keys.size, WHEAT_SOISSON["GD_medium"]))
+    durations = growth._growth_durations(np.full(keys.size, 1e-4), keys, np.full(keys.size, 2), p)
+    low = random_streams.uniform(keys, stream="growth_duration_class") < p["GD_prob_low"]
+    assert low.sum() > 50
+    assert ((durations[low] >= 0.) & (durations[low] <= WHEAT_SOISSON["GD_low"])).all()
+    assert (durations[~low] >= WHEAT_SOISSON["GD_low"]).all()
 
 
 def test_g1_segmentation_conserves_the_shared_amounts():
@@ -65,16 +62,6 @@ def test_g1_segmentation_conserves_the_shared_amounts():
     sums = [(before.props[name][apex], after.props[name][apex] + sum(after.props[name][v] for v in vs))
             for apex, vs in chains.items() if before.props[name][apex] > 0]
     assert sums and all(total == pytest.approx(amount, rel=1e-12) for amount, total in sums)
-
-
-def test_g11_supports_keep_their_type():
-    """The primary root stops within the run (no extender on its duration): its supports keep their type."""
-    first = port_run(SHORT_LIVED, n_steps=0).steps[0]
-    supports = [v for v in first.vertices if first.props["type"][v] in (TYPE_SEMINAL_SUPPORT,
-                                                                        TYPE_ADVENTITIOUS_SUPPORT)][:3]
-    last = port_run(SHORT_LIVED, n_steps=240, record_every=240).steps[-1]
-    assert supports
-    assert all(last.props["type"][v] in (TYPE_SEMINAL_SUPPORT, TYPE_ADVENTITIOUS_SUPPORT) for v in supports)
 
 
 def test_g6_actual_time_at_zero_temperature():

@@ -18,7 +18,7 @@ from openalea.metafspm.solve.decorator import actual, postsegmentation
 # The architecture's names (codes, helpers) are this module's too, as before the split
 from openalea.rhizodep.architecture import *  # noqa: F401,F403
 from openalea.rhizodep.architecture import (BY, DESCRIPTOR, MASSIC, NIE, NII, SubOrgan, RootArchitecture, doc,
-                                            outputs, power)
+                                            outputs)
 
 
 @dataclass(frozen=True)
@@ -283,83 +283,70 @@ class RootGrowth(RootArchitecture):
 
     def _supply(self, supplied, radius, length, volume, struct_mass, growing_zone_factor):
         """
-        The supply zones of the apices *supplied* (RootGrowthModel.calculating_supply_for_elongation), element by
-        element in the legacy's order (the apices visited children first, each zone from the tip to the base):
-        (owner, supplier, {resource concentration: contribution}, mass contribution).
+        The supply zones of the apices *supplied* (RootGrowthModel.calculating_supply_for_elongation): from each apex
+        towards the base, the elements' volumes until the zone's (growing_zone_factor · r³ · π), the last one in part;
+        with the collar supply (g9), a zone reaching the base continues into the collar's other children, by their
+        volume. (owner, supplier, {resource concentration: contribution}, mass contribution).
         """
         ds = self.data_structure
         concentrations = {r.concentration: np.asarray(ds.get(r.concentration), dtype=float) for r in self.resources}
         amounts = {name: concentration * struct_mass for name, concentration in concentrations.items()}
         include = np.asarray(self.supply_included(length, amounts), dtype=bool)
-        budget = growing_zone_factor * radius * power(radius, 2) * pi
-        if self.collar_supply != "none":
-            return self._supply_with_collar(supplied, budget, length, volume, struct_mass, amounts, include)
-        owner, supplier, mass = ds.path_contributions(budget, volume, struct_mass, where=supplied, include=include)
-        contributions = {name: ds.path_contributions(budget, volume, amount, where=supplied, include=include)[2]
-                         for name, amount in amounts.items()}
+        budget = growing_zone_factor * radius * radius ** 2 * pi
+        owner, supplier, taken = ds.path_contributions(budget, volume, volume, where=supplied, include=include,
+                                                       order=None)
+        share = np.where(volume[supplier] > 0., taken / np.where(volume[supplier] > 0., volume[supplier], 1.), 0.)
+        contributions = {name: amount[supplier] * share for name, amount in amounts.items()}
+        mass = struct_mass[supplier] * share
         if self.supply_gates_the_last_element:
             kept = include[supplier]
             mass = np.where(kept, mass, 0.)
             contributions = {name: np.where(kept, values, 0.) for name, values in contributions.items()}
+        if self.collar_supply != "none":
+            collar = self._collar_supply(supplied, budget, owner, taken, length, volume, struct_mass, amounts)
+            owner, supplier = np.concatenate([owner, collar[0]]), np.concatenate([supplier, collar[1]])
+            contributions = {name: np.concatenate([values, collar[2][name]]) for name, values in contributions.items()}
+            mass = np.concatenate([mass, collar[3]])
         return owner, supplier, contributions, mass
 
-    def _supply_with_collar(self, supplied, budget, length, volume, struct_mass, amounts, include):
-        """The supply zones walked element by element, a zone reaching the base continuing into the collar's other
-        children by volume (Root_BRIDGES' calculating_supply_for_elongation_opt, the collar_supply option)."""
+    def _collar_supply(self, supplied, budget, owner, taken, length, volume, struct_mass, amounts):
+        """The zones reaching the base with some of their volume left continue into the collar's other children (the
+        base's children but the zone's own), each by its share of the volume left, at most its own (Root_BRIDGES'
+        calculating_supply_for_elongation_opt). (owner, supplier, {resource concentration: contribution}, mass)."""
         ds = self.data_structure
         parents = np.asarray(ds.parents())
-        vertex_index = np.asarray(ds.get("vertex_index"))
-        owner_plant = np.asarray(ds.owner("Plant"))
-        # The collar's children (the legacy's collar_children): borne by a zero-length support, their legacy parent
-        # the base; in the legacy's order (ascending ids)
-        collar = (np.asarray(ds.get("parent_id")) == 1) & (parents >= 0) & (vertex_index[np.maximum(parents, 0)] != 1)
-        collar = collar[np.argsort(vertex_index, kind="stable")]
-        collar_children = np.argsort(vertex_index, kind="stable")[collar]
-        names = list(amounts)
-        events = []                                     # (owner, supplier, fraction of the supplier)
-        visit = ds.order("post", convention="openalea")
-        for apex in visit[supplied[visit]].tolist():
-            remaining, current, previous, own = budget[apex], apex, apex, -1
-            collar_set = set(collar_children.tolist())
-            while remaining > 0:
-                if remaining > volume[current]:
-                    if length[current] > 0.:
-                        if include[current]:
-                            events.append((apex, current, None))
-                            remaining = remaining - volume[current]
-                        if parents[current] < 0:            # the base: the collar's other children
-                            excluded = {previous, own}
-                            children = [k for k in collar_children.tolist()
-                                        if owner_plant[k] == owner_plant[apex] and k not in excluded and length[k] > 0.]
-                            # Python's sum of floats (compensated since 3.12), as Root_BRIDGES sums them
-                            total = sum([float(volume[k]) for k in children])
-                            for child in children:
-                                source = min(remaining * volume[child] / total, volume[child])
-                                events.append((apex, child, source))
-                            if remaining <= total:
-                                remaining = 0.
-                    if parents[current] < 0:
-                        break
-                    if current in collar_set:
-                        own = current                       # the zone's own collar child
-                    previous, current = current, parents[current]
-                else:
-                    events.append((apex, current, remaining))
-                    remaining = 0.
-                    break
-        owner = np.array([e[0] for e in events], dtype=np.int64)
-        supplier = np.array([e[1] for e in events], dtype=np.int64)
-        contributions, mass = {name: np.empty(len(events)) for name in names}, np.empty(len(events))
-        for k, (_, element, source) in enumerate(events):
-            for name in names:
-                contributions[name][k] = (amounts[name][element] if source is None
-                                          else amounts[name][element] * source / volume[element])
-            mass[k] = struct_mass[element] if source is None else struct_mass[element] * source / volume[element]
-        kept = include[supplier]
-        if self.supply_gates_the_last_element and kept.size:
-            mass = np.where(kept, mass, 0.)
-            contributions = {name: np.where(kept, values, 0.) for name, values in contributions.items()}
-        return owner, supplier, contributions, mass
+        n = parents.size
+        base = parents < 0
+        grandparent = np.where(parents >= 0, parents[np.maximum(parents, 0)], 0)
+        collar = (parents >= 0) & (grandparent < 0)                 # the base's children
+        # Each element's collar child (its ancestor among them; the base itself for the base), by pointer doubling
+        ancestor = np.where(base | collar, np.arange(n), parents)
+        while True:
+            jumped = ancestor[ancestor]
+            if np.array_equal(jumped, ancestor):
+                break
+            ancestor = jumped
+        left = np.asarray(budget, dtype=float)[supplied] - np.bincount(owner, weights=taken, minlength=n)[supplied]
+        apices = np.flatnonzero(supplied)
+        root_of = np.where(base, np.arange(n), parents[ancestor])     # each element's base
+        reaching = (left > 0.) & (length[root_of[apices]] > 0.)     # zones that took the whole base
+        apices, left = apices[reaching], left[reaching]
+        children = np.flatnonzero(collar & (length > 0.))
+        empty = (np.zeros(0, dtype=np.int64),) * 2 + ({name: np.zeros(0) for name in amounts}, np.zeros(0))
+        if apices.size == 0 or children.size == 0:
+            return empty
+        # The pairs (apex, collar child of its plant but its own)
+        apex_of, child_of = np.meshgrid(np.arange(apices.size), np.arange(children.size), indexing="ij")
+        apex_of, child_of = apex_of.ravel(), child_of.ravel()
+        pairs = ((root_of[children[child_of]] == root_of[apices[apex_of]])
+                 & (children[child_of] != ancestor[apices[apex_of]]))
+        apex_of, child = apex_of[pairs], children[child_of[pairs]]
+        total = np.bincount(apex_of, weights=volume[child], minlength=apices.size)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            source = np.minimum(left[apex_of] * volume[child] / total[apex_of], volume[child])
+            share = np.where(volume[child] > 0., source / volume[child], 0.)
+        return (apices[apex_of], child, {name: amount[child] * share for name, amount in amounts.items()},
+                struct_mass[child] * share)
 
     # ── The thickening's resources ─────────────────────────────────────────────────────────────────────────────
 
@@ -445,7 +432,7 @@ class RootGrowth(RootArchitecture):
         available = for_thickening["C_hexose_root"]
         increase = available * 6. * yield_growth / (root_tissue_density * C_content)
         volume_max = volume_of(type, initial_radius, length) + increase
-        nodule_radius = power(3. * volume_max / (4. * pi), 1. / 3.)      # the sphere of the volume reached (g5)
+        nodule_radius = (3. * volume_max / (4. * pi)) ** (1. / 3.)      # the sphere of the volume reached (g5)
         possible_radius = np.where(type == TYPE_NODULE, nodule_radius, np.sqrt(volume_max / (length * pi)))
         fits = possible_radius <= potential_radius
         radius = np.where(fits, possible_radius, potential_radius)
@@ -463,8 +450,7 @@ class RootGrowth(RootArchitecture):
         """
         Growth limited by the resources of the supply zone (elongation) and of the element (thickening), their cost
         taken from the suppliers in proportion to what each supplies, plus the growth respiration; the primordia
-        that elongate emerge. The costs are scattered in the legacy's visiting order (children first), so that each
-        element's sums are the legacy's, bit for bit. Each resource's demand and consumptions are written.
+        that elongate emerge. Each resource's demand and consumptions are written.
         """
         ds = self.data_structure
         time_step = float(self.time_step)
@@ -475,7 +461,7 @@ class RootGrowth(RootArchitecture):
         with np.errstate(divide="ignore", invalid="ignore"):
             initial_volume = volume_of(type, initial_radius, initial_length)
             potential_volume = volume_of(type, potential_radius, potential_length)
-            grows = ~np.isin(type, (TYPE_DEAD, TYPE_JUST_DEAD, TYPE_SEMINAL_SUPPORT, TYPE_ADVENTITIOUS_SUPPORT))
+            grows = ~np.isin(type, (TYPE_DEAD, TYPE_JUST_DEAD))
             grows &= ~((potential_length <= initial_length) & (potential_radius <= initial_radius))
             demand = self._resource_values("demand")
             computed = self.growth_demand(potential_volume - initial_volume, root_tissue_density)
@@ -501,7 +487,7 @@ class RootGrowth(RootArchitecture):
             # Elongation, limited by the supply zone's resources
             new_length = np.array(length)
             length_max = (self.elongation_volume_max(initial_volume, for_elongation, root_tissue_density)
-                          / (pi * power(initial_radius, 2)))
+                          / (pi * initial_radius ** 2))
             elongating = grows & (potential_length > initial_length)
             new_length[elongating] = np.where(potential_length[elongating] >= length_max[elongating],
                                               length_max[elongating], potential_length[elongating])
@@ -518,19 +504,11 @@ class RootGrowth(RootArchitecture):
             parents = np.asarray(ds.parents())
             nodule = thickening & (type == TYPE_NODULE)
 
-        # The costs, in the legacy's order: per element visited (children first), its elongation's suppliers (tip
-        # to base), then its own thickening, then a nodule's parent
-        visit = ds.order("post", convention="openalea")
-        rank = np.empty(visit.size, dtype=np.int64)
-        rank[visit] = np.arange(visit.size)
+        # The costs: each elongation's on its suppliers, each thickening's on the element, a nodule's also on its parent
         owner, supplier, contributions, _ = self._supply(supplied, radius, length, volume, struct_mass,
                                                          growing_zone_factor)
         thickened, nodules = np.flatnonzero(thickening), np.flatnonzero(nodule)
-        event_owner = np.concatenate([owner, thickened, nodules])
         target = np.concatenate([supplier, thickened, parents[nodules]])
-        kind = np.concatenate([np.zeros(owner.size), np.ones(thickened.size), np.full(nodules.size, 2.)])
-        order = np.lexsort((np.arange(event_owner.size), kind, rank[event_owner]))
-        target = target[order]
         respiration = np.array(resp_growth)
         for index, resource in enumerate(resources):
             name = resource.concentration
@@ -543,7 +521,7 @@ class RootGrowth(RootArchitecture):
                                      * (share / for_thickening[name]), 0.)
                 parent_share = np.where(for_thickening[name] > 0., thickening_cost[name]
                                         * (share[parents] / for_thickening[name]), 0.)
-            value = np.concatenate([elongation_events, own_share[thickened], parent_share[nodules]])[order]
+            value = np.concatenate([elongation_events, own_share[thickened], parent_share[nodules]])
             consumed = np.array(ds.get(resource.consumption_amount), dtype=float)
             consumption_rate = np.array(ds.get(resource.consumption), dtype=float)
             np.add.at(consumed, target, value)
@@ -697,7 +675,7 @@ class RootGrowth(RootArchitecture):
             short = selected & (root_hair_length < root_hair_max_length)
             out["root_hair_length"][short] = self.root_hair_elongation(short, root_hair_length[short], (
                 out["actual_length_with_hairs"] / length)[short], elapsed[short])
-            volume = (power(root_hair_radius, 2) * pi) * out["root_hair_length"] * total
+            volume = (root_hair_radius ** 2 * pi) * out["root_hair_length"] * total
             out["root_hairs_volume"][selected] = volume[selected]
             mass = volume * root_tissue_density
             out["root_hairs_struct_mass"][selected] = mass[selected]

@@ -5,7 +5,7 @@ does, with its transplant of legacy states and its bitwise suites); the records 
 
     run = port_run(parameters, n_steps=48, C_hexose_root=1e-3)
     run.scene              the metafspm Scene (one plant, growth_model(): the component alone)
-    run.steps[i]           Snapshots as legacy_run's, keyed by the legacy's vertex ids (vertex_index):
+    run.steps[i]           Snapshots as legacy_run's, keyed by the elements' MPG ids:
                            the SubOrgans, their parents through the MPG's topology (the `+` across axes included),
                            every declared variable, decoded where the port codes it (the MPG label as the legacy's
                            label 1 / 2, the EMERGENCE_* and AXIS_* codes as the legacy's strings), and the
@@ -81,8 +81,7 @@ def snapshot(scene, plant=0) -> Snapshot:
     g = ds.mtg
     owner = np.asarray(ds.owner("Plant"))
     ids = np.asarray(ds.entity_ids("node"))[owner == plant]
-    index = np.asarray(ds.get("vertex_index")).astype(int)[owner == plant]
-    legacy_of = dict(zip(ids.tolist(), index.tolist()))
+    legacy_of = dict(zip(ids.tolist(), ids.tolist()))
     apex_label = g.labels.SubOrgan.RootApex
     props = {}
     for name, spec in growth._variable_specs.items():
@@ -139,8 +138,8 @@ def state_of(scene, parameters):
     return snapshot(scene)
 
 
-class _LegacyIds:
-    """What a C_hexose_root function of legacy_run reads of the MTG: its vertices' (legacy) ids."""
+class _Ids:
+    """What a C_hexose_root function of legacy_run reads of the MTG: its vertices' ids (here the MPG's)."""
 
     def __init__(self, ids):
         self.ids = ids
@@ -151,18 +150,18 @@ class _LegacyIds:
 
 def write_given(scene, step, name, value):
     """A given input on every element, as legacy_run writes the hexose (a number, or a function of the step and the
-    legacy's ids)."""
+    elements' ids)."""
     ds = scene.populations[0].data_structure
     if value is None or not ds.has(name):              # not given, or not an input of this component
         return
-    index = np.asarray(ds.get("vertex_index")).astype(int)
+    index = np.asarray(ds.entity_ids("node")).astype(int)
     if callable(value):
-        values = value(step, _LegacyIds(index.tolist()))
+        values = value(step, _Ids(index.tolist()))
         if isinstance(values, dict):
             current = np.array(ds.get(name), dtype=float)
-            for i, legacy_id in enumerate(index.tolist()):
-                if legacy_id in values:
-                    current[i] = values[legacy_id]
+            for i, vid in enumerate(index.tolist()):
+                if vid in values:
+                    current[i] = values[vid]
             ds.set(name, current)
             return
         value = values

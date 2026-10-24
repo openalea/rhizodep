@@ -7,16 +7,16 @@ import pytest
 from openalea.rhizodep.comparison.legacy_run import legacy_run
 from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON
 from openalea.rhizodep.comparison.port_run import LEFT_OUT, port_scene
-from openalea.rhizodep.growth import (TYPE_ADVENTITIOUS_SUPPORT, TYPE_SEMINAL_SUPPORT, RootGrowth)
+from openalea.rhizodep.growth import TYPE_BASE, RootGrowth
 
 DECLARED = {f.name for f in fields(RootGrowth) if "variable_type" in f.metadata}
 
 
 def test_every_legacy_property_is_declared():
     """Each property the legacy writes over 10 days is a declared variable or parameter of the port, the MPG label,
-    or left out with a reason."""
+    or left out with a reason (the legacy's numbering: the MPG's ids and topology, devplan §32.5)."""
     last = legacy_run(dict(WHEAT_SOISSON, simple_growth_duration=True), n_steps=240, record_every=240).steps[-1]
-    missing = sorted(set(last.props) - DECLARED - set(LEFT_OUT) - {"label"})
+    missing = sorted(set(last.props) - DECLARED - set(LEFT_OUT) - {"label", "vertex_index", "parent_id"})
     assert missing == []
 
 
@@ -50,29 +50,27 @@ def test_grouping(seedling):
         assert len([o for o in organs if g.complex_at_scale(o, s.Axis) == axis]) == 1
 
 
-def test_branching_on_the_supports(seedling):
-    """Each seminal or nodal root's apex is a RootApex branched (+) on its zero-length support, in another Organ;
-    the primary's Organ is its `<` chain: base, supports, apex."""
+def test_branching_on_the_base(seedling):
+    """Each seminal or nodal root's apex is a RootApex branched (+) on the base segment, in an Organ of its own; the
+    primary's Organ is its `<` chain: the base, the apex (devplan §32.5)."""
     ds, p = seedling
     g = ds.mtg
     s, labels = g.scales, g.labels
     ids = np.asarray(ds.entity_ids("node")).tolist()
     types = dict(zip(ids, np.asarray(ds.get("type")).tolist()))
-    supports = [v for v in ids if types[v] in (TYPE_SEMINAL_SUPPORT, TYPE_ADVENTITIOUS_SUPPORT)]
-    assert len(supports) == p["n_seminal_roots"] - 1 + p["n_adventitious_roots"]
-    primary = g.complex_at_scale(supports[0], s.Organ)
-    for support in supports:
-        assert g.complex_at_scale(support, s.Organ) == primary
-        branched = [c for c in g.children(support) if g.edge_type(c) == "+"]
-        assert len(branched) == 1
-        apex = branched[0]
+    base, = [v for v in ids if types[v] == TYPE_BASE]
+    primary = g.complex_at_scale(base, s.Organ)
+    branched = [c for c in g.children(base) if g.edge_type(c) == "+"]
+    assert len(branched) == p["n_seminal_roots"] - 1 + p["n_adventitious_roots"]
+    for apex in branched:
         assert g.label(apex) == labels.SubOrgan.RootApex
         assert g.complex_at_scale(apex, s.Organ) != primary
-    chain = [v for v in ids if g.complex_at_scale(v, s.Organ) == primary]
-    assert [g.label(v) for v in chain].count(labels.SubOrgan.RootApex) == 1
+    chain = sorted(v for v in ids if g.complex_at_scale(v, s.Organ) == primary)
+    assert [g.label(v) for v in chain] == [labels.SubOrgan.RootSegment, labels.SubOrgan.RootApex]
 
 
-def test_vertex_index_is_the_legacy_numbering(seedling):
+def test_keys_are_distinct(seedling):
+    """Each element its own lineage key, and so its own draws (devplan §32.3)."""
     ds, _ = seedling
-    index = np.asarray(ds.get("vertex_index"))
-    assert sorted(index.tolist()) == list(range(1, index.size + 1))
+    keys = np.asarray(ds.get("key"))
+    assert (keys >= 0).all() and np.unique(keys).size == keys.size

@@ -11,20 +11,18 @@ devplan_metafspm.md §23).
 with MyModel.initiators = (RootArchitecture,) (or RootGrowth): each plant's seedling is built by initiate_plant, its
 parameters the class defaults overridden by the plant's scenario.
 
-The plant's structure, in the MPG (devplan §10, Q-R4):
+The plant's structure, in the MPG (devplan §10, Q-R4, §32.5):
 
     Plant
      ├─ Axis (RootAxis)  the primary root        GrowthUnit ─ Phytomer ─ Organ (RootInternode), its `<` chain of
-     │                                           SubOrgans: the base segment, the zero-length supports, the apex
-     ├─ Axis             each seminal root       its Organ's first SubOrgan, its apex, branched (+) on its support
-     └─ Axis             each nodal root         the same, on its support
+     │                                           SubOrgans: the base segment (the collar, the seed's place), the apex
+     ├─ Axis             each seminal root       its Organ's first SubOrgan, its apex, branched (+) on the base
+     └─ Axis             each nodal root         the same (on a shoot phytomer once a shoot model bears them)
 
-Every element is a SubOrgan (a RootSegment, or a RootApex for an axis' tip), carrying the variables below. The
-zero-length supports are the legacy's (several axes branched at one point); they stay until the port is exact.
-
-Numbering: `vertex_index` is the legacy's vertex id (the MTG's ids in creation order), so that the draws seeded from
-it and the comparison with the legacy match; `parent_id` and `axis_apex_id` are in that numbering (the collar's
-children, the elements borne by a support, have the base, 1, as parent_id).
+A lateral root is an Organ of its bearer's Axis, its first SubOrgan branched (+) on its bearer's segment. Every
+element is a SubOrgan (a RootSegment, or a RootApex for an axis' tip), carrying the variables below; elements are
+identified by their MPG ids. Their random draws are keyed by their lineage `key` (devplan §32.3): a pure function of
+their place in their plant, so independent of the visiting order and of the other plants of a population.
 
 Codes: `type` (TYPE_*), `lateral_root_emergence_possibility` (EMERGENCE_*), `axis_type` (AXIS_*), integers.
 """
@@ -35,7 +33,9 @@ from math import floor, pi
 import numpy as np
 import pandas as pd
 
-from openalea.metafspm.coupling.component import StructuralComponent, input_variable, parameter, state_variable
+from openalea.metafspm.coupling.component import (NewNodes, StructuralComponent, input_variable, parameter,
+                                                   state_variable)
+from openalea.metafspm.data_structure import random_streams
 from openalea.metafspm.data_structure.configs import PropsConfig, ScalesConfig
 from openalea.metafspm.solve.decorator import actual, postsegmentation, potential, segmentation
 
@@ -45,9 +45,7 @@ BY = "model_growth"
 
 # The legacy's element types (its type_* parameters)
 TYPE_BASE = 1
-TYPE_SEMINAL_SUPPORT = 2
 TYPE_SEMINAL_BEFORE_EMERGENCE = 3
-TYPE_ADVENTITIOUS_SUPPORT = 4
 TYPE_ADVENTITIOUS_BEFORE_EMERGENCE = 5
 TYPE_BEFORE_EMERGENCE = 6
 TYPE_EMERGED = 7
@@ -69,10 +67,21 @@ def doc(unit, description, unit_comment="", min_value="", max_value="", value_co
                 max_value=max_value, value_comment=value_comment, references=references, DOI=DOI)
 
 
-def power(values, exponent):
-    """values ** exponent as the legacy's Python computes it (the C library's pow): numpy's ** squares an array by
-    x * x, which differs from pow in the last bit for about 0.1 % of values; float_power calls pow."""
-    return np.float_power(values, exponent)
+EDGES = {"<": 0, "+": 1}
+
+
+def seed_keys(random_choice) -> np.ndarray:
+    """The lineage key of a plant's first element (its base), from the plant's random_choice (devplan §32.3)."""
+    return (random_streams.bits(np.asarray(random_choice, dtype=np.int64).reshape(-1), stream="seed")
+            >> np.uint64(12)).astype(np.int64)
+
+
+def child_keys(parent_keys, edge, rank=0) -> np.ndarray:
+    """The lineage keys of new elements, from their parent's key, their edge to it and their rank among the parent's
+    children of that edge created at once: a pure function of the element's place in its plant (devplan §32.3).
+    52 bits, so that a key is exact in a float array."""
+    return (random_streams.bits(np.asarray(parent_keys, dtype=np.int64).reshape(-1), stream="lineage",
+                                step=EDGES[edge], draw=rank) >> np.uint64(12)).astype(np.int64)
 
 
 def outputs(k):
@@ -113,7 +122,7 @@ def temperature_modification(soil_temperature, process_at_T_ref, T_ref, A, B, C)
     0 when C is neither 0 nor 1, or when C = 1 and A (T - T_ref) + B < 0.
     """
     x = A * (soil_temperature - T_ref) + B
-    modified = process_at_T_ref * power(x, 1 - C) * power(x, C * (soil_temperature - T_ref) / 10.)
+    modified = process_at_T_ref * x ** (1 - C) * x ** (C * (soil_temperature - T_ref) / 10.)
     return np.where(((C != 0) & (C != 1)) | ((C == 1) & (x < 0.)), 0., np.maximum(modified, 0.))
 
 
@@ -139,21 +148,17 @@ class RootArchitecture(StructuralComponent):
                                            "Example root segment's axis order computed by the initiate_mtg method or "
                                            'provided as input'),
                                      state_variable_type=DESCRIPTOR, initialize=1, scale=SubOrgan, dtype='int')
-    vertex_index: int = state_variable(**doc('dimensionless',
-                                             'Unique vertex identifier stored for ease of value access'),
-                                       state_variable_type=NII, initialize=1, scale=SubOrgan, dtype='int')
-    parent_id: int = state_variable(**doc('dimensionless',
-                                          "Unique vertex identifier of current element's parent stored for ease of "
-                                          'value access',
-                                          value_comment='-1 as default when there is no parent assigned'),
-                                    state_variable_type=NII, initialize=-1, scale=SubOrgan, dtype='int')
+    key: int = state_variable(**doc('dimensionless', "The element's lineage key, its random draws' identity: from its "
+                                                     "parent's, its edge and its rank (devplan §32.3)",
+                                    value_comment='-1 as default when not assigned'),
+                              state_variable_type=DESCRIPTOR, initialize=-1, scale=SubOrgan, dtype='int')
     axis_apex_id: int = state_variable(**doc('dimensionless',
-                                             'Vertex identifier of the terminal apex of the root axis bearing the '
-                                             'considered segment',
+                                             'Node id (the MPG vertex) of the terminal apex of the root axis bearing '
+                                             'the considered segment',
                                              value_comment='-1 as default when not assigned'),
                                        state_variable_type=NII, initialize=-1, scale=SubOrgan, dtype='int')
     lateral_primordium_index: int = state_variable(**doc('dimensionless',
-                                                         'Unique axis identifier stored for ease of value access'),
+                                                         'Node id of the lateral primordium emerging on the element'),
                                                    state_variable_type=NII, initialize=-1, scale=SubOrgan, dtype='int')
     step_elongating: int = state_variable(**doc('adim', 'Whether the element could elongate in the last actual growth '
                                                         '(the legacy\'s step_elongating_elements)'),
@@ -568,31 +573,26 @@ class RootArchitecture(StructuralComponent):
         return values
 
     @classmethod
-    def seedling(cls, parameters, stream=None) -> list:
+    def seedling(cls, parameters) -> list:
         """
-        The legacy's initial elements (RootGrowthModel.initiate_mtg, then its initiate_heterogeneous_variables and
-        the post-growth they end with) for the plant's *parameters*: a list, in the legacy's creation order, of
-        dicts with "vertex_index", "parent" (its vertex_index or None), "edge" ('<' / '+'), "apex" (a RootApex) and
-        "values" ({state variable: value}). *stream*: the plant's random stream, seeded as the legacy seeds numpy.
+        The initial elements (the legacy's RootGrowthModel.initiate_mtg, then its initiate_heterogeneous_variables and
+        the post-growth they end with), for the plant's *parameters*: a list of dicts with "parent" (its index in the
+        list, or None), "edge" ('<' / '+'), "apex" (a RootApex), "values" ({state variable: value}) and "axis_apex"
+        (the index of its axis' apex). The base segment, the seminal roots then the nodal roots branched on it, the
+        primary root's apex.
         """
         defaults = {f.name: f.default for f in fields(cls) if f.metadata.get("variable_type") == "state_variable"
                     and f.metadata.get("scale") == SubOrgan}
         elements = []
         tissue_density = parameters["new_root_tissue_density"]
-        stream = stream if stream is not None else np.random.RandomState()
 
         def add(parent, edge, apex, values):
-            element = dict(vertex_index=len(elements) + 1, parent=parent, edge=edge, apex=apex,
-                           values={**defaults, **dict.fromkeys(cls.NIL, 0.), **values})
-            elements.append(element)
-            return element
-
-        def nil_child(parent, edge, apex, type_, angle_down, angle_roll, length, radius):
-            return add(parent["vertex_index"], edge, apex,
-                       cls._nil_values(parameters, type_, 1, angle_down, angle_roll, length, radius))
+            elements.append(dict(parent=parent, edge=edge, apex=apex,
+                                 values={**defaults, **dict.fromkeys(cls.NIL, 0.), **values}))
+            return elements[-1]
 
         def main_root_durations(radius):
-            """The growth and life durations of a first-order root (with the legacy's extender)."""
+            """The growth and life durations of a first-order root (with the main roots' extender)."""
             return dict(growth_duration=(parameters["GDs"] * (2. * radius) ** 2
                                          * parameters["main_roots_growth_extender"]),
                         life_duration=parameters["LDs"] * cls._diameter_term(radius, parameters) * tissue_density)
@@ -601,15 +601,17 @@ class RootArchitecture(StructuralComponent):
         base_radius = parameters["D_ini"] / 2.
         length = parameters["initial_segment_length"]
         initial_mass = parameters["volume"] * tissue_density
-        segment = add(None, "/", False, dict(
+        base_key = int(seed_keys(parameters["random_choice"])[0])
+        add(None, "/", False, dict(
             type=TYPE_BASE, root_order=1, lateral_root_emergence_possibility=EMERGENCE_IMPOSSIBLE, emergence_cost=0.,
             angle_down=0., angle_roll=0., length=length, radius=base_radius, original_radius=base_radius,
             initial_length=length, initial_radius=base_radius, distance_from_tip=length,
             former_distance_from_tip=length, dist_to_ramif=0., actual_elongation=length, actual_elongation_rate=0.,
-            volume=parameters["volume"], struct_mass=initial_mass, initial_struct_mass=initial_mass,
+            volume=parameters["volume"], struct_mass=initial_mass, initial_struct_mass=initial_mass, key=base_key,
             **main_root_durations(base_radius)))
 
-        # The seminal, then the nodal (adventitious) roots, each on a zero-length support
+        # The seminal, then the nodal (adventitious) roots, branched on the base: each its own draws (g15)
+        rank = 0
         for kind in ("seminal", "adventitious"):
             number_of_roots = parameters[f"n_{kind}_roots"]
             forcing = parameters[f"forcing_{kind}_roots_events"]
@@ -617,22 +619,27 @@ class RootArchitecture(StructuralComponent):
                 continue
             events = cls._emergence_events(parameters, kind)
             ratio = parameters["D_sem_to_D_ini_ratio" if kind == "seminal" else "D_adv_to_D_ini_ratio"]
-            support_type, apex_type = ((TYPE_SEMINAL_SUPPORT, TYPE_SEMINAL_BEFORE_EMERGENCE) if kind == "seminal" else
-                                       (TYPE_ADVENTITIOUS_SUPPORT, TYPE_ADVENTITIOUS_BEFORE_EMERGENCE))
-            for i, (delay, roots_per_event) in enumerate(events):
-                for j in range(int(roots_per_event)):
-                    # seeded by root: its support's id, the next element's (g15)
-                    stream.seed(int(parameters["random_choice"]) * (len(elements) + 1))
-                    segment = nil_child(segment, "<", False, support_type, 0,
-                                        abs(stream.normal(180 if kind == "seminal" else 0, 180)), 0., base_radius)
+            apex_type = TYPE_SEMINAL_BEFORE_EMERGENCE if kind == "seminal" else TYPE_ADVENTITIOUS_BEFORE_EMERGENCE
+            for delay, roots_per_event in events:
+                for _ in range(int(roots_per_event)):
+                    key = child_keys([base_key], "+", rank=rank)
+                    rank += 1
+                    azimuth = float(np.abs(random_streams.normal(key, 180. if kind == "seminal" else 0., 180.,
+                                                                 stream="azimuth"))[0])
+                    angle_down = float(np.abs(random_streams.normal(key, 60., 10., stream="lateral_angle_down"))[0])
                     mean = parameters["D_ini"] / 2. * ratio
-                    radius = abs(stream.normal(mean, mean * parameters["CVDD"])) if parameters["random"] else mean
-                    apex = nil_child(segment, "+", True, apex_type, abs(stream.normal(60, 10)), 5, 0., radius)
-                    apex["values"].update(emergence_delay_in_thermal_time=delay, **main_root_durations(radius))
+                    radius = (float(np.abs(random_streams.normal(key, mean, mean * parameters["CVDD"],
+                                                                 stream="lateral_radius"))[0])
+                              if parameters["random"] else mean)
+                    apex = add(0, "+", True, cls._nil_values(parameters, apex_type, 1, angle_down, azimuth, 0., radius))
+                    apex["values"].update(emergence_delay_in_thermal_time=delay, key=int(key[0]),
+                                          **main_root_durations(radius))
 
         # The primary root's apex
-        apex = nil_child(segment, "<", True, TYPE_EMERGED, 0, 0, parameters["initial_apex_length"], base_radius)
-        apex["values"].update(initial_struct_mass=initial_mass, **main_root_durations(base_radius))
+        apex = add(0, "<", True, cls._nil_values(parameters, TYPE_EMERGED, 1, 0, 0, parameters["initial_apex_length"],
+                                                 base_radius))
+        apex["values"].update(initial_struct_mass=initial_mass, key=int(child_keys([base_key], "<")[0]),
+                              **main_root_durations(base_radius))
 
         cls._initial_values(parameters, elements)
         return elements
@@ -649,16 +656,15 @@ class RootArchitecture(StructuralComponent):
             **{resource.concentration: 0. for resource in cls.resources},
             soil_temperature=7.8, root_tissue_density=tissue_density,                                   # g3
             growth_duration=parameters["GDs"] * (2 * radius) ** 2,
-            life_duration=(parameters["LDs"] * 2. * radius * tissue_density
-                           if parameters["life_duration_diameter_exponent"] == 1 else
-                           parameters["LDs"] * cls._diameter_term(radius, parameters) * tissue_density),
+            life_duration=parameters["LDs"] * cls._diameter_term(radius, parameters) * tissue_density,
             temperature_modification=0.)}
 
     @staticmethod
     def _diameter_term(radius, parameters):
         """d^e of the life duration (e: life_duration_diameter_exponent, g21); d itself for e = 1."""
         exponent = parameters["life_duration_diameter_exponent"]
-        return 2. * radius if exponent == 1 else (2. * radius) ** exponent
+        term = np.where(exponent == 1, 2. * radius, (2. * radius) ** exponent)
+        return term if np.ndim(term) else float(term)
 
     @classmethod
     def _emergence_events(cls, parameters, kind) -> list:
@@ -676,18 +682,7 @@ class RootArchitecture(StructuralComponent):
     @classmethod
     def _initial_values(cls, parameters, elements) -> None:
         """What the legacy derives at its initiation: the inputs everywhere, the elements' volume, masses,
-        temperature factor, legacy parent, distance from tip and axis apex, the resources (_initial_resources)."""
-        by_index = {element["vertex_index"]: element for element in elements}
-        children = {index: [] for index in by_index}
-        for element in elements:
-            if element["parent"] is not None:
-                children[element["parent"]].append(element["vertex_index"])
-        # The collar (RootGrowthModel.__init__): the zero-length segments with children are skipped, their children
-        # that are not such segments have the base as parent
-        zero_segment = {index: (not element["apex"]) and element["values"]["length"] == 0
-                        for index, element in by_index.items()}
-        collar_children = {child for index in by_index if zero_segment[index] and children[index]
-                           for child in children[index] if not zero_segment[child]}
+        temperature factor, distance from tip and axis apex, the resources (_initial_resources)."""
         factor = float(temperature_modification(parameters["soil_temperature"], parameters["process_at_T_ref"],
                                                 parameters["T_ref"], parameters["A"], parameters["B"],
                                                 parameters["C"]))
@@ -696,8 +691,6 @@ class RootArchitecture(StructuralComponent):
             values.update(soil_temperature=parameters["soil_temperature"],
                           root_tissue_density=parameters["root_tissue_density"],
                           **{resource.concentration: 0. for resource in cls.resources})
-            values["vertex_index"] = element["vertex_index"]
-            values["parent_id"] = (1 if element["vertex_index"] in collar_children else (element["parent"] or -1))
             volume = (4 / 3. * pi * values["radius"] ** 3 if values["type"] == TYPE_NODULE else
                       pi * values["radius"] ** 2 * values["length"])
             values["volume"] = volume
@@ -706,15 +699,15 @@ class RootArchitecture(StructuralComponent):
             values["temperature_modification"] = factor
         cls._initial_resources(parameters, elements)
         # Distance from tip and axis apex: children before parents, along the successors ('<')
-        successor_of = {element["parent"]: element["vertex_index"] for element in elements if element["edge"] == "<"}
-        for element in reversed(elements):
-            values, successor = element["values"], successor_of.get(element["vertex_index"])
+        successor_of = {element["parent"]: index for index, element in enumerate(elements) if element["edge"] == "<"}
+        for index in reversed(range(len(elements))):
+            element = elements[index]
+            values, successor = element["values"], successor_of.get(index)
             if element["apex"] or values["type"] == TYPE_NODULE or successor is None:
-                values["distance_from_tip"], values["axis_apex_id"] = values["length"], element["vertex_index"]
+                values["distance_from_tip"], element["axis_apex"] = values["length"], index
             else:
-                successor_values = by_index[successor]["values"]
-                values["distance_from_tip"] = successor_values["distance_from_tip"] + values["length"]
-                values["axis_apex_id"] = successor_values["axis_apex_id"]
+                values["distance_from_tip"] = elements[successor]["values"]["distance_from_tip"] + values["length"]
+                element["axis_apex"] = elements[successor]["axis_apex"]
             values["former_distance_from_tip"] = values["distance_from_tip"]
 
     @classmethod
@@ -725,9 +718,7 @@ class RootArchitecture(StructuralComponent):
     def initiate_plant(cls, g, plant, parameters):
         """The legacy's seedling under *plant* (the class docstring's structure), its values on the MPG."""
         parameters = cls.plant_parameters(parameters)
-        stream = np.random.RandomState()
-        elements = cls.seedling(parameters, stream)
-        g.property("legacy_random")[plant] = stream
+        elements = cls.seedling(parameters)
         scales, labels = g.scales, g.labels
         vids = {}
 
@@ -738,7 +729,7 @@ class RootArchitecture(StructuralComponent):
                 complex_ = g.add_component(complex_, **PropsConfig(scale=scale, edge_type='/', label=label))
             return complex_
 
-        for e in elements:
+        for index, e in enumerate(elements):
             label = labels.SubOrgan.RootApex if e["apex"] else labels.SubOrgan.RootSegment
             if e["parent"] is None:
                 vid = g.add_component(new_organ(), **PropsConfig(scale=scales.SubOrgan, edge_type='/', label=label))
@@ -747,9 +738,11 @@ class RootArchitecture(StructuralComponent):
             else:
                 vid = g.add_component_with_topo(new_organ(), vids[e["parent"]],
                                                 **PropsConfig(scale=scales.SubOrgan, edge_type='+', label=label))
-            vids[e["vertex_index"]] = vid
+            vids[index] = vid
             for name, value in e["values"].items():
                 g.property(name)[vid] = value
+        for index, e in enumerate(elements):
+            g.property("axis_apex_id")[vids[index]] = vids[e["axis_apex"]]
         g.property("total_living_struct_mass")[plant] = float(sum(e["values"]["living_struct_mass"]
                                                                   for e in elements))
 
@@ -767,20 +760,13 @@ class RootArchitecture(StructuralComponent):
             self.__dict__["_apex_cache"] = cache
         return cache[1]
 
-    def _nodes_of(self, vertex_index, legacy_ids) -> np.ndarray:
-        """Per element, the node of its own plant whose legacy id is legacy_ids[element] (-1 where there is none):
-        legacy ids are numbered per plant, so a population's plants share them."""
-        plant = np.asarray(self.data_structure.owner("Plant"), dtype=np.int64)
-        vertex_index = np.asarray(vertex_index, dtype=np.int64)
-        legacy_ids = np.broadcast_to(np.asarray(legacy_ids, dtype=np.int64), vertex_index.shape)
-        stride = int(max(vertex_index.max(initial=0), legacy_ids.max(initial=0))) + 2
-        keys = plant * stride + vertex_index
-        order = np.argsort(keys, kind="stable")
-        ordered = keys[order]
-        wanted = plant * stride + np.clip(legacy_ids, 0, stride - 1)
-        position = np.searchsorted(ordered, wanted).clip(0, max(ordered.size - 1, 0))
-        found = (legacy_ids >= 0) & (ordered[position] == wanted)
-        return np.where(found, order[position], -1)
+    def _index_of(self, node_ids) -> np.ndarray:
+        """The node index of each node id (-1 where the id is -1)."""
+        node_ids = np.asarray(node_ids, dtype=np.int64)
+        known = node_ids >= 0
+        out = np.full(node_ids.shape, -1, dtype=np.int64)
+        out[known] = self.data_structure.index_of(node_ids[known])
+        return out
 
     def _parameter(self, name, selected=None):
         """A per-plant parameter's value on each element (on the *selected* ones), for the hooks."""
@@ -833,13 +819,11 @@ class RootArchitecture(StructuralComponent):
 
     @potential
     def _initial_length(self, length, radius, struct_mass, living_root_hairs_struct_mass, soil_temperature,
-                        parent_id, vertex_index, process_at_T_ref, T_ref, A, B, C) -> outputs(12):
+                        process_at_T_ref, T_ref, A, B, C) -> outputs(12):
         """The step's start: the fluxes zeroed, the initial and potential values copied, the temperature factor; a
-        zero-length apex takes its parent's soil temperature (the collar's children, the base's: parent_id)."""
+        zero-length apex takes its parent's soil temperature."""
         ds = self.data_structure
-        parents = np.asarray(ds.parents())
-        base = self._nodes_of(vertex_index, 1)                  # each element's plant's base
-        parent = np.where(np.asarray(parent_id) == 1, base, parents)
+        parent = np.asarray(ds.parents())
         soil = np.array(soil_temperature, dtype=float)
         zero_apex = self._apex() & (length == 0.)
         soil[zero_apex] = soil_temperature[parent[zero_apex]]
@@ -867,12 +851,12 @@ class RootArchitecture(StructuralComponent):
                           thermal_time_since_growth_stopped, actual_time_since_growth_stopped,
                           thermal_time_since_cells_formation, actual_time_since_cells_formation,
                           thermal_time_since_death, actual_time_since_death,
-                          lateral_root_emergence_possibility, lateral_primordium_index, vertex_index,
+                          lateral_root_emergence_possibility, lateral_primordium_index,
                           emergence_delay) -> outputs(15):
         """
         The apices (RootGrowthModel.potential_apex_development): the state machine as masked branches, the supply
         zone of those elongating (calculating_supply_for_elongation, by path windows), their potential length; a
-        lateral primordium emerging marks its bearer (the last one visited when several emerge on one bearer).
+        lateral primordium emerging marks its bearer (the latest formed when several emerge on one bearer).
         The branches are chosen on the state at the step's start (the arguments); each element is in one branch.
         The supply zones are the resources' (supply_zones).
         """
@@ -936,12 +920,11 @@ class RootArchitecture(StructuralComponent):
         if not self.resource_limited:
             new_type[selected] = TYPE_EMERGED
         else:
-            visit = ds.order("post", convention="openalea")
-            emerging = visit[selected[visit]]
+            emerging = np.flatnonzero(selected)                     # ascending ids: the latest formed last
             bearers = np.asarray(ds.parents())[emerging]
-            last = bearers.size - 1 - np.unique(bearers[::-1], return_index=True)[1]   # last visited per bearer
+            last = bearers.size - 1 - np.unique(bearers[::-1], return_index=True)[1]   # the latest per bearer
             possibility[bearers[last]] = EMERGENCE_POSSIBLE
-            primordium_index[bearers[last]] = vertex_index[emerging[last]]
+            primordium_index[bearers[last]] = np.asarray(ds.entity_ids("node"))[emerging[last]]
 
         # Growing apices
         selected = growing
@@ -989,7 +972,7 @@ class RootArchitecture(StructuralComponent):
 
     @potential
     def _theoretical_radius(self, type, length, radius, initial_radius, theoretical_radius, potential_radius,
-                            struct_mass, temperature_modification, axis_apex_id, vertex_index,
+                            struct_mass, temperature_modification, axis_apex_id,
                             thermal_time_since_primordium_formation, actual_time_since_primordium_formation,
                             thermal_time_since_emergence, actual_time_since_emergence,
                             thermal_time_since_cells_formation, actual_time_since_cells_formation,
@@ -998,7 +981,7 @@ class RootArchitecture(StructuralComponent):
         """
         The segments (RootGrowthModel.potential_segment_development): the type of their axis apex (stopped), death
         when all their children are dead, the pipe model, children first (a fold up the tree), then the potential
-        radius (limited_potential_radius), the supports' radius, the times; the nodules' thickening (thicken_nodules).
+        radius (limited_potential_radius), the times; the nodules' thickening (thicken_nodules).
         """
         ds = self.data_structure
         time_step = float(self.time_step)
@@ -1016,12 +999,10 @@ class RootArchitecture(StructuralComponent):
 
         # The axis apex's stop
         new_type = np.array(type)
-        apex_node = self._nodes_of(vertex_index, axis_apex_id)
+        apex_node = self._index_of(axis_apex_id)
         apex_type = np.where(apex_node >= 0, type[np.maximum(apex_node, 0)], -1)
-        # the supports keep their type (rhizodep's main, g11)
-        developing = normal & ~np.isin(type, (TYPE_SEMINAL_SUPPORT, TYPE_ADVENTITIOUS_SUPPORT))
-        new_type[developing & (apex_type == TYPE_JUST_STOPPED)] = TYPE_JUST_STOPPED
-        new_type[developing & (apex_type == TYPE_STOPPED)] = TYPE_STOPPED
+        new_type[normal & (apex_type == TYPE_JUST_STOPPED)] = TYPE_JUST_STOPPED
+        new_type[normal & (apex_type == TYPE_STOPPED)] = TYPE_STOPPED
 
         # Children first: death, time since death, the pipe model
         columns = np.column_stack([new_theoretical_radius, new_type.astype(float),
@@ -1039,11 +1020,11 @@ class RootArchitecture(StructuralComponent):
             n_dead = level.children(dead_child.astype(float), op="sum")
             first_death = level.children(out[:, 2], op="min", where=dead_child, fill=0.)
             own_type = rows[:, 1]
-            all_dead = todo & developing[nodes] & (n_dead == n_children)
+            all_dead = todo & (n_dead == n_children)
             dead_type = np.where((own_type == TYPE_JUST_DEAD) | (own_type == TYPE_DEAD), TYPE_DEAD, TYPE_JUST_DEAD)
             level_type = np.where(all_dead, dead_type, own_type)
             if self.radial_growth:
-                section = power(out[:, 0], 2) * pi
+                section = out[:, 0] ** 2 * pi
                 successor_section = level.children(section, op="sum", edge="<")
                 lateral_sections = level.children(section, op="sum", edge="+",
                                                   where=(length > 0.) & (child_type != TYPE_NODULE))
@@ -1066,8 +1047,6 @@ class RootArchitecture(StructuralComponent):
         if self.radial_growth:
             self.limited_potential_radius(normal, new_theoretical_radius, new_potential_radius, radius, initial_radius,
                                           length, temperature_factor, time_step)
-            support = normal & ((new_type == TYPE_SEMINAL_SUPPORT) | (new_type == TYPE_ADVENTITIOUS_SUPPORT))
-            new_radius[support] = new_potential_radius[support]
 
         # The times
         clocks.advance(normal, time_step, thermal_time_step, "primordium_formation", "emergence", "cells_formation")
@@ -1091,7 +1070,7 @@ class RootArchitecture(StructuralComponent):
     @staticmethod
     def _volume(type, radius, length):
         """RootGrowthModel.volume_from_radius_and_length: a cylinder, a sphere for a nodule."""
-        return np.where(type == TYPE_NODULE, 4 / 3. * pi * power(radius, 3), pi * power(radius, 2) * length)
+        return np.where(type == TYPE_NODULE, 4 / 3. * pi * radius ** 3, pi * radius ** 2 * length)
 
     @actual
     def _length(self, type, length, radius, initial_length, initial_radius, potential_length, potential_radius,
@@ -1109,8 +1088,7 @@ class RootArchitecture(StructuralComponent):
         volume_of = self._volume
         satisfaction = self.satisfaction_coefficient(type, initial_radius, initial_length, potential_radius,
                                                      potential_length, root_tissue_density)
-        grows = ~np.isin(type, (TYPE_DEAD, TYPE_JUST_DEAD, TYPE_STOPPED, TYPE_SEMINAL_SUPPORT,
-                                TYPE_ADVENTITIOUS_SUPPORT))
+        grows = ~np.isin(type, (TYPE_DEAD, TYPE_JUST_DEAD, TYPE_STOPPED))
         new_length, new_radius = np.array(length), np.array(radius)
         new_length[grows] += ((potential_length - initial_length) * satisfaction)[grows]
         new_radius[grows] += ((potential_radius - initial_radius) * satisfaction)[grows]
@@ -1153,15 +1131,13 @@ class RootArchitecture(StructuralComponent):
     def satisfaction_coefficient(self, type, initial_radius, initial_length, potential_radius, potential_length,
                                  root_tissue_density) -> np.ndarray:
         """ArchiSimple's satisfaction coefficient of each element's plant (the legacy's satisfaction_coefficient):
-        the structural mass offered to growth (struct_mass_input) over the potential growth's demand, summed in the
-        legacy's order (children first); 1 without demand; between 0 and 1."""
+        the structural mass offered to growth (struct_mass_input) over the potential growth's demand; 1 without demand;
+        between 0 and 1."""
         ds = self.data_structure
         demand = (self._volume(type, potential_radius, potential_length)
                   - self._volume(type, initial_radius, initial_length)) * root_tissue_density
         owner = np.asarray(ds.owner("Plant"))
-        visit = ds.order("post", convention="openalea")
-        total = np.zeros(np.asarray(ds.entity_ids("Plant")).size)
-        np.add.at(total, owner[visit], demand[visit])
+        total = np.bincount(owner, weights=demand, minlength=np.asarray(ds.entity_ids("Plant")).size)
         offered = np.maximum(np.asarray(ds.get("struct_mass_input"), dtype=float), 0.)
         with np.errstate(divide="ignore", invalid="ignore"):
             coefficient = np.where(total <= 0., 1., offered / total)
@@ -1169,11 +1145,10 @@ class RootArchitecture(StructuralComponent):
 
     # ── Segmentation and primordia (RootGrowthModel.segmentation_and_primordia_formation) ─────────────────────
     #
-    # Sequential by nature: each apex creates elements whose legacy ids (vertex_index, the next free one of its
-    # plant) seed the following draws, in the legacy's order (the apices elongated in actual growth, visited children
-    # first). An MPG-style step: it reads and edits the MPG, as the legacy its MTG; the draws come from the plant's
-    # stream, re-seeded where the legacy re-seeds numpy's global generator, so that even the legacy's draws that follow
-    # a seeding without one (a nodule's) are the same.
+    # One array-style step (devplan §32.4): the apices that elongated in actual growth are cut into segments of
+    # segment_length and a new apex; lateral primordia form on the apices and the new segments, nodules on the last
+    # segments. All of a step's new elements are one NewNodes batch, created by metafspm in bulk. The draws are keyed
+    # by the elements' lineage keys (devplan §32.3): they depend neither on the visiting order nor on the other plants.
 
     # What a new element copies from its mother (RootGrowthModel.ADDING_A_CHILD(identical_properties=True)), besides
     # the radius (its radius, original and initial radius)
@@ -1194,327 +1169,276 @@ class RootArchitecture(StructuralComponent):
     SHARED = ("initial_struct_mass", "initial_living_root_hairs_struct_mass", "struct_mass_produced",
               "root_hairs_struct_mass", "root_hairs_struct_mass_produced", "living_root_hairs_struct_mass",
               "living_root_hairs_number", "dead_root_hairs_number", "total_root_hairs_number")
+    # The per-plant parameters segmentation reads
+    SEGMENTATION_PARAMETERS = ("life_duration_diameter_exponent", "segment_length", "IPD", "Dmin", "RMD", "CVDD",
+                               "root_order_treshold", "GDs", "LDs", "new_root_tissue_density", "GD_highest", "GD_high",
+                               "GD_medium", "GD_low", "GD_prob_low", "GD_prob_medium", "nodule_formation_probability",
+                               "struct_mass_C_content")
 
-    def _inputs_of_new(self) -> tuple:
-        """The inputs a new element gets from segmentation: the soil's and the anatomy's, each resource's
-        concentration."""
-        return ("soil_temperature", "root_tissue_density") + tuple(r.concentration for r in self.resources)
-    SEGMENTATION_PARAMETERS = ("life_duration_diameter_exponent", "segment_length", "random_choice", "IPD", "Dmin",
-                               "RMD", "CVDD", "root_order_treshold", "GDs", "LDs", "main_roots_growth_extender",
-                               "new_root_tissue_density", "GD_highest",
-                               "GD_high", "GD_medium", "GD_low", "GD_prob_low", "GD_prob_medium",
-                               "nodule_formation_probability", "struct_mass_C_content")
+    def lateral_growth_duration_factor(self, bearers):
+        """Hook: the factor of the lateral primordia's growth durations with the "simple" rule, from their bearers
+        (node indices; -1 for a bearer created in the same step). The legacy: 1."""
+        return np.ones(np.asarray(bearers).size)
+
+    def _growth_durations(self, radius, keys, root_order, parameters):
+        """The "probabilistic" rule (RootGrowthModel.calculate_growth_duration): a duration drawn among classes (low,
+        medium, high) by their probabilities, uniformly within the class (GD_by_frequency), or the class's value; the
+        classes exclusive, the thinnest roots taking GD_high (g4). *parameters*: {name: a value per primordium}."""
+        p = parameters
+        draw = random_streams.uniform(keys, stream="growth_duration_class")
+        within = random_streams.uniform(keys, stream="growth_duration")
+        low, medium = draw < p["GD_prob_low"], draw < p["GD_prob_medium"]
+        if self.GD_by_frequency:
+            duration = np.where(low, within * p["GD_low"],
+                                np.where(medium, p["GD_low"] + within * (p["GD_medium"] - p["GD_low"]),
+                                         p["GD_medium"] + within * (p["GD_high"] - p["GD_medium"])))
+        else:
+            duration = np.where(low, p["GD_low"], np.where(medium, p["GD_medium"], np.where(
+                radius > p["Dmin"], p["GD_highest"], p["GD_high"])))
+        return np.where(root_order == 1, p["GD_highest"], duration)
+
+    def _default(self, name):
+        """A variable's value for new elements (its declared default)."""
+        return self.data_structure._variable_meta().get(name, {}).get("default", 0.)
 
     @segmentation
-    def _segmentation_and_primordia_formation(self):
+    def _dist_to_ramif(self, dist_to_ramif, type, root_order, length, radius, initial_length, volume, struct_mass,
+                       root_tissue_density, soil_temperature, temperature_modification, actual_elongation,
+                       actual_elongation_rate, actual_time_since_cells_formation, thermal_time_since_cells_formation,
+                       angle_roll, key, step_elongating) -> outputs(7):
+        """
+        RootGrowthModel.segmentation_and_primordium_formation on the apices that elongated (step_elongating):
+
+        - an apex longer than segment_length becomes the first of n segments of segment_length (n the largest with
+          some length left), followed by n - 1 new segments and a new apex of the remaining length; each takes its
+          share of the apex's amounts by its mass, its distance to the last branching, and the mean age of its cells
+          (the elongated part's, the elongation spread at a constant rate);
+        - a lateral primordium forms on the apex (or on its first segment) and on each new segment and apex without a
+          child, when its distance to the last branching exceeds IPD and its drawn diameter reaches Dmin (g19); the
+          position is used either way (g20); its radius RMD · (r - Dmin/2) + Dmin/2, drawn (CVDD), at most its
+          bearer's; its growth duration by the rule;
+        - a nodule on the last segment, by its probability (nodules on).
+
+        The segments' and the new apex's other values are their apex's (ADDING_A_CHILD(identical_properties)); the
+        primordia's and nodules' are nil (ADDING_A_CHILD(nil_properties)).
+        """
         ds = self.data_structure
-        g = self.mtg
-        properties = g.properties()
-        vids = np.asarray(ds.entity_ids("node"))
-        visit = ds.order("post", convention="openalea")
-        candidate = self._apex() & (np.asarray(ds.get("type")) == TYPE_EMERGED) & (
-            np.asarray(ds.get("step_elongating")) == 1)
-        apices = vids[visit[candidate[visit]]].tolist()
-        self.__dict__["_step_new_apices"] = []
-        self.__dict__["_new_inputs"] = {}
-        if not apices:
-            return
-        values = {name: dict(zip(vids.tolist(), self.parameter_values(name).tolist()))
-                  for name in self.SEGMENTATION_PARAMETERS + self.ELEMENT_PARAMETERS}
-        plant_of = dict(zip(vids.tolist(), np.asarray(ds.entity_ids("Plant"))[ds.owner("Plant")].tolist()))
-        index = np.asarray(ds.get("vertex_index"), dtype=np.int64)
-        next_index = {}
-        for plant, last in zip(plant_of.values(), index.tolist()):
-            next_index[plant] = max(next_index.get(plant, 0), last + 1)
-        streams = g.property("legacy_random")
-        for apex in apices:
-            plant = plant_of[apex]
-            if plant not in streams:
-                streams[plant] = np.random.RandomState()
-            context = dict(parameters={name: values[name][apex] for name in values}, plant=plant, next_index=next_index,
-                           stream=streams[plant])
-            new = self._segment_apex(g, properties, apex, context)
-            for v in new:
-                if v not in self.__dict__["_step_new_apices"]:
-                    self.__dict__["_step_new_apices"].append(v)
+        labels, scales = ds._mtg.labels, ds._mtg.scales
+        ids = np.asarray(ds.entity_ids("node"))
+        time_step = float(self.time_step)
+        indptr, _ = ds.children()
+        n_children = np.diff(np.asarray(indptr))
+        p = {name: np.asarray(self._parameter(name), dtype=float) for name in self.SEGMENTATION_PARAMETERS}
+        new_length, new_volume, new_mass = np.array(length), np.array(volume), np.array(struct_mass)
+        new_dist_to_ramif, new_angle_roll = np.array(dist_to_ramif), np.array(angle_roll)
+        actual_cells, thermal_cells = (np.array(actual_time_since_cells_formation),
+                                       np.array(thermal_time_since_cells_formation))
+        shared = {name: np.array(ds.get(name), dtype=float) for name in self.SHARED}
+        apices = np.flatnonzero(self._apex() & (type == TYPE_EMERGED) & (step_elongating == 1))
+        empty = NewNodes(parent=np.zeros(0, dtype=np.int64))
+        if apices.size == 0:
+            return (new_dist_to_ramif, "length", new_length, "volume", new_volume, "struct_mass", new_mass,
+                    "actual_time_since_cells_formation", actual_cells, "thermal_time_since_cells_formation",
+                    thermal_cells, "angle_roll", new_angle_roll, "new_elements", empty)
 
-    def _new_element(self, g, properties, mother, edge, apex, values, context):
-        """A new element under *mother* ('<' in its Organ; '+' a new Organ of its Axis, a lateral or a nodule), its
-        legacy id the plant's next one, and *values* on the MPG (its inputs kept for _inputs_of_new_elements)."""
-        scales, labels = g.scales, g.labels
-        label = labels.SubOrgan.RootApex if apex else labels.SubOrgan.RootSegment
-        if edge == "<":
-            vid = g.add_child(mother, **PropsConfig(scale=scales.SubOrgan, edge_type='<', label=label))
+        # Per apex
+        L, S = length[apices], p["segment_length"][apices]
+        ratio = L / S
+        whole = np.floor(ratio)
+        n_segments = np.where(L > S, np.where(ratio - whole > 0., whole, whole - 1), 0).astype(np.int64)
+        final = L - n_segments * S
+        rate, elongation = actual_elongation_rate[apices], actual_elongation[apices]
+        start_length, factor = initial_length[apices], temperature_modification[apices]
+        cells, thermal = actual_time_since_cells_formation[apices], thermal_time_since_cells_formation[apices]
+        d0, r = dist_to_ramif[apices], radius[apices]
+        split = n_segments > 0
+        mass_before = struct_mass[apices]
+
+        # The new chain elements: per split apex, its segments 2..n and the new apex (rank n + 1)
+        owner = np.repeat(np.arange(apices.size), n_segments)       # the apex (its position in apices) of each
+        first = np.cumsum(n_segments) - n_segments
+        rank = np.arange(owner.size) - first[owner] + 2               # 2..n + 1
+        is_new_apex = rank == n_segments[owner] + 1
+        chain_parent = np.where(rank == 2, ids[apices][owner], -1 - (np.arange(owner.size) - 1))
+        chain_keys = np.zeros(owner.size, dtype=np.int64)
+        apex_keys = key[apices].astype(np.int64)
+        for depth in range(2, int(rank.max(initial=1)) + 1):         # each element's key from its predecessor's
+            at = np.flatnonzero(rank == depth)
+            chain_keys[at] = child_keys(apex_keys[owner[at]] if depth == 2 else chain_keys[at - 1], "<")
+        chain_length = np.where(is_new_apex, final[owner], S[owner])
+
+        # Their segment angles, one draw per apex
+        if self.random:
+            segment_angle_down = random_streams.normal(key[apices], 0., 5., stream="segment_angle_down")
+            segment_angle_roll = random_streams.normal(key[apices], 0., 5., stream="segment_angle_roll")
         else:
-            organ = g.add_component(g.complex_at_scale(mother, scales.Phytomer),
-                                    **PropsConfig(scale=scales.Organ, edge_type='/', label=labels.Organ.RootInternode))
-            vid = g.add_component_with_topo(organ, mother, **PropsConfig(scale=scales.SubOrgan, edge_type='+',
-                                                                         label=label))
-        plant = context["plant"]
-        properties["vertex_index"][vid] = context["next_index"][plant]
-        properties["parent_id"][vid] = properties["vertex_index"][mother]
-        context["next_index"][plant] += 1
-        inputs = {}
-        for name, value in values.items():
-            if name in self._inputs_of_new():
-                inputs[name] = value
-            elif name not in self.ELEMENT_PARAMETERS:
-                properties[name][vid] = value
-        self.__dict__["_new_inputs"][vid] = inputs
-        return vid
+            segment_angle_down = segment_angle_roll = np.zeros(apices.size)
 
-    def _value(self, properties, name, vid):
-        """An element's value, its pending one for a new element's input."""
-        pending = self.__dict__["_new_inputs"].get(vid)
-        if pending is not None and name in pending:
-            return pending[name]
-        return properties[name][vid]
+        # The split apices become their first segment
+        cut = apices[split]
+        new_length[cut] = S[split]
+        new_dist_to_ramif[cut] = d0[split] - (L[split] - S[split])
+        new_volume[cut] = pi * r[split] ** 2 * S[split]
+        new_mass[cut] = new_volume[cut] * root_tissue_density[cut]
+        fraction = new_mass[cut] / mass_before[split]
+        for name in self.SHARED:
+            shared[name][cut] = shared[name][cut] * fraction
+        with np.errstate(divide="ignore", invalid="ignore"):
+            age_up = elongation / rate
+            age_down = (final + (n_segments - 1) * S) / rate
+            age_elongated = 0.5 * (age_down + age_up)
+            actual_cells[cut] = ((start_length * (cells + time_step) + (S - start_length) * age_elongated) / S)[split]
+            thermal_cells[cut] = ((start_length * (thermal + time_step * factor)
+                                   + (S - start_length) * age_elongated * factor) / S)[split]
+            # The apices too short to split: the mean age of their cells
+            kept = apices[~split & (rate > 0.)]
+            short = ~split & (rate > 0.)
+            age_elongated = 0.5 * (elongation / rate)
+            actual_cells[kept] = ((start_length * (cells + time_step) + (L - start_length) * age_elongated) / L)[short]
+            thermal_cells[kept] = ((start_length * (thermal + time_step * factor)
+                                    + (L - start_length) * age_elongated * factor) / L)[short]
 
-    def _copy_child(self, g, properties, mother, type_, root_order, angle_down, angle_roll, length, context):
-        """RootGrowthModel.ADDING_A_CHILD('<', label Apex, identical_properties=True)."""
-        radius = properties["radius"][mother]
-        values = {name: self._value(properties, name, mother) for name in self.COPIED}
+        # The new chain's values: their apex's, but for their place in the chain
+        chain = {name: np.array(ds.get(name), dtype=float)[apices][owner] for name in self.COPIED}
+        n_after = n_segments[owner] - rank                           # the segments after each (-1 for the apex)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            chain_rate = rate[owner]
+            cells_age = np.where(is_new_apex, 0.5 * final[owner] / chain_rate,
+                                 0.5 * ((final[owner] + n_after * S[owner]) / chain_rate
+                                        + (final[owner] + (n_after - 1) * S[owner]) / chain_rate))
+        chain_volume = pi * r[owner] ** 2 * chain_length
+        chain_mass = chain_volume * root_tissue_density[apices][owner]
+        chain_fraction = chain_mass / mass_before[owner]
+        chain.update(
+            type=type[apices][owner], root_order=root_order[apices][owner],
+            lateral_root_emergence_possibility=EMERGENCE_IMPOSSIBLE, emergence_cost=0.,
+            angle_down=segment_angle_down[owner], angle_roll=segment_angle_roll[owner], length=chain_length,
+            radius=r[owner], original_radius=r[owner], initial_radius=r[owner],
+            potential_length=np.where(is_new_apex, final[owner], 0.),
+            initial_length=np.where(is_new_apex, final[owner], 0.),
+            dist_to_ramif=np.where(is_new_apex, d0[owner], d0[owner] - (L[owner] - S[owner] * rank)),
+            actual_elongation=np.where(is_new_apex, elongation[owner], S[owner] * (rank - 1)),
+            volume=chain_volume, struct_mass=chain_mass, actual_time_since_cells_formation=cells_age,
+            thermal_time_since_cells_formation=cells_age * factor[owner], key=chain_keys)
         for resource in self.resources:
-            values[resource.concentration] = self._value(properties, resource.concentration, mother)
+            chain[resource.concentration] = np.asarray(ds.get(resource.concentration), dtype=float)[apices][owner]
             for role in ("required", "demand", "consumption_amount", "consumption"):
                 name = getattr(resource, role)
-                values[name] = self._value(properties, name, mother) if resource.copied_by_new_elements else 0.
-        values.update(type=type_, root_order=root_order, lateral_root_emergence_possibility=EMERGENCE_IMPOSSIBLE,
-                      emergence_cost=0., angle_down=angle_down, angle_roll=angle_roll, length=length,
-                      radius=radius, original_radius=radius, potential_length=length, initial_length=length,
-                      initial_radius=radius, volume=0.)
-        return self._new_element(g, properties, mother, "<", True, values, context)
+                chain[name] = (np.asarray(ds.get(name), dtype=float)[apices][owner] if resource.copied_by_new_elements
+                               else np.zeros(owner.size))
+        for name in self.SHARED:
+            chain[name] = np.asarray(ds.get(name), dtype=float)[apices][owner] * chain_fraction
 
-    def _segment_apex(self, g, properties, apex, context) -> list:
-        """RootGrowthModel.segmentation_and_primordium_formation: the elements it creates or returns."""
-        parameters, stream = context["parameters"], context["stream"]
-        time_step = float(self.time_step)
-        temperature_factor = properties["temperature_modification"][apex]
-        legacy_id = int(properties["vertex_index"][apex])
+        # The sites of lateral primordia: the apices (or first segments), then the new chain's elements
+        site_apex = np.concatenate([np.arange(apices.size), owner])  # each site's apex (position in apices)
+        site_new = np.concatenate([np.zeros(apices.size, bool), np.ones(owner.size, bool)])
+        site_parent = np.concatenate([ids[apices], -1 - np.arange(owner.size)])
+        site_keys = np.concatenate([key[apices].astype(np.int64), chain_keys])
+        site_distance = np.concatenate([new_dist_to_ramif[apices], chain["dist_to_ramif"]])
+        site_elongation = np.concatenate([elongation, chain["actual_elongation"]])
+        bearer = np.concatenate([apices, np.full(owner.size, -1)])
+        has_children = np.concatenate([n_children[apices] > 0, np.zeros(owner.size, bool)])
+        at = apices[site_apex]                                      # the parameters and inputs of each site's plant
+        order, radius_site, factor_site = root_order[at], radius[at], temperature_modification[at]
+        Dmin, IPD = p["Dmin"][at], p["IPD"][at]
+        possible = ~has_children
+        if self.root_order_limitation:
+            possible &= ~(order + 1 > p["root_order_treshold"][at])
+        mean = (radius_site - Dmin / 2.) * p["RMD"][at] + Dmin / 2.
         if self.random:
-            stream.seed(int(parameters["random_choice"]) * legacy_id)
-            segment_angle_down = stream.normal(0, 5)
-            segment_angle_roll = stream.normal(0, 5)
-            stream.normal(0, 5)                    # the legacy's apex_angle_down and apex_angle_roll, unused
-            stream.normal(0, 5)
+            primordium_radius = random_streams.normal(site_keys, mean, mean * p["CVDD"][at], stream="lateral_radius")
+            bearer_angle_roll = np.abs(random_streams.normal(site_keys, 120., 10., stream="bearer_angle_roll"))
+            primordium_angle_down = np.abs(random_streams.normal(site_keys, np.where(order == 1, 45., 70.), 10.,
+                                                                 stream="lateral_angle_down"))
+            primordium_angle_roll = np.abs(random_streams.normal(site_keys, 5., 5., stream="lateral_angle_roll"))
         else:
-            segment_angle_down = segment_angle_roll = 0
-        new = []
-        root_order = properties["root_order"][apex]
-        initial_length = properties["length"][apex]
-        initial_dist_to_ramif = properties["dist_to_ramif"][apex]
-        initial_elongation = properties["actual_elongation"][apex]
-        initial_elongation_rate = properties["actual_elongation_rate"][apex]
-        shared = {name: properties[name][apex] for name in self.SHARED}
-        initial_struct_mass = properties["struct_mass"][apex]          # the mass after growth (g1)
-        segment_length = parameters["segment_length"]
+            primordium_radius = mean
+            bearer_angle_roll = np.full(site_keys.size, 120.)
+            primordium_angle_down = np.where(order == 1, 45., 70.)
+            primordium_angle_roll = np.full(site_keys.size, 5.)
+        primordium_radius = np.minimum(primordium_radius, radius_site)
+        beyond = possible & (site_distance > IPD)
+        forms = beyond & (2. * primordium_radius >= Dmin)                                         # g19
+        with np.errstate(divide="ignore", invalid="ignore"):
+            rate_site = rate[site_apex]
+            time_since_formation = np.where((site_elongation > 0.) & (rate_site > 0.),
+                                            (site_distance - IPD) / rate_site, 0.)
+        site_distance = np.where(beyond, site_distance - IPD, site_distance)                      # used (g20)
+        new_dist_to_ramif[apices] = site_distance[:apices.size]
+        chain["dist_to_ramif"] = site_distance[apices.size:]
+        old = forms[:apices.size]
+        new_angle_roll[apices[old]] = bearer_angle_roll[:apices.size][old]
+        chain["angle_roll"] = np.where(forms[apices.size:], bearer_angle_roll[apices.size:], chain["angle_roll"])
 
-        if initial_length <= segment_length:
-            new += self._primordium_formation(g, properties, apex, initial_elongation_rate, context)
-            rate = properties["actual_elongation_rate"][apex]
-            if rate > 0.:
-                age_non_elongated = properties["actual_time_since_cells_formation"][apex] + time_step
-                age_up = properties["actual_elongation"][apex] / rate
-                age_elongated = 0.5 * (0 + age_up)
-                length, length0 = properties["length"][apex], properties["initial_length"][apex]
-                properties["actual_time_since_cells_formation"][apex] = (length0 * age_non_elongated
-                                                                + (length - length0) * age_elongated) / length
-                thermal_non_elongated = (properties["thermal_time_since_cells_formation"][apex]
-                                         + time_step * temperature_factor)
-                thermal_elongated = age_elongated * temperature_factor
-                properties["thermal_time_since_cells_formation"][apex] = (length0 * thermal_non_elongated
-                                                                 + (length - length0) * thermal_elongated) / length
-            return new
-
-        if initial_length / segment_length - floor(initial_length / segment_length) > 0.:
-            n_segments = floor(initial_length / segment_length)
+        # The primordia
+        f = np.flatnonzero(forms)
+        primordium_keys = child_keys(site_keys[f], "+")
+        plant = {name: values[at[f]] for name, values in p.items()}
+        primordia = self._nil_values(plant, TYPE_BEFORE_EMERGENCE, order[f] + 1, primordium_angle_down[f],
+                                     primordium_angle_roll[f], 0., primordium_radius[f])
+        primordia["soil_temperature"] = soil_temperature[at[f]]                                   # its mother's (g3)
+        if self.growth_duration_rule == "simple":                   # determinate laterals, no extender (g18)
+            primordia["growth_duration"] = (plant["GDs"] * (2. * primordium_radius[f]) ** 2
+                                            * self.lateral_growth_duration_factor(bearer[f]))
         else:
-            n_segments = floor(initial_length / segment_length) - 1
-        n_segments = int(n_segments)
-        final_apex_length = initial_length - n_segments * segment_length
-        element = apex
-        for i in range(1, n_segments + 1):
-            properties["length"][element] = segment_length
-            properties["dist_to_ramif"][element] = initial_dist_to_ramif - (initial_length - segment_length * i)
-            self._share_mass(properties, element, segment_length, initial_struct_mass, shared)
-            rate = properties["actual_elongation_rate"][element]
-            if i == 1:
-                age_non_elongated = properties["actual_time_since_cells_formation"][element] + time_step
-                age_up = properties["actual_elongation"][element] / rate
-                age_down = (final_apex_length + (n_segments - 1) * segment_length) / rate
-                age_elongated = 0.5 * (age_down + age_up)
-                length, length0 = properties["length"][element], properties["initial_length"][element]
-                properties["actual_time_since_cells_formation"][element] = (length0 * age_non_elongated + (
-                    length - length0) * age_elongated) / length
-                thermal_non_elongated = (properties["thermal_time_since_cells_formation"][element]
-                                         + time_step * temperature_factor)
-                thermal_elongated = age_elongated * temperature_factor
-                properties["thermal_time_since_cells_formation"][element] = (length0 * thermal_non_elongated + (
-                    length - length0) * thermal_elongated) / length
-            else:
-                age_up = (final_apex_length + (n_segments - i) * segment_length) / rate
-                age_down = (final_apex_length + (n_segments - 1 - i) * segment_length) / rate
-                properties["actual_time_since_cells_formation"][element] = 0.5 * (age_down + age_up)
-                properties["thermal_time_since_cells_formation"][element] = (
-                    properties["actual_time_since_cells_formation"][element] * temperature_factor)
-            new += self._primordium_formation(g, properties, element, initial_elongation_rate, context)
-            properties["label"][element] = g.labels.SubOrgan.RootSegment
-            if i < n_segments:
-                element = self._copy_child(g, properties, element, properties["type"][element], root_order,
-                                           segment_angle_down, segment_angle_roll, 0., context)
-                properties["actual_elongation"][element] = segment_length * i
-            elif (self.nodules and len(g.children(element)) < 2
-                  and stream.random_sample() < parameters["nodule_formation_probability"]):
-                self._nodule_formation(g, properties, element, context)
+            primordia["growth_duration"] = self._growth_durations(primordium_radius[f], primordium_keys, order[f] + 1,
+                                                                  plant)
+        primordia["actual_time_since_primordium_formation"] = time_since_formation[f]
+        primordia["thermal_time_since_primordium_formation"] = time_since_formation[f] * factor_site[f]
+        primordia["key"] = primordium_keys
 
-        new_length = initial_length - n_segments * segment_length
-        element = self._copy_child(g, properties, element, properties["type"][element], root_order, segment_angle_down,
-                                   segment_angle_roll, new_length, context)
-        properties["potential_length"][element] = new_length
-        properties["initial_length"][element] = new_length
-        properties["dist_to_ramif"][element] = initial_dist_to_ramif
-        properties["actual_elongation"][element] = initial_elongation
-        self._share_mass(properties, element, new_length, initial_struct_mass, shared)
-        age_up = final_apex_length / properties["actual_elongation_rate"][element]
-        properties["actual_time_since_cells_formation"][element] = 0.5 * (0 + age_up)
-        properties["thermal_time_since_cells_formation"][element] = (
-            properties["actual_time_since_cells_formation"][element] * temperature_factor)
-        new += self._primordium_formation(g, properties, element, initial_elongation_rate, context)
-        new.append(element)
-        return new
+        # The nodules, on the last segments
+        nodules = {}
+        nodule_parent = np.zeros(0, dtype=np.int64)
+        if self.nodules:
+            last = np.flatnonzero(split)                           # each split apex's last segment: its site
+            last_site = np.where(n_segments[last] == 1, last, apices.size + first[last] + n_segments[last] - 2)
+            children_then = has_children[last_site].astype(int) + forms[last_site]
+            drawn = random_streams.uniform(site_keys[last_site], stream="nodule")
+            nodule_site = last_site[(children_then < 2)
+                                    & (drawn < p["nodule_formation_probability"][apices[last]])]
+            nodule_parent = site_parent[nodule_site]
+            at_nodule = apices[site_apex[nodule_site]]
+            plant = {name: values[at_nodule] for name, values in p.items()}
+            bearer_radius = radius[at_nodule]
+            nodules = self._nil_values(plant, TYPE_NODULE, root_order[at_nodule] + 1, 90., 0., 0., 0.)
+            nodules.update(soil_temperature=soil_temperature[at_nodule], length=bearer_radius, radius=bearer_radius,
+                           original_radius=bearer_radius, volume=4 / 3. * pi * bearer_radius ** 3,
+                           key=child_keys(site_keys[nodule_site], "+", rank=1))
+            nodules["struct_mass"] = (nodules["volume"] * nodules["root_tissue_density"]
+                                      * plant["struct_mass_C_content"])
 
-    def _share_mass(self, properties, element, length, initial_struct_mass, shared):
-        """A segment's (or the new apex's) volume and mass, and its share of the apex's amounts by its mass."""
-        radius = properties["radius"][element]
-        volume = pi * radius ** 2 * length if properties["type"][element] != TYPE_NODULE else 4 / 3. * pi * radius ** 3
-        properties["volume"][element] = volume
-        properties["struct_mass"][element] = volume * self._value(properties, "root_tissue_density", element)
-        fraction = properties["struct_mass"][element] / initial_struct_mass
-        for name, value in shared.items():
-            properties[name][element] = value * fraction
-
-    def _primordium_formation(self, g, properties, apex, elongation_rate, context) -> list:
-        """RootGrowthModel.primordium_formation: a lateral primordium on *apex*, when its distance to the last one,
-        its radius and its order allow."""
-        parameters, stream = context["parameters"], context["stream"]
-        if len(g.children(apex)) >= 1:
-            return [apex]
-        root_order = properties["root_order"][apex]
-        if self.root_order_limitation and root_order + 1 > parameters["root_order_treshold"]:
-            return [apex]
-        radius = properties["radius"][apex]
-        Dmin = parameters["Dmin"]
-        mean = (radius - Dmin / 2.) * parameters["RMD"] + Dmin / 2.
-        if self.random:
-            stream.seed(int(parameters["random_choice"]) * int(properties["vertex_index"][apex]))
-            potential_radius = stream.normal((radius - Dmin / 2.) * parameters["RMD"] + Dmin / 2.,
-                                          ((radius - Dmin / 2.) * parameters["RMD"] + Dmin / 2.) * parameters["CVDD"])
-            apex_angle_roll = abs(stream.normal(120, 10))
-            primordium_angle_down = abs(stream.normal(45, 10)) if root_order == 1 else abs(stream.normal(70, 10))
-            primordium_angle_roll = abs(stream.normal(5, 5))
-        else:
-            potential_radius = (radius - Dmin / 2) * parameters["RMD"] + Dmin / 2.
-            apex_angle_roll = 120
-            primordium_angle_down = 45 if root_order == 1 else 70
-            primordium_angle_roll = 5
-        if potential_radius > radius:
-            potential_radius = radius
-        dist_to_ramif = properties["dist_to_ramif"][apex]
-        if not (dist_to_ramif > parameters["IPD"] and 2. * potential_radius >= Dmin and potential_radius <= radius):  # g19
-            if dist_to_ramif > parameters["IPD"]:                                     # the position used (g20)
-                properties["dist_to_ramif"][apex] = dist_to_ramif - parameters["IPD"]
-            return []
-        elongation_since_last_ramif = dist_to_ramif - parameters["IPD"]
-        properties["angle_roll"][apex] = apex_angle_roll
-        if properties["actual_elongation"][apex] > 0 and elongation_rate > 0.:
-            time_since_formation = elongation_since_last_ramif / elongation_rate
-        else:
-            time_since_formation = 0.
-        values = self._nil_values(parameters, TYPE_BEFORE_EMERGENCE, root_order + 1, primordium_angle_down,
-                                  primordium_angle_roll, 0., potential_radius)
-        self._new_element_soil_temperature(properties, values, apex)
-        ramif = self._new_element(g, properties, apex, "+", True, values, context)
-        if self.growth_duration_rule == "simple":                     # determinate laterals, no extender (g18)
-            properties["growth_duration"][ramif] = (parameters["GDs"] * (2. * potential_radius) ** 2
-                                                    * self.lateral_growth_duration_factor(properties, apex))
-        else:
-            properties["growth_duration"][ramif] = self._growth_duration(
-                potential_radius, int(properties["vertex_index"][ramif]), root_order + 1, parameters, stream)
-        properties["actual_time_since_primordium_formation"][ramif] = time_since_formation
-        properties["thermal_time_since_primordium_formation"][ramif] = (time_since_formation
-                                                               * properties["temperature_modification"][apex])
-        properties["dist_to_ramif"][apex] = elongation_since_last_ramif
-        return [apex, ramif]
-
-    def _new_element_soil_temperature(self, properties, values, mother):
-        """A primordium's soil temperature: its mother's (as Root_BRIDGES; g3)."""
-        values["soil_temperature"] = self._value(properties, "soil_temperature", mother)
-
-    def lateral_growth_duration_factor(self, properties, apex):
-        """Hook: the factor of a lateral primordium's growth duration with the "simple" rule, from its bearing
-        apex (*properties*: the MPG's; the legacy: 1)."""
-        return 1.
-
-    def _growth_duration(self, radius, legacy_id, root_order, parameters, stream):
-        """RootGrowthModel.calculate_growth_duration (the "probabilistic" rule): a duration drawn among classes
-        (low, medium, high) by their probabilities, uniformly within the class (GD_by_frequency), or the class's
-        value; the classes exclusive, the thinnest roots taking GD_high (g4)."""
-        stream.seed(int(parameters["random_choice"]) * legacy_id)
-        draw = stream.random_sample()
-        if root_order == 1:
-            return parameters["GD_highest"]
-        if self.GD_by_frequency:
-            if draw < parameters["GD_prob_low"]:
-                return stream.uniform(0., parameters["GD_low"])
-            if draw < parameters["GD_prob_medium"]:
-                return stream.uniform(parameters["GD_low"], parameters["GD_medium"])
-            return stream.uniform(parameters["GD_medium"], parameters["GD_high"])
-        if draw < parameters["GD_prob_low"]:
-            return parameters["GD_low"]
-        if draw < parameters["GD_prob_medium"]:
-            return parameters["GD_medium"]
-        if radius > 2 * parameters["Dmin"] / 2.:
-            return parameters["GD_highest"]
-        return parameters["GD_high"]
-
-    def _nodule_formation(self, g, properties, mother, context):
-        """RootGrowthModel.nodule_formation: a nodule, a lateral segment without apex."""
-        parameters = context["parameters"]
-        values = self._nil_values(parameters, TYPE_NODULE, properties["root_order"][mother] + 1, 90, 0, 0, 0)
-        self._new_element_soil_temperature(properties, values, mother)
-        radius = properties["radius"][mother]
-        values.update(length=radius, radius=radius, original_radius=radius)
-        values["volume"] = 4 / 3. * pi * radius ** 3
-        values["struct_mass"] = values["volume"] * values["root_tissue_density"] * parameters["struct_mass_C_content"]
-        return self._new_element(g, properties, mother, "+", False, values, context)
-
-    @segmentation
-    def _soil_temperature(self, soil_temperature, root_tissue_density) -> outputs(1):
-        """The inputs of the elements segmentation created: copied from their mother, or a primordium's (7.8 °C or
-        its mother's, new_root_tissue_density, no resource); each resource's concentration written."""
-        pending = self.__dict__.get("_new_inputs") or {}
-        ds = self.data_structure
-        values = {"soil_temperature": np.array(soil_temperature), "root_tissue_density": np.array(root_tissue_density)}
-        values.update({r.concentration: np.array(ds.get(r.concentration), dtype=float) for r in self.resources})
-        if pending:
-            index = dict(zip(np.asarray(ds.entity_ids("node")).tolist(), range(values["soil_temperature"].size)))
-            for vid, inputs in pending.items():
-                for name, value in inputs.items():
-                    values[name][index[vid]] = value
-        self.__dict__["_new_inputs"] = {}
-        for resource in self.resources:
-            ds.set(resource.concentration, values[resource.concentration])
-        return values["soil_temperature"], "root_tissue_density", values["root_tissue_density"]
+        # The batch: the chains (parents first), the primordia, the nodules
+        groups = ((chain, owner.size), (primordia, f.size), (nodules, nodule_parent.size))
+        names = set().union(*(group for group, _ in groups))
+        values = {name: np.concatenate([np.broadcast_to(np.asarray(group.get(name, self._default(name)), dtype=float),
+                                                        (size,)) for group, size in groups]) for name in names}
+        segment, apex_label = labels.SubOrgan.RootSegment, labels.SubOrgan.RootApex
+        new = NewNodes(
+            parent=np.concatenate([chain_parent, site_parent[f], nodule_parent]),
+            edge=["<"] * owner.size + ["+"] * (f.size + nodule_parent.size),
+            label=np.concatenate([np.where(is_new_apex, apex_label, segment), np.full(f.size, apex_label),
+                                  np.full(nodule_parent.size, segment)]).tolist(),
+            values=values, new_complex=np.concatenate([np.zeros(owner.size, bool), np.ones(f.size + nodule_parent.size,
+                                                                                            bool)]),
+            complex_levels=((scales.Organ, labels.Organ.RootInternode),),
+            relabel=(ids[cut], segment))
+        for name in self.SHARED:
+            ds.set(name, shared[name])
+        return (new_dist_to_ramif, "length", new_length, "volume", new_volume, "struct_mass", new_mass,
+                "actual_time_since_cells_formation", actual_cells, "thermal_time_since_cells_formation",
+                thermal_cells, "angle_roll", new_angle_roll, "new_elements", new)
 
     # ── After growth (RootGrowthModel.post_growth_updating, standalone: the repartition is metafspm's) ─────────
 
     @postsegmentation
-    def _distance_from_tip(self, length, type, distance_from_tip, vertex_index) -> outputs(2):
-        """Distance from the tip and the axis' apex, along the successors from the tips (a fold up the tree); the
-        former distance kept."""
+    def _distance_from_tip(self, length, type, distance_from_tip) -> outputs(2):
+        """Distance from the tip and the axis' apex (its node id), along the successors from the tips (a fold up the
+        tree); the former distance kept."""
         apex = self._apex()
         stop = apex | (type == TYPE_NODULE)
-        columns = np.column_stack([np.array(length, dtype=float), np.asarray(vertex_index, dtype=float)])
+        node_ids = np.asarray(self.data_structure.entity_ids("node"), dtype=float)
+        columns = np.column_stack([np.array(length, dtype=float), node_ids])
 
         def update(level, out):
             nodes = level.nodes
@@ -1524,7 +1448,7 @@ class RootArchitecture(StructuralComponent):
             tip = stop[nodes] | (successors == 0)
             rows = np.empty((nodes.size, 2))
             rows[:, 0] = np.where(tip, length[nodes], son_distance + length[nodes])
-            rows[:, 1] = np.where(tip, vertex_index[nodes], son_apex)
+            rows[:, 1] = np.where(tip, node_ids[nodes], son_apex)
             return rows
 
         folded = self.data_structure.fold(update, columns, direction="up")
@@ -1538,16 +1462,11 @@ class RootArchitecture(StructuralComponent):
         return None
 
     @postsegmentation
-    def _living_struct_mass(self, struct_mass, living_root_hairs_struct_mass, vertex_index,
-                            type) -> outputs(1):
-        """The living structural mass (none for a dead element, g22), and the plant's
-        total, summed in the legacy's order (its vertices' ids)."""
+    def _living_struct_mass(self, struct_mass, living_root_hairs_struct_mass, type) -> outputs(1):
+        """The living structural mass (none for a dead element, g22), and the plant's total."""
         ds = self.data_structure
         living = struct_mass + living_root_hairs_struct_mass
         living = np.where(np.isin(type, (TYPE_DEAD, TYPE_JUST_DEAD)), 0., living)
         owner = np.asarray(ds.owner("Plant"))
-        totals = np.zeros(np.asarray(ds.entity_ids("Plant")).size)
-        for plant in np.unique(owner):
-            nodes = np.flatnonzero(owner == plant)
-            totals[plant] = np.sum(living[nodes[np.argsort(vertex_index[nodes], kind="stable")]])
+        totals = np.bincount(owner, weights=living, minlength=np.asarray(ds.entity_ids("Plant")).size)
         return living, "total_living_struct_mass", totals
