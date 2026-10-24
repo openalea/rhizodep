@@ -4,7 +4,7 @@ import pytest
 
 from openalea.rhizodep.comparison.differences import differences
 from openalea.rhizodep.comparison.legacy_run import legacy_run
-from openalea.rhizodep.comparison.parameter_sets import GB_SOIL_1_0, variants
+from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON, variants
 from openalea.rhizodep.comparison.port_run import LEFT_OUT, port_run
 
 from stages import COVERAGE, varying_C
@@ -29,4 +29,4 @@ def test_ten_days(name):
 
 
 def test_hexose_varying():
-    assert_same_runs(GB_SOIL_1_0, C_hexose_root=varying_C)
+    assert_same_runs(WHEAT_SOISSON, C_hexose_root=varying_C)

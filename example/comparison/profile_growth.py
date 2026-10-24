@@ -111,7 +111,7 @@ def figure(name, days, legacy, port, time_step=3600):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--set", default="GB_soil_1.0/simple_growth_duration=True", help="the parameter set")
+    parser.add_argument("--set", default="wheat_soisson/simple_growth_duration=True", help="the parameter set")
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--days", type=float, default=15.)
     parser.add_argument("--C", type=float, default=1e-3, help="the given C_hexose_root (mol.g-1)")

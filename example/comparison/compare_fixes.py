@@ -94,7 +94,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("fixes", nargs="*", help="the fixes (default: all of them, one by one, then together)")
     parser.add_argument("--list", action="store_true")
-    parser.add_argument("--set", default="GB_soil_1.0/simple_growth_duration=False")
+    parser.add_argument("--set", default="wheat_soisson/simple_growth_duration=False")
     parser.add_argument("--days", type=float, default=10.)
     parser.add_argument("--C", type=float, default=1e-3, help="the given C_hexose_root (mol.g-1)")
     parser.add_argument("--with", dest="extra", nargs="*", default=[],

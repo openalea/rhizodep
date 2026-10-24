@@ -1,14 +1,20 @@
 """
-Root_BRIDGES' nitrogen regulation of growth as a subclass of RootGrowth's hooks (devplan_metafspm.md, §21): the test
-that the hooks are enough. Compared bit for bit with Root_BRIDGES' RootGrowthModelCoupled itself (test_rootbridges.py),
-so its quirks are reproduced too:
+Root growth co-limited by carbon and nitrogen: Root_BRIDGES' growth component (Wheat-BRIDGES' RootGrowthModelCoupled)
+in this package, as a subclass of RootGrowth's hooks (devplan_metafspm.md §21): the amino acids a second resource of
+growth, besides hexose.
+
+    RootGrowthCN       hexose and amino acids (AA, an input, e.g. from a nitrogen model) limit elongation (a C/N-weighted
+                       Michaelis-Menten), thickening and the root hairs; growth costs both, scattered on the suppliers;
+                       the laterals' growth durations follow the nitrate transporters' affinity; the nodal roots' emergence
+                       can follow the shoot's phytomers (synchronize_adventitious_emergence).
+
+With its LEGACY preset, it reproduces Root_BRIDGES bit for bit (test/nitrogen: its states and whole runs, compared with
+Root_BRIDGES itself in the Wheat-BRIDGES environment), quirks included:
 - its root thickening rate uses the nodules' Km values, and halves the whole rate;
 - its C-limited elongation volume divides the C content net of the amino acids' before the yield, its cost after;
 - its root hairs are regulated by the plain mean of the C and N factors, its elongation by their C share.
-
-Besides nitrogen, Root_BRIDGES' differences from rhizodep are its options: the collar supply, a primordium's soil
-temperature from its mother, the pipe model that sees its children (g16 fixed), and a supply zone taking only
-elements holding both hexose and amino acids.
+By default, it takes RootGrowth's reviewed fixes (devplan §25), Root_BRIDGES' own fixes included (the pipe model that
+sees its children, a primordium's soil temperature from its mother, the collar supply).
 """
 from dataclasses import dataclass
 
@@ -29,8 +35,8 @@ AMINO_ACIDS = Resource(concentration="AA", zone="growing_zone_amino_acids",
 
 
 @dataclass
-class RootGrowthN(RootGrowth):
-    """RootGrowth co-limited by amino acids, as Root_BRIDGES' RootGrowthModelCoupled."""
+class RootGrowthCN(RootGrowth):
+    """RootGrowth co-limited by amino acids: Root_BRIDGES' RootGrowthModelCoupled."""
 
     # --- Inputs ---
     AA: float = input_variable(**doc('mol.g-1', 'Amino acids concentration of the element'), by='model_nitrogen',

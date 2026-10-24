@@ -5,13 +5,13 @@ import pytest
 
 from openalea.rhizodep.comparison.differences import differences
 from openalea.rhizodep.comparison.legacy_run import legacy_run
-from openalea.rhizodep.comparison.parameter_sets import GB_SOIL_1_0
+from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON
 from openalea.rhizodep.comparison.port_run import LEFT_OUT, port_run
 
-PLANTS = [dict(GB_SOIL_1_0),
-          dict(GB_SOIL_1_0, D_ini=5e-4, random_choice=3),
-          dict(GB_SOIL_1_0, n_adventitious_roots=10, EL=4e-4, IPD=6e-3),
-          dict(GB_SOIL_1_0, D_ini=9e-4, n_seminal_roots=3, CVDD=0.3)]
+PLANTS = [dict(WHEAT_SOISSON),
+          dict(WHEAT_SOISSON, D_ini=5e-4, random_choice=3),
+          dict(WHEAT_SOISSON, n_adventitious_roots=10, EL=4e-4, IPD=6e-3),
+          dict(WHEAT_SOISSON, D_ini=9e-4, n_seminal_roots=3, CVDD=0.3)]
 
 
 @pytest.fixture(scope="module")

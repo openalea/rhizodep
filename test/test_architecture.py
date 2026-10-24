@@ -6,12 +6,12 @@ import pytest
 from openalea.rhizodep.architecture import RootArchitecture, TYPE_BEFORE_EMERGENCE, TYPE_EMERGED
 from openalea.rhizodep.comparison.legacy_run import STAGES, _run_stage, legacy_model, write_C_hexose_root
 from openalea.rhizodep.comparison.legacy_run import snapshot as legacy_snapshot
-from openalea.rhizodep.comparison.parameter_sets import GB_SOIL_1_0
+from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON
 from openalea.rhizodep.comparison.port_run import port_run, port_scene, run_stage, snapshot, transplant_scene
 from openalea.rhizodep.growth import RootGrowth
 
-# GB_soil_1.0's parameters the architecture has (the others are its growth's: resources, root hairs)
-ARCHITECTURE_GB = {name: value for name, value in GB_SOIL_1_0.items() if name in RootArchitecture.__dataclass_fields__}
+# wheat_soisson's parameters the architecture has (the others are its growth's: resources, root hairs)
+ARCHITECTURE_GB = {name: value for name, value in WHEAT_SOISSON.items() if name in RootArchitecture.__dataclass_fields__}
 
 
 def stepped(scene, n_steps, struct_mass_input=None):
@@ -71,7 +71,7 @@ def test_half_satisfied_growth_takes_half_the_increments():
 def test_the_satisfaction_coefficient_is_the_legacy_one():
     """On the legacy's state after its potential growth, the legacy's satisfaction_coefficient and the port's agree
     bit for bit (the demand summed in the same order)."""
-    model = legacy_model(GB_SOIL_1_0)
+    model = legacy_model(WHEAT_SOISSON)
     for step in range(100):
         write_C_hexose_root(model, step, 1e-3)
         for stage in STAGES:
@@ -105,7 +105,7 @@ def test_the_root_system_develops():
 def test_as_root_growth_with_hexose_in_excess():
     """RootArchitecture against RootGrowth with simple_growth_duration (C-free elongation and durations) and hexose in
     excess: the same root system, up to the rounding of ArchiSimple's increments (L0 + (L - L0) · 1)."""
-    parameters = dict(GB_SOIL_1_0, simple_growth_duration=True)
+    parameters = dict(WHEAT_SOISSON, simple_growth_duration=True)
     architecture = port_run({k: v for k, v in parameters.items() if k in RootArchitecture.__dataclass_fields__},
                             n_steps=120, C_hexose_root=None, record_every=120, component=RootArchitecture).steps[-1]
     growth = port_run(parameters, n_steps=120, C_hexose_root=1., record_every=120, component=RootGrowth).steps[-1]

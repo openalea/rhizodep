@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from openalea.rhizodep.comparison.legacy_run import legacy_run
-from openalea.rhizodep.comparison.parameter_sets import GB_SOIL_1_0
+from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON
 from openalea.rhizodep.comparison.port_run import LEFT_OUT, port_scene
 from openalea.rhizodep.growth import (TYPE_ADVENTITIOUS_SUPPORT, TYPE_SEMINAL_SUPPORT, RootGrowth)
 
@@ -15,7 +15,7 @@ DECLARED = {f.name for f in fields(RootGrowth) if "variable_type" in f.metadata}
 def test_every_legacy_property_is_declared():
     """Each property the legacy writes over 10 days is a declared variable or parameter of the port, the MPG label,
     or left out with a reason."""
-    last = legacy_run(dict(GB_SOIL_1_0, simple_growth_duration=True), n_steps=240, record_every=240).steps[-1]
+    last = legacy_run(dict(WHEAT_SOISSON, simple_growth_duration=True), n_steps=240, record_every=240).steps[-1]
     missing = sorted(set(last.props) - DECLARED - set(LEFT_OUT) - {"label"})
     assert missing == []
 
@@ -32,7 +32,7 @@ def test_kinds_and_scales():
 
 @pytest.fixture(scope="module")
 def seedling():
-    parameters = dict(GB_SOIL_1_0, n_seminal_roots=3, n_adventitious_roots=4)
+    parameters = dict(WHEAT_SOISSON, n_seminal_roots=3, n_adventitious_roots=4)
     scene = port_scene(parameters)
     return scene.populations[0].data_structure, parameters
 

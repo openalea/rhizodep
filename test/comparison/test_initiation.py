@@ -5,7 +5,7 @@ import pytest
 
 from openalea.rhizodep.comparison.differences import differences
 from openalea.rhizodep.comparison.legacy_run import legacy_run
-from openalea.rhizodep.comparison.parameter_sets import GB_SOIL_1_0, variants
+from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON, variants
 from openalea.rhizodep.comparison.port_run import LEFT_OUT, port_run
 
 
@@ -28,7 +28,7 @@ def test_parameter_sets(name):
     dict(n_seminal_roots=1, n_adventitious_roots=0),                   # the primary root alone
     dict(random=False),                                                # the radii not drawn: the draws shift
     dict(initial_segment_length=0., initial_apex_length=2e-3),         # a zero-length base: a collar of its own
-    dict(GB_SOIL_1_0, CVDD=0.3, random_choice=7),
+    dict(WHEAT_SOISSON, CVDD=0.3, random_choice=7),
 ], ids=["primary_only", "not_random", "zero_length_base", "GB_other_seed"])
 def test_edge_cases(change):
     assert_same_seedling(change)

@@ -40,8 +40,11 @@ StructuralComponents growing the root system in metafspm's multiscale plant grap
 - `openalea.rhizodep.architecture.RootArchitecture`: the root architecture, C-free (ArchiSimple: development,
   segmentation, laterals; growth the potential one times a satisfaction coefficient);
 - `openalea.rhizodep.growth.RootGrowth`: the architecture with its growth limited by resources (hexose), bit for bit
-  the original component's results; its hooks let a subclass add resources (`test/nitrogen`: Root_BRIDGES' nitrogen
-  regulation, bit for bit Root_BRIDGES' results). metafspm is not installable from `openalea3` in
+  the original component's results; its hooks let a subclass add resources;
+- `openalea.rhizodep.growth_CN.RootGrowthCN`: Root_BRIDGES' carbon-nitrogen growth (amino acids co-limiting growth),
+  bit for bit Root_BRIDGES' results with its LEGACY preset (`test/nitrogen`);
+- `openalea.rhizodep.parameter_sets`: a wheat (cv. Soissons, Wheat-BRIDGES' calibration) and ArchiSimple's
+  calibrations of pea, maize and peach (Pagès et al., 2014). metafspm is not installable from `openalea3` in
 this version yet: clone the repositories side by side on their working branches and install them from source.
 
 ```bash

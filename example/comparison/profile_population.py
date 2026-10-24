@@ -50,7 +50,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--plants", type=int, nargs="*", default=[1, 2, 4, 8, 16, 32])
     parser.add_argument("--days", type=float, default=7.)
-    parser.add_argument("--set", default="GB_soil_1.0/simple_growth_duration=False")
+    parser.add_argument("--set", default="wheat_soisson/simple_growth_duration=False")
     parser.add_argument("--show", action="store_true")
     args = parser.parse_args()
     if not args.show:

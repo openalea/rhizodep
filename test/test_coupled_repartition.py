@@ -9,7 +9,7 @@ import pytest
 from openalea.metafspm.coupling.component import FunctionalComponent, state_variable
 from openalea.metafspm.data_structure.configs import ScalesConfig
 from openalea.metafspm.scene.scene import Scene
-from openalea.rhizodep.comparison.parameter_sets import GB_SOIL_1_0
+from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON
 from openalea.rhizodep.comparison.port_run import write_C_hexose_root
 from openalea.rhizodep.growth import RootGrowth
 
@@ -41,7 +41,7 @@ class GrowthAndPools:
 @pytest.fixture(scope="module")
 def run():
     table = pd.DataFrame([dict(plant="p0", model=GrowthAndPools, x=0., y=0., z=0., rotation=0.,
-                               scenario={"parameters": dict(GB_SOIL_1_0)})])
+                               scenario={"parameters": dict(WHEAT_SOISSON)})])
     table.attrs.update(xrange=1., yrange=1.)
     scene = Scene(table, time_step=3600)
     ds = scene.populations[0].data_structure

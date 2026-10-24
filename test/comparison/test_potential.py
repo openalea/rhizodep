@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from openalea.rhizodep.comparison.legacy_run import legacy_stages
-from openalea.rhizodep.comparison.parameter_sets import GB_SOIL_1_0, variants
+from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON, variants
 from openalea.rhizodep.comparison.port_run import run_stage, snapshot, transplant_scene
 
 from stages import COVERAGE, assert_stage_exact, varying_C
@@ -20,7 +20,7 @@ def test_stops_deaths_nodules(simple):
 
 
 @pytest.mark.parametrize("C", [2e-5, varying_C], ids=["low", "varying"])
-@pytest.mark.parametrize("parameters", [GB_SOIL_1_0, COVERAGE], ids=["GB_soil_1.0", "coverage"])
+@pytest.mark.parametrize("parameters", [WHEAT_SOISSON, COVERAGE], ids=["wheat_soisson", "coverage"])
 def test_hexose_limited(parameters, C):
     assert_stage_exact(parameters, "potential", every=12, C_hexose_root=C)
 

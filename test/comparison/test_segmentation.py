@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from openalea.rhizodep.comparison.legacy_run import legacy_stages
-from openalea.rhizodep.comparison.parameter_sets import GB_SOIL_1_0, variants
+from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON, variants
 from openalea.rhizodep.comparison.port_run import run_stage, transplant_scene
 from openalea.rhizodep.growth import TYPE_BEFORE_EMERGENCE, TYPE_NODULE
 

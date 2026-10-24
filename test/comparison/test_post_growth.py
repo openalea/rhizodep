@@ -2,7 +2,7 @@
 post_growth_updating standalone, on the legacy's states (devplan §14, P5)."""
 import pytest
 
-from openalea.rhizodep.comparison.parameter_sets import GB_SOIL_1_0, variants
+from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON, variants
 
 from stages import COVERAGE, assert_stage_exact, varying_C
 
@@ -18,4 +18,4 @@ def test_stops_deaths_nodules(simple):
 
 
 def test_hexose_varying():
-    assert_stage_exact(GB_SOIL_1_0, "post_growth", every=12, C_hexose_root=varying_C)
+    assert_stage_exact(WHEAT_SOISSON, "post_growth", every=12, C_hexose_root=varying_C)

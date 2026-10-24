@@ -4,7 +4,7 @@ import copy
 import pytest
 
 from openalea.rhizodep.comparison.legacy_run import legacy_run
-from openalea.rhizodep.comparison.parameter_sets import GB_SOIL_1_0, variants
+from openalea.rhizodep.comparison.parameter_sets import WHEAT_SOISSON, variants
 from openalea.rhizodep.comparison.differences import differences
 from openalea.rhizodep.comparison.drawing import positions, totals
 
@@ -39,7 +39,7 @@ def test_repeatable(pair):
 
 
 def test_differences_detects():
-    run = legacy_run(GB_SOIL_1_0, n_steps=24, record_every=24)
+    run = legacy_run(WHEAT_SOISSON, n_steps=24, record_every=24)
     last = run.steps[-1]
     other = copy.deepcopy(last)
     vid = last.vertices[-1]
@@ -50,8 +50,8 @@ def test_differences_detects():
 
 
 def test_given_C_hexose_root_drives_growth():
-    low = legacy_run(GB_SOIL_1_0, n_steps=N_STEPS, C_hexose_root=1e-5, record=True, record_every=N_STEPS)
-    high = legacy_run(GB_SOIL_1_0, n_steps=N_STEPS, C_hexose_root=1e-3, record=True, record_every=N_STEPS)
+    low = legacy_run(WHEAT_SOISSON, n_steps=N_STEPS, C_hexose_root=1e-5, record=True, record_every=N_STEPS)
+    high = legacy_run(WHEAT_SOISSON, n_steps=N_STEPS, C_hexose_root=1e-3, record=True, record_every=N_STEPS)
     assert totals(low.steps[-1])["length"] < totals(high.steps[-1])["length"]
 
 
