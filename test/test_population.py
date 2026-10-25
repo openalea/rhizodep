@@ -32,9 +32,14 @@ def by_key(record):
 
 @pytest.mark.parametrize("plant", range(len(PLANTS)))
 def test_each_plant_is_the_plant_alone(population, plant):
+    """Bit for bit, but for the elements' x, which are the plant alone's moved to the plant's place (0.1 m apart)."""
     alone = port_run(PLANTS[plant], n_steps=120, record_every=120).steps[-1]
     together = population.steps[-1][plant]
     alone, together = by_key(alone), by_key(together)
+    for name in ("x1", "x2"):
+        moved, there = together.props.pop(name), alone.props.pop(name)
+        assert [moved[v] - 0.1 * plant for v in alone.vertices] == pytest.approx([there[v] for v in alone.vertices],
+                                                                                   abs=1e-12)
     diff = differences(alone, together, names=[name for name in alone.props if name not in LEFT_OUT])
     assert diff.identical, diff.summary()
     assert len(together.vertices) > 50
