@@ -35,7 +35,7 @@ def test_segmentation_conserves_the_shared_amounts():
     scene = port_scene(WHEAT_SOISSON)
     for step in range(97):
         write_C_hexose_root(scene, step, 1e-3)
-        for stage in ("potential", "actual", "segmentation", "post_growth"):
+        for stage in ("potential", "actual", "segmentation", "postsegmentation"):
             if step == 96 and stage == "segmentation":
                 break
             run_stage(scene, stage)

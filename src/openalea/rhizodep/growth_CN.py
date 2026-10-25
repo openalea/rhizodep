@@ -21,7 +21,7 @@ import numpy as np
 
 from openalea.metafspm.coupling.component import input_variable, parameter, state_variable
 from openalea.rhizodep.growth import (DESCRIPTOR, HEXOSE, NIE, NII, BY, TYPE_ADVENTITIOUS_BEFORE_EMERGENCE, Resource,
-                                      RootGrowth, SubOrgan, doc)
+                                      RootGrowth, SubOrgan)
 
 AMINO_ACIDS = Resource(concentration="AA", zone="growing_zone_amino_acids",
                        required="amino_acids_possibly_required_for_elongation",
@@ -38,40 +38,52 @@ class RootGrowthCN(RootGrowth):
     """RootGrowth co-limited by amino acids: Root_BRIDGES' RootGrowthModelCoupled."""
 
     # --- Inputs ---
-    AA: float = input_variable(**doc('mol.g-1', 'Amino acids concentration of the element'), by='model_nitrogen',
-                               initialize=0., scale=SubOrgan, state_variable_type='massic_concentration')
-    nitrate_transporters_affinity_factor: float = input_variable(
-        **doc('adim', "Factor of the nitrate transporters' affinity (a signal of the laterals' growth duration)"),
-        by='model_nitrogen', initialize=1., scale=SubOrgan)
+    AA: float = input_variable(unit="mol.g-1", description="Amino acids concentration of the element",
+                               by="model_nitrogen", initialize=0., scale=SubOrgan,
+                               state_variable_type="massic_concentration")
+    nitrate_transporters_affinity_factor: float = input_variable(unit="adim", description="Factor of the nitrate "
+                                                                                          "transporters' affinity (a "
+                                                                                          "signal of the laterals' "
+                                                                                          "growth duration)",
+                                                                 by="model_nitrogen", initialize=1., scale=SubOrgan)
 
     # --- The amino acids' variables of growth ---
-    growing_zone_amino_acids: float = state_variable(**doc('mol.g-1', "Amino acids in the apex's supply zone"),
+    growing_zone_amino_acids: float = state_variable(unit="mol.g-1",
+                                                     description="Amino acids in the apex's supply zone",
                                                      state_variable_type=NIE, initialize=0., scale=SubOrgan)
-    amino_acids_possibly_required_for_elongation: float = state_variable(
-        **doc('mol', "Amino acids of the apex's supply zone"), state_variable_type=NIE, initialize=0., scale=SubOrgan)
-    amino_acids_available_for_thickening: float = state_variable(
-        **doc('mol', "Amino acids available to the element's thickening"), state_variable_type=NIE, initialize=0.,
-        scale=SubOrgan)
-    amino_acids_growth_demand: float = state_variable(**doc('mol', "Amino acids the potential growth needs"),
+    amino_acids_possibly_required_for_elongation: float = state_variable(unit="mol", description="Amino acids of the "
+                                                                                                 "apex's supply zone",
+                                                                         state_variable_type=NIE, initialize=0.,
+                                                                         scale=SubOrgan)
+    amino_acids_available_for_thickening: float = state_variable(unit="mol", description="Amino acids available to "
+                                                                                         "the element's thickening",
+                                                                 state_variable_type=NIE, initialize=0., scale=SubOrgan)
+    amino_acids_growth_demand: float = state_variable(unit="mol", description="Amino acids the potential growth needs",
                                                       state_variable_type=NIE, initialize=0., scale=SubOrgan)
-    amino_acids_consumption_by_growth_amount: float = state_variable(
-        **doc('mol', 'Amino acids consumed by growth in the step'), state_variable_type=NIE, initialize=0.,
-        scale=SubOrgan)
-    amino_acids_consumption_by_growth: float = state_variable(
-        **doc('mol.s-1', 'Rate of amino acids consumption by growth'), state_variable_type=NIE, initialize=0.,
-        scale=SubOrgan)
-    hexose_growth_regulation: float = state_variable(**doc('adim', "Hexose's share of the elongation's regulation"),
+    amino_acids_consumption_by_growth_amount: float = state_variable(unit="mol", description="Amino acids consumed by "
+                                                                                             "growth in the step",
+                                                                     state_variable_type=NIE, initialize=0.,
+                                                                     scale=SubOrgan)
+    amino_acids_consumption_by_growth: float = state_variable(unit="mol.s-1",
+                                                              description="Rate of amino acids consumption by growth",
+                                                              state_variable_type=NIE, initialize=0., scale=SubOrgan)
+    hexose_growth_regulation: float = state_variable(unit="adim",
+                                                     description="Hexose's share of the elongation's regulation",
                                                      state_variable_type=NII, initialize=0., scale=SubOrgan)
-    AA_growth_regulation: float = state_variable(**doc('adim', "Amino acids' share of the elongation's regulation"),
+    AA_growth_regulation: float = state_variable(unit="adim",
+                                                 description="Amino acids' share of the elongation's regulation",
                                                  state_variable_type=NII, initialize=0., scale=SubOrgan)
 
     # --- The nodal roots' emergence synchronised with the shoot (synchronize_adventitious_emergence) ---
-    nodal_awaiting_synchronisation: int = state_variable(
-        **doc('adim', 'A nodal primordium not synchronised with the shoot yet (Root_BRIDGES\' '
-                      'adventitous_primordia_to_emerge)'),
-        state_variable_type=DESCRIPTOR, initialize=0, scale=SubOrgan, dtype='int')
-    synchronize_adventitious_emergence: bool = parameter(
-        **doc('adim', "Whether the nodal roots' emergence follows the shoot's phytomers"), by=BY, default=False)
+    nodal_awaiting_synchronisation: int = state_variable(unit="adim", description="A nodal primordium not "
+                                                                                  "synchronised with the shoot yet "
+                                                                                  "(Root_BRIDGES' "
+                                                                                  "adventitous_primordia_to_emerge)",
+                                                         state_variable_type=DESCRIPTOR, initialize=0, scale=SubOrgan,
+                                                         dtype="int")
+    synchronize_adventitious_emergence: bool = parameter(unit="adim", description="Whether the nodal roots' emergence "
+                                                                                  "follows the shoot's phytomers",
+                                                         by=BY, default=False)
 
     # The shoot's delays of the next nodal emergences ({plant vid: [thermal time, ...]}), consumed one per
     # synchronised primordium, as Root_BRIDGES consumes its "adventitious_to_emerge": a list, which metafspm does not
@@ -79,16 +91,17 @@ class RootGrowthCN(RootGrowth):
     nodal_emergence_delays: dict = None
 
     # --- Parameters (Root_BRIDGES') ---
-    Km_elongation_amino_acids: float = parameter(**doc('mol.g-1', 'Affinity of elongation for amino acids'), by=BY,
-                                                 default=1250 * 1e-6 / 5)
-    Km_nodule_thickening_amino_acids: float = parameter(**doc('mol.g-1', 'Affinity of thickening for amino acids'),
-                                                        by=BY, default=1250 * 1e-6 / 5. * 100)
-    struct_mass_N_content: float = parameter(**doc('mol.g-1', 'Nitrogen content of the structural mass'), by=BY,
-                                             default=0.005 / 14)
-    yield_growth_N: float = parameter(**doc('adim', 'Yield of nitrogen in growth'), by=BY, default=1.)
-    r_Nm_AA: float = parameter(**doc('adim', 'Nitrogen atoms per amino acid'), by=BY, default=1.4)
-    r_C_AA: float = parameter(**doc('adim', 'Carbon atoms per amino acid'), by=BY, default=5)
-    C_AA_min_for_elongation: float = parameter(**doc('mol.g-1', 'Amino acids kept in the supply zone'), by=BY,
+    Km_elongation_amino_acids: float = parameter(unit="mol.g-1", description="Affinity of elongation for amino acids",
+                                                 by=BY, default=1250 * 1e-6 / 5)
+    Km_nodule_thickening_amino_acids: float = parameter(unit="mol.g-1",
+                                                        description="Affinity of thickening for amino acids", by=BY,
+                                                        default=1250 * 1e-6 / 5. * 100)
+    struct_mass_N_content: float = parameter(unit="mol.g-1", description="Nitrogen content of the structural mass",
+                                             by=BY, default=0.005 / 14)
+    yield_growth_N: float = parameter(unit="adim", description="Yield of nitrogen in growth", by=BY, default=1.)
+    r_Nm_AA: float = parameter(unit="adim", description="Nitrogen atoms per amino acid", by=BY, default=1.4)
+    r_C_AA: float = parameter(unit="adim", description="Carbon atoms per amino acid", by=BY, default=5)
+    C_AA_min_for_elongation: float = parameter(unit="mol.g-1", description="Amino acids kept in the supply zone", by=BY,
                                                default=0 * 1e-5 * (6 * 12 / 0.44) * 0.005 / 14 / 1.4)
 
     resources = (HEXOSE, AMINO_ACIDS)

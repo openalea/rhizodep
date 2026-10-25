@@ -18,8 +18,7 @@ from openalea.metafspm.data_structure import random_streams
 from openalea.metafspm.solve.decorator import actual, postsegmentation, potential
 # The architecture's names (codes, helpers) are this module's too
 from openalea.archisimple.architecture import *  # noqa: F401,F403
-from openalea.archisimple.architecture import (BY, DESCRIPTOR, MASSIC, NIE, NII, SubOrgan, RootArchitecture, doc,
-                                               outputs)
+from openalea.archisimple.architecture import BY, DESCRIPTOR, MASSIC, NIE, NII, SubOrgan, RootArchitecture
 
 
 @dataclass(frozen=True)
@@ -79,251 +78,259 @@ class RootGrowth(RootArchitecture):
     RootGrowthModel, bit for bit.
     """
     # --- Inputs ---
-    C_hexose_root: float = input_variable(**doc('mol.g-1',
-                                                'Hexose concentration of the element (given by a carbon model)',
-                                                unit_comment='of hexose per gram of structural mass'),
-                                          by='model_carbon', initialize=0., scale=SubOrgan, state_variable_type=MASSIC)
-    hexose_supply_rate: float = input_variable(**doc('mol.g-1.s-1',
-                                                     "Hexose supplied to the element during the step (given by a "
-                                                     "carbon model), available to the supply zones it belongs to",
-                                                     value_comment="0: the zones hold the elements' hexose only, "
-                                                                   "the legacy's"),
-                                               by='model_carbon', initialize=0., scale=SubOrgan)
+    C_hexose_root: float = input_variable(unit="mol.g-1",
+                                          description="Hexose concentration of the element (given by a carbon model)",
+                                          unit_comment="of hexose per gram of structural mass", by="model_carbon",
+                                          initialize=0., scale=SubOrgan, state_variable_type=MASSIC)
+    hexose_supply_rate: float = input_variable(unit="mol.g-1.s-1", description="Hexose supplied to the element during "
+                                                                               "the step (given by a carbon model), "
+                                                                               "available to the supply zones it "
+                                                                               "belongs to",
+                                               value_comment="0: the zones hold the elements' hexose only, the "
+                                                             "legacy's", by="model_carbon", initialize=0.,
+                                               scale=SubOrgan)
 
     # --- State variables, declared by the legacy ---
-    growing_zone_C_hexose_root: float = state_variable(**doc('mol.g-1', 'Hexose availability in the growing zone'),
+    growing_zone_C_hexose_root: float = state_variable(unit="mol.g-1",
+                                                       description="Hexose availability in the growing zone",
                                                        state_variable_type=NII, initialize=0.0, scale=SubOrgan)
-    hexose_consumption_by_growth: float = state_variable(**doc('mol.s-1',
-                                                               'Hexose consumption rate by growth is coupled to a '
-                                                               'root growth model'),
+    hexose_consumption_by_growth: float = state_variable(unit="mol.s-1", description="Hexose consumption rate by "
+                                                                                     "growth is coupled to a root "
+                                                                                     "growth model",
                                                          state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    hexose_consumption_by_growth_amount: float = state_variable(**doc('mol',
-                                                                      'Hexose consumed by growth in the step'),
+    hexose_consumption_by_growth_amount: float = state_variable(unit="mol",
+                                                                description="Hexose consumed by growth in the step",
                                                                 state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    resp_growth: float = state_variable(**doc('mol', 'Growth respiration in the step', unit_comment='of C'),
+    resp_growth: float = state_variable(unit="mol", description="Growth respiration in the step", unit_comment="of C",
                                         state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    hexose_consumption_by_fungus: float = state_variable(**doc('mol.s-1', 'Hexose consumption rate by fungus'),
+    hexose_consumption_by_fungus: float = state_variable(unit="mol.s-1",
+                                                         description="Hexose consumption rate by fungus",
                                                          state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
 
     # --- State variables the legacy writes without declaring them ---
-    hexose_available_for_thickening: float = state_variable(**doc('mol of hexose',
-                                                                  "Hexose available for the element's radial growth"),
+    hexose_available_for_thickening: float = state_variable(unit="mol of hexose", description="Hexose available for "
+                                                                                              "the element's radial "
+                                                                                              "growth",
                                                             state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    hexose_growth_demand: float = state_variable(**doc('mol of hexose',
-                                                       "Hexose needed for the element's potential growth"),
+    hexose_growth_demand: float = state_variable(unit="mol of hexose",
+                                                 description="Hexose needed for the element's potential growth",
                                                  state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    hexose_growth_demand_rate: float = state_variable(**doc('mol of hexose.s-1',
-                                                            "Rate of hexose needed for the element's potential growth"),
+    hexose_growth_demand_rate: float = state_variable(unit="mol of hexose.s-1", description="Rate of hexose needed "
+                                                                                            "for the element's "
+                                                                                            "potential growth",
                                                       state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    hexose_possibly_required_for_elongation: float = state_variable(**doc('mol of hexose',
-                                                                          'Hexose of the supply zone available to the'
-                                                                          " apex's elongation"),
+    hexose_possibly_required_for_elongation: float = state_variable(unit="mol of hexose",
+                                                                    description="Hexose of the supply zone available "
+                                                                                "to the apex's elongation",
                                                                     state_variable_type=NIE, initialize=0.0,
                                                                     scale=SubOrgan)
-    resp_growth_rate: float = state_variable(**doc('mol of C.s-1', 'Growth respiration rate'),
+    resp_growth_rate: float = state_variable(unit="mol of C.s-1", description="Growth respiration rate",
                                              state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    resp_maintenance: float = state_variable(**doc('mol of C', 'Maintenance respiration'),
+    resp_maintenance: float = state_variable(unit="mol of C", description="Maintenance respiration",
                                              state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    struct_mass_contributing_to_elongation: float = state_variable(**doc('g',
-                                                                         'Structural mass of the supply zone '
-                                                                         "contributing to the apex's elongation"),
+    struct_mass_contributing_to_elongation: float = state_variable(unit="g", description="Structural mass of the "
+                                                                                         "supply zone contributing to "
+                                                                                         "the apex's elongation",
                                                                    state_variable_type=NIE, initialize=0.0,
                                                                    scale=SubOrgan)
 
     # --- Plant-scale state ---
 
     # --- Parameters ---
-    root_hairs_density: float = parameter(**doc('.m-2', 'Average density of root hairs',
-                                                unit_comment='number of hairs par meter of root per meter of root '
-                                                             'radius',
-                                                references='According to the data from McElgunn and Harrison (1969), '
-                                                           'the elongation rate for wheat root hairs is about 0.080 '
-                                                           'mm h-1.'),
+    root_hairs_density: float = parameter(unit=".m-2", description="Average density of root hairs",
+                                          unit_comment="number of hairs par meter of root per meter of root radius",
+                                          references="According to the data from McElgunn and Harrison (1969), the "
+                                                     "elongation rate for wheat root hairs is about 0.080 mm h-1.",
                                           by=BY, default=374999999.99999994)
-    root_hair_max_length: float = parameter(**doc('m', 'Average maximal length of a root hair',
-                                                  references='According to the work of Gahoonia et al. (1997), the '
-                                                             'root hair maximal length for wheat and barley evolves '
-                                                             'between 0.5 and 1.3 mm.'),
-                                            by=BY, default=0.001)
-    root_hairs_elongation_rate: float = parameter(**doc('.s-1', 'Average elongation rate of root hairs',
-                                                        unit_comment='in meter per second per meter of root radius',
-                                                        references='According to the data from McElgunn and Harrison '
-                                                                   '(1969), the elongation rate for wheat root hairs '
-                                                                   'is about 0.080 mm h-1.'),
-                                                  by=BY, default=0.003703703703703704)
-    growing_zone_factor: float = parameter(**doc('adim',
-                                                 'Proportionality factor between the radius and the length of the '
-                                                 'root apical zone in which C can sustain root elongation',
-                                                 references='According to illustrations by Kozlova et al. (2020), the'
-                                                            ' length of the growing zone corresponding to the root '
-                                                            'cap, meristem and elongation zones is about 8 times the '
-                                                            'diameter of the tip.'),
-                                           by=BY, default=21.0)
-    Km_elongation: float = parameter(**doc('mol.g-1', 'Affinity constant for root elongation',
-                                           unit_comment='of hexose',
-                                           references='According to Barillot et al. (2016b): Km for root growth is '
-                                                      '1250 umol C g-1 for sucrose. According to Gauthier et al '
-                                                      '(2020): Km for regulation of the RER by sucrose concentration '
-                                                      'in hz = 100-150 umol C g-1'),
-                                     by=BY, default=0.00020833333333333335)
-    relative_nodule_thickening_rate_max: float = parameter(**doc('s-1',
-                                                                 'Maximal rate of relative increase in nodule radius',
-                                                                 references="We consider that the radius can't "
-                                                                            'increase by more than 20% every day (??)'),
-                                                           by=BY, default=2.3148148148148148e-06)
-    Km_nodule_thickening: float = parameter(**doc('mol.g-1', 'Affinity constant for nodule thickening',
-                                                  unit_comment='of hexose',
-                                                  value_comment='Km_elongation * 100'),
-                                            by=BY, default=0.020833333333333336)
-    nodule_max_radius: float = parameter(**doc('m', 'Maximal radius of nodule', value_comment='Dini * 10'),
+    root_hair_max_length: float = parameter(unit="m", description="Average maximal length of a root hair",
+                                            references="According to the work of Gahoonia et al. (1997), the root "
+                                                       "hair maximal length for wheat and barley evolves between 0.5 "
+                                                       "and 1.3 mm.", by=BY, default=0.001)
+    root_hairs_elongation_rate: float = parameter(unit=".s-1", description="Average elongation rate of root hairs",
+                                                  unit_comment="in meter per second per meter of root radius",
+                                                  references="According to the data from McElgunn and Harrison "
+                                                             "(1969), the elongation rate for wheat root hairs is "
+                                                             "about 0.080 mm h-1.", by=BY, default=0.003703703703703704)
+    growing_zone_factor: float = parameter(unit="adim", description="Proportionality factor between the radius and "
+                                                                    "the length of the root apical zone in which C "
+                                                                    "can sustain root elongation",
+                                           references="According to illustrations by Kozlova et al. (2020), the "
+                                                      "length of the growing zone corresponding to the root cap, "
+                                                      "meristem and elongation zones is about 8 times the diameter of "
+                                                      "the tip.", by=BY, default=21.0)
+    Km_elongation: float = parameter(unit="mol.g-1", description="Affinity constant for root elongation",
+                                     unit_comment="of hexose", references="According to Barillot et al. (2016b): Km "
+                                                                          "for root growth is 1250 umol C g-1 for "
+                                                                          "sucrose. According to Gauthier et al "
+                                                                          "(2020): Km for regulation of the RER by "
+                                                                          "sucrose concentration in hz = 100-150 umol "
+                                                                          "C g-1", by=BY,
+                                     default=0.00020833333333333335)
+    relative_nodule_thickening_rate_max: float = parameter(unit="s-1", description="Maximal rate of relative increase "
+                                                                                   "in nodule radius",
+                                                           references="We consider that the radius can't increase by "
+                                                                      "more than 20% every day (??)", by=BY,
+                                                           default=2.3148148148148148e-06)
+    Km_nodule_thickening: float = parameter(unit="mol.g-1", description="Affinity constant for nodule thickening",
+                                            unit_comment="of hexose", value_comment="Km_elongation * 100", by=BY,
+                                            default=0.020833333333333336)
+    nodule_max_radius: float = parameter(unit="m", description="Maximal radius of nodule", value_comment="Dini * 10",
                                          by=BY, default=0.016)
-    relative_root_thickening_rate_max: float = parameter(**doc('s-1',
-                                                               'Maximal rate of relative increase in root radius',
-                                                               references="We consider that the radius can't increase"
-                                                                          ' by more than 5% every day (??)'),
-                                                         by=BY, default=5.787037037037037e-07)
-    C_hexose_min_for_elongation: float = parameter(**doc('mol.g-1', 'Treshold hexose concentration for elongation',
-                                                         unit_comment='in mol of hexose per g of structural mass',
-                                                         references='?'),
-                                                   by=BY, default=1e-05)
-    C_hexose_min_for_thickening: float = parameter(**doc('mol.g-1', 'Treshold hexose concentration for thikening',
-                                                         unit_comment='in mol of hexose per g of structural mass',
-                                                         references='?'),
-                                                   by=BY, default=1e-05)
-    Km_thickening: float = parameter(**doc('mol.g-1', 'Affinity constant for root thickening',
-                                           unit_comment='of hexose',
-                                           value_comment='Km_elongation',
-                                           references='We assume that the Michaelis-Menten constant for thickening is'
-                                                      ' the same as for root elongation. (??)'),
-                                     by=BY, default=0.00020833333333333335)
-    yield_growth: float = parameter(**doc('adim', 'Growth yield',
-                                          unit_comment='mol of CO2 per mol of C used for structural mass',
-                                          references='We use the range value (0.75-0.85) proposed by Thornley and '
-                                                     'Cannell (2000)'),
-                                    by=BY, default=0.8)
-    growth_duration_rule: str = parameter(
-        **doc('adim', "The laterals' growth durations: 'probabilistic' (classes GD_low / GD_medium / GD_high by their "
-                      "probabilities) or 'simple' (GDs·d², ArchiSimple's), the growth staying limited by resources"),
-        by=BY, default="probabilistic")
-    initial_C_hexose_root: float = parameter(**doc('mol.g-1', 'Initial hexose concentration of root segments'),
-                                             by=BY, default=0.0001)
+    relative_root_thickening_rate_max: float = parameter(unit="s-1",
+                                                         description="Maximal rate of relative increase in root radius",
+                                                         references="We consider that the radius can't increase by "
+                                                                    "more than 5% every day (??)", by=BY,
+                                                         default=5.787037037037037e-07)
+    C_hexose_min_for_elongation: float = parameter(unit="mol.g-1",
+                                                   description="Treshold hexose concentration for elongation",
+                                                   unit_comment="in mol of hexose per g of structural mass",
+                                                   references="?", by=BY, default=1e-05)
+    C_hexose_min_for_thickening: float = parameter(unit="mol.g-1",
+                                                   description="Treshold hexose concentration for thikening",
+                                                   unit_comment="in mol of hexose per g of structural mass",
+                                                   references="?", by=BY, default=1e-05)
+    Km_thickening: float = parameter(unit="mol.g-1", description="Affinity constant for root thickening",
+                                     unit_comment="of hexose", value_comment="Km_elongation",
+                                     references="We assume that the Michaelis-Menten constant for thickening is the "
+                                                "same as for root elongation. (??)", by=BY,
+                                     default=0.00020833333333333335)
+    yield_growth: float = parameter(unit="adim", description="Growth yield",
+                                    unit_comment="mol of CO2 per mol of C used for structural mass",
+                                    references="We use the range value (0.75-0.85) proposed by Thornley and Cannell "
+                                               "(2000)", by=BY, default=0.8)
+    growth_duration_rule: str = parameter(unit="adim", description="The laterals' growth durations: 'probabilistic' "
+                                                                   "(classes GD_low / GD_medium / GD_high by their "
+                                                                   "probabilities) or 'simple' (GDs·d², "
+                                                                   "ArchiSimple's), the growth staying limited by "
+                                                                   "resources", by=BY, default="probabilistic")
+    initial_C_hexose_root: float = parameter(unit="mol.g-1",
+                                             description="Initial hexose concentration of root segments", by=BY,
+                                             default=0.0001)
 
 
     # --- The root hairs and the growth duration classes (RootGrowth's; ArchiSimple has neither) ---
-    initial_living_root_hairs_struct_mass: float = state_variable(**doc('g',
-                                                                        'Same as struct_mass but corresponds to the '
-                                                                        'previous time step; it is intended to record'
-                                                                        ' the variation'),
+    initial_living_root_hairs_struct_mass: float = state_variable(unit="g", description="Same as struct_mass but "
+                                                                                        "corresponds to the previous "
+                                                                                        "time step; it is intended to "
+                                                                                        "record the variation",
                                                                   state_variable_type=NIE, initialize=0.0,
                                                                   scale=SubOrgan)
-    living_root_hairs_struct_mass: float = state_variable(**doc('g',
-                                                                'Example root segment living root hairs structural '
-                                                                'mass'),
+    living_root_hairs_struct_mass: float = state_variable(unit="g", description="Example root segment living root "
+                                                                                "hairs structural mass",
                                                           state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    root_hair_length: float = state_variable(**doc('m', 'Example root hair length',
-                                                   references='According to the work of Gahoonia et al. (1997), the '
-                                                              'root hair maximal length for wheat and barley evolves '
-                                                              'between 0.5 and 1.3 mm.'),
-                                             state_variable_type=NII, initialize=0.001, scale=SubOrgan)
-    total_root_hairs_number: float = state_variable(**doc('adim',
-                                                          'Example root hairs number on segment external surface',
-                                                          value_comment='30 * (1.6e-4 / radius) * length * 1e3',
-                                                          references=' According to the work of Gahoonia et al. '
-                                                                     '(1997), the root hair density is about 30 hairs'
-                                                                     ' per mm for winter wheat, for a root radius of '
-                                                                     'about 0.16 mm.'),
+    root_hair_length: float = state_variable(unit="m", description="Example root hair length",
+                                             references="According to the work of Gahoonia et al. (1997), the root "
+                                                        "hair maximal length for wheat and barley evolves between 0.5 "
+                                                        "and 1.3 mm.", state_variable_type=NII, initialize=0.001,
+                                             scale=SubOrgan)
+    total_root_hairs_number: float = state_variable(unit="adim",
+                                                    description="Example root hairs number on segment external surface",
+                                                    value_comment="30 * (1.6e-4 / radius) * length * 1e3",
+                                                    references=" According to the work of Gahoonia et al. (1997), the "
+                                                               "root hair density is about 30 hairs per mm for winter "
+                                                               "wheat, for a root radius of about 0.16 mm.",
                                                     state_variable_type=NIE, initialize=41.142857142857146,
                                                     scale=SubOrgan)
-    root_hairs_struct_mass_produced: float = state_variable(**doc('g', '', unit_comment='of dry weight'),
+    root_hairs_struct_mass_produced: float = state_variable(unit="g", description="", unit_comment="of dry weight",
                                                             state_variable_type=NIE, initialize=0, scale=SubOrgan)
-    actual_length_with_hairs: float = state_variable(**doc('m', 'Length of the element bearing root hairs'),
+    actual_length_with_hairs: float = state_variable(unit="m", description="Length of the element bearing root hairs",
                                                      state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    actual_time_since_root_hairs_emergence_started: float = state_variable(**doc('s',
-                                                                                 'Time since root hairs started to '
-                                                                                 'emerge on the element'),
+    actual_time_since_root_hairs_emergence_started: float = state_variable(unit="s", description="Time since root "
+                                                                                                 "hairs started to "
+                                                                                                 "emerge on the "
+                                                                                                 "element",
                                                                            state_variable_type=NII, initialize=0.0,
                                                                            scale=SubOrgan)
-    actual_time_since_root_hairs_emergence_stopped: float = state_variable(**doc('s',
-                                                                                 'Time since root hairs stopped '
-                                                                                 'emerging on the element'),
+    actual_time_since_root_hairs_emergence_stopped: float = state_variable(unit="s", description="Time since root "
+                                                                                                 "hairs stopped "
+                                                                                                 "emerging on the "
+                                                                                                 "element",
                                                                            state_variable_type=NII, initialize=0.0,
                                                                            scale=SubOrgan)
-    all_root_hairs_formed: float = state_variable(**doc('adim',
-                                                        '1 when every root hair of the element has formed, else 0'),
-                                                  state_variable_type=NII, initialize=0.0, scale=SubOrgan)
-    dead_root_hairs_number: float = state_variable(**doc('adim', 'Number of dead root hairs on the element'),
+    all_root_hairs_formed: float = state_variable(unit="adim", description="1 when every root hair of the element has "
+                                                                           "formed, else 0", state_variable_type=NII,
+                                                  initialize=0.0, scale=SubOrgan)
+    dead_root_hairs_number: float = state_variable(unit="adim", description="Number of dead root hairs on the element",
                                                    state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    living_root_hairs_number: float = state_variable(**doc('adim', 'Number of living root hairs on the element'),
+    living_root_hairs_number: float = state_variable(unit="adim",
+                                                     description="Number of living root hairs on the element",
                                                      state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    root_hairs_struct_mass: float = state_variable(**doc('g', "Structural mass of the element's root hairs"),
+    root_hairs_struct_mass: float = state_variable(unit="g", description="Structural mass of the element's root hairs",
                                                    state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    root_hairs_volume: float = state_variable(**doc('m3', "Volume of the element's root hairs"),
+    root_hairs_volume: float = state_variable(unit="m3", description="Volume of the element's root hairs",
                                               state_variable_type=NIE, initialize=0.0, scale=SubOrgan)
-    thermal_time_since_root_hairs_emergence_started: float = state_variable(**doc('s',
-                                                                                  'Thermal time since root hairs '
-                                                                                  'started to emerge'),
+    thermal_time_since_root_hairs_emergence_started: float = state_variable(unit="s", description="Thermal time since "
+                                                                                                  "root hairs started "
+                                                                                                  "to emerge",
                                                                             state_variable_type=NII, initialize=0.0,
                                                                             scale=SubOrgan)
-    thermal_time_since_root_hairs_emergence_stopped: float = state_variable(**doc('s',
-                                                                                  'Thermal time since root hairs '
-                                                                                  'stopped emerging'),
+    thermal_time_since_root_hairs_emergence_stopped: float = state_variable(unit="s", description="Thermal time since "
+                                                                                                  "root hairs stopped "
+                                                                                                  "emerging",
                                                                             state_variable_type=NII, initialize=0.0,
                                                                             scale=SubOrgan)
 
-    root_hair_radius: float = parameter(**doc('m', 'Average radius of root hair',
-                                              references='According to the work of Gahoonia et al. (1997), the root '
-                                                         'hair diameter is relatively constant for different '
-                                                         'genotypes of wheat and barley, i.e. 12 microns'),
-                                        by=BY, default=6e-06)
-    root_hairs_lifespan: float = parameter(**doc('s', 'Average lifespan of a root hair',
-                                                 unit_comment='time equivalent at temperature of T_ref',
-                                                 references='According to the data from McElgunn and Harrison (1969),'
-                                                            ' the lifespan of wheat root hairs is 40-55h, depending '
-                                                            'on the temperature. For a temperature of 20 degree '
-                                                            'Celsius, the linear regression from this data gives 46h.'),
-                                           by=BY, default=165600.0)
-    GD_highest: float = parameter(**doc('s.m-2',
-                                        'For seminal and adventitious roots, a longer growth duration is applied',
-                                        unit_comment='time equivalent at temperature of T_ref',
-                                        value_comment='Expected growth duration of a seminal root'),
-                                  by=BY, default=5184000.0)
-    GD_high: float = parameter(**doc('s.m-2',
-                                     'The growth duration has a probability of [1-GD_prob_medium] to equal GD_high',
-                                     unit_comment='time equivalent at temperature of T_ref',
-                                     references='Estimated the longest observed lateral wheat roots observed in '
-                                                'rhizoboxes (Rees et al., unpublished)'),
-                               by=BY, default=518400.0)
-    GD_medium: float = parameter(**doc('s.m-2',
-                                       'The growth duration has a probability of [GD_prob_medium - GD_prob_low] to '
-                                       'equal GD_medium',
-                                       unit_comment='time equivalent at temperature of T_ref',
-                                       references='Estimated from the medium lateral wheat roots observed in '
-                                                  'rhizoboxes (Rees et al., unpublished)'),
+    root_hair_radius: float = parameter(unit="m", description="Average radius of root hair",
+                                        references="According to the work of Gahoonia et al. (1997), the root hair "
+                                                   "diameter is relatively constant for different genotypes of wheat "
+                                                   "and barley, i.e. 12 microns", by=BY, default=6e-06)
+    root_hairs_lifespan: float = parameter(unit="s", description="Average lifespan of a root hair",
+                                           unit_comment="time equivalent at temperature of T_ref",
+                                           references="According to the data from McElgunn and Harrison (1969), the "
+                                                      "lifespan of wheat root hairs is 40-55h, depending on the "
+                                                      "temperature. For a temperature of 20 degree Celsius, the "
+                                                      "linear regression from this data gives 46h.", by=BY,
+                                           default=165600.0)
+    GD_highest: float = parameter(unit="s.m-2",
+                                  description="For seminal and adventitious roots, a longer growth duration is applied",
+                                  unit_comment="time equivalent at temperature of T_ref",
+                                  value_comment="Expected growth duration of a seminal root", by=BY, default=5184000.0)
+    GD_high: float = parameter(unit="s.m-2", description="The growth duration has a probability of [1-GD_prob_medium] "
+                                                         "to equal GD_high",
+                               unit_comment="time equivalent at temperature of T_ref", references="Estimated the "
+                                                                                                  "longest observed "
+                                                                                                  "lateral wheat "
+                                                                                                  "roots observed in "
+                                                                                                  "rhizoboxes (Rees "
+                                                                                                  "et al., "
+                                                                                                  "unpublished)", by=BY,
+                               default=518400.0)
+    GD_medium: float = parameter(unit="s.m-2", description="The growth duration has a probability of [GD_prob_medium "
+                                                           "- GD_prob_low] to equal GD_medium",
+                                 unit_comment="time equivalent at temperature of T_ref", references="Estimated from "
+                                                                                                    "the medium "
+                                                                                                    "lateral wheat "
+                                                                                                    "roots observed "
+                                                                                                    "in rhizoboxes "
+                                                                                                    "(Rees et al., "
+                                                                                                    "unpublished)",
                                  by=BY, default=60479.99999999999)
-    GD_low: float = parameter(**doc('s.m-2', 'The growth duration has a probability of [GD_prob_low] to equal GD_low',
-                                    unit_comment='time equivalent at temperature of T_ref',
-                                    references='Estimated from the shortest lateral wheat roots observed in '
-                                               'rhizoboxes (Rees et al., unpublished)'),
+    GD_low: float = parameter(unit="s.m-2",
+                              description="The growth duration has a probability of [GD_prob_low] to equal GD_low",
+                              unit_comment="time equivalent at temperature of T_ref", references="Estimated from the "
+                                                                                                 "shortest lateral "
+                                                                                                 "wheat roots "
+                                                                                                 "observed in "
+                                                                                                 "rhizoboxes (Rees et "
+                                                                                                 "al., unpublished)",
                               by=BY, default=21600.0)
-    GD_by_frequency: bool = parameter(**doc('adim',
-                                            'As an alternative to using a single value of growth duration depending '
-                                            'on diameter, we offer the possibility to rather define the growth '
-                                            'duration as a random choice between three values (low, medium and high),'
-                                            ' depending on their respective probability'),
+    GD_by_frequency: bool = parameter(unit="adim", description="As an alternative to using a single value of growth "
+                                                               "duration depending on diameter, we offer the "
+                                                               "possibility to rather define the growth duration as a "
+                                                               "random choice between three values (low, medium and "
+                                                               "high), depending on their respective probability",
                                       by=BY, default=False)
-    GD_prob_low: float = parameter(**doc('adim', 'Probability for low growth duration',
-                                         references='Estimated from the shortest lateral wheat roots observed in '
-                                                    'rhizoboxes (Rees et al., unpublished)'),
-                                   by=BY, default=0.5)
-    GD_prob_medium: float = parameter(**doc('adim', 'Coefficient of growth duration',
-                                            unit_comment='Probability for medium growth duration',
-                                            references='Estimated from the medium lateral wheat roots observed in '
-                                                       'rhizoboxes (Rees et al., unpublished)'),
-                                      by=BY, default=0.85)
+    GD_prob_low: float = parameter(unit="adim", description="Probability for low growth duration",
+                                   references="Estimated from the shortest lateral wheat roots observed in rhizoboxes "
+                                              "(Rees et al., unpublished)", by=BY, default=0.5)
+    GD_prob_medium: float = parameter(unit="adim", description="Coefficient of growth duration",
+                                      unit_comment="Probability for medium growth duration",
+                                      references="Estimated from the medium lateral wheat roots observed in "
+                                                 "rhizoboxes (Rees et al., unpublished)", by=BY, default=0.85)
 
     # The collar supply: an apex's supply zone reaching the base continues into the collar's other children by
     # volume ("collar", their own collar child excluded); "none": the legacy's, the zone stops at the base
-    collar_supply: str = parameter(**doc('adim', "The supply zone's continuation into the collar's children"),
+    collar_supply: str = parameter(unit="adim", description="The supply zone's continuation into the collar's children",
                                    by=BY, default="collar")
 
     resources = (HEXOSE,)
@@ -375,7 +382,7 @@ class RootGrowth(RootArchitecture):
         return np.array(living_root_hairs_struct_mass)
 
     @postsegmentation
-    def _living_struct_mass(self, struct_mass, living_root_hairs_struct_mass, type) -> outputs(1):
+    def _living_struct_mass(self, struct_mass, living_root_hairs_struct_mass, type) -> dict:
         """The living structural mass, the root hairs' included (none for a dead element), and the plant's
         total."""
         ds = self.data_structure
@@ -383,7 +390,7 @@ class RootGrowth(RootArchitecture):
         living = np.where(np.isin(type, (TYPE_DEAD, TYPE_JUST_DEAD)), 0., living)
         owner = np.asarray(ds.owner("Plant"))
         totals = np.bincount(owner, weights=living, minlength=np.asarray(ds.entity_ids("Plant")).size)
-        return living, "total_living_struct_mass", totals
+        return {"living_struct_mass": living, "total_living_struct_mass": totals}
 
     @classmethod
     def _initial_resources(cls, parameters, elements) -> None:
@@ -619,7 +626,7 @@ class RootGrowth(RootArchitecture):
                 struct_mass_contributing_to_elongation, resp_growth, struct_mass_produced,
                 thermal_potential_time_since_emergence, thermal_time_since_emergence, actual_time_since_emergence,
                 actual_elongation, actual_elongation_rate, dist_to_ramif, growing_zone_factor,
-                yield_growth) -> outputs(13):
+                yield_growth) -> dict:
         """
         Growth limited by the resources of the supply zone (elongation) and of the element (thickening), their cost
         taken from the suppliers in proportion to what each supplies, plus the growth respiration; the primordia
@@ -735,12 +742,12 @@ class RootGrowth(RootArchitecture):
         elongation_rate[emerged] = elongation[emerged] / time_step
         new_dist_to_ramif[longer] += elongation[longer]
 
-        return (new_length, "radius", new_radius, "volume", new_volume, "struct_mass", new_mass,
-                "struct_mass_produced", produced, "initial_struct_mass", new_initial_mass,
-                "resp_growth", respiration, "type", new_type,
-                "thermal_time_since_emergence", time_since_emergence, "actual_time_since_emergence",
-                actual_since_emergence, "actual_elongation", elongation, "actual_elongation_rate", elongation_rate,
-                "dist_to_ramif", new_dist_to_ramif, "step_elongating", elongating.astype(int))
+        return {"length": new_length, "radius": new_radius, "volume": new_volume, "struct_mass": new_mass,
+                "struct_mass_produced": produced, "initial_struct_mass": new_initial_mass, "resp_growth": respiration,
+                "type": new_type, "thermal_time_since_emergence": time_since_emergence,
+                "actual_time_since_emergence": actual_since_emergence, "actual_elongation": elongation,
+                "actual_elongation_rate": elongation_rate, "dist_to_ramif": new_dist_to_ramif,
+                "step_elongating": elongating.astype(int)}
 
     # ── The root hairs (RootGrowthModel.root_hairs_dynamics_opt) ──────────────────────────────────────────────
 
@@ -771,7 +778,7 @@ class RootGrowth(RootArchitecture):
                           actual_time_since_root_hairs_emergence_stopped,
                           thermal_time_since_root_hairs_emergence_stopped, resp_growth, growing_zone_factor,
                           root_hairs_density, root_hair_max_length, root_hair_radius, root_hairs_lifespan,
-                          yield_growth) -> outputs(14):
+                          yield_growth) -> dict:
         """RootGrowthModel.root_hairs_dynamics_opt on the elements of the legacy's focus (a structural mass, a
         Segment or Apex label, an emerged, stopped, dead or nodule type; not a collar's zero-length support):
         emergence along the element beyond the growing zone, death after their lifespan, their elongation limited
@@ -866,17 +873,17 @@ class RootGrowth(RootArchitecture):
                 ds.set(resource.consumption, consumption_rate)
                 if index == 0:                              # the carbon: growth respiration
                     out["resp"][selected] += (cost * 6. * (1 - yield_growth))[selected]
-        return (out["root_hair_length"], "actual_length_with_hairs", out["actual_length_with_hairs"],
-                "total_root_hairs_number", out["total_root_hairs_number"],
-                "dead_root_hairs_number", out["dead_root_hairs_number"],
-                "living_root_hairs_number", out["living_root_hairs_number"],
-                "all_root_hairs_formed", out["all_root_hairs_formed"],
-                "root_hairs_struct_mass", out["root_hairs_struct_mass"],
-                "living_root_hairs_struct_mass", out["living_root_hairs_struct_mass"],
-                "root_hairs_struct_mass_produced", out["root_hairs_struct_mass_produced"],
-                "root_hairs_volume", out["root_hairs_volume"],
-                "actual_time_since_root_hairs_emergence_started", out["started"],
-                "thermal_time_since_root_hairs_emergence_started", out["thermal_started"],
-                "actual_time_since_root_hairs_emergence_stopped", out["stopped"],
-                "thermal_time_since_root_hairs_emergence_stopped", out["thermal_stopped"],
-                "resp_growth", out["resp"])
+        return {"root_hair_length": out["root_hair_length"],
+                "actual_length_with_hairs": out["actual_length_with_hairs"],
+                "total_root_hairs_number": out["total_root_hairs_number"],
+                "dead_root_hairs_number": out["dead_root_hairs_number"],
+                "living_root_hairs_number": out["living_root_hairs_number"],
+                "all_root_hairs_formed": out["all_root_hairs_formed"],
+                "root_hairs_struct_mass": out["root_hairs_struct_mass"],
+                "living_root_hairs_struct_mass": out["living_root_hairs_struct_mass"],
+                "root_hairs_struct_mass_produced": out["root_hairs_struct_mass_produced"],
+                "root_hairs_volume": out["root_hairs_volume"],
+                "actual_time_since_root_hairs_emergence_started": out["started"],
+                "thermal_time_since_root_hairs_emergence_started": out["thermal_started"],
+                "actual_time_since_root_hairs_emergence_stopped": out["stopped"],
+                "thermal_time_since_root_hairs_emergence_stopped": out["thermal_stopped"], "resp_growth": out["resp"]}

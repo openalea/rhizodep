@@ -134,7 +134,7 @@ def legacy_run(parameters=None, n_steps=24, C_hexose_root=1e-3, time_step=3600, 
     return run
 
 
-STAGES = ("potential", "actual", "segmentation", "post_growth")
+STAGES = ("potential", "actual", "segmentation", "postsegmentation")
 
 
 def _run_stage(model, stage):

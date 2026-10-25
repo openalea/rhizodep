@@ -35,7 +35,7 @@ from openalea.rhizodep.comparison.port_run import write_C_hexose_root as write_p
 
 OUTPUTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "outputs", "profiling")
 STAGE_NAMES = {"potential": "potential growth", "actual": "actual growth", "segmentation": "segmentation",
-               "post_growth": "post-growth"}
+               "postsegmentation": "post-growth"}
 
 
 def time_legacy(parameters, n_steps, C_hexose_root, time_step=3600):
