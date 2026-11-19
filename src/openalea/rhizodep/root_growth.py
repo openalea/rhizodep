@@ -2256,7 +2256,7 @@ class RootGrowthModel(Model):
                                         nil_properties=True)
             # We specifically recomputes the growth duration:
             if self.simple_growth_duration:
-                ramif.growth_duration = self.GDs * (2. * ramif.radius) ** 2 * self.main_roots_growth_extender
+                ramif.growth_duration = self.GDs * (2. * ramif.radius) ** 2
             else:
                 ramif.growth_duration = self.calculate_growth_duration(radius=ramif.radius, index=ramif._vid,
                                                                        root_order=ramif.root_order)
@@ -3102,7 +3102,7 @@ class RootGrowthModel(Model):
                         # We draw a random growth-duration in the lower range:
                         growth_duration = np.random.uniform(0., self.GD_low)
                     # CASE 3: Occasionnaly, the growth duration may be a bit higher for a lateral root
-                    if random_result < self.GD_prob_medium:
+                    elif random_result < self.GD_prob_medium:
                         # We draw a random growth-duration in the lower range:
                         growth_duration = np.random.uniform(self.GD_low, self.GD_medium)
                     # CASE 3: Occasionnaly, the growth duration may be a bit higher for a lateral root

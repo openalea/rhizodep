@@ -582,7 +582,7 @@ class RootAnatomy(Model):
         stele_radius = radius - sum([layer.mean_cell_width_toR * radius + layer.cell_wall_thickness for layer in self.cell_layers 
                                      if layer.tissue_name in ("epidermis", "cortex")])
 
-        return 2 * pi * (stele_radius ** 2) * length - stele_symplasm_volume
+        return pi * (stele_radius ** 2) * length - stele_symplasm_volume
     
     @actual
     @state

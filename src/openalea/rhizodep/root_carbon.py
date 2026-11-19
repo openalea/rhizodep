@@ -146,7 +146,7 @@ class RootCarbonModel(Model):
 
     # LOCAL VARIABLES
     # Pools initial size
-    C_sucrose_root: float = declare(default=1e-4 / 10, unit="mol.g-1", unit_comment="of sucrose", description="Sucrose concentration in root",
+    phloem_sucrose: float = declare(default=1e-4 / 10, unit="mol.g-1", unit_comment="of sucrose", description="Sucrose concentration in root",
                                     min_value="", max_value="", value_comment="", references="0.0025 is a plausible value according to the results of Gauthier (2019, pers. communication), but here, we use a plausible sucrose concentration (10 mgC g-1) in roots according to various experimental results.", DOI="",
                                     variable_type="state_variable", by="model_carbon", state_variable_type="massic_concentration", edit_by="user")
     C_hexose_root: float = declare(default=1e-4, unit="mol.g-1", unit_comment="of labile hexose", description="Hexose concentration in root",
@@ -542,7 +542,7 @@ class RootCarbonModel(Model):
                 continue
             else:
                 # We increment the total amount of sucrose in the root system, including dead root elements (if any):
-                self.props["total_sucrose_phloem"][1] += n.C_sucrose_root * n.living_struct_mass - n.deficit_sucrose_root
+                self.props["total_sucrose_phloem"][1] += n.phloem_sucrose * n.living_struct_mass - n.deficit_sucrose_root
                 
 
     # Calculating the net input of sucrose by the aerial parts into the root system:
@@ -571,25 +571,25 @@ class RootCarbonModel(Model):
             print("!!! Before homogenizing sucrose concentration, the global deficit in sucrose was",
                   self.props["global_sucrose_deficit"][1])
         # The new average sucrose concentration in the root system is calculated as:
-        C_sucrose_root_after_supply = (self.props["total_sucrose_phloem"][1] + (
+        phloem_sucrose_after_supply = (self.props["total_sucrose_phloem"][1] + (
                     self.props["sucrose_input_rate"][1] * self.time_step) - self.props["global_sucrose_deficit"][1]) \
                                       / self.props["total_living_struct_mass"][1]
         
         # This new concentration includes the amount of sucrose from element that have just died,
         # but excludes the mass of these dead elements!
 
-        if C_sucrose_root_after_supply >= 0.:
-            new_C_sucrose_root = C_sucrose_root_after_supply
+        if phloem_sucrose_after_supply >= 0.:
+            new_phloem_sucrose = phloem_sucrose_after_supply
             # We reset the global variable global_sucrose_deficit:
             self.props["global_sucrose_deficit"][1] = 0.
         else:
             # We record the general deficit in sucrose:
-            self.props["global_sucrose_deficit"][1] = - C_sucrose_root_after_supply * self.props["total_living_struct_mass"][1]
+            self.props["global_sucrose_deficit"][1] = - phloem_sucrose_after_supply * self.props["total_living_struct_mass"][1]
 
             print("!!! After homogenizing sucrose concentration, the deficit in sucrose is",
                   self.props["global_sucrose_deficit"][1])
             # We defined the new concentration of sucrose as 0:
-            new_C_sucrose_root = 0.
+            new_phloem_sucrose = 0.
         
         # We go through the MTG to modify the sugars concentrations:
         for vid in self.g.vertices_iter(scale=1):
@@ -597,10 +597,10 @@ class RootCarbonModel(Model):
             # If the element has not emerged yet, it doesn't contain any sucrose yet;
             # if has died, it should not contain any sucrose anymore:
             if n.length <= 0. or n.type == self.type_Dead or n.type == self.type_Just_dead:
-                n.C_sucrose_root = 0.
+                n.phloem_sucrose = 0.
             else:
                 # The local sucrose concentration in the root is calculated from the new sucrose concentration calculated above:
-                n.C_sucrose_root = new_C_sucrose_root
+                n.phloem_sucrose = new_phloem_sucrose
                 
             # AND BECAUSE THE LOCAL DEFICITS OF SUCROSE HAVE BEEN ALREADY INCLUDED IN THE TOTAL SUCROSE CALCULATION,
             # WE RESET ALL LOCAL DEFICITS TO 0:
@@ -614,7 +614,7 @@ class RootCarbonModel(Model):
     # parenchyma and from the epidermis. The function also simulates the opposite process of sucrose loading,
     # considering that 2 mol of hexose are produced for 1 mol of sucrose.
     @rate
-    def _hexose_diffusion_from_phloem(self, type, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
+    def _hexose_diffusion_from_phloem(self, type, length, phloem_exchange_surface, phloem_sucrose, C_hexose_root,
                                              hexose_consumption_by_growth, soil_temperature):
         
 
@@ -627,12 +627,12 @@ class RootCarbonModel(Model):
                                                                 C=self.phloem_unloading_C)
 
             
-        return np.where((length <= 0.) | (phloem_exchange_surface <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead) | (self.props["global_sucrose_deficit"][1] > 0.) | (C_sucrose_root <= C_hexose_root / 2.), 0.,
-                        2. * phloem_permeability * (C_sucrose_root - C_hexose_root / 2.) * phloem_exchange_surface)
+        return np.where((length <= 0.) | (phloem_exchange_surface <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead) | (self.props["global_sucrose_deficit"][1] > 0.) | (phloem_sucrose <= C_hexose_root / 2.), 0.,
+                        2. * phloem_permeability * (phloem_sucrose - C_hexose_root / 2.) * phloem_exchange_surface)
             
 
     @rate
-    def _hexose_active_production_from_phloem(self, length, phloem_exchange_surface, C_sucrose_root, C_hexose_root,
+    def _hexose_active_production_from_phloem(self, length, phloem_exchange_surface, phloem_sucrose, C_hexose_root,
                                                      hexose_consumption_by_growth, soil_temperature):
         
         max_unloading_rate = self.max_unloading_rate * (1 + hexose_consumption_by_growth /
@@ -643,9 +643,9 @@ class RootCarbonModel(Model):
                                                             B=self.phloem_unloading_B,
                                                             C=self.phloem_unloading_C)
         
-        return np.where((length <= 0.) | (phloem_exchange_surface <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead) | (self.props["global_sucrose_deficit"][1] > 0.) | (C_sucrose_root <= C_hexose_root / 2.), 0.,
-                        np.maximum(2. * max_unloading_rate * C_sucrose_root * phloem_exchange_surface / (
-                            self.Km_unloading + C_sucrose_root), 0))
+        return np.where((length <= 0.) | (phloem_exchange_surface <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead) | (self.props["global_sucrose_deficit"][1] > 0.) | (phloem_sucrose <= C_hexose_root / 2.), 0.,
+                        np.maximum(2. * max_unloading_rate * phloem_sucrose * phloem_exchange_surface / (
+                            self.Km_unloading + phloem_sucrose), 0))
             
     # TODO : Remove, just for output
     # @rate
@@ -771,7 +771,7 @@ class RootCarbonModel(Model):
         
 
     @rate
-    def _phloem_hexose_exudation(self, living_struct_mass, length, phloem_volume, root_exchange_surface, C_hexose_root, C_sucrose_root,
+    def _phloem_hexose_exudation(self, living_struct_mass, length, phloem_volume, root_exchange_surface, C_hexose_root, phloem_sucrose,
                                         C_hexose_soil, phloem_exchange_surface, soil_temperature):
         
         corrected_P_max_apex = (self.Pmax_apex / 10 / 8) * self.temperature_modification(
@@ -788,7 +788,7 @@ class RootCarbonModel(Model):
         corrected_permeability_coeff = corrected_P_max_apex
         # The two crossed symplasmic surfaces are accounted for in series
         return np.where((length <= 0) | (root_exchange_surface <= 0.) | (C_hexose_root <= 0.), 0.,
-                        corrected_permeability_coeff * ((2 * C_sucrose_root * living_struct_mass / phloem_volume) - C_hexose_soil) * phloem_exchange_surface)
+                        corrected_permeability_coeff * ((2 * phloem_sucrose * living_struct_mass / phloem_volume) - C_hexose_soil) * phloem_exchange_surface)
     
 
     # Uptake of hexose from the soil by the root:
@@ -829,7 +829,7 @@ class RootCarbonModel(Model):
     # ------------------
     # This function computes the rate of mucilage secretion (in mol of equivalent hexose per second) for a given root element n.
     @rate
-    def _mucilage_secretion(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_mucilage_soil, soil_temperature):
+    def _mucilage_secretion(self, length, C_hexose_root, type, distance_from_tip, radius, Cs_mucilage_soil, soil_temperature):
         
         # We correct the maximal secretion rate according to soil temperature
         # (This could to a bell-shape where the maximum is obtained at 27 degree Celsius,
@@ -841,6 +841,8 @@ class RootCarbonModel(Model):
             # the maximal concentration soil (NOTE: Cs_mucilage_soil is expressed in mol of equivalent hexose per m2 of
             # external surface):
 
+        external_root_exchange_surface = 2 * pi * radius * length
+
         corrected_secretion_rate_max = self.secretion_rate_max * self.temperature_modification(
                                                                                 soil_temperature=soil_temperature,
                                                                                 T_ref=self.secretion_rate_max_T_ref,
@@ -850,8 +852,8 @@ class RootCarbonModel(Model):
             (1 + (distance_from_tip - length / 2.) / radius) ** self.gamma_secretion) * (self.Cs_mucilage_soil_max - Cs_mucilage_soil) / self.Cs_mucilage_soil_max
         # TODO: Validate this linear decrease until reaching the max surfacic density.
 
-        return np.where((length <= 0) | (root_exchange_surface <= 0.) | (C_hexose_root <= 0.) | (type == self.type_Dead) | (type == self.type_Stopped) | (distance_from_tip < length), 0.,
-                        np.maximum(corrected_secretion_rate_max * root_exchange_surface * C_hexose_root / (self.Km_secretion + C_hexose_root), 0.))
+        return np.where((length <= 0) | (external_root_exchange_surface <= 0.) | (C_hexose_root <= 0.) | (type == self.type_Dead) | (type == self.type_Stopped) | (distance_from_tip < length), 0.,
+                        np.maximum(corrected_secretion_rate_max * external_root_exchange_surface * C_hexose_root / (self.Km_secretion + C_hexose_root), 0.))
 
     # Release of root cells:
     # ----------------------
@@ -861,6 +863,8 @@ class RootCarbonModel(Model):
     # hexose per m2) is also linearily decreasing the release of cells at the interface.
     @rate
     def _cells_release(self, length, root_exchange_surface, C_hexose_root, type, distance_from_tip, radius, Cs_cells_soil, soil_temperature):
+        
+        external_root_exchange_surface = 2 * pi * radius * length
 
         cells_surfacic_release = np.where(
             # We modify the maximal surfacic release rate according to the mean distance to the tip (in the middle of the
@@ -894,20 +898,20 @@ class RootCarbonModel(Model):
         # The release of cells by the root is then calculated according to this surface:
         # TODO: Are we sure that cells release is not dependent on C availability?
         
-        return np.where((length <= 0) | (root_exchange_surface <= 0.) | (C_hexose_root <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead) | (type == self.type_Stopped), 0.,
-                np.maximum(root_exchange_surface * corrected_cells_surfacic_release, 0.))
+        return np.where((length <= 0) | (external_root_exchange_surface <= 0.) | (C_hexose_root <= 0.) | (type == self.type_Just_dead) | (type == self.type_Dead) | (type == self.type_Stopped), 0.,
+                np.maximum(external_root_exchange_surface * corrected_cells_surfacic_release, 0.))
 
     # These methods calculate the time derivative (dQ/dt) of the amount in each pool, for a given root element, based on
     # a C balance.
         
     @state
-    def _C_sucrose_root(self, C_sucrose_root, living_struct_mass, hexose_diffusion_from_phloem,
+    def _phloem_sucrose(self, phloem_sucrose, living_struct_mass, hexose_diffusion_from_phloem,
                             hexose_active_production_from_phloem, phloem_hexose_exudation, sucrose_loading_in_phloem,
                             phloem_hexose_uptake_from_soil, deficit_sucrose_root) -> tuple[float, str, float]:
         
         # TODO as in Root-BRIDGES and for C_hexose_reserve, change the way balance is computed for Rhizodep to avoid root system balance issues
         
-        balance = C_sucrose_root + (self.time_step / living_struct_mass) * (
+        balance = phloem_sucrose + (self.time_step / living_struct_mass) * (
                 - hexose_diffusion_from_phloem / 2.
                 - hexose_active_production_from_phloem / 2.
                 - phloem_hexose_exudation / 2.
@@ -984,8 +988,8 @@ class RootCarbonModel(Model):
     
     
     @totalstate
-    def _total_sucrose_phloem(self, C_sucrose_root, living_struct_mass):
-        return sum([x * y for x, y in zip(C_sucrose_root.values(), living_struct_mass.values())])
+    def _total_sucrose_phloem(self, phloem_sucrose, living_struct_mass):
+        return sum([x * y for x, y in zip(phloem_sucrose.values(), living_struct_mass.values())])
 
 
     def check_balance(self):
@@ -1020,7 +1024,7 @@ class RootCarbonModel(Model):
     def compute_root_system_C_content(self):
         return sum([(6*labile + 12*phloem + 6*reserve)*m for labile, phloem, reserve, m in zip(
             self.props["C_hexose_root"].values(), 
-            self.props["C_sucrose_root"].values(),
+            self.props["phloem_sucrose"].values(),
             self.props["C_hexose_reserve"].values(),
             self.props["living_struct_mass"].values())])
 
@@ -1408,7 +1412,7 @@ class RootCarbonModel(Model):
     #
     #             # # We calculate the new concentration of sucrose in the root according to sucrose conversion into hexose:
     #             # sucrose_root_derivative = y_time_derivatives["sucrose_root"] * time_step
-    #             # n.C_sucrose_root = (n.C_sucrose_root * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
+    #             # n.phloem_sucrose = (n.phloem_sucrose * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
     #             #                     + sucrose_root_derivative) / (n.struct_mass + n.living_root_hairs_struct_mass)
     #             #
     #             # # We calculate the new concentration of hexose in the root cytoplasm:
@@ -1471,10 +1475,10 @@ class RootCarbonModel(Model):
     #             n.Cs_cells_soil = n.cells_soil / (n.external_surface + n.living_root_hairs_external_surface)
     #
     #             # SPECIAL CASE FOR SUCROSE:
-    #             # As sucrose pool was not included in the solver, we update C_sucrose_root based on the mean exchange rates
+    #             # As sucrose pool was not included in the solver, we update phloem_sucrose based on the mean exchange rates
     #             # calculated over the time_step.
     #             # We calculate the initial amount of sucrose in the root element:
-    #             initial_sucrose_root_amount = n.C_sucrose_root \
+    #             initial_sucrose_root_amount = n.phloem_sucrose \
     #                                           * (n.initial_struct_mass + n.initial_living_root_hairs_struct_mass)
     #             # We call again a dictionary containing the time derivative (dQ/dt) of the amount present in each pool, and
     #             # in particular sucrose, based on the balance between different rates (NOTE: the transfer of sucrose
@@ -1482,7 +1486,7 @@ class RootCarbonModel(Model):
     #             y_time_derivatives = self.calculating_time_derivatives_of_the_amount_in_each_pool(n)
     #             estimated_sucrose_root_derivative = y_time_derivatives['sucrose_root'] * time_step
     #             # Eventually, the new concentration of sucrose in the root element is calculated:
-    #             n.C_sucrose_root = (initial_sucrose_root_amount + estimated_sucrose_root_derivative) \
+    #             n.phloem_sucrose = (initial_sucrose_root_amount + estimated_sucrose_root_derivative) \
     #                                / (n.struct_mass + n.living_root_hairs_struct_mass)
     #
     #         # WITH BOTH OPTIONS, AFTER ALL PROCESSES HAVE BEEN COMPUTED:
